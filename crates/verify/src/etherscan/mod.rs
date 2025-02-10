@@ -303,9 +303,12 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<VerifyContract> {
-        // NOTE(zk): will retrieve the zksync source set if this is a zksolc
-        // verification request
-        let (source, contract_name, code_format) = self.dispatch_source_provider(args, context)?;
+        let provider = self.source_provider(args);
+        match &context {
+            CompilerVerificationContext::Solc(context) => provider.source(args, context),
+            // NOTE(zk): retrieve zksolc input instead of solc
+            CompilerVerificationContext::ZkSolc(context) => provider.zksync_source(args, context),
+        }
 
         let mut compiler_version = context.compiler_version().clone();
         compiler_version.build = match RE_BUILD_COMMIT.captures(compiler_version.build.as_str()) {
@@ -321,8 +324,8 @@ impl EtherscanVerificationProvider {
                 .constructor_arguments(constructor_args)
                 .code_format(code_format);
 
-        // NOTE(zk): add zksunc-specific items to the request
-        self.populate_verify_args_extras(context, &mut verify_args);
+        // NOTE(zk): add zksync-specific items to the request
+        self.zk_verify_args(context, &mut verify_args);
 
         if args.via_ir {
             // we explicitly set this __undocumented__ argument to true if provided by the user,
@@ -552,7 +555,7 @@ mod tests {
             "--root",
             root_path,
         ]);
-        let result = args.resolve_context().await;
+        let result = args.resolve_either_context().await;
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
@@ -579,7 +582,7 @@ Compiler run successful!
             "--root",
             &prj.root().to_string_lossy(),
         ]);
-        let context = args.resolve_context().await.unwrap();
+        let context = args.resolve_either_context().await.unwrap();
 
         let mut etherscan = EtherscanVerificationProvider::default();
         etherscan.preflight_verify_check(args, context).await.unwrap();

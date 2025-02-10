@@ -25,7 +25,7 @@ pub trait EtherscanZksyncSourceProvider {
 impl EtherscanVerificationProvider {
     /// Populates the `verify_args` request with context-specific
     /// information
-    pub(super) fn populate_verify_args_extras(
+    pub(super) fn zk_verify_args(
         &self,
         context: &CompilerVerificationContext,
         verify_args: &mut VerifyContract,
@@ -39,19 +39,6 @@ impl EtherscanVerificationProvider {
                 ("zksolcVersion".to_string(), format!("v{}", context.compiler_version.zksolc)),
             ];
             verify_args.other.extend(extras);
-        }
-    }
-
-    /// Dispatches the correct source request depending on the context
-    pub fn dispatch_source_provider(
-        &self,
-        args: &VerifyArgs,
-        context: &CompilerVerificationContext,
-    ) -> Result<(String, String, CodeFormat)> {
-        let provider = self.source_provider(args);
-        match &context {
-            CompilerVerificationContext::Solc(context) => provider.source(args, context),
-            CompilerVerificationContext::ZkSolc(context) => provider.zksync_source(args, context),
         }
     }
 }

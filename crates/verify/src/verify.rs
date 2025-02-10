@@ -210,7 +210,7 @@ impl VerifyArgs {
             None => config.chain.unwrap_or_default(),
         };
 
-        let context = self.resolve_context().await?;
+        let context = self.resolve_either_context().await?;
 
         // Set Etherscan options.
         self.etherscan.chain = Some(chain);
@@ -266,11 +266,11 @@ impl VerifyArgs {
 
     /// Resolves [VerificationContext] object either from entered contract name or by trying to
     /// match bytecode located at given address.
-    pub async fn resolve_context(&self) -> Result<CompilerVerificationContext> {
+    pub async fn resolve_either_context(&self) -> Result<CompilerVerificationContext> {
         if self.zksync {
             self.zk_resolve_context().await.map(CompilerVerificationContext::ZkSolc)
         } else {
-            self.resolve_solc_context().await.map(CompilerVerificationContext::Solc)
+            self.resolve_context().await.map(CompilerVerificationContext::Solc)
         }
     }
 
@@ -278,7 +278,7 @@ impl VerifyArgs {
     /// match bytecode located at given address.
     ///
     /// Will assume configured compiler is solc or equivalent
-    async fn resolve_solc_context(&self) -> Result<VerificationContext> {
+    async fn resolve_context(&self) -> Result<VerificationContext> {
         let mut config = self.load_config()?;
         config.libraries.extend(self.libraries.clone());
 

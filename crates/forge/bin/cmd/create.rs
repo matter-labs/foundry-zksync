@@ -262,7 +262,7 @@ impl CreateArgs {
         verify.etherscan.key =
             config.get_etherscan_config_with_chain(Some(chain.into()))?.map(|c| c.key);
 
-        let context = verify.resolve_context().await?;
+        let context = verify.resolve_either_context().await?;
 
         verify.verification_provider()?.preflight_verify_check(verify, context).await?;
         Ok(())
