@@ -18,6 +18,7 @@ mod doc;
 mod eip712;
 mod geiger;
 mod inline_config;
+mod inspect;
 mod multi_script;
 mod odyssey;
 mod script;
