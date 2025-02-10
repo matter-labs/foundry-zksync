@@ -310,7 +310,7 @@ impl EtherscanVerificationProvider {
             CompilerVerificationContext::ZkSolc(context) => {
                 // NOTE(zk): this is "source" but it really means the full
                 // compiler input, so we need a different one for zksolc
-                self.source_provider(args).zk_source(args, context)?
+                self.source_provider(args).zksync_source(args, context)?
             }
         };
 
