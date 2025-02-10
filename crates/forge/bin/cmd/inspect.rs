@@ -20,9 +20,9 @@ use foundry_compilers::{
 };
 use foundry_config::{zksync::config_create_project, Config, SolcReq};
 use regex::Regex;
+use semver::Version;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, sync::LazyLock};
-use semver::Version;
 
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]
