@@ -303,12 +303,16 @@ impl EtherscanVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<VerifyContract> {
-        let provider = self.source_provider(args);
-        match &context {
-            CompilerVerificationContext::Solc(context) => provider.source(args, context),
-            // NOTE(zk): retrieve zksolc input instead of solc
-            CompilerVerificationContext::ZkSolc(context) => provider.zksync_source(args, context),
-        }
+        let (source, contract_name, code_format) = match context {
+            CompilerVerificationContext::Solc(context) => {
+                self.source_provider(args).source(args, context)?
+            }
+            CompilerVerificationContext::ZkSolc(context) => {
+                // NOTE(zk): this is "source" but it really means the full
+                // compiler input, so we need a different one for zksolc
+                self.source_provider(args).zk_source(args, context)?
+            }
+        };
 
         let mut compiler_version = context.compiler_version().clone();
         compiler_version.build = match RE_BUILD_COMMIT.captures(compiler_version.build.as_str()) {
