@@ -19,7 +19,6 @@ use alloy_zksync::network::Zksync;
 use eyre::{Result, WrapErr};
 use foundry_config::NamedChain;
 use reqwest::Url;
-use runtime_transport::RuntimeTransport;
 use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
@@ -36,7 +35,7 @@ const DEFAULT_UNKNOWN_CHAIN_BLOCK_TIME: Duration = Duration::from_secs(3);
 const POLL_INTERVAL_BLOCK_TIME_SCALE_FACTOR: f32 = 0.6;
 
 /// Helper type alias for a retry provider
-pub type RetryProvider<N = AnyNetwork> = RootProvider<RetryBackoffService<RuntimeTransport>, N>;
+pub type RetryProvider<N = AnyNetwork> = RootProvider<N>;
 
 /// Helper type alias for a retry provider with a signer
 pub type RetryProviderWithSigner<N = AnyNetwork> = FillProvider<
@@ -53,8 +52,7 @@ pub type RetryProviderWithSigner<N = AnyNetwork> = FillProvider<
         >,
         WalletFiller<EthereumWallet>,
     >,
-    RootProvider<RetryBackoffService<RuntimeTransport>, N>,
-    RetryBackoffService<RuntimeTransport>,
+    RootProvider<N>,
     N,
 >;
 

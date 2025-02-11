@@ -177,6 +177,7 @@ impl ForgeTestProfile {
             ),
             show_metrics: false,
             timeout: None,
+            show_solidity: false,
             no_zksync_reserved_addresses: false,
         };
 

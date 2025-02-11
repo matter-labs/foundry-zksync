@@ -247,7 +247,7 @@ impl SendTxArgs {
     }
 }
 
-async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+async fn cast_send<P: Provider<AnyNetwork>>(
     provider: P,
     tx: WithOtherFields<TransactionRequest>,
     cast_async: bool,
