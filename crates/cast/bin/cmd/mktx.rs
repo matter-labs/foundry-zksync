@@ -3,6 +3,7 @@ use alloy_network::{eip2718::Encodable2718, EthereumWallet, TransactionBuilder};
 use alloy_primitives::hex;
 use alloy_signer::Signer;
 use alloy_zksync::wallet::ZksyncWallet;
+use cast::ZkTransactionOpts;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -11,8 +12,6 @@ use foundry_cli::{
 };
 use foundry_common::ens::NameOrAddress;
 use std::{path::PathBuf, str::FromStr};
-
-mod zksync;
 
 /// CLI arguments for `cast mktx`.
 #[derive(Debug, Parser)]
@@ -49,7 +48,7 @@ pub struct MakeTxArgs {
     eth: EthereumOpts,
     /// Zksync Transaction
     #[command(flatten)]
-    zk_tx: zksync::ZkTransactionOpts,
+    zk_tx: ZkTransactionOpts,
 
     /// Force a zksync eip-712 transaction and apply CREATE overrides
     #[arg(long = "zksync")]
@@ -115,7 +114,7 @@ impl MakeTxArgs {
 
         if zk_tx.has_zksync_args() || zk_force {
             let zk_wallet = ZksyncWallet::new(signer);
-            let zktx = zksync::build_tx(tx, zk_tx, &config, zkcode).await?;
+            let zktx = ZkTransactionOpts::build_tx(&zk_tx, tx, zkcode, &config).await?;
             let signed = zktx.build(&zk_wallet).await?.encoded_2718();
             sh_println!("0x{}", hex::encode(signed))?;
             return Ok(());

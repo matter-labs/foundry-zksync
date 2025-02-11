@@ -2,6 +2,7 @@ use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockId;
+use cast::zksync::ZkTransactionOpts;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -10,8 +11,6 @@ use foundry_cli::{
 };
 use foundry_common::ens::NameOrAddress;
 use std::str::FromStr;
-
-mod zksync;
 
 /// CLI arguments for `cast estimate`.
 #[derive(Debug, Parser)]
@@ -43,7 +42,7 @@ pub struct EstimateArgs {
 
     /// Zksync Transaction
     #[command(flatten)]
-    zk_tx: zksync::ZkTransactionOpts,
+    zk_tx: ZkTransactionOpts,
 
     /// Force a zksync eip-712 transaction and apply CREATE overrides
     #[arg(long = "zksync")]
@@ -112,7 +111,7 @@ impl EstimateArgs {
             .await?;
 
         let gas = if zk_tx.has_zksync_args() || zk_force {
-            zksync::estimate_gas(zk_tx, &config, tx, code).await?
+            ZkTransactionOpts::estimate_gas(&zk_tx, tx, code, &config).await?
         } else {
             provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?
         };
