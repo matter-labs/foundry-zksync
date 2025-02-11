@@ -120,7 +120,7 @@ impl CreateArgs {
         let project = config.project()?;
 
         if self.build.compiler.zk.enabled() {
-            return self.run_zksync(project).await;
+            self.run_zksync(project).await
             // NOTE(zk): we want the indent here so any change from
             // upstream causes a conflict so we replay the changes to zk-specific code
         } else {
