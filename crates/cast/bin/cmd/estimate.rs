@@ -12,8 +12,6 @@ use foundry_cli::{
 use foundry_common::ens::NameOrAddress;
 use std::str::FromStr;
 
-mod zksync;
-
 /// CLI arguments for `cast estimate`.
 #[derive(Debug, Parser)]
 pub struct EstimateArgs {

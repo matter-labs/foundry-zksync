@@ -12,6 +12,8 @@ use alloy_zksync::network::{
 };
 use clap::{command, Parser};
 use eyre::Result;
+use foundry_cli::utils;
+use foundry_config::Config;
 
 use crate::Cast;
 

@@ -13,8 +13,6 @@ use foundry_cli::{
 use foundry_common::ens::NameOrAddress;
 use std::{path::PathBuf, str::FromStr};
 
-mod zksync;
-
 /// CLI arguments for `cast mktx`.
 #[derive(Debug, Parser)]
 pub struct MakeTxArgs {
