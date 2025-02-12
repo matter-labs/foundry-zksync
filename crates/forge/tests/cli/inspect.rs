@@ -60,6 +60,6 @@ contract ContractOne {
         .stdout_lossy();
     cmd.forge_fuse();
 
-    // a ZKsync type bytecode
+    // The deployed bytecode in our case should be the same as the bytecode
     assert_eq!(out, output_bytecode);
 });

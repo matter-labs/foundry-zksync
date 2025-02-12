@@ -8,7 +8,7 @@ use foundry_compilers::{
 };
 use foundry_compilers_artifacts_solc::{
     CompactBytecode, CompactContract, CompactContractBytecode, CompactContractBytecodeCow,
-    CompactDeployedBytecode, ConfigurableContractArtifact,
+    CompactDeployedBytecode,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -124,17 +124,6 @@ impl From<ZkContractArtifact> for CompactContract {
             bin: c.bytecode.clone().map(|b| b.object()),
             bin_runtime: c.bytecode.clone().map(|b| b.object()),
             abi: c.abi,
-        }
-    }
-}
-
-impl From<ZkContractArtifact> for ConfigurableContractArtifact {
-    fn from(c: ZkContractArtifact) -> Self {
-        Self {
-            abi: c.abi,
-            bytecode: c.bytecode.clone().map(|b| b.into()),
-            deployed_bytecode: c.bytecode.clone().map(|b| b.into()),
-            ..Default::default()
         }
     }
 }

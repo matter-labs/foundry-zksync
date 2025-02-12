@@ -19,7 +19,7 @@ use foundry_compilers::{
     utils::canonicalize,
 };
 use foundry_config::{
-    zksync::{self, config_create_project},
+    zksync::{self},
     Config, SolcReq,
 };
 use regex::Regex;
@@ -137,13 +137,12 @@ impl InspectArgs {
             return Ok(())
         };
 
-        let artifact = compiler
-            .files([target_path.clone()])
-            .compile(&project)?
-            .remove(&target_path, &contract.name)
-            .ok_or_else(|| {
-                eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
-            })?;
+        let mut output = compiler.files([target_path.clone()]).compile(&project)?;
+
+        // Find the artifact
+        let artifact = output.remove(&target_path, &contract.name).ok_or_else(|| {
+            eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
+        })?;
 
         // Match on ContractArtifactFields and pretty-print
         match field {
