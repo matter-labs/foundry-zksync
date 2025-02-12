@@ -2,7 +2,7 @@ use alloy_json_abi::{EventParam, InternalType, JsonAbi, Param};
 use alloy_primitives::{hex, keccak256, Address};
 use clap::Parser;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Table};
-use core::convert::Into;
+use core::{convert::Into, result::Result::Err};
 use eyre::{Context, Result};
 use forge::revm::primitives::Eof;
 use foundry_cli::opts::{BuildOpts, CompilerOpts};
@@ -18,7 +18,10 @@ use foundry_compilers::{
     info::ContractInfo,
     utils::canonicalize,
 };
-use foundry_config::{zksync::config_create_project, Config, SolcReq};
+use foundry_config::{
+    zksync::{self, config_create_project},
+    Config, SolcReq,
+};
 use regex::Regex;
 use semver::Version;
 use serde_json::{Map, Value};
@@ -73,29 +76,74 @@ impl InspectArgs {
             project.find_contract_path(&contract.name)?
         };
 
-        let artifact = if modified_build_args.compiler.zk.enabled() {
+        let fields_zksolc_specific_behavior = vec![
+            ContractArtifactField::Abi,
+            ContractArtifactField::Bytecode,
+            ContractArtifactField::DeployedBytecode,
+        ];
+
+        // GasEstimates , StorageLayout, Metadata, Eof, EofInit
+        let fields_zksolc_unimplemented_warn = vec![
+            ContractArtifactField::GasEstimates,
+            ContractArtifactField::StorageLayout,
+            ContractArtifactField::Metadata,
+            ContractArtifactField::Eof,
+            ContractArtifactField::EofInit,
+        ];
+
+        // Assembly, LegacyAssembly , Ir, IrOptmized, Ewasm
+        let fields_zksolc_should_error = vec![
+            ContractArtifactField::Assembly,
+            ContractArtifactField::AssemblyOptimized,
+            ContractArtifactField::LegacyAssembly,
+            ContractArtifactField::Ir,
+            ContractArtifactField::IrOptimized,
+            ContractArtifactField::Ewasm,
+        ];
+
+        // NOTE(zk): ZKsync version of inspect does not support all fields
+        if modified_build_args.compiler.zk.enabled() && fields_zksolc_should_error.contains(&field)
+        {
+            return Err(eyre::eyre!("ZKsync version of inspect does not support this field"))
+        } else if modified_build_args.compiler.zk.enabled() &&
+            fields_zksolc_unimplemented_warn.contains(&field)
+        {
+            warn!("This field has not been implemented for zksolc yet, so defaulting to solc implementation")
+        } else if modified_build_args.compiler.zk.enabled() &&
+            fields_zksolc_specific_behavior.contains(&field)
+        {
             let config = Config {
                 solc: Some(SolcReq::Version(Version::new(0, 8, 26))),
                 ..Default::default()
             };
-            let project = config_create_project(&config, false, true).unwrap();
-            compiler
+            let project = zksync::config_create_project(&config, false, true).unwrap();
+            let artifact = compiler
                 .files([target_path.clone()])
                 .zksync_compile(&project)?
                 .remove(&target_path, &contract.name)
                 .ok_or_else(|| {
                     eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
-                })?
-                .into()
-        } else {
-            compiler
-                .files([target_path.clone()])
-                .compile(&project)?
-                .remove(&target_path, &contract.name)
-                .ok_or_else(|| {
-                    eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
-                })?
+                })?;
+
+            // NOTE(zk) this list will grow with more implementations along we actually implement
+            // them. So far we have just this ones, but we have to eventually end up
+            // with an empty array in fields_zksolc_unimplemented_warn
+            if field == ContractArtifactField::DeployedBytecode {
+                print_json_str(&artifact.bytecode, Some("object"))?;
+            } else if field == ContractArtifactField::Bytecode {
+                print_json_str(&artifact.bytecode, Some("object"))?;
+            }
+
+            return Ok(())
         };
+
+        let artifact = compiler
+            .files([target_path.clone()])
+            .compile(&project)?
+            .remove(&target_path, &contract.name)
+            .ok_or_else(|| {
+                eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
+            })?;
 
         // Match on ContractArtifactFields and pretty-print
         match field {
@@ -160,17 +208,6 @@ impl InspectArgs {
                 print_eof(artifact.bytecode)?;
             }
         };
-
-        if modified_build_args.compiler.zk.enabled() {
-            if !matches!(
-                field,
-                ContractArtifactField::Abi |
-                    ContractArtifactField::Bytecode |
-                    ContractArtifactField::DeployedBytecode
-            ) {
-                warn!(target: "forge", "ZKsync version of inspect does not support this field");
-            }
-        }
 
         Ok(())
     }
