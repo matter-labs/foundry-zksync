@@ -76,8 +76,8 @@ impl InspectArgs {
         };
 
         // NOTE(zk) Fields that should have specific behavior for zksolc
-        // TODO: we shold migrate all fields from fields_zksolc_unimplemented_warn to this array and
-        // eventually
+        // TODO: we should migrate all fields from fields_zksolc_unimplemented_warn to this array
+        // and eventually
         let fields_zksolc_specific_behavior = vec![
             ContractArtifactField::Abi,
             ContractArtifactField::Bytecode,
