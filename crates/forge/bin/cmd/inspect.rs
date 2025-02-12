@@ -20,10 +20,9 @@ use foundry_compilers::{
 };
 use foundry_config::{
     zksync::{self},
-    Config, SolcReq,
+    Config,
 };
 use regex::Regex;
-use semver::Version;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, sync::LazyLock};
 
@@ -112,10 +111,7 @@ impl InspectArgs {
         } else if modified_build_args.compiler.zk.enabled() &&
             fields_zksolc_specific_behavior.contains(&field)
         {
-            let config = Config {
-                solc: Some(SolcReq::Version(Version::new(0, 8, 26))),
-                ..Default::default()
-            };
+            let config = Config { ..Default::default() };
             let project = zksync::config_create_project(&config, false, true).unwrap();
             let artifact = compiler
                 .files([target_path.clone()])
