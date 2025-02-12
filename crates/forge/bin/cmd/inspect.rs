@@ -75,13 +75,15 @@ impl InspectArgs {
             project.find_contract_path(&contract.name)?
         };
 
+        // NOTE(zk) Fields that should have specific behavior for zksolc
+        // TODO: we shold migrate all fields from fields_zksolc_unimplemented_warn to this array and
+        // eventually
         let fields_zksolc_specific_behavior = vec![
             ContractArtifactField::Abi,
             ContractArtifactField::Bytecode,
             ContractArtifactField::DeployedBytecode,
         ];
 
-        // GasEstimates , StorageLayout, Metadata, Eof, EofInit
         let fields_zksolc_unimplemented_warn = vec![
             ContractArtifactField::GasEstimates,
             ContractArtifactField::StorageLayout,
@@ -90,7 +92,7 @@ impl InspectArgs {
             ContractArtifactField::EofInit,
         ];
 
-        // Assembly, LegacyAssembly , Ir, IrOptmized, Ewasm
+        // We should not try to implement zk behavior for this
         let fields_zksolc_should_error = vec![
             ContractArtifactField::Assembly,
             ContractArtifactField::AssemblyOptimized,
@@ -124,9 +126,15 @@ impl InspectArgs {
             // NOTE(zk) this list will grow with more implementations along we actually implement
             // them. So far we have just this ones, but we have to eventually end up
             // with an empty array in fields_zksolc_unimplemented_warn
-            if field == ContractArtifactField::DeployedBytecode {
-                print_json_str(&artifact.bytecode, Some("object"))?;
+            if field == ContractArtifactField::Abi {
+                let abi = artifact
+                    .abi
+                    .as_ref()
+                    .ok_or_else(|| eyre::eyre!("Failed to fetch lossless ABI"))?;
+                print_abi(abi)?;
             } else if field == ContractArtifactField::Bytecode {
+                print_json_str(&artifact.bytecode, Some("object"))?;
+            } else if field == ContractArtifactField::DeployedBytecode {
                 print_json_str(&artifact.bytecode, Some("object"))?;
             }
 

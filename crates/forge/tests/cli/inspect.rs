@@ -70,4 +70,12 @@ contract ContractOne {
 
     // The deployed bytecode in our case should be the same as the bytecode
     assert_eq!(out_zk_bytecode, out_deployedbytecode);
+
+    // Throw an error when trying to inspect the assembly field
+    cmd.arg("inspect")
+        .arg("ContractOne")
+        .arg("assembly")
+        .arg("--zksync")
+        .assert_failure()
+        .stderr_eq("Error: ZKsync version of inspect does not support this field\n");
 });
