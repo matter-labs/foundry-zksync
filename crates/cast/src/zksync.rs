@@ -138,4 +138,58 @@ where
 
         Ok(res)
     }
+
+    pub async fn call_zk(
+        &self,
+        req: &ZkTransactionRequest,
+        func: Option<&Function>,
+        block: Option<BlockId>,
+    ) -> Result<String> {
+        let res = self.provider.call(req).block(block.unwrap_or_default()).await?;
+
+        let mut decoded = vec![];
+
+        if let Some(func) = func {
+            // decode args into tokens
+            decoded = match func.abi_decode_output(res.as_ref(), false) {
+                Ok(decoded) => decoded,
+                Err(err) => {
+                    // ensure the address is a contract
+                    if res.is_empty() {
+                        // check that the recipient is a contract that can be called
+                        if let Some(TxKind::Call(addr)) = req.to {
+                            if let Ok(code) = self
+                                .provider
+                                .get_code_at(addr)
+                                .block_id(block.unwrap_or_default())
+                                .await
+                            {
+                                if code.is_empty() {
+                                    eyre::bail!("contract {addr:?} does not have any code")
+                                }
+                            }
+                        } else if Some(TxKind::Create) == req.to {
+                            eyre::bail!("tx req is a contract deployment");
+                        } else {
+                            eyre::bail!("recipient is None");
+                        }
+                    }
+                    return Err(err).wrap_err(
+                        "could not decode output; did you specify the wrong function return data type?"
+                    );
+                }
+            };
+        }
+
+        // handle case when return type is not specified
+        Ok(if decoded.is_empty() {
+            res.to_string()
+        } else if shell::is_json() {
+            let tokens = decoded.iter().map(format_token_raw).collect::<Vec<_>>();
+            serde_json::to_string_pretty(&tokens).unwrap()
+        } else {
+            // seth compatible user-friendly return type conversions
+            decoded.iter().map(format_token).collect::<Vec<_>>().join("\n")
+        })
+    }
 }
