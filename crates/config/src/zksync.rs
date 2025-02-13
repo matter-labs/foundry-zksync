@@ -20,8 +20,8 @@ use foundry_zksync_compilers::{
     },
 };
 use semver::Version;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, path::PathBuf};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
 use crate::{Config, SkipBuildFilters, SolcReq};
 
@@ -73,10 +73,10 @@ pub struct ZkSyncConfig {
     /// zkSolc optimizer details
     pub optimizer_details: Option<OptimizerDetails>,
 
-    // zksolc suppressed warnings.
+    #[serde(deserialize_with = "deserialize_warning_set")]
     pub suppressed_warnings: HashSet<WarningType>,
 
-    // zksolc suppressed errors.
+    #[serde(deserialize_with = "deserialize_error_set")]
     pub suppressed_errors: HashSet<ErrorType>,
 }
 
@@ -121,6 +121,8 @@ impl ZkSyncConfig {
         via_ir: bool,
         offline: bool,
     ) -> Result<ZkSolcSettings, SolcError> {
+        info!("Parsing settings for zksync");
+        info!("self: {:?}", self);
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
@@ -332,6 +334,40 @@ pub fn config_ensure_zksolc(
     }
 
     Ok(None)
+}
+
+fn deserialize_warning_set<'de, D>(deserializer: D) -> Result<HashSet<WarningType>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let strings: Vec<String> = Vec::deserialize(deserializer)?;
+    Ok(strings
+        .into_iter()
+        .filter_map(|s| match WarningType::from_str(&s) {
+            Ok(warning) => Some(warning),
+            Err(e) => {
+                error!("Failed to parse warning type: '{}' with error: {}", s, e);
+                None
+            }
+        })
+        .collect())
+}
+
+fn deserialize_error_set<'de, D>(deserializer: D) -> Result<HashSet<ErrorType>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let strings: Vec<String> = Vec::deserialize(deserializer)?;
+    Ok(strings
+        .into_iter()
+        .filter_map(|s| match ErrorType::from_str(&s) {
+            Ok(error) => Some(error),
+            Err(e) => {
+                error!("Failed to parse error type: '{}' with error: {}", s, e);
+                None
+            }
+        })
+        .collect())
 }
 
 #[cfg(test)]
