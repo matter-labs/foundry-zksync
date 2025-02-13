@@ -1,4 +1,4 @@
-//! Contains various tests for checking configuration
+//! Contains tests for checking configuration for zksync
 
 use std::fs;
 
@@ -6,7 +6,7 @@ use foundry_test_utils::util::OutputExt;
 
 // test to check that the config is not skipped when using the wrong settings in the foundry.toml
 // and emits the correct warnings
-forgetest!(foundry_toml_config_error_does_not_skip_correct_settings, |prj, cmd| {
+forgetest!(test_zk_foundry_toml_config_error_does_not_skip_correct_settings, |prj, cmd| {
     let faulty_toml = r"
     [profile.default]
     src = 'src'
