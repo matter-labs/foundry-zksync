@@ -8,7 +8,7 @@ use alloy_signer::Signer;
 use alloy_transport::Transport;
 use alloy_zksync::{network::Zksync, wallet::ZksyncWallet};
 use cast::{Cast, ZkTransactionOpts};
-use clap::{builder::ArgPredicate, Parser};
+use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
@@ -19,22 +19,6 @@ use foundry_common::ens::NameOrAddress;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 
 mod zksync;
-/// ZkSync-specific paymaster parameters for transactions
-#[derive(Debug, Parser)]
-pub struct ZksyncParams {
-    /// Use ZKSync
-    #[arg(long, default_value_ifs([("paymaster_address", ArgPredicate::IsPresent, "true"),("paymaster_input", ArgPredicate::IsPresent, "true")]))]
-    zksync: bool,
-
-    /// The paymaster address for the ZKSync transaction
-    #[arg(long = "zk-paymaster-address", requires = "paymaster_input")]
-    paymaster_address: Option<String>,
-
-    /// The paymaster input for the ZKSync transaction
-    #[arg(long = "zk-paymaster-input", requires = "paymaster_address")]
-    paymaster_input: Option<String>,
-}
-
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
 pub struct SendTxArgs {
