@@ -73,9 +73,11 @@ pub struct ZkSyncConfig {
     /// zkSolc optimizer details
     pub optimizer_details: Option<OptimizerDetails>,
 
+    // zksolc suppressed warnings.
     #[serde(deserialize_with = "deserialize_warning_set")]
     pub suppressed_warnings: HashSet<WarningType>,
 
+    // zksolc suppressed errors.
     #[serde(deserialize_with = "deserialize_error_set")]
     pub suppressed_errors: HashSet<ErrorType>,
 }
@@ -121,8 +123,6 @@ impl ZkSyncConfig {
         via_ir: bool,
         offline: bool,
     ) -> Result<ZkSolcSettings, SolcError> {
-        info!("Parsing settings for zksync");
-        info!("self: {:?}", self);
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
