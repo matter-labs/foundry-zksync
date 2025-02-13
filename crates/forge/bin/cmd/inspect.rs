@@ -75,14 +75,12 @@ impl InspectArgs {
             project.find_contract_path(&contract.name)?
         };
 
-        // NOTE(zk) Fields that should have specific behavior for zksolc
-        // TODO: we should migrate all fields from fields_zksolc_unimplemented_warn to this array
-        // and eventually
-        let fields_zksolc_specific_behavior = vec![
-            ContractArtifactField::Abi,
-            ContractArtifactField::Bytecode,
-            ContractArtifactField::DeployedBytecode,
-        ];
+        // NOTE(zk): Fields that should have specific behavior for zksolc
+        // TODO(zk): we should eventually migrate all fields from fields_zksolc_unimplemented_warn
+        // to this array
+
+        let fields_zksolc_specific_behavior =
+            vec![ContractArtifactField::Bytecode, ContractArtifactField::DeployedBytecode];
 
         let fields_zksolc_unimplemented_warn = vec![
             ContractArtifactField::GasEstimates,
@@ -106,10 +104,11 @@ impl InspectArgs {
         if modified_build_args.compiler.zk.enabled() && fields_zksolc_should_error.contains(&field)
         {
             return Err(eyre::eyre!("ZKsync version of inspect does not support this field"))
-        } else if modified_build_args.compiler.zk.enabled() &&
+        }
+        if modified_build_args.compiler.zk.enabled() &&
             fields_zksolc_unimplemented_warn.contains(&field)
         {
-            warn!("This field has not been implemented for zksolc yet, so defaulting to solc implementation")
+            return Err(eyre::eyre!("This field has not been implemented for zksolc yet, so defaulting to solc implementation"))
         } else if modified_build_args.compiler.zk.enabled() &&
             fields_zksolc_specific_behavior.contains(&field)
         {
@@ -123,16 +122,10 @@ impl InspectArgs {
                     eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
                 })?;
 
-            // NOTE(zk) this list will grow with more implementations along we actually implement
+            // NOTE(zk): this list will grow with more implementations along we actually implement
             // them. So far we have just this ones, but we have to eventually end up
             // with an empty array in fields_zksolc_unimplemented_warn
-            if field == ContractArtifactField::Abi {
-                let abi = artifact
-                    .abi
-                    .as_ref()
-                    .ok_or_else(|| eyre::eyre!("Failed to fetch lossless ABI"))?;
-                print_abi(abi)?;
-            } else if field == ContractArtifactField::Bytecode {
+            if field == ContractArtifactField::Bytecode {
                 print_json_str(&artifact.bytecode, Some("object"))?;
             } else if field == ContractArtifactField::DeployedBytecode {
                 print_json_str(&artifact.bytecode, Some("object"))?;
