@@ -18,13 +18,12 @@ use foundry_compilers::{
     info::ContractInfo,
     utils::canonicalize,
 };
-use foundry_config::{
-    zksync::{self},
-    Config,
-};
+use foundry_config::{self, Config};
 use regex::Regex;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, sync::LazyLock};
+
+use crate::cmd::zksolc;
 
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]
@@ -79,60 +78,13 @@ impl InspectArgs {
         // TODO(zk): we should eventually migrate all fields from fields_zksolc_unimplemented_warn
         // to this array
 
-        let fields_zksolc_specific_behavior =
-            vec![ContractArtifactField::Bytecode, ContractArtifactField::DeployedBytecode];
-
-        let fields_zksolc_unimplemented_warn = vec![
-            ContractArtifactField::GasEstimates,
-            ContractArtifactField::StorageLayout,
-            ContractArtifactField::Metadata,
-            ContractArtifactField::Eof,
-            ContractArtifactField::EofInit,
-        ];
-
-        // We should not try to implement zk behavior for this
-        let fields_zksolc_should_error = vec![
-            ContractArtifactField::Assembly,
-            ContractArtifactField::AssemblyOptimized,
-            ContractArtifactField::LegacyAssembly,
-            ContractArtifactField::Ir,
-            ContractArtifactField::IrOptimized,
-            ContractArtifactField::Ewasm,
-        ];
-
-        // NOTE(zk): ZKsync version of inspect does not support all fields
-        if modified_build_args.compiler.zk.enabled() && fields_zksolc_should_error.contains(&field)
-        {
-            return Err(eyre::eyre!("ZKsync version of inspect does not support this field"))
-        }
-        if modified_build_args.compiler.zk.enabled() &&
-            fields_zksolc_unimplemented_warn.contains(&field)
-        {
-            return Err(eyre::eyre!("This field has not been implemented for zksolc yet, so defaulting to solc implementation"))
-        } else if modified_build_args.compiler.zk.enabled() &&
-            fields_zksolc_specific_behavior.contains(&field)
-        {
-            let config = Config { ..Default::default() };
-            let project = zksync::config_create_project(&config, false, true).unwrap();
-            let artifact = compiler
-                .files([target_path.clone()])
-                .zksync_compile(&project)?
-                .remove(&target_path, &contract.name)
-                .ok_or_else(|| {
-                    eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
-                })?;
-
-            // NOTE(zk): this list will grow with more implementations along we actually implement
-            // them. So far we have just this ones, but we have to eventually end up
-            // with an empty array in fields_zksolc_unimplemented_warn
-            if field == ContractArtifactField::Bytecode {
-                print_json_str(&artifact.bytecode, Some("object"))?;
-            } else if field == ContractArtifactField::DeployedBytecode {
-                print_json_str(&artifact.bytecode, Some("object"))?;
+        if modified_build_args.compiler.zk.enabled() {
+            let should_compile_with_zksolc = zksolc::check_command_for_field(&field)?;
+            if should_compile_with_zksolc {
+                let config = Config { ..Default::default() };
+                return zksolc::inspect(&field, config, target_path, &contract.name);
             }
-
-            return Ok(())
-        };
+        }
 
         let mut output = compiler.files([target_path.clone()]).compile(&project)?;
 
@@ -596,7 +548,7 @@ fn print_json(obj: &impl serde::Serialize) -> Result<()> {
     Ok(())
 }
 
-fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<()> {
+pub(crate) fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<()> {
     sh_println!("{}", get_json_str(obj, key)?)?;
     Ok(())
 }
