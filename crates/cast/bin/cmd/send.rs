@@ -5,7 +5,6 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
-use alloy_transport::Transport;
 use alloy_zksync::{
     network::{
         transaction_request::TransactionRequest as ZkTransactionRequest,
@@ -262,7 +261,7 @@ async fn cast_send<P: Provider<AnyNetwork>>(
     handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
 }
 
-async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Transport + Clone>(
+async fn cast_send_zk<P: Provider<AnyNetwork>, Z: ZksyncProvider>(
     provider: P,
     zk_provider: Z,
     mut tx: WithOtherFields<TransactionRequest>,
@@ -296,8 +295,8 @@ async fn cast_send_zk<P: Provider<T, AnyNetwork>, Z: ZksyncProvider<T>, T: Trans
     handle_transaction_result(cast.as_ref(), tx_hash, cast_async, confs, timeout).await
 }
 
-async fn handle_transaction_result<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
-    cast: &Cast<P, T>,
+async fn handle_transaction_result<P: Provider<AnyNetwork>>(
+    cast: &Cast<P>,
     tx_hash: &TxHash,
     cast_async: bool,
     confs: u64,
