@@ -288,7 +288,7 @@ impl MockedCalls {
 
         for (call, call_return_data) in self.with_value.iter().chain(self.without_value.iter()) {
             if call.address == code_address {
-                let value_matches = call.value.map_or(true, |value| value == actual_value);
+                let value_matches = call.value.is_none_or(|value| value == actual_value);
                 if !value_matches {
                     continue;
                 }
