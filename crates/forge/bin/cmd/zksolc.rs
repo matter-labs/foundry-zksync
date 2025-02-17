@@ -7,6 +7,9 @@ use super::inspect::ContractArtifactField;
 use crate::cmd::inspect::print_json_str;
 
 pub fn check_command_for_field(field: &ContractArtifactField) -> Result<bool> {
+    // NOTE(zk): Fields that should have specific behavior for zksolc
+    // TODO(zk): we should eventually migrate all fields from fields_zksolc_unimplemented_warn
+    // to this array
     let fields_zksolc_specific_behavior =
         vec![ContractArtifactField::Bytecode, ContractArtifactField::DeployedBytecode];
 
