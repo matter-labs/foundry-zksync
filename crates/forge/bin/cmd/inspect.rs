@@ -545,8 +545,7 @@ fn print_json(obj: &impl serde::Serialize) -> Result<()> {
     Ok(())
 }
 
-// NOTE(zk): This is a macro defined in upstream code that is used to print a JSON string. 
-// we needed to make it public so that we can use it in a separate file (zksolc).
+// NOTE(zk): we make this public so that we can use it in `zksolc` module.
 pub(crate) fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<()> {
     sh_println!("{}", get_json_str(obj, key)?)?;
     Ok(())
