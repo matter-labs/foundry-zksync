@@ -74,7 +74,6 @@ impl InspectArgs {
             project.find_contract_path(&contract.name)?
         };
 
-
         if modified_build_args.compiler.zk.enabled() {
             let should_compile_with_zksolc = zksolc::check_command_for_field(&field)?;
             if should_compile_with_zksolc {
