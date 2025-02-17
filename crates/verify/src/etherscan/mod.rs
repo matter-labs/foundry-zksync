@@ -514,7 +514,6 @@ async fn ensure_solc_build_metadata(version: Version) -> Result<Version> {
 }
 
 #[cfg(test)]
-#[allow(clippy::needless_return)]
 mod tests {
     use super::*;
     use clap::Parser;
