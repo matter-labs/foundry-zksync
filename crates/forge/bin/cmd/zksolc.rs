@@ -11,9 +11,9 @@ pub fn check_command_for_field(field: &ContractArtifactField) -> Result<bool> {
     // TODO(zk): we should eventually migrate all fields from fields_zksolc_unimplemented_warn
     // to this array
     let fields_zksolc_specific_behavior =
-        vec![ContractArtifactField::Bytecode, ContractArtifactField::DeployedBytecode];
+        [ContractArtifactField::Bytecode, ContractArtifactField::DeployedBytecode];
 
-    let fields_zksolc_unimplemented_warn = vec![
+    let fields_zksolc_unimplemented_warn = [
         ContractArtifactField::GasEstimates,
         ContractArtifactField::StorageLayout,
         ContractArtifactField::Metadata,
@@ -21,7 +21,7 @@ pub fn check_command_for_field(field: &ContractArtifactField) -> Result<bool> {
         ContractArtifactField::EofInit,
     ];
 
-    let fields_zksolc_should_error = vec![
+    let fields_zksolc_should_error = [
         ContractArtifactField::Assembly,
         ContractArtifactField::AssemblyOptimized,
         ContractArtifactField::LegacyAssembly,
@@ -59,9 +59,7 @@ pub fn inspect(
             eyre::eyre!("Could not find artifact `{}` in the compiled artifacts", contract_name)
         })?;
 
-    if *field == ContractArtifactField::Bytecode {
-        print_json_str(&artifact.bytecode, Some("object"))?;
-    } else if *field == ContractArtifactField::DeployedBytecode {
+    if matches!(field, ContractArtifactField::Bytecode | ContractArtifactField::DeployedBytecode) {
         print_json_str(&artifact.bytecode, Some("object"))?;
     }
 
