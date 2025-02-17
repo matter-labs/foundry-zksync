@@ -339,6 +339,7 @@ where
         }
 
         if !fill {
+            self.tx.nonce = Some(tx_nonce);
             return Ok((self.tx, self.state.func));
         }
 
@@ -370,6 +371,7 @@ where
             self.tx.gas = Some(self.provider.estimate_gas(&self.tx).await?);
         }
 
+        self.tx.nonce = Some(tx_nonce);
         Ok((self.tx, self.state.func))
     }
 
