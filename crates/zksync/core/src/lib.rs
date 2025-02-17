@@ -1,7 +1,7 @@
 //! # foundry-zksync
 //!
 //! Main Foundry ZKSync implementation.
-#![warn(missing_docs, unused_crate_dependencies)]
+#![warn(missing_docs)]
 
 /// Contains cheatcode implementations.
 pub mod cheatcodes;
