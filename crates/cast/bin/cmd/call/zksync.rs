@@ -1,13 +1,9 @@
 use alloy_json_abi::Function;
-use alloy_network::TransactionBuilder;
 use alloy_primitives::{TxKind, U256};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolCall;
-use alloy_zksync::{
-    network::transaction_request::TransactionRequest as ZkTransactionRequest,
-    provider::ZksyncProvider,
-};
+use alloy_zksync::network::transaction_request::TransactionRequest as ZkTransactionRequest;
 use cast::ZkTransactionOpts;
 use eyre::Result;
 use foundry_cli::utils;
@@ -20,7 +16,6 @@ pub async fn convert_tx(
     zk_code: Option<String>,
     config: &Config,
 ) -> Result<ZkTransactionRequest> {
-    let zk_provider = utils::get_provider_zksync(config)?;
     let mut tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
 
     // NOTE(zk): here we are doing a `call` so the fee doesn't matter
