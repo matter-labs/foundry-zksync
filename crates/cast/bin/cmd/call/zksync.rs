@@ -5,7 +5,8 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolCall;
 use alloy_zksync::{
-    network::transaction_request::TransactionRequest as ZkTransactionRequest, provider::ZksyncProvider
+    network::transaction_request::TransactionRequest as ZkTransactionRequest,
+    provider::ZksyncProvider,
 };
 use cast::ZkTransactionOpts;
 use eyre::Result;
@@ -40,8 +41,9 @@ pub fn convert_func(tx: &WithOtherFields<TransactionRequest>, func: Function) ->
     // if we are deploying we should return the "create" function
     // instead of the original which may be the constructor
     if tx.to == Some(TxKind::Create) {
-        Function::parse(alloy_zksync::contracts::l2::contract_deployer::createCall::SIGNATURE).map_err(Into::into)}
-    else {
+        Function::parse(alloy_zksync::contracts::l2::contract_deployer::createCall::SIGNATURE)
+            .map_err(Into::into)
+    } else {
         Ok(func)
     }
 }

@@ -14,7 +14,10 @@ use alloy_zksync::network::{
 };
 use clap::{command, Parser};
 use eyre::{Context, Result};
-use foundry_common::{fmt::{format_token, format_token_raw}, shell};
+use foundry_common::{
+    fmt::{format_token, format_token_raw},
+    shell,
+};
 
 use crate::Cast;
 
