@@ -317,3 +317,36 @@ casttest!(test_zk_cast_call, async |_prj, cmd| {
 
 "#]]);
 });
+
+casttest!(test_zk_cast_call_create, async |_prj, cmd| {
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    cmd.cast_fuse()
+        .args(["call", "--rpc-url", &url, "--zksync", "--create", COUNTER_BYTECODE])
+        .assert_success()
+        .stdout_eq(str![[r#"
+0x000000000000000000000000f78d915dd63894ab9b78130a176bd372cce176c0
+
+"#]]);
+
+    // NOTE: we have the same output address because the state change
+    // is never propagated so the nonce remains the same
+
+    cmd.cast_fuse()
+        .args([
+            "call",
+            "--rpc-url",
+            &url,
+            "--zksync",
+            "--create",
+            EMPTY_CONTRACT_WITH_CONSTRUCTOR_BYTECODE,
+            "constructor(uint256)",
+            "1",
+        ])
+        .assert_success()
+        .stdout_eq(str![[r#"
+0x000000000000000000000000f78d915dd63894ab9b78130a176bd372cce176c0
+
+"#]]);
+});
