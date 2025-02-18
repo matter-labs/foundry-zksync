@@ -6,7 +6,6 @@ use alloy_sol_types::SolCall;
 use alloy_zksync::network::transaction_request::TransactionRequest as ZkTransactionRequest;
 use cast::ZkTransactionOpts;
 use eyre::Result;
-use foundry_config::Config;
 
 /// Converts the given tx request to be a full ZkSync transaction request with fee estimation
 pub async fn convert_tx(
