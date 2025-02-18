@@ -35,6 +35,7 @@ pub struct Cast {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)]
 pub enum CastSubcommand {
     /// Prints the maximum value of the given integer type.
     #[command(visible_aliases = &["--max-int", "maxi"])]

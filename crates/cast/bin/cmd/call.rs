@@ -261,7 +261,7 @@ impl CallArgs {
             // or `create` in case of deployment
             // as the original evm func would be the constructor
             let func = func.map(|func| zksync::convert_func(&tx, func)).transpose()?;
-            let zk_tx = zksync::convert_tx(tx, zk_tx, zkcode, &config).await?;
+            let zk_tx = zksync::convert_tx(tx, zk_tx, zkcode).await?;
 
             let cast = Cast::new(provider);
             let zk_cast = ZkCast::new(utils::get_provider_zksync(&config)?, cast);
