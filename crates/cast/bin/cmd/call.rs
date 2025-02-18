@@ -195,7 +195,7 @@ impl CallArgs {
             .await?;
 
         // TODO(zk): add --trace support
-        if trace && !is_zk {
+        if trace {
             if let Some(BlockId::Number(BlockNumberOrTag::Number(block_number))) = self.block {
                 // Override Config `fork_block_number` (if set) with CLI value.
                 config.fork_block_number = Some(block_number);
