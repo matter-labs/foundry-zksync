@@ -130,7 +130,7 @@ impl CallArgs {
         let figment = Into::<Figment>::into(&self.eth).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
 
-        let is_zk = self.zk_tx.has_zksync_args() || zk_force;
+        let is_zk = self.zk_tx.has_zksync_args() || self.zk_force;
 
         let mut config = Config::from_provider(figment)?.sanitized();
         config.zksync.compile = is_zk;
@@ -152,7 +152,7 @@ impl CallArgs {
             labels,
             data,
             with_local_artifacts,
-            zk_tx, zk_force,
+            zk_tx,
             ..
         } = self;
 
@@ -195,7 +195,7 @@ impl CallArgs {
             .await?;
 
         // TODO(zk): add --trace support
-        if trace {
+        if trace && !is_zk {
             if let Some(BlockId::Number(BlockNumberOrTag::Number(block_number))) = self.block {
                 // Override Config `fork_block_number` (if set) with CLI value.
                 config.fork_block_number = Some(block_number);
@@ -260,13 +260,13 @@ impl CallArgs {
             // ensure we are calling either the target func
             // or `create` in case of deployment
             // as the original evm func would be the constructor
-            let func = zksync::convert_func(&tx, func)?;
+            let func = func.map(|func| zksync::convert_func(&tx, func)).transpose()?;
             let zk_tx = zksync::convert_tx(tx, zk_tx, zkcode, &config).await?;
 
             let cast = Cast::new(provider);
             let zk_cast = ZkCast::new(utils::get_provider_zksync(&config)?, cast);
 
-            sh_println!("{}", zk_cast.call_zk(&tx, func.as_ref(), block).await?)?;
+            sh_println!("{}", zk_cast.call_zk(&zk_tx, func.as_ref(), block).await?)?;
         } else {
             sh_println!("{}", Cast::new(provider).call(&tx, func.as_ref(), block).await?)?;
         }

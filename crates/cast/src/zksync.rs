@@ -1,9 +1,11 @@
 //! Contains zksync specific logic for foundry's `cast` functionality
 
+use alloy_dyn_abi::FunctionExt;
+use alloy_json_abi::Function;
 use alloy_network::{AnyNetwork, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
-use alloy_rpc_types::TransactionRequest;
+use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_transport::Transport;
 use alloy_zksync::network::{
@@ -11,7 +13,8 @@ use alloy_zksync::network::{
     unsigned_tx::eip712::PaymasterParams, Zksync,
 };
 use clap::{command, Parser};
-use eyre::Result;
+use eyre::{Context, Result};
+use foundry_common::{fmt::{format_token, format_token_raw}, shell};
 
 use crate::Cast;
 
@@ -157,7 +160,7 @@ where
                     // ensure the address is a contract
                     if res.is_empty() {
                         // check that the recipient is a contract that can be called
-                        if let Some(TxKind::Call(addr)) = req.to {
+                        if let Some(TxKind::Call(addr)) = req.kind() {
                             if let Ok(code) = self
                                 .provider
                                 .get_code_at(addr)
@@ -168,7 +171,7 @@ where
                                     eyre::bail!("contract {addr:?} does not have any code")
                                 }
                             }
-                        } else if Some(TxKind::Create) == req.to {
+                        } else if Some(TxKind::Create) == req.kind() {
                             eyre::bail!("tx req is a contract deployment");
                         } else {
                             eyre::bail!("recipient is None");

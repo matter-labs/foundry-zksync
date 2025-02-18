@@ -1,12 +1,13 @@
 use alloy_json_abi::Function;
 use alloy_network::TransactionBuilder;
+use alloy_primitives::{TxKind, U256};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolCall;
 use alloy_zksync::{
-    contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS, network::transaction_request::TransactionRequest as ZkTransactionRequest, provider::ZksyncProvider
+    network::transaction_request::TransactionRequest as ZkTransactionRequest, provider::ZksyncProvider
 };
-use cast::{ZkCast, ZkTransactionOpts};
+use cast::ZkTransactionOpts;
 use eyre::Result;
 use foundry_cli::utils;
 use foundry_config::Config;
@@ -30,11 +31,11 @@ pub async fn convert_tx(
 }
 
 /// Retrieve the appropriate function given the transaction options
-pub async fn convert_func(tx: &WithOtherFields<TransactionRequest>, func: Function) -> Result<Function> {
+pub fn convert_func(tx: &WithOtherFields<TransactionRequest>, func: Function) -> Result<Function> {
     // if we are deploying we should return the "create" function
     // instead of the original which may be the constructor
     if tx.to == Some(TxKind::Create) {
-        Function::parse(alloy_zksync::contracts::l2::contract_deployer::createCall::SIGNATURE)}
+        Function::parse(alloy_zksync::contracts::l2::contract_deployer::createCall::SIGNATURE).map_err(Into::into)}
     else {
         Ok(func)
     }
