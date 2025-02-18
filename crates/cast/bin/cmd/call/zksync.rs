@@ -22,7 +22,12 @@ pub async fn convert_tx(
     let zk_provider = utils::get_provider_zksync(config)?;
     let mut tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
 
-    let fee = ZksyncProvider::estimate_fee(&zk_provider, tx.clone()).await?;
+    let Ok(fee) = ZksyncProvider::estimate_fee(&zk_provider, tx.clone()).await else {
+        warn!("unable to estimate fee thru `zks_estimateFee` endpoint, transaction may fail");
+        tx.set_gas_per_pubdata(U256::from(3000));
+        return Ok(tx);
+    };
+
     tx.set_max_fee_per_gas(fee.max_fee_per_gas);
     tx.set_max_priority_fee_per_gas(fee.max_priority_fee_per_gas);
     tx.set_gas_limit(fee.gas_limit);
