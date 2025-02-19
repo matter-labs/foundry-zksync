@@ -328,6 +328,7 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InputState> {
         }
 
         if !fill {
+            self.tx.nonce = Some(tx_nonce);
             return Ok((self.tx, self.state.func));
         }
 
@@ -359,6 +360,7 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InputState> {
             self.estimate_gas().await?;
         }
 
+        self.tx.nonce = Some(tx_nonce);
         Ok((self.tx, self.state.func))
     }
 
