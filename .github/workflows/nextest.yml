@@ -49,6 +49,7 @@ jobs:
     env:
       ETH_RPC_URL: https://eth-mainnet.alchemyapi.io/v2/C3JEvfW6VgtqZQa-Qp1E-2srEiIc02sD
       CARGO_PROFILE_DEV_DEBUG: 0
+      # Note(zk): Using our own Alchemy API key to avoid rate limiting issues
       ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
     steps:
       - uses: actions/checkout@v4

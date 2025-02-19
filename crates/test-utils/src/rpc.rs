@@ -32,6 +32,7 @@ static INFURA_KEYS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
 });
 
 // List of alchemy keys for mainnet
+// Note(zk): We try using the env variable if present to avoid rate limiting issues from Foundry upstream
 static ALCHEMY_KEYS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     let mut keys = if let Ok(key) = env::var("ALCHEMY_API_KEY") {
         vec![Box::leak(key.into_boxed_str()) as &'static str]
