@@ -157,6 +157,7 @@ impl<S: ReadStorage + fmt::Debug + StorageAccessRecorder> WriteStorage for Stora
     }
 }
 
+/// Allows recording accesses on the storage view by CAlls and CREATEs.
 pub trait StorageViewRecorder {
     fn start_recording(&mut self);
     fn stop_recording(&mut self);

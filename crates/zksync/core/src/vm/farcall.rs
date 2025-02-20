@@ -151,10 +151,6 @@ pub(crate) struct TxExecutionTracker {
     status: TxExecutionStatus,
 }
 
-impl TxExecutionTracker {
-    pub(crate) fn track_transaction(&self) {}
-}
-
 /// The currently executing transaction status, and any optional call start and ends. This is
 /// tracked per opcode and returned to the observer.
 #[derive(Debug, Clone)]
@@ -663,11 +659,4 @@ pub(crate) fn parse<H: HistoryMode>(
     } else {
         ParsedFarCall::SimpleCall { to: current.code_address, value, calldata }
     }
-}
-
-pub(crate) fn get_msg_value_recipient(state: &VmLocalStateData<'_>) -> H160 {
-    let address = state.vm_local_state.registers[MSG_VALUE_SIMULATOR_DATA_ADDRESS_REG as usize]
-        .value
-        .to_h256();
-    address.to_h160()
 }

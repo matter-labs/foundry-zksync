@@ -188,31 +188,3 @@ interface Vm {{
         s.replace("\r\n", "\n")
     }
 }
-
-pub fn print_access(accesses: &[Vec<Vm::AccountAccess>]) {
-    let total = accesses.len();
-    let show = |acc: &Vm::AccountAccess| {
-        println!("\t[{:?}] {:?}->{:?} val={}", acc.kind, acc.accessor, acc.account, acc.value,);
-        acc.storageAccesses.iter().for_each(|x| {
-            println!(
-                "\t\t{} {:?} = {:?}",
-                if x.isWrite { "WRITE" } else { "READ" },
-                x.slot,
-                x.newValue,
-            );
-        });
-    };
-    if total == 0 {
-        println!("[0] ");
-        println!("[1] ");
-    } else if total > 1 {
-        println!("[0] ");
-        accesses[0].iter().for_each(show);
-        println!("[1] ");
-        accesses[1].iter().for_each(show);
-    } else {
-        println!("[0] ");
-        accesses[0].iter().for_each(show);
-        println!("[1] ");
-    }
-}

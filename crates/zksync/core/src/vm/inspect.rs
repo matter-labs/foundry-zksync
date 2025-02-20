@@ -229,9 +229,8 @@ where
     );
 
     let account_accesses = era_db.get_account_accesses();
-    println!("{account_accesses:#?}");
 
-    // TODO(zk): adapt this to use account_accesses
+    // TODO(zk): adapt this to use account_accesses as well
     if let Some(record) = &mut era_db.accesses {
         for k in modified_storage.keys() {
             record.writes.entry(k.address().to_address()).or_default().push(k.key().to_ru256());
