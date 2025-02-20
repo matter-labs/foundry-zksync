@@ -23,7 +23,7 @@ use regex::Regex;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, sync::LazyLock};
 
-use crate::cmd::zksync;
+mod zksync;
 
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]

@@ -3,8 +3,7 @@ use foundry_common::compile::ProjectCompiler;
 use foundry_config::Config;
 use std::path::PathBuf;
 
-use super::inspect::ContractArtifactField;
-use crate::cmd::inspect::print_json_str;
+use super::{print_json_str, ContractArtifactField};
 
 pub fn check_command_for_field(field: &ContractArtifactField) -> Result<bool> {
     // NOTE(zk): Fields that should have specific behavior for zksolc
