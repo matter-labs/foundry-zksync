@@ -5,16 +5,9 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
-use alloy_zksync::{
-    network::{
-        transaction_request::TransactionRequest as ZkTransactionRequest,
-        unsigned_tx::eip712::PaymasterParams, Zksync,
-    },
-    provider::ZksyncProvider,
-    wallet::ZksyncWallet,
-};
-use cast::{Cast, ZkCast};
-use clap::{builder::ArgPredicate, Parser};
+use alloy_zksync::{network::Zksync, wallet::ZksyncWallet};
+use cast::{Cast, ZkTransactionOpts};
+use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},

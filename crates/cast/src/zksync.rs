@@ -1,16 +1,17 @@
 //! Contains zksync specific logic for foundry's `cast` functionality
 
+use crate::Cast;
 use alloy_network::{AnyNetwork, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
+use alloy_rpc_types::TransactionRequest;
+use alloy_serde::WithOtherFields;
 use alloy_zksync::network::{
     transaction_request::TransactionRequest as ZkTransactionRequest,
     unsigned_tx::eip712::PaymasterParams, Zksync,
 };
 use clap::{command, Parser};
 use eyre::Result;
-
-use crate::Cast;
 
 #[derive(Clone, Debug, Parser)]
 #[command(next_help_heading = "Transaction options")]
