@@ -1217,7 +1217,7 @@ exclude = []
     "failure_persist_dir": "cache/invariant",
     "show_metrics": false,
     "timeout": null,
-    "show_solidity": false
+    "show_solidity": false,
     "no_zksync_reserved_addresses": false
   },
   "ffi": false,

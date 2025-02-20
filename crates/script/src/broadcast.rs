@@ -14,7 +14,6 @@ use alloy_primitives::{
 use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use alloy_transport::Transport;
 use alloy_zksync::network::{
     transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType, Zksync,
 };

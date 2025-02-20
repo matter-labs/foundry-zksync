@@ -1,7 +1,6 @@
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::U256;
 use alloy_provider::{network::AnyNetwork, Provider};
-use alloy_transport::Transport;
 use alloy_zksync::network::Zksync;
 use eyre::{ContextCompat, Result};
 use foundry_common::{

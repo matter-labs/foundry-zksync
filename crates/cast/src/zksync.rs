@@ -1,19 +1,17 @@
 //! Contains zksync specific logic for foundry's `cast` functionality
 
+use crate::Cast;
 use alloy_network::{AnyNetwork, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes, TxKind, U256};
 use alloy_provider::{PendingTransactionBuilder, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use alloy_transport::Transport;
 use alloy_zksync::network::{
     transaction_request::TransactionRequest as ZkTransactionRequest,
     unsigned_tx::eip712::PaymasterParams, Zksync,
 };
 use clap::{command, Parser};
 use eyre::Result;
-
-use crate::Cast;
 
 #[derive(Clone, Debug, Parser)]
 #[command(next_help_heading = "Transaction options")]
@@ -86,27 +84,25 @@ impl ZkTransactionOpts {
     }
 }
 
-pub struct ZkCast<P, T, Z> {
+pub struct ZkCast<P, Z> {
     provider: Z,
-    inner: Cast<P, T>,
+    inner: Cast<P>,
 }
 
-impl<P, T, Z> AsRef<Cast<P, T>> for ZkCast<P, T, Z>
+impl<P, Z> AsRef<Cast<P>> for ZkCast<P, Z>
 where
-    P: Provider<T, AnyNetwork>,
-    T: Transport + Clone,
-    Z: Provider<T, Zksync>,
+    P: Provider<AnyNetwork>,
+    Z: Provider<Zksync>,
 {
-    fn as_ref(&self) -> &Cast<P, T> {
+    fn as_ref(&self) -> &Cast<P> {
         &self.inner
     }
 }
 
-impl<P, T, Z> ZkCast<P, T, Z>
+impl<P, Z> ZkCast<P, Z>
 where
-    P: Provider<T, AnyNetwork>,
-    T: Transport + Clone,
-    Z: Provider<T, Zksync>,
+    P: Provider<AnyNetwork>,
+    Z: Provider<Zksync>,
 {
     /// Creates a new ZkCast instance from the provided client and Cast instance
     ///
@@ -126,14 +122,14 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    pub fn new(provider: Z, cast: Cast<P, T>) -> Self {
+    pub fn new(provider: Z, cast: Cast<P>) -> Self {
         Self { provider, inner: cast }
     }
 
     pub async fn send_zk(
         &self,
         tx: ZkTransactionRequest,
-    ) -> Result<PendingTransactionBuilder<T, Zksync>> {
+    ) -> Result<PendingTransactionBuilder<Zksync>> {
         let res = self.provider.send_transaction(tx).await?;
 
         Ok(res)

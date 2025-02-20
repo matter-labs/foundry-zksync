@@ -55,26 +55,42 @@ contract TestPaymasterFlow is Test {
         require(address(alice).balance == alice_balance, "Balance is not the same");
     }
 
-    function testFailPaymasterBalanceDoesNotUpdate() public {
+    // We check that the balance of the paymaster does not update
+    // because we have an issue where the paymaster balance doesn't get updated
+    // within the test environment execution.
+    // See original PR: https://github.com/matter-labs/foundry-zksync/pull/591
+    function testPaymasterBalanceDoesNotUpdate() public {
         uint256 alice_balance = address(alice).balance;
         uint256 paymaster_balance = address(paymaster).balance;
-        (bool success,) = address(vm).call(
-            abi.encodeWithSignature("zkUsePaymaster(address,bytes)", address(paymaster), paymaster_encoded_input)
+        (bool success, ) = address(vm).call(
+            abi.encodeWithSignature(
+                "zkUsePaymaster(address,bytes)",
+                address(paymaster),
+                paymaster_encoded_input
+            )
         );
         require(success, "zkUsePaymaster call failed");
 
         vm.prank(alice, alice);
         do_stuff.do_stuff(bob);
 
-        require(address(alice).balance == alice_balance, "Balance is not the same");
-        require(address(paymaster).balance < paymaster_balance, "Paymaster balance is not less");
+        require(
+            address(alice).balance == alice_balance,
+            "Balance is not the same"
+        );
+        require(
+            address(paymaster).balance == paymaster_balance,
+            "Paymaster balance is not the same when expected to be the same in execution environment"
+        );
     }
 
-    function testFailTransactionFailsWhenNotUsingPaymaster() public {
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testRevertsWhenNotUsingPaymaster() public {
         vm.deal(address(do_stuff), 1 ether);
         require(address(alice).balance == 0, "Balance is not 0 ether");
         vm.prank(alice, alice);
 
+        vm.expectRevert();
         do_stuff.do_stuff(bob);
     }
 }

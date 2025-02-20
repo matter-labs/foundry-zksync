@@ -245,17 +245,18 @@ alloy-sol-macro-input = "0.8.18"
 alloy-sol-types = "0.8.18"
 syn-solidity = "0.8.18"
 
-alloy-chains = "0.1"
+# Note(zk): We need to pin the version of alloy-chain to 0.1.61 because 0.1.62 removes VARIANTS and still need it for now
+alloy-chains = "=0.1.61"
 alloy-rlp = "0.3"
-alloy-zksync = "0.9.0"
+alloy-zksync = { git = "https://github.com/popzxc/alloy-zksync/", rev = "78c3748cd29b008dae38d2fbf31c982539fc4112" }
 
 alloy-trie = "0.7.0"
 
 ## op-alloy
-op-alloy-rpc-types = "0.9.0"
 ## Note(zk): Foundry upstream change to maili-consensus but we need to keep
 ## it for zksync for now until era-solc updates the pinned version of serde
-op-alloy-consensus = "0.9.0"
+op-alloy-consensus = "0.10.0"
+op-alloy-rpc-types = "0.10.0"
 
 ## cli
 anstream = "0.6"
