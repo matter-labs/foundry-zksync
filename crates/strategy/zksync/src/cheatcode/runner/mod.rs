@@ -642,7 +642,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                                 gas_limit: input.gas_limit(),
                                 caller: input.caller(),
                             },
-                            decoded_log,
+                            &decoded_log,
                         );
                     },
                 );
@@ -812,7 +812,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                                 gas_limit: call.gas_limit,
                                 caller: call.caller,
                             },
-                            decoded_log,
+                            &decoded_log,
                         );
                     },
                 );

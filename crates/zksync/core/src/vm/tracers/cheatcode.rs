@@ -38,7 +38,7 @@ use crate::{
         farcall::{CallAction, CallDepth, CallExecutionStatus, FarCallHandler, TxExecutionStatus},
         storage_recorder::CallType,
         storage_view::StorageViewRecorder,
-        ZkEnv,
+        ZkEnv, HARDHAT_CONSOLE_ADDRESS,
     },
     ZkPaymasterData, EMPTY_CODE,
 };
@@ -185,11 +185,8 @@ impl CheatcodeTracer {
         value: rU256,
     ) -> bool {
         // The following addresses are expected to have empty bytecode
-        let ignored_known_addresses = [
-            foundry_evm_abi::HARDHAT_CONSOLE_ADDRESS,
-            self.call_context.tx_caller,
-            self.call_context.msg_sender,
-        ];
+        let ignored_known_addresses =
+            [HARDHAT_CONSOLE_ADDRESS, self.call_context.tx_caller, self.call_context.msg_sender];
 
         // Skip empty code check for empty calldata with non-zero value (Transfers)
         if calldata.is_empty() && !value.is_zero() {

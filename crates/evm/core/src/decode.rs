@@ -1,12 +1,11 @@
 //! Various utilities to decode test results.
 
+use crate::abi::{console, Vm};
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::{Error, JsonAbi};
 use alloy_primitives::{hex, map::HashMap, Log, Selector};
 use alloy_sol_types::{SolEventInterface, SolInterface, SolValue};
-use foundry_cheatcodes_spec::Vm;
 use foundry_common::SELECTOR_LEN;
-use foundry_evm_abi::Console;
 use itertools::Itertools;
 use revm::interpreter::InstructionResult;
 use std::{fmt, sync::OnceLock};
@@ -53,7 +52,7 @@ pub fn decode_console_logs(logs: &[Log]) -> Vec<String> {
 /// This function returns [None] if it is not a DSTest log or the result of a Hardhat
 /// `console.log`.
 pub fn decode_console_log(log: &Log) -> Option<String> {
-    Console::ConsoleEvents::decode_log(log, false).ok().map(|decoded| decoded.to_string())
+    console::ds::ConsoleEvents::decode_log(log, false).ok().map(|decoded| decoded.to_string())
 }
 
 /// Decodes revert data.

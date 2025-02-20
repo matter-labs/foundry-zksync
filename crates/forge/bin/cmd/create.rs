@@ -11,7 +11,7 @@ use alloy_signer::Signer;
 use alloy_transport::{Transport, TransportError};
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
-use forge_verify::{zk_provider::CompilerVerificationContext, RetryArgs, VerifierArgs, VerifyArgs};
+use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::{
     opts::{BuildOpts, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, read_constructor_args_file, remove_contract, LoadConfig},
@@ -109,103 +109,108 @@ pub struct CreateArgs {
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
-        let mut config = self.try_load_config_emit_warnings()?;
+        let mut config = self.load_config()?;
         // Install missing dependencies.
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
             // need to re-configure here to also catch additional remappings
-            config = self.load_config();
+            config = self.load_config()?;
         }
 
         // Find Project & Compile
         let project = config.project()?;
 
         if self.build.compiler.zk.enabled() {
-            return self.run_zksync(project).await;
-        }
-
-        let target_path = if let Some(ref mut path) = self.contract.path {
-            canonicalize(project.root().join(path))?
+            self.run_zksync(project).await
+            // NOTE(zk): we want the indent here so any change from
+            // upstream causes a conflict so we replay the changes to zk-specific code
         } else {
-            project.find_contract_path(&self.contract.name)?
-        };
+            let target_path = if let Some(ref mut path) = self.contract.path {
+                canonicalize(project.root().join(path))?
+            } else {
+                project.find_contract_path(&self.contract.name)?
+            };
 
-        let output = compile::compile_target(&target_path, &project, shell::is_json())?;
+            let output = compile::compile_target(&target_path, &project, shell::is_json())?;
 
-        let (abi, bin, id) = remove_contract(output, &target_path, &self.contract.name)?;
+            let (abi, bin, id) = remove_contract(output, &target_path, &self.contract.name)?;
 
-        let bin = match bin.object {
-            BytecodeObject::Bytecode(_) => bin.object,
-            _ => {
-                let link_refs = bin
-                    .link_references
-                    .iter()
-                    .flat_map(|(path, names)| {
-                        names.keys().map(move |name| format!("\t{name}: {path}"))
-                    })
-                    .collect::<Vec<String>>()
-                    .join("\n");
-                eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+            let bin = match bin.object {
+                BytecodeObject::Bytecode(_) => bin.object,
+                _ => {
+                    let link_refs = bin
+                        .link_references
+                        .iter()
+                        .flat_map(|(path, names)| {
+                            names.keys().map(move |name| format!("\t{name}: {path}"))
+                        })
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                }
+            };
+
+            // Add arguments to constructor
+            let params = if let Some(constructor) = &abi.constructor {
+                let constructor_args = self
+                    .constructor_args_path
+                    .clone()
+                    .map(read_constructor_args_file)
+                    .transpose()?;
+                self.parse_constructor_args(
+                    constructor,
+                    constructor_args.as_deref().unwrap_or(&self.constructor_args),
+                )?
+            } else {
+                vec![]
+            };
+
+            let provider = utils::get_provider(&config)?;
+
+            // respect chain, if set explicitly via cmd args
+            let chain_id = if let Some(chain_id) = self.chain_id() {
+                chain_id
+            } else {
+                provider.get_chain_id().await?
+            };
+
+            // Whether to broadcast the transaction or not
+            let dry_run = !self.broadcast;
+
+            if self.unlocked {
+                // Deploy with unlocked account
+                let sender = self.eth.wallet.from.expect("required");
+                self.deploy(
+                    abi,
+                    bin,
+                    params,
+                    provider,
+                    chain_id,
+                    sender,
+                    config.transaction_timeout,
+                    id,
+                    dry_run,
+                )
+                .await
+            } else {
+                // Deploy with signer
+                let signer = self.eth.wallet.signer().await?;
+                let deployer = signer.address();
+                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
+                    .wallet(EthereumWallet::new(signer))
+                    .on_provider(provider);
+                self.deploy(
+                    abi,
+                    bin,
+                    params,
+                    provider,
+                    chain_id,
+                    deployer,
+                    config.transaction_timeout,
+                    id,
+                    dry_run,
+                )
+                .await
             }
-        };
-
-        // Add arguments to constructor
-        let params = if let Some(constructor) = &abi.constructor {
-            let constructor_args =
-                self.constructor_args_path.clone().map(read_constructor_args_file).transpose()?;
-            self.parse_constructor_args(
-                constructor,
-                constructor_args.as_deref().unwrap_or(&self.constructor_args),
-            )?
-        } else {
-            vec![]
-        };
-
-        let provider = utils::get_provider(&config)?;
-
-        // respect chain, if set explicitly via cmd args
-        let chain_id = if let Some(chain_id) = self.chain_id() {
-            chain_id
-        } else {
-            provider.get_chain_id().await?
-        };
-
-        // Whether to broadcast the transaction or not
-        let dry_run = !self.broadcast;
-
-        if self.unlocked {
-            // Deploy with unlocked account
-            let sender = self.eth.wallet.from.expect("required");
-            self.deploy(
-                abi,
-                bin,
-                params,
-                provider,
-                chain_id,
-                sender,
-                config.transaction_timeout,
-                id,
-                dry_run,
-            )
-            .await
-        } else {
-            // Deploy with signer
-            let signer = self.eth.wallet.signer().await?;
-            let deployer = signer.address();
-            let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                .wallet(EthereumWallet::new(signer))
-                .on_provider(provider);
-            self.deploy(
-                abi,
-                bin,
-                params,
-                provider,
-                chain_id,
-                deployer,
-                config.transaction_timeout,
-                id,
-                dry_run,
-            )
-            .await
         }
     }
 
@@ -258,15 +263,11 @@ impl CreateArgs {
 
         // Check config for Etherscan API Keys to avoid preflight check failing if no
         // ETHERSCAN_API_KEY value set.
-        let config = verify.load_config_emit_warnings();
+        let config = verify.load_config()?;
         verify.etherscan.key =
             config.get_etherscan_config_with_chain(Some(chain.into()))?.map(|c| c.key);
 
-        let context = if verify.zksync {
-            CompilerVerificationContext::ZkSolc(verify.zk_resolve_context().await?)
-        } else {
-            CompilerVerificationContext::Solc(verify.resolve_context().await?)
-        };
+        let context = verify.resolve_either_context().await?;
 
         verify.verification_provider()?.preflight_verify_check(verify, context).await?;
         Ok(())

@@ -60,7 +60,7 @@ pub use script::{Broadcast, Wallets, WalletsInner};
 mod string;
 
 mod test;
-pub use test::expect::{handle_expect_emit, handle_expect_revert};
+pub use test::expect::handle_expect_emit;
 
 mod toml;
 

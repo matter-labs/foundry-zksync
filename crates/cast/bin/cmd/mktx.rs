@@ -2,15 +2,18 @@ use crate::tx::{self, CastTxBuilder};
 use alloy_network::{eip2718::Encodable2718, EthereumWallet, TransactionBuilder};
 use alloy_primitives::hex;
 use alloy_signer::Signer;
+use alloy_zksync::wallet::ZksyncWallet;
+use cast::ZkTransactionOpts;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
-    utils::get_provider,
+    utils::{get_provider, LoadConfig},
 };
 use foundry_common::ens::NameOrAddress;
-use foundry_config::Config;
 use std::{path::PathBuf, str::FromStr};
+
+mod zksync;
 
 /// CLI arguments for `cast mktx`.
 #[derive(Debug, Parser)]
@@ -45,6 +48,13 @@ pub struct MakeTxArgs {
 
     #[command(flatten)]
     eth: EthereumOpts,
+    /// Zksync Transaction
+    #[command(flatten)]
+    zk_tx: ZkTransactionOpts,
+
+    /// Force a zksync eip-712 transaction and apply CREATE overrides
+    #[arg(long = "zksync")]
+    zk_force: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -65,16 +75,18 @@ pub enum MakeTxSubcommands {
 
 impl MakeTxArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, command, tx, path, eth } = self;
+        let Self { to, mut sig, mut args, command, tx, path, eth, zk_tx, zk_force } = self;
 
         let blob_data = if let Some(path) = path { Some(std::fs::read(path)?) } else { None };
 
+        let mut zkcode = Default::default();
         let code = if let Some(MakeTxSubcommands::Create {
             code,
             sig: constructor_sig,
             args: constructor_args,
         }) = command
         {
+            zkcode = code.clone();
             sig = constructor_sig;
             args = constructor_args;
             Some(code)
@@ -82,7 +94,7 @@ impl MakeTxArgs {
             None
         };
 
-        let config = Config::from(&eth);
+        let config = eth.load_config()?;
 
         // Retrieve the signer, and bail if it can't be constructed.
         let signer = eth.wallet.signer().await?;
@@ -99,12 +111,21 @@ impl MakeTxArgs {
             .with_code_sig_and_args(code, sig, args)
             .await?
             .with_blob_data(blob_data)?
-            .build(&signer)
+            .build_raw(&signer)
             .await?;
+
+        if zk_tx.has_zksync_args() || zk_force {
+            let zk_wallet = ZksyncWallet::new(signer);
+            let zktx = zksync::build_tx(zk_tx, tx, zkcode, &config).await?;
+            let signed = zktx.build(&zk_wallet).await?.encoded_2718();
+            sh_println!("0x{}", hex::encode(signed))?;
+            return Ok(());
+        }
 
         let tx = tx.build(&EthereumWallet::new(signer)).await?;
 
         let signed_tx = hex::encode(tx.encoded_2718());
+
         sh_println!("0x{signed_tx}")?;
 
         Ok(())

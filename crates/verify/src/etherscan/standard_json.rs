@@ -1,4 +1,4 @@
-use super::{EtherscanSourceProvider, VerifyArgs};
+use super::{EtherscanSourceProvider, EtherscanZksyncSourceProvider, VerifyArgs};
 use crate::{provider::VerificationContext, zk_provider::ZkVerificationContext};
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
@@ -52,8 +52,10 @@ impl EtherscanSourceProvider for EtherscanStandardJsonSource {
         );
         Ok((source, name, CodeFormat::StandardJsonInput))
     }
+}
 
-    fn zk_source(
+impl EtherscanZksyncSourceProvider for EtherscanStandardJsonSource {
+    fn zksync_source(
         &self,
         _args: &VerifyArgs,
         context: &ZkVerificationContext,
