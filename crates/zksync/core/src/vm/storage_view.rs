@@ -9,7 +9,7 @@ use zksync_vm_interface::storage::{ReadStorage, WriteStorage};
 
 use crate::convert::{ConvertAddress, ConvertH160, ConvertH256};
 
-use super::storage_recorder::{CallAddresses, CallType, StorageRecorder};
+use super::storage_recorder::{CallAddresses, CallType, StorageAccessRecorder};
 
 /// `StorageView` is a buffer for `StorageLog`s between storage and transaction execution code.
 /// In order to commit transactions logs should be submitted to the underlying storage
@@ -124,7 +124,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
     }
 }
 
-impl<S: ReadStorage + fmt::Debug + StorageRecorder> WriteStorage for StorageView<S> {
+impl<S: ReadStorage + fmt::Debug + StorageAccessRecorder> WriteStorage for StorageView<S> {
     fn read_storage_keys(&self) -> &HashMap<StorageKey, StorageValue> {
         &self.read_storage_keys
     }
@@ -162,6 +162,7 @@ pub trait StorageViewRecorder {
     fn stop_recording(&mut self);
     fn record_call_start(
         &mut self,
+        is_mimic: bool,
         call_type: CallType,
         accessor: Address,
         account: Address,
@@ -171,7 +172,7 @@ pub trait StorageViewRecorder {
     fn record_call_end(&mut self);
 }
 
-impl<S: ReadStorage + fmt::Debug + StorageRecorder> StorageViewRecorder for StorageView<S> {
+impl<S: ReadStorage + fmt::Debug + StorageAccessRecorder> StorageViewRecorder for StorageView<S> {
     fn start_recording(&mut self) {
         self.storage_handle.start_recording();
     }
@@ -182,13 +183,22 @@ impl<S: ReadStorage + fmt::Debug + StorageRecorder> StorageViewRecorder for Stor
 
     fn record_call_start(
         &mut self,
+        is_mimic: bool,
         call_type: CallType,
         accessor: Address,
         account: Address,
         data: Vec<u8>,
         value: U256,
     ) {
-        let balance = self.read_value(&storage_key_for_eth_balance(&account.to_h160())).to_ru256();
+        // if a call is mimic with a value, then it's a call with transfer and the balance is
+        // already updated via call to MsgValueSimulator, so we need to account for that here.
+        let balance = if is_mimic && !value.is_zero() {
+            self.read_value(&storage_key_for_eth_balance(&account.to_h160()))
+                .to_ru256()
+                .saturating_sub(value)
+        } else {
+            self.read_value(&storage_key_for_eth_balance(&account.to_h160())).to_ru256()
+        };
         self.storage_handle.record_call_start(call_type, accessor, account, balance, data, value);
     }
 
@@ -207,7 +217,7 @@ mod test {
     use zksync_types::{AccountTreeId, Address, H256};
     use zksync_vm_interface::storage::InMemoryStorage;
 
-    impl StorageRecorder for &InMemoryStorage {
+    impl StorageAccessRecorder for &InMemoryStorage {
         fn start_recording(&mut self) {}
         fn stop_recording(&mut self) {}
         fn record_read(&mut self, _key: &StorageKey, _value: H256) {}

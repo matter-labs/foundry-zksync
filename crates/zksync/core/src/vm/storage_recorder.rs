@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, Bytes, U256};
-use zksync_types::{StorageKey, H256, L2_BASE_TOKEN_ADDRESS};
+use zksync_types::{StorageKey, H256};
 
 use crate::{convert::ConvertH160, is_system_address};
 
@@ -8,7 +8,8 @@ pub enum CallType {
     Create(H256),
 }
 
-pub trait StorageRecorder {
+/// Interface for recording storage accesses via CALLs or CREATEs.
+pub trait StorageAccessRecorder {
     fn start_recording(&mut self);
     fn stop_recording(&mut self);
     fn record_read(&mut self, key: &StorageKey, value: H256);
@@ -26,12 +27,7 @@ pub trait StorageRecorder {
     fn record_call_end(&mut self, accessor: Address, account: Address, new_balance: U256);
 }
 
-#[derive(Debug)]
-pub enum AccountAccessKind {
-    Call,
-    Create,
-}
-
+/// Represents the storage access during vm execution.
 #[derive(Debug)]
 pub struct StorageAccess {
     /// The account whose storage was accessed.
@@ -46,17 +42,37 @@ pub struct StorageAccess {
     pub new_value: H256,
 }
 
+/// Account Access type
+#[derive(Debug)]
+pub enum AccountAccessKind {
+    /// Access was a call.
+    Call,
+    /// Access was a create.
+    Create,
+}
+
+/// Represents the account access during vm execution.
 #[derive(Debug)]
 pub struct AccountAccess {
+    /// Call depth.
     pub depth: u64,
+    /// Call type.
     pub kind: AccountAccessKind,
+    /// Account that was accessed.
     pub account: Address,
+    /// Accessor account.
     pub accessor: Address,
+    /// Call data.
     pub data: Bytes,
+    /// Deployed bytecode hash if CREATE.
     pub deployed_bytecode_hash: H256,
+    /// Call value.
     pub value: U256,
+    /// Previous balance of the accessed account.
     pub old_balance: U256,
+    /// New balance of the accessed account.
     pub new_balance: U256,
+    /// Storage slots that were accessed.
     pub storage_accesses: Vec<StorageAccess>,
 }
 
@@ -77,10 +93,16 @@ pub struct AccountAccesses {
     /// so we track them using this strategy to know when to skip the respective `Ret`s of already
     /// skipped `FarCalls`s.
     call_tracker: Vec<CallAddresses>,
+    last_create_addresses: Vec<Address>,
 }
 
 impl AccountAccesses {
     pub fn get_records(self) -> Vec<AccountAccess> {
+        assert!(
+            self.last_create_addresses.is_empty(),
+            "last create address is not empty; expected a CALL after CREATE to pop it: {:?}",
+            self.last_create_addresses
+        );
         assert!(
             self.call_tracker.is_empty(),
             "CallTracker stack is not empty; found calls without matching returns: {:?}",
@@ -98,9 +120,7 @@ impl AccountAccesses {
         );
         self.records
     }
-    // }
 
-    // impl StorageRecorder for AccountAccesses {
     pub fn start_recording(&mut self) {
         self.is_recording = true;
     }
@@ -119,7 +139,6 @@ impl AccountAccesses {
             return;
         }
 
-        // println!("[StorageRecorder] READ  {:?} {:?} -> {:?}", key.address(), key.key(), value);
         let record = self.pending.last_mut().expect("expected at least one record");
         record.storage_accesses.push(StorageAccess {
             account: key.address().to_address(),
@@ -135,21 +154,10 @@ impl AccountAccesses {
             return;
         }
 
-        // if key.address() == L2_BASE_TOKEN_ADDRESS {
-        //     println!("TOKEN {:?} = {:?}", key.k)
-        // }
         // do not record system addresses
         if is_system_address(key.address().to_address()) {
             return;
         }
-
-        // println!(
-        //     "[StorageRecorder] WRITE  {:?} {:?} {:?} -> {:?}",
-        //     key.address(),
-        //     key.key(),
-        //     old_value,
-        //     new_value
-        // );
 
         let record = self.pending.last_mut().expect("expected at least one record");
         record.storage_accesses.push(StorageAccess {
@@ -181,30 +189,24 @@ impl AccountAccesses {
             return;
         }
 
-        println!(
-            "[StorageRecorder] CALL {accessor:?} -> {account:?} | [{value}] {}",
-            alloy_primitives::hex::encode(&data)
-        );
-        let last_depth = if !self.pending.is_empty() {
-            self.pending.last().map(|record| record.depth).expect("must have at least one record")
-        } else {
-            self.records.last().map(|record| record.depth).unwrap_or_default()
-        };
-
-        // We do not record system addresses, so do not increment the depth.
-        // let new_depth = if is_system_address(accessor) || is_system_address(account) {
-        //     last_depth
-        // } else {
-        //     last_depth.checked_add(1).expect("overflow in recording call depth")
-        // };
-
-        let new_depth = last_depth.checked_add(1).expect("overflow in recording call depth");
         let (kind, deployed_bytecode_hash) = match call_type {
             CallType::Call => (AccountAccessKind::Call, Default::default()),
             CallType::Create(bytecode_hash) => (AccountAccessKind::Create, bytecode_hash),
         };
 
-        // TODO balance of target?
+        // For create we expect another CALL with empty data to the newly created address that we
+        // should skip recording, so we track the address until a matching CALL pops it.
+        if matches!(kind, AccountAccessKind::Create) {
+            self.last_create_addresses.push(account)
+        }
+
+        let last_depth = if !self.pending.is_empty() {
+            self.pending.last().map(|record| record.depth).expect("must have at least one record")
+        } else {
+            self.records.last().map(|record| record.depth).unwrap_or_default()
+        };
+        let new_depth = last_depth.checked_add(1).expect("overflow in recording call depth");
+
         self.pending.push(AccountAccess {
             depth: new_depth,
             kind,
@@ -214,7 +216,7 @@ impl AccountAccesses {
             deployed_bytecode_hash,
             value,
             old_balance: balance,
-            new_balance: balance.saturating_add(value),
+            new_balance: U256::ZERO, //balance.saturating_add(value),
             storage_accesses: Default::default(),
         });
     }
@@ -230,11 +232,19 @@ impl AccountAccesses {
         }
 
         let mut record = self.pending.pop().expect("unexpected return while recording call");
-        if record.value.is_zero() {
-            println!("[StorageRecorder] CALL-END CORRECTION = {new_balance:} {record:?}");
-            record.new_balance = new_balance;
-        } else {
-            println!("[StorageRecorder] CALL-END {record:?}");
+        record.new_balance = new_balance;
+
+        // For create we expect another CALL with empty data to the newly created address that we
+        // should skip recording
+        if let Some(last_create_addr) = self.last_create_addresses.last().cloned() {
+            if matches!(record.kind, AccountAccessKind::Call) &&
+                record.account == last_create_addr &&
+                record.data.is_empty()
+            {
+                // skip recording this call
+                self.last_create_addresses.pop();
+                return;
+            }
         }
 
         if self.pending.is_empty() {

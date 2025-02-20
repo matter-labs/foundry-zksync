@@ -55,6 +55,10 @@ pub struct ZksyncCheatcodeInspectorStrategyContext {
 
     /// Era Vm environment
     pub zk_env: ZkEnv,
+
+    /// Mark the last recorded account access for removal, on CALL/CREATE-end.
+    /// This is a record inserted by revm's cheatcode inspector on CALL/CREATE-begin.
+    pub remove_recorded_access_at: Option<usize>,
 }
 
 impl ZksyncCheatcodeInspectorStrategyContext {
@@ -114,6 +118,7 @@ impl ZksyncCheatcodeInspectorStrategyContext {
             persisted_factory_deps: Default::default(),
             set_deployer_call_input_factory_deps: Default::default(),
             zk_env,
+            remove_recorded_access_at: Default::default(),
         }
     }
 }

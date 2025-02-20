@@ -24,7 +24,7 @@ use crate::{
 };
 
 use super::storage_recorder::{
-    AccountAccess, AccountAccesses, CallAddresses, CallType, StorageRecorder,
+    AccountAccess, AccountAccesses, CallAddresses, CallType, StorageAccessRecorder,
 };
 
 /// Default chain id
@@ -212,7 +212,7 @@ where
     }
 }
 
-impl<DB> StorageRecorder for &mut ZKVMData<'_, DB>
+impl<DB> StorageAccessRecorder for &mut ZKVMData<'_, DB>
 where
     DB: Database,
     <DB as Database>::Error: Debug,

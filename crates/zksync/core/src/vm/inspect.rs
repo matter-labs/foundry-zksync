@@ -46,7 +46,7 @@ use crate::{
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
         env::{create_l1_batch_env, create_system_env},
-        storage_recorder::{AccountAccess, StorageRecorder},
+        storage_recorder::{AccountAccess, StorageAccessRecorder},
         storage_view::StorageView,
         tracers::{
             bootloader::{BootloaderDebug, BootloaderDebugTracer},
@@ -229,6 +229,7 @@ where
     );
 
     let account_accesses = era_db.get_account_accesses();
+    println!("{account_accesses:#?}");
 
     // TODO(zk): adapt this to use account_accesses
     if let Some(record) = &mut era_db.accesses {
@@ -487,7 +488,7 @@ struct InnerZkVmResult {
     recorded_immutables: rHashMap<H160, rHashMap<rU256, FixedBytes<32>>>,
 }
 
-fn inspect_inner<S: ReadStorage + StorageRecorder>(
+fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,

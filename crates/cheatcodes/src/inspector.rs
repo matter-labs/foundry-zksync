@@ -922,6 +922,7 @@ where {
             }
         }
 
+        self.strategy.runner.zksync_remove_duplicate_account_access(self);
         self.strategy.runner.zksync_record_create_address(self.strategy.context.as_mut(), &outcome);
 
         outcome
@@ -1541,6 +1542,8 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
                 }
             }
         }
+
+        self.strategy.runner.zksync_remove_duplicate_account_access(self);
 
         // At the end of the call,
         // we need to check if we've found all the emits.

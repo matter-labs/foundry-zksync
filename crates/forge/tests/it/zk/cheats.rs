@@ -154,6 +154,14 @@ async fn test_zk_zk_vm_skip_works() {
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_state_diff_works() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new(".*", "ZkStateDiffTest", ".*");
+
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
+}
+
 forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
     setup_deploy_prj(&mut prj);
 
