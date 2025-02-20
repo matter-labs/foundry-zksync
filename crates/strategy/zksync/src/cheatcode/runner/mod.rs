@@ -913,7 +913,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut()
             {
                 if let Some(last) = recorded_account_diffs_stack.first_mut() {
-                    // This entry has been inserted during CREATE/CALL opeartions in revm's
+                    // This entry has been inserted during CREATE/CALL operations in revm's
                     // cheatcode inspector and must be removed.
                     let _ = last.remove(index);
                 }

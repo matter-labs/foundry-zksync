@@ -229,11 +229,11 @@ impl FarCallHandler {
             Opcode::FarCall(opcode) => {
                 let current = state.vm_local_state.callstack.current;
 
-                let calldata = get_calldata(&state, memory);
+                let calldata = get_calldata(state, memory);
 
                 match self.tx_execution_tracker.status {
                     TxExecutionStatus::Pending => {
-                        let calldata = get_calldata(&state, memory);
+                        let calldata = get_calldata(state, memory);
                         if calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION) {
                             self.tx_execution_tracker.status = TxExecutionStatus::Executing;
                             self.tx_execution_tracker.call_tracker.push(TrackedCall {
@@ -257,7 +257,7 @@ impl FarCallHandler {
                         }
                     }
                     TxExecutionStatus::Executing => {
-                        let calldata = get_calldata(&state, memory);
+                        let calldata = get_calldata(state, memory);
                         self.tx_execution_tracker.call_tracker.push(TrackedCall {
                             opcode,
                             address: current.code_address.to_address(),
@@ -295,7 +295,7 @@ impl FarCallHandler {
                             .call_tracker
                             .pop()
                             .expect("must have a matching call entry");
-                        if self.tx_execution_tracker.call_tracker.len() == 0 {
+                        if self.tx_execution_tracker.call_tracker.is_empty() {
                             self.tx_execution_tracker.status = TxExecutionStatus::Finished;
 
                             return CurrentTxExecutionStatus {

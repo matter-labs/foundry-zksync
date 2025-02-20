@@ -241,13 +241,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     storage.borrow_mut().start_recording();
                 }
                 TxExecutionStatus::Finished => {
-                    if let Some(call_status) = &tx_tracking.call_status {
-                        match call_status {
-                            CallExecutionStatus::CallFinished(_tx) => {
-                                storage.borrow_mut().record_call_end()
-                            }
-                            _ => (),
-                        }
+                    if let Some(CallExecutionStatus::CallFinished(_tx)) = &tx_tracking.call_status {
+                        storage.borrow_mut().record_call_end()
                     }
                     storage.borrow_mut().stop_recording()
                 }

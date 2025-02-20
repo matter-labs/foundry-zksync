@@ -265,7 +265,7 @@ where
         }
 
         let value = self.read_db(*key.address(), h256_to_u256(*key.key()));
-        self.record_read(&key, value);
+        self.record_read(key, value);
         value
     }
 
