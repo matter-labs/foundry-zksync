@@ -194,7 +194,7 @@ where
             let tokens = decoded.iter().map(format_token_raw).collect::<Vec<_>>();
             serde_json::to_string_pretty(&tokens).unwrap()
         } else {
-            // seth compatible user-friendly return type conversions
+            // set compatible user-friendly return type conversions
             decoded.iter().map(format_token).collect::<Vec<_>>().join("\n")
         })
     }
