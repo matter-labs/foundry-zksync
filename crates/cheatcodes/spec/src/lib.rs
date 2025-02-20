@@ -189,17 +189,10 @@ interface Vm {{
     }
 }
 
-
 pub fn print_access(accesses: &[Vec<Vm::AccountAccess>]) {
     let total = accesses.len();
     let show = |acc: &Vm::AccountAccess| {
-        println!(
-            "\t[{:?}] {:?}->{:?} val={}",
-            acc.kind,
-            acc.accessor,
-            acc.account,
-            acc.value,
-        );
+        println!("\t[{:?}] {:?}->{:?} val={}", acc.kind, acc.accessor, acc.account, acc.value,);
         acc.storageAccesses.iter().for_each(|x| {
             println!(
                 "\t\t{} {:?} = {:?}",
