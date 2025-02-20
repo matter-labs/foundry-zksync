@@ -9,7 +9,7 @@ Update or revert to a specific Foundry-zksync branch with ease.
 <!-- TODO: update to reference curl link once available -->
 
 ```sh
-./install.sh
+./install
 ```
 
 ## Usage
