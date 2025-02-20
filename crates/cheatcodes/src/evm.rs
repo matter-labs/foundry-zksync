@@ -17,7 +17,6 @@ use foundry_evm_core::{
     constants::{CALLER, CHEATCODE_ADDRESS, TEST_CONTRACT_ADDRESS},
 };
 use foundry_evm_traces::StackSnapshotType;
-use itertools::Itertools;
 use rand::Rng;
 use revm::primitives::{Account, Bytecode, SpecId, KECCAK_EMPTY};
 use std::{

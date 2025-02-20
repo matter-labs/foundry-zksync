@@ -19,29 +19,24 @@ use zksync_multivm::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},
         zkevm_opcode_defs::{
             FarCallOpcode, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
-            RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
         },
     },
 };
 use zksync_types::{
-    ethabi, get_code_key, get_nonce_key, utils::storage_key_for_eth_balance, StorageValue,
-    BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    ethabi, get_code_key, get_nonce_key, StorageValue, BOOTLOADER_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, H160, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
     SYSTEM_CONTEXT_ADDRESS, U256,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
-    cheatcodes::get_nonce,
     compute_create2_address, compute_create_address,
-    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
+    convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
     hash_bytecode,
     state::{parse_full_nonce, FullNonce},
     vm::{
-        farcall::{
-            self, CallAction, CallDepth, CallExecutionStatus, FarCallHandler, ParsedFarCall,
-            TxExecutionStatus,
-        },
-        storage_recorder::{CallAddresses, CallType, StorageAccessRecorder},
+        farcall::{CallAction, CallDepth, CallExecutionStatus, FarCallHandler, TxExecutionStatus},
+        storage_recorder::CallType,
         storage_view::StorageViewRecorder,
         ZkEnv,
     },
@@ -168,7 +163,6 @@ pub struct CheatcodeTracer {
     farcall_handler: FarCallHandler,
     /// Immutables recorded via calls to ImmutableSimulator::setImmutables.
     recorded_immutables: HashMap<H160, HashMap<rU256, FixedBytes<32>>>,
-    count: u64,
 }
 
 impl CheatcodeTracer {
@@ -179,14 +173,7 @@ impl CheatcodeTracer {
         result: Arc<OnceCell<CheatcodeTracerResult>>,
         call_context: CallContext,
     ) -> Self {
-        CheatcodeTracer {
-            mocked_calls,
-            expected_calls,
-            call_context,
-            result,
-            count: 100,
-            ..Default::default()
-        }
+        CheatcodeTracer { mocked_calls, expected_calls, call_context, result, ..Default::default() }
     }
 
     /// Check if the given address's code is empty
@@ -337,7 +324,9 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                         data,
                         value.to_ru256(),
                     ),
-                    CallExecutionStatus::CallFinished(tx) => storage.borrow_mut().record_call_end(),
+                    CallExecutionStatus::CallFinished(_tx) => {
+                        storage.borrow_mut().record_call_end()
+                    }
                 }
             }
         }
