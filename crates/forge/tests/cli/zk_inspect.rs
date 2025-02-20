@@ -3,15 +3,12 @@ use foundry_config::Config;
 use foundry_test_utils::forgetest;
 
 forgetest!(test_zk_inspect, |prj, cmd| {
-    prj.insert_ds_test();
     prj.add_source(
         "Contracts.sol",
         r#"
 //SPDX-license-identifier: MIT
 
 pragma solidity ^0.8.20;
-
-import "./test.sol";
 
 contract ContractOne {
     int public i;

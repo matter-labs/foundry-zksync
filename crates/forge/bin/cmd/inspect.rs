@@ -23,7 +23,7 @@ use regex::Regex;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, sync::LazyLock};
 
-use crate::cmd::zksolc;
+use crate::cmd::zksync;
 
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]
@@ -75,10 +75,10 @@ impl InspectArgs {
         };
 
         if modified_build_args.compiler.zk.enabled() {
-            let should_compile_with_zksolc = zksolc::check_command_for_field(&field)?;
+            let should_compile_with_zksolc = zksync::check_command_for_field(&field)?;
             if should_compile_with_zksolc {
                 let config = Config { ..Default::default() };
-                return zksolc::inspect(&field, config, target_path, &contract.name);
+                return zksync::inspect(&field, config, target_path, &contract.name);
             }
         }
 

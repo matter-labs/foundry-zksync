@@ -18,7 +18,6 @@ mod doc;
 mod eip712;
 mod geiger;
 mod inline_config;
-mod inspect;
 mod multi_script;
 mod odyssey;
 mod script;
@@ -28,6 +27,7 @@ mod test_cmd;
 mod verify;
 mod verify_bytecode;
 mod version;
+mod zk_inspect;
 
 mod ext_integration;
 mod zk_build;
