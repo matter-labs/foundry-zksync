@@ -800,10 +800,10 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
     /// Increments the EraVM transaction nonce after recording broadcastable txs
     /// and if we are not in isolate mode, as that handles it already
-    fn zksync_increment_nonce_after_broadcast(&self, state: &mut Cheatcodes, ecx: Ecx) {
+    fn zksync_increment_nonce_after_broadcast(&self, state: &mut Cheatcodes, ecx: Ecx<'_, '_, '_>) {
         // Explicitly increment tx nonce if calls are not isolated and we are broadcasting
         // This isn't needed in EVM, but required in zkEVM as the nonces are split.
-        if let Some(broadcast) = &self.broadcast {
+        if let Some(broadcast) = &state.broadcast {
             if ecx.inner.journaled_state.depth() >= broadcast.depth
                 && !state.config.evm_opts.isolate
             {
