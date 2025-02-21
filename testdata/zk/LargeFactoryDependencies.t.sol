@@ -6,12 +6,8 @@ import "./LargeContracts.sol";
 
 interface Cheatcodes {
     function broadcast(address sender) external view;
-    function zkGetTransactionNonce(
-        address account
-    ) external view returns (uint64 nonce);
-    function zkGetDeploymentNonce(
-        address account
-    ) external view returns (uint64 nonce);
+    function zkGetTransactionNonce(address account) external view returns (uint64 nonce);
+    function zkGetDeploymentNonce(address account) external view returns (uint64 nonce);
 }
 
 contract ZkLargeFactoryDependenciesTest is DSTest {
