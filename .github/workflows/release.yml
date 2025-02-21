@@ -115,12 +115,12 @@ jobs:
           # `target`: Rust build target triple
           # `platform` and `arch`: Used in tarball names
           # `svm`: target platform to use for the Solc binary: https://github.com/roynalnaruto/svm-rs/blob/84cbe0ac705becabdc13168bae28a45ad2299749/svm-builds/build.rs#L4-L24
-          - runner: ubuntu-24.04-github-hosted-16core
+          - runner: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             svm_target_platform: linux-amd64
             platform: linux
             arch: amd64
-          - runner: ubuntu-24.04-github-hosted-16core
+          - runner: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
             svm_target_platform: linux-aarch64
             platform: linux
@@ -164,15 +164,8 @@ jobs:
         run: |
           set -eo pipefail
           target="${{ matrix.target }}"
-          flags=()
 
-          # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
-          # # Remove jemalloc, only keep `asm-keccak` if applicable
-          # if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
-          #     flags+=(--features asm-keccak)
-          # fi
-
-          RUSTFLAGS='-C target-feature=+crt-static' OPENSSL_STATIC=1 cross build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          OPENSSL_STATIC=1 cross build --release --bin forge --bin cast --target "${target}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
