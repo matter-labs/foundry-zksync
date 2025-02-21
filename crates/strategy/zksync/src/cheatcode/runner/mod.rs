@@ -804,8 +804,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         // Explicitly increment tx nonce if calls are not isolated and we are broadcasting
         // This isn't needed in EVM, but required in zkEVM as the nonces are split.
         if let Some(broadcast) = &state.broadcast {
-            if ecx.inner.journaled_state.depth() >= broadcast.depth
-                && !state.config.evm_opts.isolate
+            if ecx.inner.journaled_state.depth() >= broadcast.depth &&
+                !state.config.evm_opts.isolate
             {
                 foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, &mut ecx.inner);
                 debug!("incremented zksync nonce after broadcastable create");
