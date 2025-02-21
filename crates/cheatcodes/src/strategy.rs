@@ -161,6 +161,8 @@ pub trait CheatcodeInspectorStrategyExt {
     ) -> Option<CallOutcome> {
         None
     }
+
+    fn zksync_increment_nonce_after_broadcast(&self, _state: &mut Cheatcodes, _ecx: Ecx) {}
 }
 
 #[derive(Debug, Default, Clone)]

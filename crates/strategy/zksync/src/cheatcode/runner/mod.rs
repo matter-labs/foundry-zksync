@@ -195,18 +195,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             rpc,
             transaction: TransactionMaybeSigned::Unsigned(tx),
         });
-
-        // Explicitly increment tx nonce if calls are not isolated.
-        // This isn't needed in EVM, but required in zkEVM as the nonces are split.
-        if !config.evm_opts.isolate {
-            let tx_nonce = nonce;
-            foundry_zksync_core::set_tx_nonce(
-                broadcast.new_origin,
-                U256::from(tx_nonce.saturating_add(1)),
-                ecx_inner,
-            );
-            debug!(target: "cheatcodes", address=%broadcast.new_origin, new_tx_nonce=tx_nonce+1, tx_nonce, "incremented zksync tx nonce");
-        }
     }
 
     fn record_broadcastable_call_transactions(
@@ -304,16 +292,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             transaction: TransactionMaybeSigned::Unsigned(tx),
         });
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
-
-        // Explicitly increment tx nonce if calls are not isolated.
-        if !config.evm_opts.isolate {
-            foundry_zksync_core::set_tx_nonce(
-                broadcast.new_origin,
-                U256::from(tx_nonce.saturating_add(1)),
-                ecx_inner,
-            );
-            debug!(target: "cheatcodes", address=%broadcast.new_origin, new_tx_nonce=tx_nonce+1, tx_nonce, "incremented zksync tx nonce");
-        }
     }
 
     fn post_initialize_interp(
@@ -816,6 +794,21 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     },
                     memory_offset: call.return_memory_offset.clone(),
                 })
+            }
+        }
+    }
+
+    /// Increments the EraVM transaction nonce after recording broadcastable txs
+    /// and if we are not in isolate mode, as that handles it already
+    fn zksync_increment_nonce_after_broadcast(&self, state: &mut Cheatcodes, ecx: Ecx) {
+        // Explicitly increment tx nonce if calls are not isolated and we are broadcasting
+        // This isn't needed in EVM, but required in zkEVM as the nonces are split.
+        if let Some(broadcast) = &self.broadcast {
+            if ecx.inner.journaled_state.depth() >= broadcast.depth
+                && !state.config.evm_opts.isolate
+            {
+                foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, &mut ecx.inner);
+                debug!("incremented zksync nonce after broadcastable create");
             }
         }
     }
