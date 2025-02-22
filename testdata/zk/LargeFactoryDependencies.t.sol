@@ -27,7 +27,7 @@ contract ZkLargeFactoryDependenciesTest is DSTest {
         uint256 deploymentNonce = vm.zkGetDeploymentNonce(sender);
 
         // LargeContract should be deployed in 3 batches
-        uint256 n_batches = 3;
+        uint256 numBatches = 3;
 
         vm.broadcast(sender); // otherwise nonce is not propagated
         new LargeContract();
