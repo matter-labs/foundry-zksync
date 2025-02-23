@@ -23,7 +23,6 @@ pub trait StorageAccessRecorder {
         data: Vec<u8>,
         value: U256,
     );
-    fn pop_call_end_addresses(&mut self) -> CallAddresses;
     fn record_call_end(&mut self, accessor: Address, account: Address, new_balance: U256);
 }
 
@@ -88,25 +87,27 @@ pub struct AccountAccesses {
     pending: Vec<AccountAccess>,
     records_inner: Vec<AccountAccess>,
     is_recording: bool,
-    /// Track `FarCalls`s to allow matching them with their respective `Ret` opcodes.
-    /// zkEVM erases the `msg.sender` and `code_address` for certain calls like to MsgSimulator,
-    /// so we track them using this strategy to know when to skip the respective `Ret`s of already
-    /// skipped `FarCalls`s.
-    call_tracker: Vec<CallAddresses>,
-    last_create_addresses: Vec<Address>,
+    /// Track the calls that must be skipped.
+    /// We track this on a different stack to easily skip the `call_end`
+    /// instances, if they were marked to be skipped in the `call_start`.
+    call_skip_tracker: Vec<bool>,
+    /// Mark the next call at a given depth and having the given address accesses.
+    /// This is useful, for example to skip nested constructor calls after CREATE,
+    /// to allow us to omit/flatten them like in EVM.
+    skip_next_call: Option<(u64, CallAddresses)>,
 }
 
 impl AccountAccesses {
     pub fn get_records(self) -> Vec<AccountAccess> {
         assert!(
-            self.last_create_addresses.is_empty(),
-            "last create address is not empty; expected a CALL after CREATE to pop it: {:?}",
-            self.last_create_addresses
+            self.call_skip_tracker.is_empty(),
+            "call skip tracker is not empty; found calls without matching returns: {:?}",
+            self.call_skip_tracker
         );
         assert!(
-            self.call_tracker.is_empty(),
-            "CallTracker stack is not empty; found calls without matching returns: {:?}",
-            self.call_tracker
+            self.skip_next_call.is_none(),
+            "skip next call is not empty: {:?}",
+            self.skip_next_call
         );
         assert!(
             self.pending.is_empty(),
@@ -182,10 +183,9 @@ impl AccountAccesses {
             return;
         }
 
-        self.call_tracker.push(CallAddresses { account, accessor });
-
         // do not record calls to/from system addresses
         if is_system_address(accessor) || is_system_address(account) {
+            self.call_skip_tracker.push(true);
             return;
         }
 
@@ -194,12 +194,6 @@ impl AccountAccesses {
             CallType::Create(bytecode_hash) => (AccountAccessKind::Create, bytecode_hash),
         };
 
-        // For create we expect another CALL with empty data to the newly created address that we
-        // should skip recording, so we track the address until a matching CALL pops it.
-        if matches!(kind, AccountAccessKind::Create) {
-            self.last_create_addresses.push(account)
-        }
-
         let last_depth = if !self.pending.is_empty() {
             self.pending.last().map(|record| record.depth).expect("must have at least one record")
         } else {
@@ -207,6 +201,28 @@ impl AccountAccesses {
         };
         let new_depth = last_depth.checked_add(1).expect("overflow in recording call depth");
 
+        // For create we expect another CALL if the constructor is invoked. We need to skip/flatten
+        // this call so it is consistent with CREATE in the EVM.
+        match kind {
+            AccountAccessKind::Create => {
+                // skip the next nested call to the created address from the caller.
+                self.skip_next_call =
+                    Some((new_depth.saturating_add(1), CallAddresses { account, accessor }));
+            }
+            AccountAccessKind::Call => {
+                if let Some((depth, call_addr)) = self.skip_next_call.take() {
+                    if depth == new_depth &&
+                        call_addr.accessor == accessor &&
+                        call_addr.account == account
+                    {
+                        self.call_skip_tracker.push(true);
+                        return;
+                    }
+                }
+            }
+        }
+
+        self.call_skip_tracker.push(false);
         self.pending.push(AccountAccess {
             depth: new_depth,
             kind,
@@ -216,34 +232,29 @@ impl AccountAccesses {
             deployed_bytecode_hash,
             value,
             old_balance: balance,
-            new_balance: U256::ZERO, //balance.saturating_add(value),
+            new_balance: U256::ZERO,
             storage_accesses: Default::default(),
         });
     }
 
-    pub fn record_call_end(&mut self, account: Address, accessor: Address, new_balance: U256) {
+    pub fn record_call_end(&mut self, _account: Address, _accessor: Address, new_balance: U256) {
         if !self.is_recording {
             return;
         }
 
-        // do not record calls to/from system addresses
-        if is_system_address(accessor) || is_system_address(account) {
+        let skip_call =
+            self.call_skip_tracker.pop().expect("unexpected return while skipping call recording");
+        if skip_call {
             return;
         }
 
         let mut record = self.pending.pop().expect("unexpected return while recording call");
         record.new_balance = new_balance;
 
-        // For create we expect another CALL with empty data to the newly created address that we
-        // should skip recording
-        if let Some(last_create_addr) = self.last_create_addresses.last().cloned() {
-            if matches!(record.kind, AccountAccessKind::Call) &&
-                record.account == last_create_addr &&
-                record.data.is_empty()
-            {
-                // skip recording this call
-                self.last_create_addresses.pop();
-                return;
+        if let Some((depth, _)) = &self.skip_next_call {
+            if record.depth < *depth {
+                // reset call skip if not encountered (depth has been crossed)
+                self.skip_next_call = None;
             }
         }
 
@@ -259,9 +270,5 @@ impl AccountAccesses {
             // we have pending records, so record to inner.
             self.records_inner.push(record);
         }
-    }
-
-    pub fn pop_call_end_addresses(&mut self) -> CallAddresses {
-        self.call_tracker.pop().expect("unexpected request for call addresses; none on stack")
     }
 }

@@ -33,6 +33,11 @@ pub(crate) struct StorageView<S> {
     initial_writes_cache: HashMap<StorageKey, bool>,
     /// The tx caller.
     caller: H160,
+    /// Call tracker for recording storage accesses.
+    /// Track `FarCalls`s to allow matching them with their respective `Ret` opcodes.
+    /// zkEVM erases the `msg.sender` and `code_address` for certain calls like to MsgSimulator,
+    /// so we track them using this strategy to retain this information.
+    call_tracker: Vec<CallAddresses>,
 }
 
 impl<S: ReadStorage + fmt::Debug> StorageView<S> {
@@ -48,6 +53,7 @@ impl<S: ReadStorage + fmt::Debug> StorageView<S> {
             read_storage_keys: HashMap::new(),
             initial_writes_cache: HashMap::new(),
             caller,
+            call_tracker: Default::default(),
         }
     }
 
@@ -200,11 +206,14 @@ impl<S: ReadStorage + fmt::Debug + StorageAccessRecorder> StorageViewRecorder fo
         } else {
             self.read_value(&storage_key_for_eth_balance(&account.to_h160())).to_ru256()
         };
+
+        self.call_tracker.push(CallAddresses { account, accessor });
         self.storage_handle.record_call_start(call_type, accessor, account, balance, data, value);
     }
 
     fn record_call_end(&mut self) {
-        let CallAddresses { account, accessor } = self.storage_handle.pop_call_end_addresses();
+        let CallAddresses { account, accessor } =
+            self.call_tracker.pop().expect("unexpected request for call addresses; none on stack");
         let new_balance =
             self.read_value(&storage_key_for_eth_balance(&account.to_h160())).to_ru256();
         self.storage_handle.record_call_end(account, accessor, new_balance);
@@ -234,9 +243,6 @@ mod test {
         ) {
         }
         fn record_call_end(&mut self, _accessor: rAddress, _account: rAddress, _new_balance: U256) {
-        }
-        fn pop_call_end_addresses(&mut self) -> CallAddresses {
-            Default::default()
         }
     }
 
