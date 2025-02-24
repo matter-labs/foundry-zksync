@@ -21,7 +21,10 @@ contract StorageAccessor {
 }
 
 contract StorageAccessorDelegator {
-    function accessDelegation(StorageAccessor store1, StorageAccessor store2) public {
+    function accessDelegation(
+        StorageAccessor store1,
+        StorageAccessor store2
+    ) public {
         store1.read(bytes32(uint256(0x1b)));
         store1.write(bytes32(uint256(0x11)), bytes32(uint256(0x1a)));
         store2.write(bytes32(uint256(0x22)), bytes32(uint256(0x2a)));
@@ -51,8 +54,10 @@ contract PaymentDelegator {
 contract TransferDelegator {
     constructor() payable {}
 
-    function transferDelegation1Eth(address payee) public payable returns (bool success) {
-        (success,) = payable(payee).call{value: 1 ether}("");
+    function transferDelegation1Eth(
+        address payee
+    ) public payable returns (bool success) {
+        (success, ) = payable(payee).call{value: 1 ether}("");
     }
 }
 
@@ -107,7 +112,9 @@ contract ZkStateDiffTest is DSTest {
         store2.write(bytes32(uint256(0x22)), bytes32(uint256(0x2a)));
         store2.write(bytes32(uint256(0x23)), bytes32(uint256(0x2b)));
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
 
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](4);
@@ -240,7 +247,9 @@ contract ZkStateDiffTest is DSTest {
 
         storeDelegator.accessDelegation(store1, store2);
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
 
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](5);
@@ -388,7 +397,9 @@ contract ZkStateDiffTest is DSTest {
 
         payment.transact();
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](1);
 
@@ -416,7 +427,9 @@ contract ZkStateDiffTest is DSTest {
 
         paymentDelegator.transactDelegation(payment);
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](2);
 
@@ -459,7 +472,9 @@ contract ZkStateDiffTest is DSTest {
 
         payment.pay{value: 1 ether}();
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](1);
 
@@ -487,7 +502,9 @@ contract ZkStateDiffTest is DSTest {
 
         paymentDelegator.payDelegation{value: 1 ether}(payment);
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](2);
 
@@ -529,10 +546,12 @@ contract ZkStateDiffTest is DSTest {
         vm.startStateDiffRecording();
 
         // fails for 65536 and lower.
-        (bool success,) = payable(address(65537)).call{value: 1 ether}("");
+        (bool success, ) = payable(address(65537)).call{value: 1 ether}("");
         require(success);
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](1);
 
@@ -562,7 +581,9 @@ contract ZkStateDiffTest is DSTest {
         bool success = transferDelegator.transferDelegation1Eth(address(65537));
         require(success);
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](2);
 
@@ -606,7 +627,9 @@ contract ZkStateDiffTest is DSTest {
         address(new Bank());
         address(new Bank{value: 1 ether}());
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](2);
 
@@ -616,7 +639,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0x12db303A83e945CDBeB72359Ec365D2bd63d331E,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -631,7 +654,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0xf22ee22d4241fB723420Bec92D59f9913F1C949f,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
@@ -649,7 +672,9 @@ contract ZkStateDiffTest is DSTest {
 
         createDelegator.createDelegation();
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](3);
 
@@ -674,7 +699,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0x1F586b3A8E212336d1e3876e738314907732b7D5,
             accessor: 0xa4e69fB667e67734817b27C4b44a3b03542912D6,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -689,7 +714,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0xBC29fab1B038dBcfAE7099FE15e037584df360a2,
             accessor: 0xa4e69fB667e67734817b27C4b44a3b03542912D6,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
@@ -708,17 +733,19 @@ contract ZkStateDiffTest is DSTest {
         address(new Bank{salt: bytes32(uint256(0xe0))}());
         address(new Bank{value: 1 ether, salt: bytes32(uint256(0xe1))}());
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](2);
 
         expected[0] = Vm.AccountAccess({
             depth: 1,
             kind: Vm.AccountAccessKind.Create,
-            account: 0x08127508bd0496d2994eBbB85640518C7370df58,
+            account: 0x4cBbED7a4B02af358921620375133401CC2B168E,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -730,10 +757,10 @@ contract ZkStateDiffTest is DSTest {
         expected[1] = Vm.AccountAccess({
             depth: 1,
             kind: Vm.AccountAccessKind.Create,
-            account: 0x1efA7Ea529EAE6067aeD7223A88138975C531B32,
+            account: 0x649e0F52838Bf0dEac5a10465744113Bd0465723,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
@@ -751,7 +778,9 @@ contract ZkStateDiffTest is DSTest {
 
         create2Delegator.create2Delegation();
 
-        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(
+            vm.stopAndReturnStateDiff()
+        );
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
         Vm.AccountAccess[] memory expected = new Vm.AccountAccess[](3);
 
@@ -773,10 +802,10 @@ contract ZkStateDiffTest is DSTest {
         expected[1] = Vm.AccountAccess({
             depth: 2,
             kind: Vm.AccountAccessKind.Create,
-            account: 0x8f1008a7f1c09EB69E274105Ee4f7c14dFdDEe7E,
+            account: 0xeea6b123371297C6bb96F838D49E142e85f19875,
             accessor: 0x38C6337a87f3479f8E55789da8B9334Da21416FC,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -788,10 +817,10 @@ contract ZkStateDiffTest is DSTest {
         expected[2] = Vm.AccountAccess({
             depth: 2,
             kind: Vm.AccountAccessKind.Create,
-            account: 0x11a94Ab91007F5db82e21BA31529A9e871433B44,
+            account: 0x4dcD1E170c899395c7eAC37cE1F1AC9C3C9AEc12,
             accessor: 0x38C6337a87f3479f8E55789da8B9334Da21416FC,
             data: hex"",
-            deployedCode: hex"01000017ab6419b26e7d847fa40e504e976702137924a997d0fda898a524b954",
+            deployedCode: hex"01000017b3622c8fd779ff9fbd0fcdcd566e9fc90a08f72a594025e008c1e650",
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
@@ -804,34 +833,34 @@ contract ZkStateDiffTest is DSTest {
         assertEq(expected, diff);
     }
 
-    function concat(Vm.StorageAccess memory a) internal pure returns (Vm.StorageAccess[] memory out) {
+    function concat(
+        Vm.StorageAccess memory a
+    ) internal pure returns (Vm.StorageAccess[] memory out) {
         out = new Vm.StorageAccess[](1);
         out[0] = a;
     }
 
-    function concat(Vm.StorageAccess memory a, Vm.StorageAccess memory b)
-        internal
-        pure
-        returns (Vm.StorageAccess[] memory out)
-    {
+    function concat(
+        Vm.StorageAccess memory a,
+        Vm.StorageAccess memory b
+    ) internal pure returns (Vm.StorageAccess[] memory out) {
         out = new Vm.StorageAccess[](2);
         out[0] = a;
         out[1] = b;
     }
 
-    function filterCallOrCreate(Vm.AccountAccess[] memory inArr)
-        internal
-        pure
-        returns (Vm.AccountAccess[] memory out)
-    {
+    function filterCallOrCreate(
+        Vm.AccountAccess[] memory inArr
+    ) internal pure returns (Vm.AccountAccess[] memory out) {
         // allocate max length for out array
         out = new Vm.AccountAccess[](inArr.length);
         // track end size
         uint256 size;
         for (uint256 i = 0; i < inArr.length; ++i) {
             if (
-                inArr[i].kind == Vm.AccountAccessKind.Call || inArr[i].kind == Vm.AccountAccessKind.StaticCall
-                    || inArr[i].kind == Vm.AccountAccessKind.Create
+                inArr[i].kind == Vm.AccountAccessKind.Call ||
+                inArr[i].kind == Vm.AccountAccessKind.StaticCall ||
+                inArr[i].kind == Vm.AccountAccessKind.Create
             ) {
                 out[size] = inArr[i];
                 ++size;
@@ -843,25 +872,58 @@ contract ZkStateDiffTest is DSTest {
         }
     }
 
-    function assertEq(Vm.AccountAccess[] memory want, Vm.AccountAccess[] memory got) internal {
+    function assertEq(
+        Vm.AccountAccess[] memory want,
+        Vm.AccountAccess[] memory got
+    ) internal {
         assertEq(want.length, got.length, "account accesses length mismatch");
         for (uint256 i = 0; i < want.length; ++i) {
             assertEq(want[i].depth, got[i].depth, keyField(i, "depth"));
-            assertEq(uint8(want[i].kind), uint8(got[i].kind), keyField(i, "kind"));
+            assertEq(
+                uint8(want[i].kind),
+                uint8(got[i].kind),
+                keyField(i, "kind")
+            );
             assertEq(want[i].account, got[i].account, keyField(i, "account"));
-            assertEq(want[i].accessor, got[i].accessor, keyField(i, "accessor"));
+            assertEq(
+                want[i].accessor,
+                got[i].accessor,
+                keyField(i, "accessor")
+            );
             assertEq(want[i].data, got[i].data, keyField(i, "data"));
-            assertEq(want[i].deployedCode, got[i].deployedCode, keyField(i, "deployedCode"));
+            assertEq(
+                want[i].deployedCode,
+                got[i].deployedCode,
+                keyField(i, "deployedCode")
+            );
             assertEq(want[i].value, got[i].value, keyField(i, "value"));
-            assertEq(want[i].oldBalance, got[i].oldBalance, keyField(i, "oldBalance"));
-            assertEq(want[i].newBalance, got[i].newBalance, keyField(i, "newBalance"));
+            assertEq(
+                want[i].oldBalance,
+                got[i].oldBalance,
+                keyField(i, "oldBalance")
+            );
+            assertEq(
+                want[i].newBalance,
+                got[i].newBalance,
+                keyField(i, "newBalance")
+            );
 
-            assertEq(want[i].storageAccesses.length, got[i].storageAccesses.length, "storage accesses length mismatch");
+            assertEq(
+                want[i].storageAccesses.length,
+                got[i].storageAccesses.length,
+                "storage accesses length mismatch"
+            );
             for (uint256 j = 0; j < want[i].storageAccesses.length; ++j) {
                 assertEq(
-                    want[i].storageAccesses[j].account, got[i].storageAccesses[j].account, keyStorage(i, j, "account")
+                    want[i].storageAccesses[j].account,
+                    got[i].storageAccesses[j].account,
+                    keyStorage(i, j, "account")
                 );
-                assertEq(want[i].storageAccesses[j].slot, got[i].storageAccesses[j].slot, keyStorage(i, j, "slot"));
+                assertEq(
+                    want[i].storageAccesses[j].slot,
+                    got[i].storageAccesses[j].slot,
+                    keyStorage(i, j, "slot")
+                );
                 assertEq(
                     vm.toString(want[i].storageAccesses[j].isWrite),
                     vm.toString(got[i].storageAccesses[j].isWrite),
@@ -881,15 +943,26 @@ contract ZkStateDiffTest is DSTest {
         }
     }
 
-    function keyField(uint256 index, string memory field) internal pure returns (string memory) {
+    function keyField(
+        uint256 index,
+        string memory field
+    ) internal pure returns (string memory) {
         return string.concat("[", vm.toString(index), "].", field);
     }
 
-    function keyStorage(uint256 index, uint256 storageIndex, string memory field)
-        internal
-        pure
-        returns (string memory)
-    {
-        return string.concat("[", vm.toString(index), "].storage[", vm.toString(storageIndex), "].", field);
+    function keyStorage(
+        uint256 index,
+        uint256 storageIndex,
+        string memory field
+    ) internal pure returns (string memory) {
+        return
+            string.concat(
+                "[",
+                vm.toString(index),
+                "].storage[",
+                vm.toString(storageIndex),
+                "].",
+                field
+            );
     }
 }
