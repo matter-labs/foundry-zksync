@@ -5,7 +5,6 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
-use alloy_transport::Transport;
 use alloy_zksync::{network::Zksync, wallet::ZksyncWallet};
 use cast::{Cast, ZkTransactionOpts};
 use clap::Parser;
@@ -232,7 +231,7 @@ impl SendTxArgs {
     }
 }
 
-async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+async fn cast_send<P: Provider<AnyNetwork>>(
     provider: P,
     tx: WithOtherFields<TransactionRequest>,
     cast_async: bool,
@@ -247,8 +246,8 @@ async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
     handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
 }
 
-async fn handle_transaction_result<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
-    cast: &Cast<P, T>,
+async fn handle_transaction_result<P: Provider<AnyNetwork>>(
+    cast: &Cast<P>,
     tx_hash: &TxHash,
     cast_async: bool,
     confs: u64,
