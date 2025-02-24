@@ -28,6 +28,6 @@ contract ZkLargeFactoryDependenciesTest is DSTest {
         vm.broadcast(sender); // otherwise nonce is not propagated
         new LargeContract();
         assertEq(vm.zkGetDeploymentNonce(sender), deploymentNonce + 1);
-        assertEq(vm.zkGetTransactionNonce(sender), txNonce + n_batches);
+        assertEq(vm.zkGetTransactionNonce(sender), txNonce + numBatches);
     }
 }
