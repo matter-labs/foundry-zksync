@@ -212,7 +212,6 @@ impl FarCallHandler {
         match data.opcode.variant.opcode {
             Opcode::NearCall(_) => match self.tx_execution_tracker.status {
                 TxExecutionStatus::Executing => {
-                    let len = self.tx_execution_tracker.call_tracker.len();
                     let last = self
                         .tx_execution_tracker
                         .call_tracker

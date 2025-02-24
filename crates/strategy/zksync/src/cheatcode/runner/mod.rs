@@ -611,6 +611,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
+            record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -796,6 +797,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
+            record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
         };
 
         let mut gas = Gas::new(call.gas_limit);

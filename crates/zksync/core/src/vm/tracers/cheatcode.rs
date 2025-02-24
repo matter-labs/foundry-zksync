@@ -108,6 +108,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub paymaster_data: Option<ZkPaymasterData>,
     /// Era Vm environment
     pub zk_env: ZkEnv,
+    /// Whether to record storage accesses.
+    pub record_storage_accesses: bool,
 }
 
 /// Tracer result to return back to foundry.
@@ -146,6 +148,8 @@ pub struct CallContext {
     /// L1 block hashes to return when `BLOCKHASH` opcode is encountered. This ensures consistency
     /// when returning environment data in L2.
     pub block_hashes: HashMap<rU256, FixedBytes<32>>,
+    /// Whether to record storage accesses.
+    pub record_storage_accesses: bool,
 }
 
 /// A tracer to allow for foundry-specific functionality.
@@ -233,92 +237,104 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         self.farcall_handler.track_call_actions(&state, &data);
         let tx_tracking = self.farcall_handler.track_tx_execution(&state, &data, memory);
 
-        // Record account accesses
-        if tx_tracking.status_changed {
-            match tx_tracking.status {
-                TxExecutionStatus::Pending => (),
-                TxExecutionStatus::Executing => {
-                    storage.borrow_mut().start_recording();
-                }
-                TxExecutionStatus::Finished => {
-                    if let Some(CallExecutionStatus::CallFinished(_tx)) = &tx_tracking.call_status {
-                        storage.borrow_mut().record_call_end()
+        if self.call_context.record_storage_accesses {
+            // Record account accesses
+            if tx_tracking.status_changed {
+                match tx_tracking.status {
+                    TxExecutionStatus::Pending => (),
+                    TxExecutionStatus::Executing => {
+                        storage.borrow_mut().start_recording();
                     }
-                    storage.borrow_mut().stop_recording()
+                    TxExecutionStatus::Finished => {
+                        if let Some(CallExecutionStatus::CallFinished(_tx)) =
+                            &tx_tracking.call_status
+                        {
+                            storage.borrow_mut().record_call_end()
+                        }
+                        storage.borrow_mut().stop_recording()
+                    }
                 }
             }
-        }
 
-        // record accesses
-        if self.farcall_handler.is_tx_executing() {
-            if let Some(call_status) = tx_tracking.call_status {
-                let current = state.vm_local_state.callstack.current;
-                // Check if we have the msg.sender override correction scheduled and
-                // account for it as it is not yet applied
-                // to some of the calls we record.
-                let msg_sender = self
-                    .farcall_handler
-                    .immediate_actions()
-                    .iter()
-                    .find_map(|action| match action {
-                        CallAction::SetMessageSender(address) => Some(*address),
-                        _ => None,
-                    })
-                    .unwrap_or_else(|| current.msg_sender.to_address());
+            // record accesses
+            if self.farcall_handler.is_tx_executing() {
+                if let Some(call_status) = tx_tracking.call_status {
+                    let current = state.vm_local_state.callstack.current;
+                    // Check if we have the msg.sender override correction scheduled and
+                    // account for it as it is not yet applied
+                    // to some of the calls we record.
+                    let msg_sender = self
+                        .farcall_handler
+                        .immediate_actions()
+                        .iter()
+                        .find_map(|action| match action {
+                            CallAction::SetMessageSender(address) => Some(*address),
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| current.msg_sender.to_address());
 
-                let value = U256::from(current.context_u128_value);
-                let calldata = get_calldata(&state, memory);
-                let to = current.code_address;
+                    let value = U256::from(current.context_u128_value);
+                    let calldata = get_calldata(&state, memory);
+                    let to = current.code_address;
 
-                let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS &&
-                    (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) ||
-                        calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
-                {
-                    let mut params = ethabi::decode(
-                        &[
-                            ethabi::ParamType::Uint(256),
-                            ethabi::ParamType::Uint(256),
-                            ethabi::ParamType::Bytes,
-                        ],
-                        &calldata[4..],
-                    )
-                    .expect("failed to decode transfer parameters");
+                    let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS &&
+                        (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) ||
+                            calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
+                    {
+                        let mut params = ethabi::decode(
+                            &[
+                                ethabi::ParamType::Uint(256),
+                                ethabi::ParamType::Uint(256),
+                                ethabi::ParamType::Bytes,
+                            ],
+                            &calldata[4..],
+                        )
+                        .expect("failed to decode transfer parameters");
 
-                    let salt =
-                        params.remove(0).into_uint().expect("must be valid uint256").to_h256();
-                    let bytecode_hash =
-                        params.remove(0).into_uint().expect("must be valid uint256").to_h256();
-                    let constructor_input =
-                        params.remove(0).into_bytes().expect("must be valid uint256");
+                        let salt =
+                            params.remove(0).into_uint().expect("must be valid uint256").to_h256();
+                        let bytecode_hash =
+                            params.remove(0).into_uint().expect("must be valid uint256").to_h256();
+                        let constructor_input =
+                            params.remove(0).into_bytes().expect("must be valid uint256");
 
-                    let address = if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) {
-                        let full_nonce =
-                            storage.borrow_mut().read_value(&get_nonce_key(&msg_sender.to_h160()));
-                        let FullNonce { deploy_nonce, .. } =
-                            parse_full_nonce(full_nonce.to_ru256());
-                        compute_create_address(msg_sender, deploy_nonce as u32)
-                    } else if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2) {
-                        compute_create2_address(msg_sender, bytecode_hash, salt, &constructor_input)
+                        let address = if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) {
+                            let full_nonce = storage
+                                .borrow_mut()
+                                .read_value(&get_nonce_key(&msg_sender.to_h160()));
+                            let FullNonce { deploy_nonce, .. } =
+                                parse_full_nonce(full_nonce.to_ru256());
+                            compute_create_address(msg_sender, deploy_nonce as u32)
+                        } else if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2) {
+                            compute_create2_address(
+                                msg_sender,
+                                bytecode_hash,
+                                salt,
+                                &constructor_input,
+                            )
+                        } else {
+                            unreachable!()
+                        };
+
+                        (CallType::Create(bytecode_hash), address, constructor_input.to_vec())
                     } else {
-                        unreachable!()
+                        (CallType::Call, to.to_address(), calldata)
                     };
 
-                    (CallType::Create(bytecode_hash), address, constructor_input.to_vec())
-                } else {
-                    (CallType::Call, to.to_address(), calldata)
-                };
-
-                match call_status {
-                    CallExecutionStatus::CallStart(tx) => storage.borrow_mut().record_call_start(
-                        matches!(tx.opcode, FarCallOpcode::Mimic),
-                        call_type,
-                        msg_sender,
-                        account,
-                        data,
-                        value.to_ru256(),
-                    ),
-                    CallExecutionStatus::CallFinished(_tx) => {
-                        storage.borrow_mut().record_call_end()
+                    match call_status {
+                        CallExecutionStatus::CallStart(tx) => {
+                            storage.borrow_mut().record_call_start(
+                                matches!(tx.opcode, FarCallOpcode::Mimic),
+                                call_type,
+                                msg_sender,
+                                account,
+                                data,
+                                value.to_ru256(),
+                            )
+                        }
+                        CallExecutionStatus::CallFinished(_tx) => {
+                            storage.borrow_mut().record_call_end()
+                        }
                     }
                 }
             }
