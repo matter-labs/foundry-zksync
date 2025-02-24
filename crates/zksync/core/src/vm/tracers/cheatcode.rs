@@ -245,10 +245,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                         // Both calldata match, taking the length of the assumed smaller one (which will have at least the selector), and
                         *expected_calldata == calldata[..expected_calldata.len()] &&
                         // The value matches, if provided
-                        expected
-                            .value
-                            .map_or(true, |value|{
-                                value == rU256::from(current.context_u128_value)})
+                        expected.value.is_none_or(|value|{value == rU256::from(current.context_u128_value)})
                         {
                             *actual_count += 1;
                         }
@@ -279,7 +276,7 @@ impl<S: ReadStorage, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for Cheatcode
                         .iter_mut()
                         .find(|(mock, _)| {
                             call_input.get(..mock.calldata.len()) == Some(&mock.calldata[..]) &&
-                                mock.value.map_or(true, |value| value == call_value)
+                                mock.value.is_none_or(|value| value == call_value)
                         })
                         .map(|(_, v)| v),
                 } {
