@@ -24,7 +24,7 @@ use crate::{
 };
 
 use super::storage_recorder::{
-    AccountAccess, AccountAccesses, CallAddresses, CallType, StorageAccessRecorder,
+    AccountAccess, AccountAccesses, CallType, StorageAccessRecorder,
 };
 
 /// Default chain id
