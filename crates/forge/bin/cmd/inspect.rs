@@ -2,6 +2,7 @@ use alloy_json_abi::{EventParam, InternalType, JsonAbi, Param};
 use alloy_primitives::{hex, keccak256, Address};
 use clap::Parser;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Table};
+use core::{convert::Into, result::Result::Err};
 use eyre::{Context, Result};
 use forge::revm::primitives::Eof;
 use foundry_cli::opts::{BuildOpts, CompilerOpts};
@@ -17,9 +18,12 @@ use foundry_compilers::{
     info::ContractInfo,
     utils::canonicalize,
 };
+use foundry_config::{self, Config};
 use regex::Regex;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, sync::LazyLock};
+
+mod zksync;
 
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]
@@ -69,6 +73,15 @@ impl InspectArgs {
         } else {
             project.find_contract_path(&contract.name)?
         };
+
+        if modified_build_args.compiler.zk.enabled() {
+            let should_compile_with_zksolc = zksync::check_command_for_field(&field)?;
+            if should_compile_with_zksolc {
+                let config = Config { ..Default::default() };
+                return zksync::inspect(&field, config, target_path, &contract.name);
+            }
+        }
+
         let mut output = compiler.files([target_path.clone()]).compile(&project)?;
 
         // Find the artifact
@@ -531,7 +544,8 @@ fn print_json(obj: &impl serde::Serialize) -> Result<()> {
     Ok(())
 }
 
-fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<()> {
+// NOTE(zk): we make this public so that we can use it in `zksolc` module.
+pub(crate) fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<()> {
     sh_println!("{}", get_json_str(obj, key)?)?;
     Ok(())
 }
