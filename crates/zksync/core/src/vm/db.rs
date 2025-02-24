@@ -248,10 +248,6 @@ where
     fn record_call_end(&mut self, accessor: Address, account: Address, new_balance: rU256) {
         self.account_accesses.record_call_end(accessor, account, new_balance);
     }
-
-    fn pop_call_end_addresses(&mut self) -> CallAddresses {
-        self.account_accesses.pop_call_end_addresses()
-    }
 }
 
 impl<DB> ReadStorage for &mut ZKVMData<'_, DB>
