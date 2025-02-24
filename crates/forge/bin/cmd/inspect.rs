@@ -21,6 +21,8 @@ use regex::Regex;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, sync::LazyLock};
 
+mod zksync;
+
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]
 pub struct InspectArgs {

@@ -34,4 +34,5 @@ mod zk_build;
 mod zk_cmd;
 mod zk_config;
 mod zk_ext_integration;
+mod zk_inspect;
 mod zk_script;
