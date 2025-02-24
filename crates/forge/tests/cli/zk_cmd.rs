@@ -101,15 +101,16 @@ import "forge-std/Test.sol";
 // https://github.com/matter-labs/foundry-zksync/issues/478
 contract CallEmptyCode is Test {
     // This test should make our EraVM tracer print out an ERROR trace
-    function testFailDetectEmptyCodeContracts() external {
+    function testDetectEmptyCodeContracts() external {
         address mockMe = address(123456789);
 
         vm.mockCall(mockMe, abi.encodeWithSignature("foo()"), abi.encode(42));
 
         (bool success, bytes memory ret) = mockMe.call(abi.encodeWithSignature("bar()"));
 
-        require(success, "callMethod failed");
-        require(keccak256(ret) == keccak256(abi.encode(42)), "return not as expected");
+        require(!success, "callMethod succeeded when it should have failed");
+        require(keccak256(ret) != keccak256(abi.encode(42)), "return expected to be different but it was the same");
+
     }
 }
 "#,

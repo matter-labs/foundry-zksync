@@ -145,10 +145,6 @@ jobs:
 
   deny:
     uses: ithacaxyz/ci/.github/workflows/deny.yml@main
-    with:
-      # Clear out arguments to not pass `--all-features` to `cargo deny`.
-      # Many crates have an `openssl` feature which enables banned dependencies.
-      deny-flags: ""
 
 
   check-ci-install:

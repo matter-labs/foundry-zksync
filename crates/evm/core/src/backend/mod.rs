@@ -2043,7 +2043,6 @@ fn apply_state_changeset(
 }
 
 #[cfg(test)]
-#[allow(clippy::needless_return)]
 mod tests {
     use crate::{
         backend::{strategy::BackendStrategy, Backend},

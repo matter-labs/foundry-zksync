@@ -1,7 +1,7 @@
 //! # foundry-zksync
 //!
 //! Main Foundry ZKSync implementation.
-#![warn(missing_docs, unused_crate_dependencies)]
+#![warn(missing_docs)]
 
 /// Contains cheatcode implementations.
 pub mod cheatcodes;
@@ -20,7 +20,6 @@ pub mod state;
 
 use alloy_network::TransactionBuilder;
 use alloy_primitives::{address, hex, keccak256, Address, Bytes, B256, U256 as rU256};
-use alloy_transport::Transport;
 use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
     provider::ZksyncProvider,
@@ -137,7 +136,7 @@ pub struct EstimatedGas {
 
 /// Estimates the gas parameters for the provided transaction.
 /// This will call `estimateFee` method on the rpc and set the gas parameters on the transaction.
-pub async fn estimate_fee<P: ZksyncProvider<T>, T: Transport + Clone>(
+pub async fn estimate_fee<P: ZksyncProvider>(
     tx: &mut ZkTransactionRequest,
     provider: P,
     estimate_multiplier: u64,

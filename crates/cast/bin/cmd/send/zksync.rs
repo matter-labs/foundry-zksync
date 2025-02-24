@@ -3,7 +3,6 @@ use alloy_primitives::hex;
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use alloy_transport::Transport;
 use alloy_zksync::{
     network::{
         transaction_request::TransactionRequest as ZkTransactionRequest,
@@ -15,7 +14,7 @@ use cast::{Cast, ZkCast, ZkTransactionOpts};
 use eyre::Result;
 
 #[allow(clippy::too_many_arguments)]
-pub async fn send_zk_transaction<P, Z, T>(
+pub async fn send_zk_transaction<P, Z>(
     provider: P,
     zk_provider: Z,
     tx: WithOtherFields<TransactionRequest>,
@@ -26,9 +25,8 @@ pub async fn send_zk_transaction<P, Z, T>(
     timeout: u64,
 ) -> Result<()>
 where
-    P: Provider<T, AnyNetwork>,
-    Z: ZksyncProvider<T>,
-    T: Transport + Clone,
+    P: Provider<AnyNetwork>,
+    Z: ZksyncProvider,
 {
     let mut tx = prepare_zk_transaction(tx, zk_tx_opts, zk_code)?;
 
