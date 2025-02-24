@@ -162,7 +162,13 @@ pub trait CheatcodeInspectorStrategyExt {
         None
     }
 
-    fn zksync_increment_nonce_after_broadcast(&self, _state: &mut Cheatcodes, _ecx: Ecx) {}
+    fn zksync_increment_nonce_after_broadcast(
+        &self,
+        _state: &mut Cheatcodes,
+        _ecx: Ecx,
+        _is_static: bool,
+    ) {
+    }
 }
 
 #[derive(Debug, Default, Clone)]

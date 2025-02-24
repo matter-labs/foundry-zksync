@@ -155,7 +155,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             let mut tx = WithOtherFields::new(TransactionRequest {
                 from: Some(broadcast.new_origin),
                 to: Some(TxKind::Call(Address::ZERO)),
-                value: Some(input.value()),
+                value: None,
                 nonce: Some(nonce),
                 ..Default::default()
             });
@@ -800,12 +800,22 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
     /// Increments the EraVM transaction nonce after recording broadcastable txs
     /// and if we are not in isolate mode, as that handles it already
-    fn zksync_increment_nonce_after_broadcast(&self, state: &mut Cheatcodes, ecx: Ecx<'_, '_, '_>) {
+    fn zksync_increment_nonce_after_broadcast(
+        &self,
+        state: &mut Cheatcodes,
+        ecx: Ecx<'_, '_, '_>,
+        is_static: bool,
+    ) {
+        // Don't do anything for static calls
+        if is_static {
+            return;
+        }
+
         // Explicitly increment tx nonce if calls are not isolated and we are broadcasting
         // This isn't needed in EVM, but required in zkEVM as the nonces are split.
         if let Some(broadcast) = &state.broadcast {
-            if ecx.inner.journaled_state.depth() >= broadcast.depth &&
-                !state.config.evm_opts.isolate
+            if ecx.inner.journaled_state.depth() >= broadcast.depth
+                && !state.config.evm_opts.isolate
             {
                 foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, &mut ecx.inner);
                 debug!("incremented zksync nonce after broadcastable create");
