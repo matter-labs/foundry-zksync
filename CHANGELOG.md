@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.9](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.8...foundry-zksync-v0.0.9) (2025-02-20)
+
+
+### Features
+
+* add support for cast estimate ([#903](https://github.com/matter-labs/foundry-zksync/issues/903)) ([5eaf1a7](https://github.com/matter-labs/foundry-zksync/commit/5eaf1a794e98086e3ff1900e384e62b95448dd70))
+* Add support for cast send --create  ([#913](https://github.com/matter-labs/foundry-zksync/issues/913)) ([9aaddd6](https://github.com/matter-labs/foundry-zksync/commit/9aaddd6507039cf031599b81ede78fde75b28f6d))
+* cast mktx and mktx --create support ([#911](https://github.com/matter-labs/foundry-zksync/issues/911)) ([4f89e2f](https://github.com/matter-labs/foundry-zksync/commit/4f89e2fd316edb4a8ad013779679ea55ce7a4e03))
+* **cast:zk:** `call` and `call --create` support ([#917](https://github.com/matter-labs/foundry-zksync/issues/917)) ([2eaac65](https://github.com/matter-labs/foundry-zksync/commit/2eaac658af0152576ce6515db650787199a4abb7))
+* inspect command ([#906](https://github.com/matter-labs/foundry-zksync/issues/906)) ([f7059a1](https://github.com/matter-labs/foundry-zksync/commit/f7059a156c1efb2f7c8dd350521bb0cf69e8809c))
+
+
+### Bug Fixes
+
+* foundry toml invalid setting does not discard other settings ([#912](https://github.com/matter-labs/foundry-zksync/issues/912)) ([27eda8b](https://github.com/matter-labs/foundry-zksync/commit/27eda8b39ee5fef6997c6993ccea771b0439b6db))
+* Use new alchemy key to avoid rate limiting issues ([#919](https://github.com/matter-labs/foundry-zksync/issues/919)) ([89fa128](https://github.com/matter-labs/foundry-zksync/commit/89fa12899e7407576f29297b80b0fa161e6532c5))
+
 ## [0.0.8](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.7...foundry-zksync-v0.0.8) (2025-02-05)
 
 

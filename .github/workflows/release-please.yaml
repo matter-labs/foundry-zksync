@@ -22,7 +22,7 @@ jobs:
   release-please:
     uses: matter-labs/zksync-ci-common/.github/workflows/release-please.yaml@v1
     secrets:
-      slack_webhook: ${{ secrets.SLACK_WEBHOOK }}
+      slack_webhook: ${{ secrets.SLACK_WEBHOOK_RELEASES }}
       gh_token: ${{ secrets.GITHUB_TOKEN }}
     with:
       config: '.github/release-please/config.json'     # Specify the path to the configuration file
