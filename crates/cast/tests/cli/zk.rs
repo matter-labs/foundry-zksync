@@ -344,9 +344,7 @@ casttest!(test_zk_cast_call, async |_prj, cmd| {
             "--zksync",
         ])
         .assert_success()
-        .stdout_eq(str![[r#"
-0x00000000000000000000000000000000000000000000003635c9adc5dea00000
-"#]]);
+        .stdout_eq(str![[r#"0x00000000000000000000000000000000000000000000003635c9adc5dea00000"#]]);
 });
 
 casttest!(test_zk_cast_call_create, async |_prj, cmd| {
@@ -356,9 +354,7 @@ casttest!(test_zk_cast_call_create, async |_prj, cmd| {
     cmd.cast_fuse()
         .args(["call", "--rpc-url", &url, "--zksync", "--create", COUNTER_BYTECODE])
         .assert_success()
-        .stdout_eq(str![[r#"
-0x000000000000000000000000f78d915dd63894ab9b78130a176bd372cce176c0
-"#]]);
+        .stdout_eq(str![[r#"0x000000000000000000000000f78d915dd63894ab9b78130a176bd372cce176c0"#]]);
 
     // NOTE: we have the same output address because the state change
     // is never propagated so the nonce remains the same
@@ -375,7 +371,5 @@ casttest!(test_zk_cast_call_create, async |_prj, cmd| {
             "1",
         ])
         .assert_success()
-        .stdout_eq(str![[r#"
-0x000000000000000000000000f78d915dd63894ab9b78130a176bd372cce176c0
-"#]]);
+        .stdout_eq(str![[r#"0x000000000000000000000000f78d915dd63894ab9b78130a176bd372cce176c0"#]]);
 });
