@@ -6,22 +6,23 @@ use core::{convert::Into, result::Result::Err};
 use eyre::{Context, Result};
 use forge::revm::primitives::Eof;
 use foundry_cli::opts::{BuildOpts, CompilerOpts};
-use foundry_common::{compile::ProjectCompiler, fmt::pretty_eof, shell};
-use foundry_compilers::{
-    artifacts::{
-        output_selection::{
-            BytecodeOutputSelection, ContractOutputSelection, DeployedBytecodeOutputSelection,
-            EvmOutputSelection, EwasmOutputSelection,
-        },
-        CompactBytecode, StorageLayout,
+use foundry_common::{
+    compile::{PathOrContractInfo, ProjectCompiler},
+    find_matching_contract_artifact, find_target_path,
+    fmt::pretty_eof,
+    shell,
+};
+use foundry_compilers::artifacts::{
+    output_selection::{
+        BytecodeOutputSelection, ContractOutputSelection, DeployedBytecodeOutputSelection,
+        EvmOutputSelection, EwasmOutputSelection,
     },
-    info::ContractInfo,
-    utils::canonicalize,
+    CompactBytecode, StorageLayout,
 };
 use foundry_config::{self, Config};
 use regex::Regex;
 use serde_json::{Map, Value};
-use std::{collections::BTreeMap, fmt, sync::LazyLock};
+use std::{collections::BTreeMap, fmt, str::FromStr, sync::LazyLock};
 
 mod zksync;
 
@@ -29,7 +30,8 @@ mod zksync;
 #[derive(Clone, Debug, Parser)]
 pub struct InspectArgs {
     /// The identifier of the contract to inspect in the form `(<path>:)?<contractname>`.
-    pub contract: ContractInfo,
+    #[arg(value_parser = PathOrContractInfo::from_str)]
+    pub contract: PathOrContractInfo,
 
     /// The contract artifact field to inspect.
     #[arg(value_enum)]
@@ -38,11 +40,15 @@ pub struct InspectArgs {
     /// All build arguments are supported
     #[command(flatten)]
     build: BuildOpts,
+
+    /// Whether to remove comments when inspecting `ir` and `irOptimized` artifact fields.
+    #[arg(long, short, help_heading = "Display options")]
+    pub strip_yul_comments: bool,
 }
 
 impl InspectArgs {
     pub fn run(self) -> Result<()> {
-        let Self { contract, field, build } = self;
+        let Self { contract, field, build, strip_yul_comments } = self;
 
         trace!(target: "forge", ?field, ?contract, "running forge inspect");
 
@@ -68,6 +74,7 @@ impl InspectArgs {
         // Build the project
         let project = modified_build_args.project()?;
         let compiler = ProjectCompiler::new().quiet(true);
+<<<<<<< HEAD
         let target_path = if let Some(path) = &contract.path {
             canonicalize(project.root().join(path))?
         } else {
@@ -82,12 +89,13 @@ impl InspectArgs {
             }
         }
 
+=======
+        let target_path = find_target_path(&project, &contract)?;
+>>>>>>> foundry/master
         let mut output = compiler.files([target_path.clone()]).compile(&project)?;
 
         // Find the artifact
-        let artifact = output.remove(&target_path, &contract.name).ok_or_else(|| {
-            eyre::eyre!("Could not find artifact `{contract}` in the compiled artifacts")
-        })?;
+        let artifact = find_matching_contract_artifact(&mut output, &target_path, contract.name())?;
 
         // Match on ContractArtifactFields and pretty-print
         match field {
@@ -123,10 +131,10 @@ impl InspectArgs {
                 print_json(&artifact.devdoc)?;
             }
             ContractArtifactField::Ir => {
-                print_yul(artifact.ir.as_deref())?;
+                print_yul(artifact.ir.as_deref(), strip_yul_comments)?;
             }
             ContractArtifactField::IrOptimized => {
-                print_yul(artifact.ir_optimized.as_deref())?;
+                print_yul(artifact.ir_optimized.as_deref(), strip_yul_comments)?;
             }
             ContractArtifactField::Metadata => {
                 print_json(&artifact.metadata)?;
@@ -550,15 +558,19 @@ pub(crate) fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> 
     Ok(())
 }
 
-fn print_yul(yul: Option<&str>) -> Result<()> {
+fn print_yul(yul: Option<&str>, strip_comments: bool) -> Result<()> {
     let Some(yul) = yul else {
         eyre::bail!("Could not get IR output");
     };
 
     static YUL_COMMENTS: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(///.*\n\s*)|(\s*/\*\*.*\*/)").unwrap());
+        LazyLock::new(|| Regex::new(r"(///.*\n\s*)|(\s*/\*\*.*?\*/)").unwrap());
 
-    sh_println!("{}", YUL_COMMENTS.replace_all(yul, ""))?;
+    if strip_comments {
+        sh_println!("{}", YUL_COMMENTS.replace_all(yul, ""))?;
+    } else {
+        sh_println!("{yul}")?;
+    }
 
     Ok(())
 }

@@ -10,7 +10,14 @@ use crate::{
     strategy::CheatcodeInspectorStrategy,
     test::{
         assume::AssumeNoRevert,
+<<<<<<< HEAD
         expect::{self, ExpectedEmitTracker, ExpectedRevert, ExpectedRevertKind},
+=======
+        expect::{
+            self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedCreate,
+            ExpectedEmitTracker, ExpectedRevert, ExpectedRevertKind,
+        },
+>>>>>>> foundry/master
         revert_handlers,
     },
     utils::IgnoredTraces,
@@ -470,6 +477,8 @@ pub struct Cheatcodes {
     pub expected_calls: ExpectedCallTracker,
     /// Expected emits
     pub expected_emits: ExpectedEmitTracker,
+    /// Expected creates
+    pub expected_creates: Vec<ExpectedCreate>,
 
     /// Map of context depths to memory offset ranges that may be written to within the call depth.
     pub allowed_mem_writes: HashMap<u64, Vec<Range<u64>>>,
@@ -606,6 +615,7 @@ impl Cheatcodes {
             mocked_functions: Default::default(),
             expected_calls: Default::default(),
             expected_emits: Default::default(),
+            expected_creates: Default::default(),
             allowed_mem_writes: Default::default(),
             broadcast: Default::default(),
             broadcastable_transactions: Default::default(),
@@ -812,7 +822,12 @@ impl Cheatcodes {
     }
 
     // common create_end functionality for both legacy and EOF.
-    fn create_end_common(&mut self, ecx: Ecx, mut outcome: CreateOutcome) -> CreateOutcome
+    fn create_end_common(
+        &mut self,
+        ecx: Ecx,
+        call: Option<&CreateInputs>,
+        mut outcome: CreateOutcome,
+    ) -> CreateOutcome
 where {
         let ecx = &mut ecx.inner;
 
@@ -924,7 +939,28 @@ where {
             }
         }
 
+<<<<<<< HEAD
         self.strategy.runner.zksync_record_create_address(self.strategy.context.as_mut(), &outcome);
+=======
+        // Match the create against expected_creates
+        if !self.expected_creates.is_empty() {
+            if let (Some(address), Some(call)) = (outcome.address, call) {
+                if let Ok(created_acc) = ecx.journaled_state.load_account(address, &mut ecx.db) {
+                    let bytecode =
+                        created_acc.info.code.clone().unwrap_or_default().original_bytes();
+                    if let Some((index, _)) =
+                        self.expected_creates.iter().find_position(|expected_create| {
+                            expected_create.deployer == call.caller &&
+                                expected_create.create_scheme.eq(call.scheme) &&
+                                expected_create.bytecode == bytecode
+                        })
+                    {
+                        self.expected_creates.swap_remove(index);
+                    }
+                }
+            }
+        }
+>>>>>>> foundry/master
 
         outcome
     }
@@ -1681,7 +1717,9 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
             }
 
             // If there's not a revert, we can continue on to run the last logic for expect*
-            // cheatcodes. Match expected calls
+            // cheatcodes.
+
+            // Match expected calls
             for (address, calldatas) in &self.expected_calls {
                 // Loop over each address, and for each address, loop over each calldata it expects.
                 for (calldata, (expected, actual_count)) in calldatas {
@@ -1729,6 +1767,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
                     }
                 }
             }
+
             // Check if we have any leftover expected emits
             // First, if any emits were found at the root call, then we its ok and we remove them.
             self.expected_emits.retain(|(expected, _)| expected.count > 0 && !expected.found);
@@ -1745,6 +1784,19 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
                 outcome.result.output = Error::encode(msg);
                 return outcome;
             }
+
+            // Check for leftover expected creates
+            if let Some(expected_create) = self.expected_creates.first() {
+                let msg = format!(
+                    "expected {} call by address {} for bytecode {} but not found",
+                    expected_create.create_scheme,
+                    hex::encode_prefixed(expected_create.deployer),
+                    hex::encode_prefixed(&expected_create.bytecode),
+                );
+                outcome.result.result = InstructionResult::Revert;
+                outcome.result.output = Error::encode(msg);
+                return outcome;
+            }
         }
 
         outcome
@@ -1757,10 +1809,10 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
     fn create_end(
         &mut self,
         ecx: Ecx,
-        _call: &CreateInputs,
+        call: &CreateInputs,
         outcome: CreateOutcome,
     ) -> CreateOutcome {
-        self.create_end_common(ecx, outcome)
+        self.create_end_common(ecx, Some(call), outcome)
     }
 
     fn eofcreate(&mut self, ecx: Ecx, call: &mut EOFCreateInputs) -> Option<CreateOutcome> {
@@ -1773,7 +1825,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
         _call: &EOFCreateInputs,
         outcome: CreateOutcome,
     ) -> CreateOutcome {
-        self.create_end_common(ecx, outcome)
+        self.create_end_common(ecx, None, outcome)
     }
 }
 
