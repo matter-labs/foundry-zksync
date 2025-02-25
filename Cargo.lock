@@ -73,7 +73,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
-<<<<<<< HEAD
 name = "alloy"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -99,30 +98,18 @@ name = "alloy-chains"
 version = "0.1.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a754dbb534198644cb8355b8c23f4aaecf03670fb9409242be1fa1e25897ee9"
-=======
-name = "alloy-chains"
-version = "0.1.62"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1317fde6d2d3cd6082a15144c23230697a5e1a91a27d1facc146715d3b4b2046"
->>>>>>> foundry/master
 dependencies = [
  "alloy-primitives",
  "num_enum 0.7.3",
  "serde",
- "strum 0.27.1",
+ "strum 0.26.3",
 ]
 
 [[package]]
 name = "alloy-consensus"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "41ed961a48297c732a5d97ee321aa8bb5009ecadbcb077d8bec90cb54e651629"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69e32ef5c74bbeb1733c37f4ac7f866f8c8af208b7b4265e21af609dcac5bd5e"
->>>>>>> foundry/master
 dependencies = [
  "alloy-eips 0.5.4",
  "alloy-primitives",
@@ -188,7 +175,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "alloy-core"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,11 +191,6 @@ dependencies = [
 name = "alloy-dyn-abi"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-name = "alloy-dyn-abi"
-version = "0.8.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
 checksum = "555896f0b8578adb522b1453b6e6cc6704c3027bd0af20058befdde992cee8e9"
 dependencies = [
  "alloy-json-abi",
@@ -249,7 +230,6 @@ dependencies = [
  "alloy-rlp",
  "arbitrary",
  "rand 0.8.5",
-<<<<<<< HEAD
  "serde",
 ]
 
@@ -262,8 +242,6 @@ dependencies = [
  "alloy-primitives",
  "alloy-rlp",
  "derive_more",
-=======
->>>>>>> foundry/master
  "serde",
 ]
 
@@ -277,18 +255,13 @@ dependencies = [
  "alloy-rlp",
  "arbitrary",
  "derive_more",
-<<<<<<< HEAD
  "k256 0.13.4",
-=======
- "k256",
->>>>>>> foundry/master
  "rand 0.8.5",
  "serde",
 ]
 
 [[package]]
 name = "alloy-eips"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b69e06cf9c37be824b9d26d6d101114fdde6af0c87de2828b414c05c4b3daa71"
@@ -309,10 +282,6 @@ dependencies = [
 name = "alloy-eips"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
 checksum = "5591581ca2ab0b3e7226a4047f9a1bfcf431da1d0cce3752fda609fea3c27e37"
 dependencies = [
  "alloy-eip2124",
@@ -356,7 +325,6 @@ dependencies = [
 
 [[package]]
 name = "alloy-json-rpc"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af5979e0d5a7bf9c7eb79749121e8256e59021af611322aee56e77e20776b4b3"
@@ -373,10 +341,6 @@ dependencies = [
 name = "alloy-json-rpc"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
 checksum = "762414662d793d7aaa36ee3af6928b6be23227df1681ce9c039f6f11daadef64"
 dependencies = [
  "alloy-primitives",
@@ -389,15 +353,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-network"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "204237129086ce5dc17a58025e93739b01b45313841f98fa339eb1d780511e57"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8be03f2ebc00cf88bd06d3c6caf387dceaa9c7e6b268216779fa68a9bf8ab4e6"
->>>>>>> foundry/master
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -441,15 +399,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-network-primitives"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "514f70ee2a953db21631cd817b13a1571474ec77ddc03d47616d5e8203489fde"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a00ce618ae2f78369918be0c20f620336381502c83b6ed62c2f7b2db27698b0"
->>>>>>> foundry/master
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -478,19 +430,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81a3906afb50446392eb798dae4b918ba4ffcca47542efda7215776ddc8b5037"
 dependencies = [
  "alloy-genesis",
-<<<<<<< HEAD
  "alloy-network 0.11.1",
  "alloy-primitives",
  "alloy-signer 0.11.1",
  "alloy-signer-local 0.11.1",
  "k256 0.13.4",
-=======
- "alloy-network",
- "alloy-primitives",
- "alloy-signer",
- "alloy-signer-local",
- "k256",
->>>>>>> foundry/master
  "rand 0.8.5",
  "serde_json",
  "tempfile",
@@ -709,15 +653,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-eth"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00b034779a4850b4b03f5be5ea674a1cf7d746b2da762b34d1860ab45e48ca27"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b4dbee4d82f8a22dde18c28257bed759afeae7ba73da4a1479a039fd1445d04"
->>>>>>> foundry/master
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-eips 0.5.4",
@@ -780,7 +718,6 @@ dependencies = [
 
 [[package]]
 name = "alloy-serde"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "028e72eaa9703e4882344983cfe7636ce06d8cce104a78ea62fd19b46659efc4"
@@ -794,10 +731,6 @@ dependencies = [
 name = "alloy-serde"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
 checksum = "8732058f5ca28c1d53d241e8504620b997ef670315d7c8afab856b3e3b80d945"
 dependencies = [
  "alloy-primitives",
@@ -807,7 +740,6 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "592c185d7100258c041afac51877660c7bf6213447999787197db4842f0e938e"
@@ -824,10 +756,6 @@ dependencies = [
 name = "alloy-signer"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
 checksum = "f96b3526fdd779a4bd0f37319cfb4172db52a7ac24cdbb8804b72091c18e1701"
 dependencies = [
  "alloy-dyn-abi",
@@ -836,13 +764,8 @@ dependencies = [
  "async-trait",
  "auto_impl",
  "either",
-<<<<<<< HEAD
  "elliptic-curve 0.13.8",
  "k256 0.13.4",
-=======
- "elliptic-curve",
- "k256",
->>>>>>> foundry/master
  "thiserror 2.0.11",
 ]
 
@@ -904,15 +827,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-signer-local"
-<<<<<<< HEAD
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6614f02fc1d5b079b2a4a5320018317b506fd0a6d67c1fd5542a71201724986c"
-=======
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe8f78cd6b7501c7e813a1eb4a087b72d23af51f5bb66d4e948dc840bdd207d8"
->>>>>>> foundry/master
 dependencies = [
  "alloy-consensus 0.5.4",
  "alloy-network 0.5.4",
@@ -940,11 +857,7 @@ dependencies = [
  "coins-bip32",
  "coins-bip39",
  "eth-keystore",
-<<<<<<< HEAD
  "k256 0.13.4",
-=======
- "k256",
->>>>>>> foundry/master
  "rand 0.8.5",
  "thiserror 2.0.11",
 ]
@@ -1320,10 +1233,7 @@ dependencies = [
  "op-alloy-rpc-types",
  "parking_lot",
  "rand 0.8.5",
-<<<<<<< HEAD
  "regex",
-=======
->>>>>>> foundry/master
  "revm",
  "serde",
  "serde_json",
@@ -1489,15 +1399,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-<<<<<<< HEAD
 version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
-=======
-version = "1.0.96"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b964d184e89d9b6b67dd2715bc8e74cf3107fb2b529990c90cf517326150bf4"
->>>>>>> foundry/master
 
 [[package]]
 name = "arbitrary"
@@ -1799,9 +1703,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "aws-config"
-version = "1.5.16"
+version = "1.5.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50236e4d60fe8458de90a71c0922c761e41755adf091b1b03de1cef537179915"
+checksum = "490aa7465ee685b2ced076bb87ef654a47724a7844e2c7d3af4e749ce5b875dd"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1841,9 +1745,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.12.3"
+version = "1.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c6a895b664295a4ba0c2c0203c7075ea585dd75cd5c37a8efac829e13e460ef"
+checksum = "4cd755adf9707cf671e31d944a189be3deaaeee11c8bc1d669bb8022ac90fbd0"
 dependencies = [
  "aws-lc-sys",
  "paste",
@@ -1886,18 +1790,14 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "tracing",
-<<<<<<< HEAD
- "uuid 1.13.2",
-=======
  "uuid 1.14.0",
->>>>>>> foundry/master
 ]
 
 [[package]]
 name = "aws-sdk-kms"
-version = "1.60.0"
+version = "1.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adc36035f7393a24719069c9a2f52e20972f7ee8472bd788e863968736acc449"
+checksum = "72054067b7b84e963ee29c3b7fdfc61f76bcfc697e38b8dc1095a3ad2e7e764a"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1917,9 +1817,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sso"
-version = "1.59.0"
+version = "1.60.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00a35fc7e74f5be45839eb753568535c074a592185dd0a2d406685018d581c43"
+checksum = "60186fab60b24376d3e33b9ff0a43485f99efd470e3b75a9160c849741d63d56"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1939,9 +1839,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-ssooidc"
-version = "1.60.0"
+version = "1.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8fa655b4f313124ce272cbc38c5fef13793c832279cec750103e5e6b71a54b8"
+checksum = "7033130ce1ee13e6018905b7b976c915963755aef299c1521897679d6cd4f8ef"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1961,9 +1861,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-sts"
-version = "1.60.0"
+version = "1.61.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc1cfe5e16b90421ea031f4c6348b534ef442e76f6bf4a1b2b592c12cc2c6af9"
+checksum = "c5c1cac7677179d622b4448b0d31bcb359185295dc6fca891920cfb17e2b5156"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -2333,16 +2233,7 @@ version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0700ddab506f33b20a03b13996eccd309a48e5ff77d0d95926aa0210fb4e95f1"
 dependencies = [
- "bit-vec 0.6.3",
-]
-
-[[package]]
-name = "bit-set"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
-dependencies = [
- "bit-vec 0.8.0",
+ "bit-vec",
 ]
 
 [[package]]
@@ -2353,12 +2244,6 @@ checksum = "349f9b6a179ed607305526ca489b34ad0a41aed5f7980fa90eb03160b69598fb"
 dependencies = [
  "serde",
 ]
-
-[[package]]
-name = "bit-vec"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
 
 [[package]]
 name = "bitflags"
@@ -2461,7 +2346,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "block-padding"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2471,11 +2355,6 @@ checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
 name = "blst"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-name = "blst"
-version = "0.3.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
 checksum = "47c79a94619fade3c0b887670333513a67ac28a6a7e653eb260bf0d4103db38d"
 dependencies = [
  "cc",
@@ -2700,15 +2579,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-<<<<<<< HEAD
-version = "1.2.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c3d1b2e905a3a7b00a6141adb0e4c0bb941d11caf55349d863942a1cc44e3c9"
-=======
 version = "1.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c736e259eea577f443d5c86c304f9f4ae0295c43f3ba05c21f1d66b5f06001af"
->>>>>>> foundry/master
 dependencies = [
  "jobserver",
  "libc",
@@ -2843,7 +2716,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "circuit_sequencer_api"
 version = "0.150.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2869,14 +2741,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.30"
+version = "4.5.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-name = "clap"
-version = "4.5.30"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
-checksum = "92b7b18d71fad5313a1e320fa9897994228ce274b60faa4d694fe0ea89cd9e6d"
+checksum = "027bb0d98429ae334a8698531da7077bdf906419543a35a55c2cb1b66437d767"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -2884,9 +2751,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.30"
+version = "4.5.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a35db2071778a7344791a4fb4f95308b5673d219dee3ae348b86642574ecc90c"
+checksum = "5589e0cba072e0f3d23791efac0fd8627b49c829c196a492e88168e6a669d863"
 dependencies = [
  "anstream",
  "anstyle",
@@ -2899,9 +2766,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.45"
+version = "4.5.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e3040c8291884ddf39445dc033c70abc2bc44a42f0a3a00571a0f483a83f0cd"
+checksum = "f5c5508ea23c5366f77e53f5a0070e5a84e51687ec3ef9e0464c86dc8d13ce98"
 dependencies = [
  "clap",
 ]
@@ -3007,11 +2874,7 @@ dependencies = [
  "once_cell",
  "pbkdf2 0.12.2",
  "rand 0.8.5",
-<<<<<<< HEAD
  "sha2 0.10.8",
-=======
- "sha2",
->>>>>>> foundry/master
  "thiserror 1.0.69",
 ]
 
@@ -3520,7 +3383,6 @@ name = "data-encoding"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "575f75dfd25738df5b91b8e43e14d44bda14637a58fae779fd2b064f8bf3e010"
-<<<<<<< HEAD
 
 [[package]]
 name = "data-encoding-macro"
@@ -3541,8 +3403,6 @@ dependencies = [
  "data-encoding",
  "syn 2.0.98",
 ]
-=======
->>>>>>> foundry/master
 
 [[package]]
 name = "dbus"
@@ -3562,7 +3422,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef552e6f588e446098f6ba40d89ac146c8c7b64aade83c051ee00bb5d2bc18d"
 dependencies = [
  "serde",
- "uuid 1.13.2",
+ "uuid 1.14.0",
 ]
 
 [[package]]
@@ -3873,9 +3733,9 @@ dependencies = [
 
 [[package]]
 name = "either"
-version = "1.13.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
+checksum = "b7914353092ddf589ad78f25c5c1c21b7f80b0ff8621e7c814c3485b5306da9d"
 
 [[package]]
 name = "elasticlunr-rs"
@@ -3922,15 +3782,9 @@ dependencies = [
  "generic-array",
  "group 0.13.0",
  "pem-rfc7468",
-<<<<<<< HEAD
  "pkcs8 0.10.2",
  "rand_core 0.6.4",
  "sec1 0.7.3",
-=======
- "pkcs8",
- "rand_core 0.6.4",
- "sec1",
->>>>>>> foundry/master
  "subtle",
  "zeroize",
 ]
@@ -4040,7 +3894,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "envy"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4087,12 +3940,6 @@ dependencies = [
  "serde_json",
  "which 6.0.3",
 ]
-=======
-name = "equivalent"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
->>>>>>> foundry/master
 
 [[package]]
 name = "errno"
@@ -4409,16 +4256,12 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flate2"
-version = "1.0.35"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c936bfdafb507ebbf50b8074c54fa31c5be9a1e7e5f467dd659697041407d07c"
+checksum = "11faaf5a5236997af9848be0bef4db95824b1d534ebc64d0f0c6cf3e67bd38dc"
 dependencies = [
  "crc32fast",
-<<<<<<< HEAD
- "miniz_oxide 0.8.4",
-=======
  "miniz_oxide 0.8.5",
->>>>>>> foundry/master
 ]
 
 [[package]]
@@ -4830,13 +4673,8 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
-<<<<<<< HEAD
  "strsim 0.11.1",
- "strum",
-=======
- "strsim",
  "strum 0.27.1",
->>>>>>> foundry/master
  "tempfile",
  "tokio",
  "tracing",
@@ -6018,11 +5856,7 @@ version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0f9ef7462f7c099f518d754361858f86d8a07af53ba9af0fe635bbccb151a63"
 dependencies = [
-<<<<<<< HEAD
  "ff 0.13.0",
-=======
- "ff",
->>>>>>> foundry/master
  "rand_core 0.6.4",
  "subtle",
 ]
@@ -6371,10 +6205,7 @@ dependencies = [
  "http 1.2.0",
  "hyper 1.6.0",
  "hyper-util",
-<<<<<<< HEAD
  "log",
-=======
->>>>>>> foundry/master
  "rustls 0.23.23",
  "rustls-native-certs 0.8.1",
  "rustls-pki-types",
@@ -7274,7 +7105,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55cb077ad656299f160924eb2912aa147d7339ea7d69e1b5517326fdcec3c1ca"
 dependencies = [
  "ascii-canvas",
- "bit-set 0.5.3",
+ "bit-set",
  "ena",
  "itertools 0.11.0",
  "lalrpop-util",
@@ -7324,9 +7155,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.169"
+version = "0.2.170"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
+checksum = "875b3680cb2f8f71bdcf9a30f38d48282f5d3c95cbf9b3fa57269bb5d5c06828"
 
 [[package]]
 name = "libdbus-sys"
@@ -7673,15 +7504,9 @@ dependencies = [
 
 [[package]]
 name = "miniz_oxide"
-<<<<<<< HEAD
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3b1c9bd4fe1f0f8b387f6eb9eb3b4a1aa26185e5750efb9140301703f62cd1b"
-=======
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e3e04debbb59698c15bacbb6d93584a8c0ca9cc3213cb423d31f760d8843ce5"
->>>>>>> foundry/master
 dependencies = [
  "adler2",
 ]
@@ -7797,11 +7622,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee3224f0e8be7c2a1ebc77ef9c3eecb90f55c6594399ee825de964526b3c9056"
 dependencies = [
-<<<<<<< HEAD
- "uuid 1.13.2",
-=======
  "uuid 1.14.0",
->>>>>>> foundry/master
 ]
 
 [[package]]
@@ -8708,9 +8529,9 @@ checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
 name = "portable-atomic"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "280dc24453071f1b63954171985a0b0d30058d287960968b9b2aca264c8d4ee6"
+checksum = "350e9b48cbc6b0e028b0473b114454c6316e57336ee184ceab6e53f72c178b3e"
 
 [[package]]
 name = "portable-atomic-util"
@@ -8970,17 +8791,11 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-<<<<<<< HEAD
 version = "1.5.0"
 source = "git+https://github.com/nbaztec/proptest?branch=v1.5.0-foundry-zksync#bb936381bf0486435a9f7f03a96d7933fb19ed17"
-=======
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14cae93065090804185d3b75f0bf93b8eeda30c7a9b4a33d3bdb3988d6229e50"
->>>>>>> foundry/master
 dependencies = [
- "bit-set 0.8.0",
- "bit-vec 0.8.0",
+ "bit-set",
+ "bit-vec",
  "bitflags 2.8.0",
  "lazy_static",
  "num-traits",
@@ -9006,15 +8821,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-<<<<<<< HEAD
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "deb1435c188b76130da55f17a466d252ff7b1418b2ad3e037d127b94e3411f29"
-=======
-version = "0.13.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2796faa41db3ec313a31f7624d9286acf277b52de526150b7e69f3debf891ee5"
->>>>>>> foundry/master
 dependencies = [
  "bytes",
  "prost-derive 0.12.6",
@@ -9053,38 +8862,22 @@ dependencies = [
 
 [[package]]
 name = "prost-derive"
-<<<<<<< HEAD
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81bddcdb20abf9501610992b6759a4c888aef7d1a7247ef75e2404275ac24af1"
 dependencies = [
  "anyhow",
  "itertools 0.12.1",
-=======
-version = "0.13.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
-dependencies = [
- "anyhow",
- "itertools 0.14.0",
->>>>>>> foundry/master
  "proc-macro2",
  "quote",
  "syn 2.0.98",
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "prost-derive"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
-=======
-name = "prost-types"
-version = "0.13.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16"
->>>>>>> foundry/master
 dependencies = [
  "anyhow",
  "itertools 0.14.0",
@@ -9219,8 +9012,7 @@ dependencies = [
  "quick-xml 0.37.2",
  "strip-ansi-escapes",
  "thiserror 2.0.11",
-<<<<<<< HEAD
- "uuid 1.13.2",
+ "uuid 1.14.0",
 ]
 
 [[package]]
@@ -9239,9 +9031,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d6da84cc204722a989e01ba2f6e1e276e190f22263d0cb6ce8526fcdb0d2e1f"
 dependencies = [
  "byteorder",
-=======
- "uuid 1.14.0",
->>>>>>> foundry/master
 ]
 
 [[package]]
@@ -9272,11 +9061,7 @@ dependencies = [
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
-<<<<<<< HEAD
  "rustc-hash 2.1.1",
-=======
- "rustc-hash",
->>>>>>> foundry/master
  "rustls 0.23.23",
  "socket2",
  "thiserror 2.0.11",
@@ -9294,11 +9079,7 @@ dependencies = [
  "getrandom 0.2.15",
  "rand 0.8.5",
  "ring",
-<<<<<<< HEAD
  "rustc-hash 2.1.1",
-=======
- "rustc-hash",
->>>>>>> foundry/master
  "rustls 0.23.23",
  "rustls-pki-types",
  "slab",
@@ -9385,11 +9166,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3779b94aeb87e8bd4e834cee3650289ee9e0d5677f976ecdb6d219e5f4f6cd94"
 dependencies = [
  "rand_chacha 0.9.0",
-<<<<<<< HEAD
- "rand_core 0.9.1",
-=======
  "rand_core 0.9.2",
->>>>>>> foundry/master
  "zerocopy 0.8.20",
 ]
 
@@ -9401,8 +9178,6 @@ checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.6.4",
-<<<<<<< HEAD
-=======
 ]
 
 [[package]]
@@ -9413,17 +9188,6 @@ checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
 dependencies = [
  "ppv-lite86",
  "rand_core 0.9.2",
->>>>>>> foundry/master
-]
-
-[[package]]
-name = "rand_chacha"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
-dependencies = [
- "ppv-lite86",
- "rand_core 0.9.1",
 ]
 
 [[package]]
@@ -9452,15 +9216,9 @@ dependencies = [
 
 [[package]]
 name = "rand_core"
-<<<<<<< HEAD
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a88e0da7a2c97baa202165137c158d0a2e824ac465d13d81046727b34cb247d3"
-=======
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a509b1a2ffbe92afab0e55c8fd99dea1c280e8171bd2d88682bb20bc41cbc2c"
->>>>>>> foundry/master
 dependencies = [
  "getrandom 0.3.1",
  "zerocopy 0.8.20",
@@ -9824,15 +9582,9 @@ dependencies = [
 
 [[package]]
 name = "ring"
-<<<<<<< HEAD
-version = "0.17.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e75ec5e92c4d8aede845126adc388046234541629e76029599ed35a003c7ed24"
-=======
 version = "0.17.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "da5349ae27d3887ca812fb375b45a4fbb36d8d12d2df394968cd86e35683fe73"
->>>>>>> foundry/master
 dependencies = [
  "cc",
  "cfg-if",
@@ -9890,9 +9642,9 @@ dependencies = [
 
 [[package]]
 name = "ruint"
-version = "1.13.1"
+version = "1.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "825df406ec217a8116bd7b06897c6cc8f65ffefc15d030ae2c9540acc9ed50b6"
+checksum = "f5ef8fb1dd8de3870cb8400d51b4c2023854bbafd5431a3ac7e7317243e22d2f"
 dependencies = [
  "alloy-rlp",
  "arbitrary",
@@ -10224,9 +9976,9 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "0.8.21"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09c024468a378b7e36765cd36702b7a90cc3cba11654f6685c8f233408e89e92"
+checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
 dependencies = [
  "dyn-clone",
  "schemars_derive",
@@ -10236,9 +9988,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "0.8.21"
+version = "0.8.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1eee588578aff73f856ab961cd2f79e36bc45d7ded33a7562adba4667aecc0e"
+checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -10330,7 +10082,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9465315bc9d4566e1724f0fffcbcc446268cb522e60f9a27bcded6b19c108113"
 dependencies = [
  "rand 0.8.5",
-<<<<<<< HEAD
  "secp256k1-sys 0.10.1",
 ]
 
@@ -10341,9 +10092,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "70a129b9e9efbfb223753b9163c4ab3b13cff7fd9c7f010fbac25ab4099fa07e"
 dependencies = [
  "cc",
-=======
- "secp256k1-sys",
->>>>>>> foundry/master
 ]
 
 [[package]]
@@ -10454,7 +10202,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd0b0ec5f1c1ca621c432a25813d8d60c88abe6d3e08a3eb9cf37d97a0fe3d73"
 
 [[package]]
-<<<<<<< HEAD
 name = "sentry"
 version = "0.31.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10559,7 +10306,7 @@ dependencies = [
  "thiserror 1.0.69",
  "time",
  "url",
- "uuid 1.13.2",
+ "uuid 1.14.0",
 ]
 
 [[package]]
@@ -10567,18 +10314,11 @@ name = "serde"
 version = "1.0.210"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8e3592472072e6e22e0a54d5904d9febf8508f65fb8552499a1abc7d1078c3a"
-=======
-name = "serde"
-version = "1.0.218"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8dfc9d19bdbf6d17e22319da49161d5d0108e4188e8b680aef6299eed22df60"
->>>>>>> foundry/master
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "serde-value"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10602,12 +10342,6 @@ name = "serde_derive"
 version = "1.0.210"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "243902eda00fad750862fc144cea25caca5e20d615af0a81bee94ca738f1df1f"
-=======
-name = "serde_derive"
-version = "1.0.218"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09503e191f4e797cb8aac08e9a4a4695c5edf6a2e70e376d961ddd5c969f82b"
->>>>>>> foundry/master
 dependencies = [
  "proc-macro2",
  "quote",
@@ -10627,15 +10361,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-<<<<<<< HEAD
 version = "1.0.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ff5456707a1de34e7e37f2a6fd3d3f808c318259cbd01ab6377795054b483d8"
-=======
-version = "1.0.139"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44f86c3acccc9c65b153fe1b85a3be07fe5515274ec9f0653b4a0875731c72a6"
->>>>>>> foundry/master
 dependencies = [
  "indexmap 2.7.1",
  "itoa",
@@ -10963,9 +10691,9 @@ dependencies = [
 
 [[package]]
 name = "similar-asserts"
-version = "1.6.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f08357795f0d604ea7d7130f22c74b03838c959bdb14adde3142aab4d18a293"
+checksum = "b5b441962c817e33508847a22bd82f03a30cff43642dc2fae8b050566121eb9a"
 dependencies = [
  "console",
  "similar",
@@ -11222,13 +10950,8 @@ dependencies = [
  "sha2 0.10.8",
  "thiserror 2.0.11",
  "tokio",
-<<<<<<< HEAD
  "toml_edit 0.22.24",
- "uuid 1.13.2",
-=======
- "toml_edit",
  "uuid 1.14.0",
->>>>>>> foundry/master
  "zip",
  "zip-extract",
 ]
@@ -11267,9 +10990,9 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "stacker"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d08feb8f695b465baed819b03c128dc23f57a694510ab1f06c77f763975685e"
+checksum = "d9156ebd5870ef293bfb43f91c7a74528d363ec0d424afe24160ed5a4343d08a"
 dependencies = [
  "cc",
  "cfg-if",
@@ -11929,7 +11652,6 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-<<<<<<< HEAD
 version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
@@ -11943,10 +11665,6 @@ dependencies = [
 name = "toml_edit"
 version = "0.22.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-=======
-version = "0.22.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
->>>>>>> foundry/master
 checksum = "17b4795ff5edd201c7cd6dca065ae59972ce77d1b80fa0a84d94950ece7d1474"
 dependencies = [
  "indexmap 2.7.1",
@@ -12492,15 +12210,9 @@ dependencies = [
 
 [[package]]
 name = "uuid"
-<<<<<<< HEAD
-version = "1.13.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c1f41ffb7cf259f1ecc2876861a17e7142e63ead296f671f81f6ae85903e0d6"
-=======
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93d59ca99a559661b96bf898d8fce28ed87935fd2bea9f05983c1464dd6c71b1"
->>>>>>> foundry/master
 dependencies = [
  "getrandom 0.3.1",
  "serde",
@@ -13725,7 +13437,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "sha2 0.10.8",
- "strum",
+ "strum 0.26.3",
  "thiserror 1.0.69",
  "tiny-keccak 2.0.2",
  "url",
@@ -13976,7 +13688,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "strum",
+ "strum 0.26.3",
  "thiserror 1.0.69",
  "tracing",
  "zksync_basic_types",

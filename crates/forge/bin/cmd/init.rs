@@ -44,11 +44,7 @@ pub struct InitArgs {
 impl InitArgs {
     pub fn run(self) -> Result<()> {
         let Self { root, template, branch, install, offline, force, vscode } = self;
-<<<<<<< HEAD
-        let DependencyInstallOpts { shallow, no_git, no_commit, zksync } = install;
-=======
-        let DependencyInstallOpts { shallow, no_git, commit } = install;
->>>>>>> foundry/master
+        let DependencyInstallOpts { shallow, no_git, commit, zksync } = install;
 
         // create the root dir if it does not exist
         if !root.exists() {
