@@ -344,7 +344,8 @@ casttest!(test_zk_cast_call, async |_prj, cmd| {
             "--zksync",
         ])
         .assert_success()
-        .stdout_eq(str![[r#"0x00000000000000000000000000000000000000000000003635c9adc5dea00000"#]]);
+        .stdout_eq(str![[r#"0x00000000000000000000000000000000000000000000003635c9adc5dea00000
+"#]]);
 });
 
 casttest!(test_zk_cast_call_create, async |_prj, cmd| {
