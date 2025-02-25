@@ -712,18 +712,10 @@ contract ZkStateDiffTest is DSTest {
 
         bytes32 salt1 = bytes32(uint256(0xe0));
         bytes32 salt2 = bytes32(uint256(0xe1));
-        address bankAddr1 = Create2Utils.computeCreate2Address(
-            address(this),
-            salt1,
-            bankBytecodeHash,
-            keccak256(abi.encode())
-        );
-        address bankAddr2 = Create2Utils.computeCreate2Address(
-            address(this),
-            salt2,
-            bankBytecodeHash,
-            keccak256(abi.encode())
-        );
+        address bankAddr1 =
+            Create2Utils.computeCreate2Address(address(this), salt1, bankBytecodeHash, keccak256(abi.encode()));
+        address bankAddr2 =
+            Create2Utils.computeCreate2Address(address(this), salt2, bankBytecodeHash, keccak256(abi.encode()));
 
         address(new Bank{salt: salt1}());
         address(new Bank{value: 1 ether, salt: salt2}());
@@ -770,16 +762,10 @@ contract ZkStateDiffTest is DSTest {
         vm.startStateDiffRecording();
 
         address bankAddr1 = Create2Utils.computeCreate2Address(
-            address(create2Delegator),
-            bytes32(uint256(0xf0)),
-            bankBytecodeHash,
-            keccak256(abi.encode())
+            address(create2Delegator), bytes32(uint256(0xf0)), bankBytecodeHash, keccak256(abi.encode())
         );
         address bankAddr2 = Create2Utils.computeCreate2Address(
-            address(create2Delegator),
-            bytes32(uint256(0xf1)),
-            bankBytecodeHash,
-            keccak256(abi.encode())
+            address(create2Delegator), bytes32(uint256(0xf1)), bankBytecodeHash, keccak256(abi.encode())
         );
 
         create2Delegator.create2Delegation();
