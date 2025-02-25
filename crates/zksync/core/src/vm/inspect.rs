@@ -99,6 +99,8 @@ where
     let mut aggregated_result: Option<ZKVMExecutionResult> = None;
 
     for (idx, mut tx) in txns.into_iter().enumerate() {
+        let pending_txs = total_txns - idx;
+
         // cap gas limit so that we do not set a number greater than
         // remaining sender balance
         let (new_gas_limit, _) = gas_params(
@@ -161,8 +163,9 @@ where
             _ => unreachable!("aggregated result must only contain success"),
         }
 
-        // Increment the nonce manually if there are multiple batches
-        if total_txns > 1 {
+        // Increment the nonce manually if there are other transactions
+        // to be executed after the current one
+        if pending_txs > 1 {
             increment_tx_nonce(initiator_address.to_address(), ecx);
         }
     }

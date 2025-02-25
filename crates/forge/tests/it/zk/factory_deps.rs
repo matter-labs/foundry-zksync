@@ -77,5 +77,9 @@ contract ZkLargeFactoryDependenciesScript is Script {
     let content = foundry_common::fs::read_to_string(run_latest).unwrap();
 
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
-    assert_eq!(json["transactions"].as_array().expect("broadcastable txs").len(), 3);
+    let txns = json["transactions"].as_array().expect("broadcastable txs");
+    assert_eq!(txns.len(), 3);
+
+    // check that the txs have strictly monotonically increasing nonces
+    assert!(txns.iter().filter_map(|tx| tx["nonce"].as_u64()).is_sorted_by(|a, b| a + 1 == *b));
 });
