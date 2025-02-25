@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 import "ds-test/test.sol";
 import "../cheats/Vm.sol";
 import "./Bank.sol";
+import "./Create2Utils.sol";
 import "../default/logs/console.sol";
 
 contract StorageAccessor {
@@ -86,6 +87,8 @@ contract ZkStateDiffTest is DSTest {
     CreateDelegator createDelegator;
     Create2Delegator create2Delegator;
 
+    bytes32 bankBytecodeHash;
+
     function setUp() public {
         store1 = new StorageAccessor();
         store2 = new StorageAccessor();
@@ -97,6 +100,8 @@ contract ZkStateDiffTest is DSTest {
         transferDelegator = new TransferDelegator{value: 5 ether}();
         createDelegator = new CreateDelegator{value: 5 ether}();
         create2Delegator = new Create2Delegator{value: 5 ether}();
+
+        bankBytecodeHash = vm.parseJsonBytes32(vm.readFile("./zk/zkout/Bank.sol/Bank.json"), ".hash");
     }
 
     function testStateDiffReturnedForStorageAccesses() external {
@@ -616,7 +621,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0x12db303A83e945CDBeB72359Ec365D2bd63d331E,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -631,7 +636,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0xf22ee22d4241fB723420Bec92D59f9913F1C949f,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
@@ -674,7 +679,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0x1F586b3A8E212336d1e3876e738314907732b7D5,
             accessor: 0xa4e69fB667e67734817b27C4b44a3b03542912D6,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -689,7 +694,7 @@ contract ZkStateDiffTest is DSTest {
             account: 0xBC29fab1B038dBcfAE7099FE15e037584df360a2,
             accessor: 0xa4e69fB667e67734817b27C4b44a3b03542912D6,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
@@ -705,8 +710,23 @@ contract ZkStateDiffTest is DSTest {
     function testStateDiffReturnedForCreate2() external {
         vm.startStateDiffRecording();
 
-        address(new Bank{salt: bytes32(uint256(0xe0))}());
-        address(new Bank{value: 1 ether, salt: bytes32(uint256(0xe1))}());
+        bytes32 salt1 = bytes32(uint256(0xe0));
+        bytes32 salt2 = bytes32(uint256(0xe1));
+        address bankAddr1 = Create2Utils.computeCreate2Address(
+            address(this),
+            salt1,
+            bankBytecodeHash,
+            keccak256(abi.encode())
+        );
+        address bankAddr2 = Create2Utils.computeCreate2Address(
+            address(this),
+            salt2,
+            bankBytecodeHash,
+            keccak256(abi.encode())
+        );
+
+        address(new Bank{salt: salt1}());
+        address(new Bank{value: 1 ether, salt: salt2}());
 
         Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
         Vm.ChainInfo memory chainInfo = Vm.ChainInfo(0, 31337);
@@ -715,10 +735,10 @@ contract ZkStateDiffTest is DSTest {
         expected[0] = Vm.AccountAccess({
             depth: 1,
             kind: Vm.AccountAccessKind.Create,
-            account: 0xCd1C51b52d2584168EF048f568c0db633b32BDC5,
+            account: bankAddr1,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -730,10 +750,10 @@ contract ZkStateDiffTest is DSTest {
         expected[1] = Vm.AccountAccess({
             depth: 1,
             kind: Vm.AccountAccessKind.Create,
-            account: 0x054B8406567a62eE44f46376FFaeBc3a557d4050,
+            account: bankAddr2,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
@@ -748,6 +768,19 @@ contract ZkStateDiffTest is DSTest {
 
     function testStateDiffReturnedForNestedCreate2() external {
         vm.startStateDiffRecording();
+
+        address bankAddr1 = Create2Utils.computeCreate2Address(
+            address(create2Delegator),
+            bytes32(uint256(0xf0)),
+            bankBytecodeHash,
+            keccak256(abi.encode())
+        );
+        address bankAddr2 = Create2Utils.computeCreate2Address(
+            address(create2Delegator),
+            bytes32(uint256(0xf1)),
+            bankBytecodeHash,
+            keccak256(abi.encode())
+        );
 
         create2Delegator.create2Delegation();
 
@@ -773,10 +806,10 @@ contract ZkStateDiffTest is DSTest {
         expected[1] = Vm.AccountAccess({
             depth: 2,
             kind: Vm.AccountAccessKind.Create,
-            account: 0x50FC872004C5cb107d553419Bd9Baa61d8c91ab2,
+            account: bankAddr1,
             accessor: 0x38C6337a87f3479f8E55789da8B9334Da21416FC,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 0,
             oldBalance: 0,
             newBalance: 0,
@@ -788,10 +821,10 @@ contract ZkStateDiffTest is DSTest {
         expected[2] = Vm.AccountAccess({
             depth: 2,
             kind: Vm.AccountAccessKind.Create,
-            account: 0x105241946B8807b9a5723667D2B6844f06470126,
+            account: bankAddr2,
             accessor: 0x38C6337a87f3479f8E55789da8B9334Da21416FC,
             data: hex"",
-            deployedCode: hex"010000172ee8294f978fc2fccd315c44a2461433a165064bfe3ac0f330e1d2d1",
+            deployedCode: abi.encodePacked(bankBytecodeHash),
             value: 1000000000000000000,
             oldBalance: 0,
             newBalance: 1000000000000000000,
