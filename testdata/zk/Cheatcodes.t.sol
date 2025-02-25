@@ -221,10 +221,9 @@ contract ZkCheatcodesTest is DSTest {
         revert("test");
     }
 
-    function testFailExpectRevertDeeperDepthsWithDefaultConfig() public {
-        Reverter reverter = new Reverter();
+    function testExpectRevertFailsWithDeeperDepthsWithDefaultConfig() public {
+        vm._expectCheatcodeRevert();
         vm.expectRevert();
-        reverter.nestedRevert(reverter);
     }
 
     function testExpectRevertDeeperDepthsWithInternalRevertsEnabled() public {
@@ -444,7 +443,9 @@ contract ZkCheatcodeZkVmSkipTest is DSTest {
         vm.makePersistent(address(helper));
     }
 
-    function testFail_UseCheatcodesInZkVmWithoutSkip() external {
+    /// forge-config: default.allow_internal_expect_revert = true
+    function testRevertWhen_UseCheatcodesInZkVmWithoutSkip() external {
+        vm.expectRevert();
         helper.exec();
     }
 

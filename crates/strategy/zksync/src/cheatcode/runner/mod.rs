@@ -471,13 +471,16 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
     fn zksync_sync_nonce(
         &self,
-        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
         sender: Address,
         nonce: u64,
         ecx: Ecx<'_, '_, '_>,
     ) {
+        let ctx = get_context(ctx);
         // NOTE(zk): We sync with the nonce changes to ensure that the nonce matches
-        foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx);
+        if !ctx.using_zk_vm {
+            foundry_zksync_core::cheatcodes::set_nonce(sender, U256::from(nonce), ecx);
+        }
     }
 
     fn zksync_set_deployer_call_input(

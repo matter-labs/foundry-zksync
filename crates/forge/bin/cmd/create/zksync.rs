@@ -1,20 +1,18 @@
 //! Contains zksync-specific code to run `forge create`
 
 use std::{
-    borrow::Borrow,
     collections::{HashSet, VecDeque},
-    marker::PhantomData,
     path::PathBuf,
     sync::Arc,
 };
 
+use super::{ContractDeploymentError, ContractFactory, CreateArgs, DeploymentTxFactory};
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::JsonAbi;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
 use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_signer::Signer;
-use alloy_transport::Transport;
 use alloy_zksync::{
     network::{
         transaction_request::TransactionRequest, unsigned_tx::eip712::PaymasterParams, Zksync,
@@ -34,8 +32,6 @@ use foundry_compilers::{artifacts::BytecodeObject, utils::canonicalize, Artifact
 use foundry_zksync_compilers::compilers::artifact_output::zk::ZkContractArtifact;
 use foundry_zksync_core::convert::ConvertH160;
 use serde_json::json;
-
-use super::{ContractDeploymentError, ContractFactory, CreateArgs, DeploymentTxFactory};
 
 #[derive(Clone, Debug, Parser)]
 pub struct ZkCreateArgs {
@@ -220,7 +216,7 @@ impl CreateArgs {
 
     /// Deploys the contract using ZKsync provider.
     #[allow(clippy::too_many_arguments)]
-    async fn deploy_zk<P: Provider<T, Zksync>, T: Transport + Clone>(
+    async fn deploy_zk<P: Provider<Zksync>>(
         self,
         abi: JsonAbi,
         bin: BytecodeObject,
@@ -366,21 +362,19 @@ impl CreateArgs {
 /// Helper which manages the deployment transaction of a smart contract
 #[derive(Debug)]
 #[must_use = "Deployer does nothing unless you `send` it"]
-pub struct ZkDeployer<B, P, T> {
+pub struct ZkDeployer<P> {
     /// The deployer's transaction, exposed for overriding the defaults
     pub tx: TransactionRequest,
     abi: JsonAbi,
-    client: B,
+    client: P,
     confs: usize,
     timeout: u64,
     zk_factory_deps: Option<Vec<Vec<u8>>>,
-    _p: PhantomData<P>,
-    _t: PhantomData<T>,
 }
 
-impl<B, P, T> Clone for ZkDeployer<B, P, T>
+impl<P> Clone for ZkDeployer<P>
 where
-    B: Clone,
+    P: Clone + Provider<Zksync>,
 {
     fn clone(&self) -> Self {
         Self {
@@ -390,17 +384,13 @@ where
             confs: self.confs,
             timeout: self.timeout,
             zk_factory_deps: self.zk_factory_deps.clone(),
-            _p: PhantomData,
-            _t: PhantomData,
         }
     }
 }
 
-impl<B, P, T> ZkDeployer<B, P, T>
+impl<P> ZkDeployer<P>
 where
-    B: Borrow<P> + Clone,
-    P: Provider<T, Zksync>,
-    T: Transport + Clone,
+    P: Clone + Provider<Zksync>,
 {
     /// Broadcasts the contract deployment transaction and after waiting for it to
     /// be sufficiently confirmed (default: 1), it returns a tuple with
@@ -411,7 +401,6 @@ where
     ) -> Result<(Address, <Zksync as Network>::ReceiptResponse), ContractDeploymentError> {
         let receipt = self
             .client
-            .borrow()
             .send_transaction(self.tx)
             .await?
             .with_required_confirmations(self.confs as u64)
@@ -426,17 +415,15 @@ where
     }
 }
 
-impl<P, T, B> DeploymentTxFactory<B, P, T>
+impl<P> DeploymentTxFactory<P>
 where
-    B: Borrow<P> + Clone,
-    P: Provider<T, Zksync>,
-    T: Transport + Clone,
+    P: Provider<Zksync> + Clone,
 {
     /// Creates a factory for deployment of the Contract with bytecode, and the
     /// constructor defined in the abi. The client will be used to send any deployment
     /// transaction.
-    pub fn new_zk(abi: JsonAbi, bytecode: Bytes, client: B, timeout: u64) -> Self {
-        Self { client, abi, bytecode, timeout, _p: PhantomData, _t: PhantomData }
+    pub fn new_zk(abi: JsonAbi, bytecode: Bytes, client: P, timeout: u64) -> Self {
+        Self { client, abi, bytecode, timeout }
     }
 
     /// Create a deployment tx using the provided tokens as constructor
@@ -445,10 +432,7 @@ where
         self,
         params: Vec<DynSolValue>,
         zk_data: &ZkSyncData,
-    ) -> Result<ZkDeployer<B, P, T>, ContractDeploymentError>
-    where
-        B: Clone,
-    {
+    ) -> Result<ZkDeployer<P>, ContractDeploymentError> {
         // Encode the constructor args & concatenate with the bytecode if necessary
         if self.abi.constructor().is_none() && !params.is_empty() {
             return Err(ContractDeploymentError::ConstructorError)
@@ -476,8 +460,6 @@ where
             confs: 1,
             timeout: self.timeout,
             zk_factory_deps: None,
-            _p: PhantomData,
-            _t: PhantomData,
         })
     }
 }

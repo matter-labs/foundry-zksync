@@ -13,7 +13,8 @@ contract ZkSetupForkFailureTest is DSTest {
     }
 
     // We test that the following function is called after EVM fork from zk context
-    function testFail_ZkSetupForkFailureExecutesTest() public pure {
+    function test_ZkSetupForkFailureExecutesTest() public pure {
+        // We check this test to fails on the cargo side.
         assert(false);
     }
 }

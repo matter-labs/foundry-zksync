@@ -14,10 +14,9 @@ use foundry_zksync_core::state::{get_nonce_storage, new_full_nonce};
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_setup_fork_failure() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
-    let filter =
-        Filter::new("testFail_ZkSetupForkFailureExecutesTest", "ZkSetupForkFailureTest", ".*");
+    let filter = Filter::new("test_ZkSetupForkFailureExecutesTest", "ZkSetupForkFailureTest", ".*");
 
-    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).should_fail().run().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]

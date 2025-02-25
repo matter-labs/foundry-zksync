@@ -365,7 +365,7 @@ impl ZkSolc {
                     if name.ends_with(".yul") {
                         let sanitized_name = name
                             .split('/')
-                            .last()
+                            .next_back()
                             .and_then(|name| name.strip_suffix(".yul"))
                             .expect("Error sanitizing path into name");
                         // Removing and inserting should be fine because there cannot be
@@ -616,7 +616,7 @@ fn version_from_output(output: Output) -> Result<Version> {
         let version = stdout
             .lines()
             .filter(|l| !l.trim().is_empty())
-            .last()
+            .next_back()
             .ok_or_else(|| SolcError::msg("Version not found in zksolc output"))?;
 
         version

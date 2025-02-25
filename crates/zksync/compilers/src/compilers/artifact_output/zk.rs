@@ -110,7 +110,7 @@ impl<'a> From<&'a ZkContractArtifact> for CompactContractBytecodeCow<'a> {
 impl From<ZkContractArtifact> for CompactContractBytecode {
     fn from(c: ZkContractArtifact) -> Self {
         Self {
-            abi: c.abi.map(Into::into),
+            abi: c.abi,
             deployed_bytecode: c.bytecode.clone().map(|b| b.into()),
             bytecode: c.bytecode.clone().map(|b| b.into()),
         }
