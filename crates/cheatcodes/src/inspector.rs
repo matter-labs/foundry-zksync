@@ -804,6 +804,7 @@ impl Cheatcodes {
         }
 
         if let Some(result) = self.strategy.runner.zksync_try_create(self, ecx, &input, executor) {
+            self.strategy.runner.zksync_increment_nonce_after_broadcast(self, ecx, false);
             return Some(result);
         }
 
@@ -1222,6 +1223,7 @@ where {
         }
 
         if let Some(result) = self.strategy.runner.zksync_try_call(self, ecx, call, executor) {
+            self.strategy.runner.zksync_increment_nonce_after_broadcast(self, ecx, call.is_static);
             return Some(result);
         }
 
