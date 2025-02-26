@@ -12,7 +12,8 @@ use foundry_cheatcodes::{
         CheatcodeInspectorStrategyRunner, EvmCheatcodeInspectorStrategyRunner,
     },
     Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, InnerEcx, Result, Vm,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, InnerEcx, Result,
+    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
@@ -54,6 +55,83 @@ mod utils;
 /// ZKsync implementation for [CheatcodeInspectorStrategyRunner].
 #[derive(Debug, Default, Clone)]
 pub struct ZksyncCheatcodeInspectorStrategyRunner;
+
+impl ZksyncCheatcodeInspectorStrategyRunner {
+    fn append_recorded_accesses(
+        &self,
+        state: &mut Cheatcodes,
+        ecx: Ecx<'_, '_, '_>,
+        account_accesses: Vec<foundry_zksync_core::vm::AccountAccess>,
+    ) {
+        if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut() {
+            // A duplicate entry is inserted on call/create start by the revm, and updated on
+            // call/create end. We have no easy way to skip that logic as of now, so
+            // we record the index the duplicate entry will be at and remove it
+            // via call to`zksync_fix_recorded_acceses`.
+            //
+            // TODO(zk): This is currently a hack, as account access recording is
+            // done in 4 parts - create/create_end and call/call_end. And these must all be
+            // moved to strategy.
+            //
+            // If we have a pending stack, it will be appended to the end of primary stack, else at
+            // the beginning, once the record is finalized.
+            let stack_insert_index = if recorded_account_diffs_stack.len() > 1 {
+                recorded_account_diffs_stack.first().map_or(0, Vec::len)
+            } else {
+                0
+            };
+
+            if let Some(last) = recorded_account_diffs_stack.last_mut() {
+                let ctx = get_context(state.strategy.context.as_mut());
+                ctx.remove_recorded_access_at = Some(stack_insert_index);
+
+                for record in account_accesses {
+                    let access = AccountAccess {
+                        chainInfo: ChainInfo {
+                            forkId: ecx.db.active_fork_id().unwrap_or_default(),
+                            chainId: U256::from(ecx.env.cfg.chain_id),
+                        },
+                        accessor: record.accessor,
+                        account: record.account,
+                        kind: match record.kind {
+                            foundry_zksync_core::vm::AccountAccessKind::Call => {
+                                AccountAccessKind::Call
+                            }
+                            foundry_zksync_core::vm::AccountAccessKind::Create => {
+                                AccountAccessKind::Create
+                            }
+                        },
+                        initialized: true,
+                        oldBalance: record.old_balance,
+                        newBalance: record.new_balance,
+                        value: record.value,
+                        data: record.data,
+                        reverted: false,
+                        deployedCode: if record.deployed_bytecode_hash.is_zero() {
+                            Default::default()
+                        } else {
+                            Bytes::from(record.deployed_bytecode_hash.0)
+                        },
+                        storageAccesses: record
+                            .storage_accesses
+                            .into_iter()
+                            .map(|record| StorageAccess {
+                                account: record.account,
+                                slot: record.slot.to_b256(),
+                                isWrite: record.is_write,
+                                previousValue: record.previous_value.to_b256(),
+                                newValue: record.new_value.to_b256(),
+                                reverted: false,
+                            })
+                            .collect(),
+                        depth: record.depth,
+                    };
+                    last.push(access);
+                }
+            }
+        }
+    }
+}
 
 impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner {
     fn base_contract_deployed(&self, ctx: &mut dyn CheatcodeInspectorStrategyContext) {
@@ -514,6 +592,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
+            record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
         };
 
         let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
@@ -564,8 +643,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     }
                 }
 
-                // record immutable variables
                 if result.execution_result.is_success() {
+                    // record immutable variables
                     for (addr, imm_values) in result.recorded_immutables {
                         let addr = addr.to_address();
                         let keys = imm_values
@@ -582,6 +661,9 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                             keys,
                         );
                     }
+
+                    // record storage accesses
+                    self.append_recorded_accesses(state, ecx, result.account_accesses);
                 }
 
                 match result.execution_result {
@@ -696,6 +778,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
+            record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
         };
 
         let mut gas = Gas::new(call.gas_limit);
@@ -740,6 +823,11 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                             );
                         }
                     }
+                }
+
+                if result.execution_result.is_success() {
+                    // record storage accesses
+                    self.append_recorded_accesses(state, ecx, result.account_accesses);
                 }
 
                 match result.execution_result {
@@ -797,6 +885,21 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     },
                     memory_offset: call.return_memory_offset.clone(),
                 })
+            }
+        }
+    }
+
+    fn zksync_remove_duplicate_account_access(&self, state: &mut Cheatcodes) {
+        let ctx = get_context(state.strategy.context.as_mut());
+
+        if let Some(index) = ctx.remove_recorded_access_at.take() {
+            if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut()
+            {
+                if let Some(last) = recorded_account_diffs_stack.first_mut() {
+                    // This entry has been inserted during CREATE/CALL operations in revm's
+                    // cheatcode inspector and must be removed.
+                    let _ = last.remove(index);
+                }
             }
         }
     }
