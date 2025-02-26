@@ -1,91 +1,67 @@
-use alloy_network::{AnyNetwork, TransactionBuilder};
-use alloy_primitives::hex;
-use alloy_provider::Provider;
+use std::sync::Arc;
+
+use alloy_network::AnyNetwork;
+use alloy_primitives::FixedBytes;
+use alloy_provider::{PendingTransactionBuilder, ProviderBuilder, RootProvider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use alloy_zksync::{
-    network::{
-        transaction_request::TransactionRequest as ZkTransactionRequest,
-        unsigned_tx::eip712::PaymasterParams,
-    },
-    provider::ZksyncProvider,
-};
-use cast::{Cast, ZkCast, ZkTransactionOpts};
+use alloy_signer::Signer;
+use alloy_zksync::{network::Zksync, provider::ZksyncProvider, wallet::ZksyncWallet};
+use cast::{NoopWallet, ZkTransactionOpts};
 use eyre::Result;
+use foundry_cli::opts::EthereumOpts;
 
-#[allow(clippy::too_many_arguments)]
-pub async fn send_zk_transaction<P, Z>(
-    provider: P,
+use crate::tx::{self, CastTxBuilder, InputState, SenderKind};
+
+pub async fn send_zk_transaction(
+    zk_provider: RootProvider<Zksync>,
+    builder: CastTxBuilder<&RootProvider<AnyNetwork>, InputState>,
+    eth_opts: &EthereumOpts,
+    zk_tx_opts: ZkTransactionOpts,
+    zk_code: Option<String>,
+) -> Result<FixedBytes<32>> {
+    if zk_tx_opts.custom_signature.is_none() {
+        let signer = eth_opts.wallet.signer().await?;
+        let from = signer.address();
+        tx::validate_from_address(eth_opts.wallet.from, from)?;
+
+        let (tx, _) = builder.build_raw(&signer).await?;
+        let signer = Arc::new(signer);
+
+        let zk_wallet = ZksyncWallet::from(signer.clone());
+        let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
+            .wallet(zk_wallet.clone())
+            .on_provider(&zk_provider);
+        send_transaction_internal(zk_provider, tx, zk_tx_opts, zk_code).await
+    } else if let Some(from) = eth_opts.wallet.from {
+        let (tx, _) = builder.build_raw(SenderKind::Address(from)).await?;
+
+        let zk_wallet = NoopWallet { address: from };
+        let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
+            .wallet(zk_wallet.clone())
+            .on_provider(&zk_provider);
+        send_transaction_internal(zk_provider, tx, zk_tx_opts, zk_code).await
+    } else {
+        eyre::bail!("expected address via --from option to be used for custom signature");
+    }
+}
+
+async fn send_transaction_internal<Z>(
     zk_provider: Z,
     tx: WithOtherFields<TransactionRequest>,
     zk_tx_opts: ZkTransactionOpts,
     zk_code: Option<String>,
-    cast_async: bool,
-    confs: u64,
-    timeout: u64,
-) -> Result<()>
+) -> Result<FixedBytes<32>>
 where
-    P: Provider<AnyNetwork>,
     Z: ZksyncProvider,
 {
-    let mut tx = prepare_zk_transaction(tx, zk_tx_opts, zk_code)?;
+    let mut tx = zk_tx_opts.build_base_tx(tx, zk_code)?;
 
     // Estimate fees
     foundry_zksync_core::estimate_fee(&mut tx, &zk_provider, 130, None).await?;
 
-    let cast = ZkCast::new(zk_provider, Cast::new(provider));
-    let pending_tx = cast.send_zk(tx).await?;
+    let pending_tx: PendingTransactionBuilder<Zksync> = zk_provider.send_transaction(tx).await?;
     let tx_hash = pending_tx.inner().tx_hash();
 
-    if cast_async {
-        sh_println!("{tx_hash:#x}")?;
-    } else {
-        let receipt = cast
-            .as_ref()
-            .receipt(format!("{tx_hash:#x}"), None, confs, Some(timeout), false)
-            .await?;
-        sh_println!("{receipt}")?;
-    }
-
-    Ok(())
-}
-
-fn prepare_zk_transaction(
-    mut tx: WithOtherFields<TransactionRequest>,
-    zk_tx_opts: ZkTransactionOpts,
-    zk_code: Option<String>,
-) -> Result<ZkTransactionRequest> {
-    use alloy_primitives::TxKind;
-
-    let is_create = tx.to == Some(TxKind::Create);
-    let paymaster_params = zk_tx_opts
-        .paymaster_address
-        .and_then(|addr| zk_tx_opts.paymaster_input.map(|input| (addr, input)))
-        .map(|(addr, input)| PaymasterParams { paymaster: addr, paymaster_input: input });
-
-    tx.inner.transaction_type = Some(zksync_types::l2::TransactionType::EIP712Transaction as u8);
-
-    let mut zk_tx: ZkTransactionRequest = tx.inner.into();
-
-    if is_create {
-        let input_data = zk_tx.input().unwrap_or_default().to_vec();
-        let zk_code =
-            zk_code.ok_or_else(|| eyre::eyre!("ZkSync code is required for contract creation"))?;
-        let zk_code_bytes = hex::decode(zk_code)?;
-        let constructor_args = &input_data[zk_code_bytes.len()..];
-
-        zk_tx = zk_tx.with_create_params(
-            zk_code_bytes,
-            constructor_args.to_vec(),
-            zk_tx_opts.factory_deps.iter().map(|b| b.to_vec()).collect(),
-        )?;
-    } else {
-        zk_tx.set_factory_deps(zk_tx_opts.factory_deps);
-    }
-
-    if let Some(paymaster_params) = paymaster_params {
-        zk_tx.set_paymaster_params(paymaster_params);
-    }
-
-    Ok(zk_tx)
+    Ok(*tx_hash)
 }

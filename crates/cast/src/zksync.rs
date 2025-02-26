@@ -1,15 +1,18 @@
 //! Contains zksync specific logic for foundry's `cast` functionality
 
+use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::FunctionExt;
 use alloy_json_abi::Function;
-use alloy_network::{AnyNetwork, TransactionBuilder};
-use alloy_primitives::{hex, Address, Bytes, TxKind, U256};
-use alloy_provider::{PendingTransactionBuilder, Provider};
+use alloy_network::{AnyNetwork, NetworkWallet, TransactionBuilder};
+use alloy_primitives::{hex, Address, Bytes, PrimitiveSignature, TxKind, U256};
+use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_zksync::network::{
     transaction_request::TransactionRequest as ZkTransactionRequest,
-    unsigned_tx::eip712::PaymasterParams, Zksync,
+    tx_envelope::TxEnvelope,
+    unsigned_tx::{eip712::PaymasterParams, TypedTransaction},
+    Zksync,
 };
 use clap::{command, Parser};
 use eyre::{Context, Result};
@@ -31,6 +34,10 @@ pub struct ZkTransactionOpts {
     #[arg(long = "zk-paymaster-input", requires = "paymaster_address", value_parser = parse_hex_bytes)]
     pub paymaster_input: Option<Bytes>,
 
+    /// Custom signature for the ZKSync transaction
+    #[arg(long = "zk-custom-signature",  value_parser = parse_hex_bytes)]
+    pub custom_signature: Option<Bytes>,
+
     /// Factory dependencies for the ZKSync transaction
     #[arg(long = "zk-factory-deps", value_parser = parse_hex_bytes, value_delimiter = ',')]
     pub factory_deps: Vec<Bytes>,
@@ -47,6 +54,7 @@ fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
 impl ZkTransactionOpts {
     pub fn has_zksync_args(&self) -> bool {
         self.paymaster_address.is_some() ||
+            self.custom_signature.is_some() ||
             !self.factory_deps.is_empty() ||
             self.gas_per_pubdata.is_some()
     }
@@ -70,6 +78,10 @@ impl ZkTransactionOpts {
             tx.set_paymaster_params(PaymasterParams { paymaster, paymaster_input });
         }
 
+        if let Some(custom_signature) = self.custom_signature.clone() {
+            tx.set_custom_signature(custom_signature);
+        }
+
         if is_create {
             let input_data = tx.input().cloned().unwrap_or_default().to_vec();
             let zk_code = zk_code
@@ -87,6 +99,7 @@ impl ZkTransactionOpts {
         }
 
         tx.prep_for_submission();
+        dbg!(&tx);
         Ok(tx)
     }
 }
@@ -131,15 +144,6 @@ where
     /// ```
     pub fn new(provider: Z, cast: Cast<P>) -> Self {
         Self { provider, inner: cast }
-    }
-
-    pub async fn send_zk(
-        &self,
-        tx: ZkTransactionRequest,
-    ) -> Result<PendingTransactionBuilder<Zksync>> {
-        let res = self.provider.send_transaction(tx).await?;
-
-        Ok(res)
     }
 
     pub async fn call_zk(
@@ -194,5 +198,48 @@ where
             // set compatible user-friendly return type conversions
             decoded.iter().map(format_token).collect::<Vec<_>>().join("\n")
         })
+    }
+}
+
+/// Fills transaction with an emtpy signature. Used when custom signature is present
+/// as a signed transaction is expected by alloy types as well as the Zksync node
+/// which rlp decodes the signature but ignores it afterwards
+#[derive(Debug, Clone)]
+pub struct NoopWallet {
+    pub address: Address,
+}
+
+impl NetworkWallet<Zksync> for NoopWallet {
+    fn default_signer_address(&self) -> Address {
+        self.address
+    }
+
+    fn has_signer_for(&self, address: &Address) -> bool {
+        self.address == *address
+    }
+
+    fn signer_addresses(&self) -> impl Iterator<Item = Address> {
+        [self.address].into_iter()
+    }
+
+    #[doc(alias = "sign_tx_from")]
+    async fn sign_transaction_from(
+        &self,
+        _sender: Address,
+        tx: TypedTransaction,
+    ) -> alloy_signer::Result<TxEnvelope> {
+        match tx {
+            TypedTransaction::Native(_) => {
+                Err(alloy_signer::Error::other("NoopWallet should only be used for zksync eip712 transactions with custom signature"))
+            }
+            TypedTransaction::Eip712(t) => {
+                if t.eip712_meta.as_ref().map(|m| m.custom_signature.as_ref()).is_none() {
+                    Err(alloy_signer::Error::other("NoopWallet should only be used for zksync eip712 transactions with custom signature"))
+                } else {
+                    let sig = PrimitiveSignature::try_from([0_u8; 65].as_slice()).unwrap();
+                    Ok(TxEnvelope::Eip712(t.into_signed(sig)))
+                }
+            }
+        }
     }
 }

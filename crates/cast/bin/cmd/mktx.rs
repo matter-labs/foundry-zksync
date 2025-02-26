@@ -115,8 +115,8 @@ impl MakeTxArgs {
             .await?;
 
         if zk_tx.has_zksync_args() || zk_force {
-            let zk_wallet = ZksyncWallet::new(signer);
             let zktx = zksync::build_tx(zk_tx, tx, zkcode, &config).await?;
+            let zk_wallet = ZksyncWallet::new(signer);
             let signed = zktx.build(&zk_wallet).await?.encoded_2718();
             sh_println!("0x{}", hex::encode(signed))?;
             return Ok(());
