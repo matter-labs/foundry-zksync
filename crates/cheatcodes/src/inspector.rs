@@ -804,6 +804,7 @@ impl Cheatcodes {
         }
 
         if let Some(result) = self.strategy.runner.zksync_try_create(self, ecx, &input, executor) {
+            self.strategy.runner.zksync_increment_nonce_after_broadcast(self, ecx, false);
             return Some(result);
         }
 
@@ -923,6 +924,7 @@ where {
             }
         }
 
+        self.strategy.runner.zksync_remove_duplicate_account_access(self);
         self.strategy.runner.zksync_record_create_address(self.strategy.context.as_mut(), &outcome);
 
         outcome
@@ -1222,6 +1224,7 @@ where {
         }
 
         if let Some(result) = self.strategy.runner.zksync_try_call(self, ecx, call, executor) {
+            self.strategy.runner.zksync_increment_nonce_after_broadcast(self, ecx, call.is_static);
             return Some(result);
         }
 
@@ -1568,6 +1571,8 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
                 }
             }
         }
+
+        self.strategy.runner.zksync_remove_duplicate_account_access(self);
 
         // At the end of the call,
         // we need to check if we've found all the emits.

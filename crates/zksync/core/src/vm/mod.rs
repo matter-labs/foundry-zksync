@@ -3,6 +3,7 @@ mod env;
 mod farcall;
 mod inspect;
 mod runner;
+mod storage_recorder;
 mod storage_view;
 mod tracers;
 
@@ -16,6 +17,7 @@ pub use runner::{
     balance, call, code_hash, create, deploy_nonce, encode_create_params, transact, tx_nonce,
     ZkCreateInputs,
 };
+pub use storage_recorder::{AccountAccess, AccountAccessKind, StorageAccess};
 pub use tracers::cheatcode::CheatcodeTracerContext;
 
 /// The Hardhat console address.

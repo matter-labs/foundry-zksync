@@ -89,6 +89,7 @@ where
         block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
         is_create,
         is_static: false,
+        record_storage_accesses: false,
     };
 
     let mut ccx = CheatcodeTracerContext {
@@ -215,6 +216,7 @@ where
         block_hashes: get_historical_block_hashes(ecx),
         is_create: true,
         is_static: false,
+        record_storage_accesses: ccx.record_storage_accesses,
     };
 
     inspect_as_batch(tx, ecx, &mut ccx, call_ctx)
@@ -287,6 +289,7 @@ where
         block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
         is_create: false,
         is_static: call.is_static,
+        record_storage_accesses: ccx.record_storage_accesses,
     };
 
     inspect(tx, ecx, &mut ccx, call_ctx)

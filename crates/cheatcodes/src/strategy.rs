@@ -161,6 +161,16 @@ pub trait CheatcodeInspectorStrategyExt {
     ) -> Option<CallOutcome> {
         None
     }
+
+    fn zksync_remove_duplicate_account_access(&self, _state: &mut Cheatcodes) {}
+
+    fn zksync_increment_nonce_after_broadcast(
+        &self,
+        _state: &mut Cheatcodes,
+        _ecx: Ecx,
+        _is_static: bool,
+    ) {
+    }
 }
 
 #[derive(Debug, Default, Clone)]
