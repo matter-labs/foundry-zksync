@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.10](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.9...foundry-zksync-v0.0.10) (2025-02-26)
+
+
+### Features
+
+* support state diff cheatcode ([#922](https://github.com/matter-labs/foundry-zksync/issues/922)) ([a7b05d3](https://github.com/matter-labs/foundry-zksync/commit/a7b05d38b8a3e14cbda85abdac58dbb8bc19868a))
+* Upstream 67be473 ([#924](https://github.com/matter-labs/foundry-zksync/issues/924)) ([ca9d1aa](https://github.com/matter-labs/foundry-zksync/commit/ca9d1aa4fb54e87f0e1ccad04e2b4f629b4520cc))
+
+
+### Bug Fixes
+
+* Add back test_zk_cast_call and test_zk_cast_call_create ([#933](https://github.com/matter-labs/foundry-zksync/issues/933)) ([b8a577e](https://github.com/matter-labs/foundry-zksync/commit/b8a577ed4816df84df437a5d456f9e04fe9012f5))
+* consistent nonce w/ tx batching ([#929](https://github.com/matter-labs/foundry-zksync/issues/929)) ([ae9cfd1](https://github.com/matter-labs/foundry-zksync/commit/ae9cfd10d906b5ab350258533219da1f4775c118))
+* Nonce mismatch when broadcasting in setup function  ([#923](https://github.com/matter-labs/foundry-zksync/issues/923)) ([cdef273](https://github.com/matter-labs/foundry-zksync/commit/cdef273ef198820ac6fa390bc868c6c8aa5cbab2))
+
 ## [0.0.9](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.8...foundry-zksync-v0.0.9) (2025-02-20)
 
 
