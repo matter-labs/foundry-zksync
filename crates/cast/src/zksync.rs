@@ -200,7 +200,7 @@ where
     }
 }
 
-/// Fills transaction with an emtpy signature. Used when custom signature is present
+/// Fills transaction with an empty signature. Used when custom signature is present
 /// as a signed transaction is expected by alloy types as well as the Zksync node
 /// which rlp decodes the signature but ignores it afterwards
 #[derive(Debug, Clone)]
