@@ -407,8 +407,7 @@ casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
         .assert_success();
 
     let signature = hex::encode("ok".as_bytes());
-    let output = cmd
-        .cast_fuse()
+    cmd.cast_fuse()
         .args([
             "send",
             rw_address,
@@ -426,5 +425,30 @@ casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
         .get_output()
         .stdout_lossy();
 
-    println!("{}", output);
+    let raw_tx = cmd
+        .cast_fuse()
+        .args([
+            "mktx",
+            rw_address,
+            "0x",
+            "--value",
+            "0.00001ether",
+            "--from",
+            aa_account_address,
+            "--zk-custom-signature",
+            &signature,
+            "--zk-gas-per-pubdata",
+            "100000",
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    cmd.cast_fuse()
+        .args(["publish", "--rpc-url", &url, raw_tx.trim_end()])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
 });

@@ -99,7 +99,6 @@ impl ZkTransactionOpts {
         }
 
         tx.prep_for_submission();
-        dbg!(&tx);
         Ok(tx)
     }
 }
