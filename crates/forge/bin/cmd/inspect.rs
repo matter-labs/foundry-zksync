@@ -81,7 +81,7 @@ impl InspectArgs {
             let should_compile_with_zksolc = zksync::check_command_for_field(&field)?;
             if should_compile_with_zksolc {
                 let config = Config { ..Default::default() };
-                return zksync::inspect(&field, config, target_path, &contract.name);
+                return zksync::inspect(&field, config, target_path, contract.name());
             }
         }
 
