@@ -10,10 +10,7 @@ use crate::{
     strategy::CheatcodeInspectorStrategy,
     test::{
         assume::AssumeNoRevert,
-        expect::{
-            self, ExpectedCallData, ExpectedCallTracker, ExpectedCallType, ExpectedCreate,
-            ExpectedEmitTracker, ExpectedRevert, ExpectedRevertKind,
-        },
+        expect::{self, ExpectedCreate, ExpectedEmitTracker, ExpectedRevert, ExpectedRevertKind},
         revert_handlers,
     },
     utils::IgnoredTraces,
@@ -556,6 +553,7 @@ impl Clone for Cheatcodes {
             mocked_functions: self.mocked_functions.clone(),
             expected_calls: self.expected_calls.clone(),
             expected_emits: self.expected_emits.clone(),
+            expected_creates: self.expected_creates.clone(),
             allowed_mem_writes: self.allowed_mem_writes.clone(),
             broadcast: self.broadcast.clone(),
             broadcastable_transactions: self.broadcastable_transactions.clone(),
