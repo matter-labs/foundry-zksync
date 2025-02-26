@@ -1,12 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "zksync-contracts/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
-import {TransactionHelper, Transaction} from "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
-import {SystemContractsCaller} from "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
-import {SystemContractHelper} from "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
+import {
+    IAccount,
+    ACCOUNT_VALIDATION_SUCCESS_MAGIC
+} from "zksync-contracts/zksync-contracts/l2/system-contracts/interfaces/IAccount.sol";
+import {
+    TransactionHelper,
+    Transaction
+} from "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/TransactionHelper.sol";
+import {SystemContractsCaller} from
+    "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
+import {SystemContractHelper} from
+    "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
 import {EfficientCall} from "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder} from "zksync-contracts/zksync-contracts/l2/system-contracts/Constants.sol";
+import {
+    BOOTLOADER_FORMAL_ADDRESS,
+    NONCE_HOLDER_SYSTEM_CONTRACT,
+    DEPLOYER_SYSTEM_CONTRACT,
+    INonceHolder
+} from "zksync-contracts/zksync-contracts/l2/system-contracts/Constants.sol";
 import {Utils} from "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 import {InsufficientFunds, InvalidSig, SigField, FailedToPayOperator} from "./SystemContractErrors.sol";
 
@@ -72,52 +85,37 @@ contract AAAccount is IAccount {
         bytes32, // _txHash
         bytes32 _suggestedSignedHash,
         Transaction calldata _transaction
-    )
-        external
-        payable
-        override
-        ignoreNonBootloader
-        ignoreInDelegateCall
-        returns (bytes4 magic)
-    {
+    ) external payable override ignoreNonBootloader ignoreInDelegateCall returns (bytes4 magic) {
         magic = _validateTransaction(_suggestedSignedHash, _transaction);
     }
 
     /// @notice Inner method for validating transaction and increasing the nonce
     /// @param _suggestedSignedHash The hash of the transaction signed by the EOA
     /// @param _transaction The transaction.
-    function _validateTransaction(
-        bytes32 _suggestedSignedHash,
-        Transaction calldata _transaction
-    ) internal returns (bytes4 magic) {
+    function _validateTransaction(bytes32 _suggestedSignedHash, Transaction calldata _transaction)
+        internal
+        returns (bytes4 magic)
+    {
         // Note, that nonce holder can only be called with "isSystem" flag.
         SystemContractsCaller.systemCallWithPropagatedRevert(
             uint32(gasleft()),
             address(NONCE_HOLDER_SYSTEM_CONTRACT),
             0,
-            abi.encodeCall(
-                INonceHolder.incrementMinNonceIfEquals,
-                (_transaction.nonce)
-            )
+            abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (_transaction.nonce))
         );
 
         // Even though for the transaction types present in the system right now,
         // we always provide the suggested signed hash, this should not be
         // always expected. In case the bootloader has no clue what the default hash
         // is, the bytes32(0) will be supplied.
-        bytes32 txHash = _suggestedSignedHash != bytes32(0)
-            ? _suggestedSignedHash
-            : _transaction.encodeHash();
+        bytes32 txHash = _suggestedSignedHash != bytes32(0) ? _suggestedSignedHash : _transaction.encodeHash();
 
         // The fact there is enough balance for the account
         // should be checked explicitly to prevent user paying for fee for a
         // transaction that wouldn't be included on Ethereum.
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
         if (totalRequiredBalance > address(this).balance) {
-            revert InsufficientFunds(
-                totalRequiredBalance,
-                address(this).balance
-            );
+            revert InsufficientFunds(totalRequiredBalance, address(this).balance);
         }
 
         if (_isValidSignature(txHash, _transaction.signature)) {
@@ -143,9 +141,7 @@ contract AAAccount is IAccount {
     /// of the account via L1 -> L2 communication. However, the default account can initiate a transaction
     /// from L1, so we formally implement the interface method, but it doesn't execute any logic.
     /// @param _transaction The transaction to execute.
-    function executeTransactionFromOutside(
-        Transaction calldata _transaction
-    ) external payable override {
+    function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         // Behave the same as for fallback/receive, just execute nothing, returns nothing
     }
 
@@ -163,19 +159,13 @@ contract AAAccount is IAccount {
             bytes4 selector = bytes4(data[:4]);
             // Check that called function is the deployment method,
             // the others deployer method is not supposed to be called from the default account.
-            isSystemCall =
-                selector == DEPLOYER_SYSTEM_CONTRACT.create.selector ||
-                selector == DEPLOYER_SYSTEM_CONTRACT.create2.selector ||
-                selector == DEPLOYER_SYSTEM_CONTRACT.createAccount.selector ||
-                selector == DEPLOYER_SYSTEM_CONTRACT.create2Account.selector;
+            isSystemCall = selector == DEPLOYER_SYSTEM_CONTRACT.create.selector
+                || selector == DEPLOYER_SYSTEM_CONTRACT.create2.selector
+                || selector == DEPLOYER_SYSTEM_CONTRACT.createAccount.selector
+                || selector == DEPLOYER_SYSTEM_CONTRACT.create2Account.selector;
         }
-        bool success = EfficientCall.rawCall({
-            _gas: gas,
-            _address: to,
-            _value: value,
-            _data: data,
-            _isSystem: isSystemCall
-        });
+        bool success =
+            EfficientCall.rawCall({_gas: gas, _address: to, _value: value, _data: data, _isSystem: isSystemCall});
         if (!success) {
             EfficientCall.propagateRevert();
         }
@@ -185,10 +175,7 @@ contract AAAccount is IAccount {
     /// @param _hash The hash of the transaction to be signed.
     /// @param _signature The signature of the transaction.
     /// @return EIP1271_SUCCESS_RETURN_VALUE if the signature is correct. It reverts otherwise.
-    function _isValidSignature(
-        bytes32 _hash,
-        bytes memory _signature
-    ) internal view returns (bool) {
+    function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         return keccak256(_signature) == keccak256(abi.encodePacked("ok"));
     }
 

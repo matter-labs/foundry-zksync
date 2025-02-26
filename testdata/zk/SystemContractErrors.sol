@@ -18,10 +18,7 @@ error CompressionValueTransformError(uint256 expected, uint256 actual);
 // 0xc2ea251e
 error CompressionValueSubError(uint256 expected, uint256 actual);
 // 0x849acb7f
-error CompressorInitialWritesProcessedNotEqual(
-    uint256 expected,
-    uint256 actual
-);
+error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
 // 0x61a6a4b3
 error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
 // 0x9be48d8d

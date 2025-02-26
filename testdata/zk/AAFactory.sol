@@ -11,24 +11,16 @@ contract AAFactory {
         aaBytecodeHash = _aaBytecodeHash;
     }
 
-    function deployAccount(
-        bytes32 salt
-    ) external returns (address accountAddress) {
-        (bool success, bytes memory returnData) = SystemContractsCaller
-            .systemCallWithReturndata(
-                uint32(gasleft()),
-                address(DEPLOYER_SYSTEM_CONTRACT),
-                uint128(0),
-                abi.encodeCall(
-                    DEPLOYER_SYSTEM_CONTRACT.create2Account,
-                    (
-                        salt,
-                        aaBytecodeHash,
-                        "",
-                        IContractDeployer.AccountAbstractionVersion.Version1
-                    )
-                )
-            );
+    function deployAccount(bytes32 salt) external returns (address accountAddress) {
+        (bool success, bytes memory returnData) = SystemContractsCaller.systemCallWithReturndata(
+            uint32(gasleft()),
+            address(DEPLOYER_SYSTEM_CONTRACT),
+            uint128(0),
+            abi.encodeCall(
+                DEPLOYER_SYSTEM_CONTRACT.create2Account,
+                (salt, aaBytecodeHash, "", IContractDeployer.AccountAbstractionVersion.Version1)
+            )
+        );
         require(success, string(returnData));
 
         (accountAddress) = abi.decode(returnData, (address));

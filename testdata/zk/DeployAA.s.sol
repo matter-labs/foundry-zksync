@@ -9,12 +9,8 @@ contract DeployAA is Script {
     function run() external {
         vm.startBroadcast();
         // deploy resolver
-        (bool _success, ) = address(vm).call(
-            abi.encodeWithSignature("zkUseFactoryDep(string)", "AAAccount")
-        );
-        string memory artifact = vm.readFile(
-            "./zkout/AAAccount.sol/AAAccount.json"
-        );
+        (bool _success,) = address(vm).call(abi.encodeWithSignature("zkUseFactoryDep(string)", "AAAccount"));
+        string memory artifact = vm.readFile("./zkout/AAAccount.sol/AAAccount.json");
         bytes32 bytecodeHash = vm.parseJsonBytes32(artifact, ".hash");
 
         AAFactory factory = new AAFactory(bytecodeHash);
