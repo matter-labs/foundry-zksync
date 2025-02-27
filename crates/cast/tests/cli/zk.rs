@@ -390,13 +390,12 @@ casttest!(test_zk_cast_call_create, async |_prj, cmd| {
 
 casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
     util::initialize(prj.root());
-    prj.add_script("DeployAA.s.sol", include_str!("../../../../testdata/zk/DeployAA.s.sol"))
-        .unwrap();
-    prj.add_source("AAAccount.sol", include_str!("../../../../testdata/zk/AAAccount.sol")).unwrap();
-    prj.add_source("AAFactory.sol", include_str!("../../../../testdata/zk/AAFactory.sol")).unwrap();
+    prj.add_script("DeployAA.s.sol", include_str!("../fixtures/zk/DeployAA.s.sol")).unwrap();
+    prj.add_source("AAAccount.sol", include_str!("../fixtures/zk/AAAccount.sol")).unwrap();
+    prj.add_source("AAFactory.sol", include_str!("../fixtures/zk/AAFactory.sol")).unwrap();
     prj.add_source(
         "SystemContractErrors.sol",
-        include_str!("../../../../testdata/zk/SystemContractErrors.sol"),
+        include_str!("../fixtures/zk/SystemContractErrors.sol"),
     )
     .unwrap();
     prj.write_config(Config {
