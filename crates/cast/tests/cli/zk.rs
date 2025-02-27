@@ -1,4 +1,10 @@
-use foundry_test_utils::{casttest, str, util::OutputExt, ZkSyncNode};
+use alloy_primitives::hex;
+use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
+use foundry_test_utils::{
+    casttest, str,
+    util::{self, OutputExt},
+    ZkSyncNode,
+};
 use foundry_zksync_core::convert::ConvertH160;
 use zksync_types::L2_BASE_TOKEN_ADDRESS;
 
@@ -330,7 +336,6 @@ casttest!(test_zk_cast_call, async |_prj, cmd| {
         .next()
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
-
     let base_token = L2_BASE_TOKEN_ADDRESS.to_address();
 
     cmd.cast_fuse()
@@ -381,4 +386,130 @@ casttest!(test_zk_cast_call_create, async |_prj, cmd| {
 0x000000000000000000000000f78d915dd63894ab9b78130a176bd372cce176c0
 
 "#]]);
+});
+
+casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
+    util::initialize(prj.root());
+    prj.add_script("DeployAA.s.sol", include_str!("../fixtures/zk/DeployAA.s.sol")).unwrap();
+    prj.add_source("AAAccount.sol", include_str!("../fixtures/zk/AAAccount.sol")).unwrap();
+    prj.add_source("AAFactory.sol", include_str!("../fixtures/zk/AAFactory.sol")).unwrap();
+    prj.add_source(
+        "SystemContractErrors.sol",
+        include_str!("../fixtures/zk/SystemContractErrors.sol"),
+    )
+    .unwrap();
+    prj.write_config(Config {
+        optimizer: Some(true),
+        optimizer_runs: Some(200),
+        via_ir: true,
+        fs_permissions: FsPermissions::new(vec![PathPermission::read("./zkout")]),
+        ..Default::default()
+    });
+
+    // Install required dependencies
+    cmd.forge_fuse()
+        .args(["install", "cyfrin/zksync-contracts", "--no-commit", "--shallow"])
+        .assert_success();
+
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    let (rw_address, rw_private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
+
+    let counter_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+    // Deploy counter
+    cmd.cast_fuse()
+        .args(["rpc", "hardhat_setCode", counter_address, COUNTER_BYTECODE, "--rpc-url", &url])
+        .assert_success();
+
+    cmd.forge_fuse()
+        .args([
+            "script",
+            "./script/DeployAA.s.sol:DeployAA",
+            "--rpc-url",
+            &url,
+            "--zk-enable-eravm-extensions",
+            "--private-key",
+            rw_private_key,
+            "--zksync",
+            "--broadcast",
+            "--slow",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
+        .find(|file| file.ends_with("run-latest.json"))
+        .expect("No broadcast artifacts");
+
+    let content = foundry_common::fs::read_to_string(run_latest).unwrap();
+
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let aa_account_address =
+        &json["receipts"].as_array().unwrap()[1]["contractAddress"].to_string().replace("\"", "");
+
+    // Fund the aa account
+    cmd.cast_fuse()
+        .args([
+            "send",
+            aa_account_address,
+            "0x",
+            "--value",
+            "0.1ether",
+            "--private-key",
+            rw_private_key,
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success();
+
+    let signature = hex::encode("ok".as_bytes());
+    cmd.cast_fuse()
+        .args([
+            "send",
+            rw_address,
+            "0x",
+            "--value",
+            "0.00001ether",
+            "--from",
+            aa_account_address,
+            "--zk-custom-signature",
+            &signature,
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    let raw_tx = cmd
+        .cast_fuse()
+        .args([
+            "mktx",
+            rw_address,
+            "0x",
+            "--value",
+            "0.00001ether",
+            "--from",
+            aa_account_address,
+            "--zk-custom-signature",
+            &signature,
+            "--zk-gas-per-pubdata",
+            "100000",
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    cmd.cast_fuse()
+        .args(["publish", "--rpc-url", &url, raw_tx.trim_end()])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
 });
