@@ -5,7 +5,7 @@ use eyre::Result;
 use foundry_evm::{
     backend::{
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        Backend,
+        Backend, DatabaseExt,
     },
     InspectorExt,
 };
@@ -56,7 +56,12 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         let ctx = get_context(backend.strategy.context.as_mut());
         ctx.persisted_factory_deps = persisted_factory_deps;
 
-        result
+        let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
+
+        result.map(|(result, call_traces)| {
+            inspector.trace_zksync(&mut evm_context, call_traces);
+            result
+        })
     }
 
     /// When creating or switching forks, we update the AccountInfo of the contract.

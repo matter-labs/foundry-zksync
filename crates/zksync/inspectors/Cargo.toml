@@ -18,3 +18,4 @@ foundry-zksync-core.workspace = true
 
 alloy-primitives.workspace = true
 revm.workspace = true
+tracing.workspace = true

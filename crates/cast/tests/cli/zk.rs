@@ -355,6 +355,39 @@ casttest!(test_zk_cast_call, async |_prj, cmd| {
 "#]]);
 });
 
+casttest!(test_zk_cast_call_trace, async |_prj, cmd| {
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    let (addr, private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
+
+    let counter_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+    // Deploy counter
+    cmd.cast_fuse()
+        .args(["rpc", "hardhat_setCode", counter_address, COUNTER_BYTECODE, "--rpc-url", &url])
+        .assert_success();
+
+    cmd.cast_fuse()
+        .args([
+            "call",
+            "--trace",
+            counter_address,
+            "increment()",
+            "--private-key",
+            private_key,
+            "--rpc-url",
+            &url,
+            "--zksync",
+        ])
+        .assert_success()
+        .stdout_eq(str![[r#"
+this should be a trace
+"#]]);
+});
+
 casttest!(test_zk_cast_call_create, async |_prj, cmd| {
     let node = ZkSyncNode::start().await;
     let url = node.url();

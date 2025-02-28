@@ -1168,6 +1168,10 @@ impl InspectorExt for InspectorStack {
     fn create2_deployer(&self) -> Address {
         self.create2_deployer
     }
+
+    fn trace_zksync(&mut self, ecx: &mut EvmContext<&mut dyn DatabaseExt>, call_traces: Vec<Call>) {
+        self.as_mut().trace_zksync(ecx, call_traces);
+    }
 }
 
 impl<'a> Deref for InspectorStackRefMut<'a> {

@@ -14,6 +14,7 @@ use revm::{
     },
     Database, EvmContext, Inspector,
 };
+use tracing::instrument;
 
 /// A Wrapper around [TracingInspector] to allow adding zkEVM traces.
 #[derive(Clone, Debug, Default)]
@@ -192,6 +193,7 @@ impl InspectorExt for TraceCollector {
         context: &mut EvmContext<&mut dyn DatabaseExt>,
         call_traces: Vec<Call>,
     ) {
+        // NISH
         fn trace_call_recursive(
             tracer: &mut TracingInspector,
             context: &mut EvmContext<&mut dyn DatabaseExt>,
@@ -217,12 +219,16 @@ impl InspectorExt for TraceCollector {
                 false
             };
 
+            tracing::info!("is_first_non_system_call: {:?}", is_first_non_system_call);
+
             // We ignore traces from system addresses, the default account abstraction calls on
             // caller address, and the original call (identified when neither `to` or
             // `from` are system addresses) since it is already included in EVM trace.
             let record_trace = !is_first_non_system_call &&
                 !foundry_zksync_core::is_system_address(inputs.target_address) &&
                 inputs.target_address != context.env.tx.caller;
+
+            tracing::info!("record_trace: {:?}", record_trace);
 
             let (new_depth, overflow) = context.journaled_state.depth.overflowing_add(1);
             if !overflow && record_trace {
