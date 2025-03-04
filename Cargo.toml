@@ -27,6 +27,10 @@ members = [
 ]
 resolver = "2"
 
+[workspace.metadata]
+# NOTE(zk): track upstream version after each merge
+metadata.upstream_version = "1.0.0"
+
 [workspace.package]
 version = "0.0.9" # x-release-please-version
 edition = "2021"
