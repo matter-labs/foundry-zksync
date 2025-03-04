@@ -93,6 +93,6 @@ fn upstream_version() -> Result<String, Box<dyn Error>> {
     let metadata = cargo_metadata::MetadataCommand::new().exec()?;
     Ok(metadata.workspace_metadata["metadata"]["upstream_version"]
         .as_str()
-        .ok_or("Unable to retrieve upstream version from metadat")?
+        .ok_or("Unable to retrieve upstream version from metadata")?
         .to_string())
 }
