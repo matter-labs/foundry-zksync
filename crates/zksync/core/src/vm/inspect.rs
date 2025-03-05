@@ -46,6 +46,7 @@ use crate::{
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
         env::{create_l1_batch_env, create_system_env},
+        storage_recorder::{AccountAccess, StorageAccessRecorder},
         storage_view::StorageView,
         tracers::{
             bootloader::{BootloaderDebug, BootloaderDebugTracer},
@@ -70,6 +71,8 @@ pub struct ZKVMExecutionResult {
     pub call_traces: Vec<Call>,
     /// Immutables recorded via calls to ImmutableSimulator::setImmutables.
     pub recorded_immutables: rHashMap<H160, rHashMap<rU256, FixedBytes<32>>>,
+    /// Recorded account accesses.
+    pub account_accesses: Vec<AccountAccess>,
 }
 
 /// Revm-style result with ZKVM Execution
@@ -118,6 +121,7 @@ where
                     call_traces: result.call_traces,
                     execution_result: exec,
                     recorded_immutables: result.recorded_immutables,
+                    account_accesses: result.account_accesses,
                 });
             }
             (None, exec) => {
@@ -126,6 +130,7 @@ where
                     call_traces: result.call_traces,
                     execution_result: exec,
                     recorded_immutables: result.recorded_immutables,
+                    account_accesses: result.account_accesses,
                 });
             }
             (
@@ -141,12 +146,14 @@ where
                             output: agg_output,
                         },
                     recorded_immutables: aggregated_recorded_immutables,
+                    account_accesses: aggregated_storage_accesses,
                 }),
                 rExecutionResult::Success { reason, gas_used, gas_refunded, logs, output },
             ) => {
                 aggregated_logs.append(&mut result.logs);
                 aggregated_call_traces.append(&mut result.call_traces);
                 aggregated_recorded_immutables.extend(result.recorded_immutables);
+                aggregated_storage_accesses.extend(result.account_accesses);
                 *agg_reason = reason;
                 *agg_gas_used += gas_used;
                 *agg_gas_refunded += gas_refunded;
@@ -225,6 +232,9 @@ where
         "gas usage",
     );
 
+    let account_accesses = era_db.get_account_accesses();
+
+    // TODO(zk): adapt this to use account_accesses as well
     if let Some(record) = &mut era_db.accesses {
         for k in modified_storage.keys() {
             record.writes.entry(k.address().to_address()).or_default().push(k.key().to_ru256());
@@ -288,6 +298,7 @@ where
                     output,
                 },
                 recorded_immutables,
+                account_accesses,
             }
         }
         ExecutionResult::Revert { output } => {
@@ -305,6 +316,7 @@ where
                     output: Bytes::from(output),
                 },
                 recorded_immutables,
+                account_accesses,
             }
         }
         ExecutionResult::Halt { reason } => {
@@ -322,6 +334,7 @@ where
                     gas_used: gas_usage.gas_used(),
                 },
                 recorded_immutables,
+                account_accesses,
             }
         }
     };
@@ -478,7 +491,7 @@ struct InnerZkVmResult {
     recorded_immutables: rHashMap<H160, rHashMap<rU256, FixedBytes<32>>>,
 }
 
-fn inspect_inner<S: ReadStorage>(
+fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
     chain_id: L2ChainId,

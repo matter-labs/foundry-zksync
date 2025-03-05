@@ -23,7 +23,7 @@ use foundry_zksync_compilers::{
     },
     link::{self as zk_link, MissingLibrary},
 };
-use foundry_zksync_core::hash_bytecode;
+use foundry_zksync_core::{hash_bytecode, H256};
 use semver::Version;
 
 use crate::{LinkOutput, Linker, LinkerError};
@@ -193,7 +193,7 @@ impl<'a> ZkLinker<'a> {
             let (lib_path, lib_name) = self.linker.convert_artifact_id_to_lib_path(id);
 
             libraries.libs.entry(lib_path).or_default().entry(lib_name).or_insert_with(|| {
-                let address = foundry_zksync_core::compute_create_address(sender, nonce);
+                let address = foundry_zksync_core::compute_create_address(sender, nonce as u32);
                 libs_to_deploy.push((id, address));
                 nonce += 1;
 
@@ -274,8 +274,12 @@ impl<'a> ZkLinker<'a> {
             let code = library_bytecode.bytes().expect("fully linked bytecode");
             let bytecode_hash = hash_bytecode(code);
 
-            let address =
-                foundry_zksync_core::compute_create2_address(sender, bytecode_hash, salt, &[]);
+            let address = foundry_zksync_core::compute_create2_address(
+                sender,
+                bytecode_hash,
+                H256::from_slice(&salt.0),
+                &[],
+            );
 
             let (file, name) = self.linker.convert_artifact_id_to_lib_path(id);
 
