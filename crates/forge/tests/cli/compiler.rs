@@ -206,7 +206,7 @@ forgetest!(can_list_resolved_multiple_compiler_versions_skipped_json, |prj, cmd|
   ],
   "Vyper": [
     {
-      "version": "0.4.1",
+      "version": "0.4.0",
       "paths": [
         "src/Counter.vy",
         "src/ICounter.vyi"
