@@ -21,7 +21,6 @@ fn test_verify_bytecode(
 ) {
     let etherscan_key = next_mainnet_etherscan_api_key();
     let rpc_url = next_http_archive_rpc_url();
-    println!("{etherscan_key}");
 
     // fetch and flatten source code
     let source_code = cmd
