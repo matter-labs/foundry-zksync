@@ -1,5 +1,5 @@
 //! Contains various tests for checking forge commands related to verifying contracts on Etherscan
-//! and Sourcify.
+//! and ZkSync explorer.
 
 use crate::utils::{self, network_private_key, EnvExternalities};
 use alloy_chains::NamedChain;
