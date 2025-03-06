@@ -42,6 +42,8 @@ contract ContractOne {
         .stdout_lossy();
     cmd.forge_fuse();
 
+    let out_solc_bytecode = out_solc_bytecode.lines().last().expect("inspect returns output");
+
     let out_zk_bytecode = cmd
         .arg("inspect")
         .arg("ContractOne")
@@ -52,6 +54,8 @@ contract ContractOne {
         .stdout_lossy();
     cmd.forge_fuse();
 
+    let out_zk_bytecode = out_zk_bytecode.lines().last().expect("inspect returns output");
+
     let out_deployedbytecode = cmd
         .arg("inspect")
         .arg("ContractOne")
@@ -61,6 +65,8 @@ contract ContractOne {
         .get_output()
         .stdout_lossy();
     cmd.forge_fuse();
+
+    let out_deployedbytecode = out_deployedbytecode.lines().last().expect("inspect returns output");
 
     // The solc and zksolc bytecodes returned by inspect should be different
     assert_ne!(out_solc_bytecode, out_zk_bytecode);

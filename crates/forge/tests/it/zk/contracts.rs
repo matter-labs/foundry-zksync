@@ -62,7 +62,7 @@ async fn test_zk_contract_create2() {
     );
     util::initialize(prj.root());
 
-    cmd.args(["install", "matter-labs/era-contracts", "--no-commit", "--shallow"]).assert_success();
+    cmd.args(["install", "matter-labs/era-contracts", "--shallow"]).assert_success();
     cmd.forge_fuse();
 
     let mut config = cmd.config();
