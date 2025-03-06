@@ -407,9 +407,7 @@ casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
     });
 
     // Install required dependencies
-    cmd.forge_fuse()
-        .args(["install", "cyfrin/zksync-contracts", "--no-commit", "--shallow"])
-        .assert_success();
+    cmd.forge_fuse().args(["install", "cyfrin/zksync-contracts", "--shallow"]).assert_success();
 
     let node = ZkSyncNode::start().await;
     let url = node.url();
