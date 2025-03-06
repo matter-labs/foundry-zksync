@@ -56,24 +56,6 @@ function doStuff() external {{}}
     prj.add_source("Verify.sol", &contract).unwrap();
 }
 
-fn add_verify_target_with_constructor(prj: &TestProject) {
-    prj.add_source(
-        "Verify.sol",
-        r#"
-import {Unique} from "./unique.sol";
-contract Verify is Unique {
-    struct SomeStruct {
-        uint256 a;
-        string str;
-    }
-
-    constructor(SomeStruct memory st, address owner) {}
-}
-"#,
-    )
-    .unwrap();
-}
-
 #[allow(clippy::disallowed_macros)]
 fn parse_verification_result(cmd: &mut TestCommand, retries: u32) -> eyre::Result<()> {
     // Give Block Explorer some time to verify the contract.
@@ -178,48 +160,6 @@ fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: Te
 }
 
 #[allow(clippy::disallowed_macros)]
-fn guess_constructor_args(info: Option<EnvExternalities>, prj: TestProject, mut cmd: TestCommand) {
-    // only execute if keys present
-    if let Some(info) = info {
-        println!("verifying on {}", info.chain);
-        add_unique(&prj);
-        add_verify_target_with_constructor(&prj);
-
-        let contract_path = "src/Verify.sol:Verify";
-        let output = cmd
-            .arg("create")
-            .args(info.create_args())
-            .arg(contract_path)
-            .arg("--zksync")
-            .args(vec![
-                "--constructor-args",
-                "(239,SomeString)",
-                "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-            ])
-            .args(vec![
-                "--verifier-url".to_string(),
-                "https://explorer.sepolia.era.zksync.dev/contract_verification".to_string(),
-            ])
-            .assert_success()
-            .get_output()
-            .stdout_lossy();
-
-        let address = utils::parse_deployed_address(output.as_str())
-            .unwrap_or_else(|| panic!("Failed to parse deployer {output}"));
-
-        cmd.forge_fuse().arg("verify-contract").root_arg().args([
-            address,
-            contract_path.to_string(),
-            "--verifier".to_string(),
-            info.verifier.to_string(),
-            "--guess-constructor-args".to_string(),
-        ]);
-
-        await_verification_response(info, cmd)
-    }
-}
-
-#[allow(clippy::disallowed_macros)]
 /// Executes create --verify on the given chain
 fn create_verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: TestCommand) {
     // only execute if keys present
@@ -292,9 +232,3 @@ forgetest!(zk_can_verify_random_contract_sepolia, |prj, cmd| {
 forgetest!(zk_can_create_verify_random_contract_sepolia, |prj, cmd| {
     create_verify_on_chain(zk_env_externalities(), prj, cmd);
 });
-
-// // tests `create && contract-verify --guess-constructor-args && verify-check` on Sepolia testnet
-// if // correct env vars are set
-// forgetest!(zk_can_guess_constructor_args, |prj, cmd| {
-//     guess_constructor_args(zk_env_externalities(), prj, cmd);
-// });
