@@ -159,8 +159,8 @@ fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: Te
     }
 }
 
-#[allow(clippy::disallowed_macros)]
 /// Executes create --verify on the given chain
+#[allow(clippy::disallowed_macros)]
 fn create_verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: TestCommand) {
     // only execute if keys present
     if let Some(info) = info {
