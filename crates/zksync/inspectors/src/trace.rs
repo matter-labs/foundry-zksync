@@ -287,6 +287,7 @@ impl InspectorExt for TraceCollector {
                 extra_gas = extra_gas.saturating_add(inner_extra_gas);
             }
 
+            // We then decrement the call depth so `call_end`/`create_end` has the correct context
             if !overflow && record_trace {
                 context.journaled_state.depth = context.journaled_state.depth.saturating_sub(1);
             }
