@@ -9,6 +9,7 @@ use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_types::TransactionRequest;
 use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
 use eyre::{Context, Result};
+use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
     backend::{
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
@@ -136,19 +137,14 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionRequest> {
-        let decoded =
+    ) -> eyre::Result<TransactionMaybeSigned> {
+        let envelope: ZkTxEnvelope =
             ZkTxEnvelope::decode_2718(&mut data.as_ref()).wrap_err("Failed to decode tx")?;
 
-        trace!(?decoded, "execute signed transaction");
-        print!("2. >>>>>>>>> {:?}", decoded);
-
-        // let opt: Option<&
-        // alloy_consensus::Signed<alloy_zksync::network::unsigned_tx::eip712::TxEip712>> =
-        let tx_712 = decoded.as_eip712();
+        let tx_712 = envelope.as_eip712();
         let parts = tx_712.unwrap().clone().into_parts().0;
 
-        let transaction_request: TransactionRequest = TransactionRequest {
+        let tx: TransactionRequest = TransactionRequest {
             from: Some(parts.from),
             max_fee_per_gas: Some(parts.max_fee_per_gas),
             max_priority_fee_per_gas: Some(parts.max_priority_fee_per_gas),
@@ -167,10 +163,12 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             gas_price: Default::default(),
         };
 
+        trace!(?tx, "execute signed transaction");
+
         back.commit(journaled_state.state.clone());
 
         let res = {
-            configure_tx_req_env(&mut env, &transaction_request, None)?;
+            configure_tx_req_env(&mut env, &tx, None)?;
             let env = back.env_with_handler_cfg(env);
 
             let mut db = back.clone();
@@ -182,7 +180,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         back.commit(res.state);
         update_state(&mut journaled_state.state, back, None)?;
 
-        Ok(transaction_request)
+        Ok(tx.into())
     }
 }
 

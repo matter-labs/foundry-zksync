@@ -10,6 +10,7 @@ use alloy_consensus::TxEnvelope;
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
+use foundry_common::TransactionMaybeSigned;
 use revm::{
     db::CacheDB,
     primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
@@ -117,7 +118,7 @@ pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt 
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionRequest>;
+    ) -> eyre::Result<TransactionMaybeSigned>;
 }
 
 pub trait BackendStrategyRunnerExt {
@@ -207,7 +208,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionRequest> {
+    ) -> eyre::Result<TransactionMaybeSigned> {
         let envelope: TxEnvelope = TxEnvelope::decode_2718(&mut data.as_ref())
             .wrap_err("Failed to decode transaction envelope")?;
 
@@ -229,7 +230,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         back.commit(res.state);
         update_state(&mut journaled_state.state, back, None)?;
 
-        Ok(tx.clone())
+        Ok(envelope.try_into()?)
     }
 }
 

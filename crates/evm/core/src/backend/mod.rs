@@ -11,10 +11,11 @@ use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
 use alloy_primitives::{keccak256, map::HashMap, uint, Address, Bytes, B256, U256};
 use alloy_provider::Provider;
-use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
+use alloy_rpc_types::{BlockNumberOrTag, Transaction};
 use eyre::Context;
 use foundry_common::{
-    is_known_system_sender, provider::try_get_zksync_http_provider, SYSTEM_TRANSACTION_TYPE,
+    is_known_system_sender, provider::try_get_zksync_http_provider, TransactionMaybeSigned,
+    SYSTEM_TRANSACTION_TYPE,
 };
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use itertools::Itertools;
@@ -239,7 +240,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionRequest>;
+    ) -> eyre::Result<TransactionMaybeSigned>;
 
     /// Returns the `ForkId` that's currently used in the database, if fork mode is on
     fn active_fork_id(&self) -> Option<LocalForkId>;
@@ -1356,7 +1357,7 @@ impl DatabaseExt for Backend {
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionRequest> {
+    ) -> eyre::Result<TransactionMaybeSigned> {
         let runner = self.strategy.runner;
         Ok(runner.transact_from_tx(self, data, env, journaled_state, inspector)?)
     }
