@@ -20,7 +20,6 @@ async fn test_zk_contract_paymaster() {
         "install",
         "OpenZeppelin/openzeppelin-contracts",
         "cyfrin/zksync-contracts",
-        "--no-commit",
         "--shallow",
     ])
     .assert_success();
@@ -58,7 +57,6 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
         "install",
         "OpenZeppelin/openzeppelin-contracts",
         "cyfrin/zksync-contracts",
-        "--no-commit",
         "--shallow",
     ])
     .assert_success();
