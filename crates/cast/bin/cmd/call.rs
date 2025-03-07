@@ -232,6 +232,7 @@ impl CallArgs {
             let (mut env, fork, chain, odyssey) =
                 TracingExecutor::get_fork_material(&config, evm_opts).await?;
 
+            // modify settings that usually set in eth_call
             env.cfg.disable_block_gas_limit = true;
             env.block.gas_limit = U256::MAX;
 
