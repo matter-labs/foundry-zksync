@@ -148,10 +148,9 @@ fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: Te
             "--zksync".to_string(),
             "--verifier-url".to_string(),
             "https://explorer.sepolia.era.zksync.dev/contract_verification".to_string(),
+            "--verifier",
+            "zksync",
         ];
-
-        args.push("--verifier".to_string());
-        args.push(info.verifier.clone());
 
         cmd.forge_fuse().arg("verify-contract").root_arg().args(args);
 
