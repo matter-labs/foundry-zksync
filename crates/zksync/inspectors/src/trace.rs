@@ -14,7 +14,6 @@ use revm::{
     },
     Database, EvmContext, Inspector,
 };
-use tracing::instrument;
 
 /// A Wrapper around [TracingInspector] to allow adding zkEVM traces.
 #[derive(Clone, Debug, Default)]
@@ -192,6 +191,7 @@ impl InspectorExt for TraceCollector {
         &mut self,
         context: &mut EvmContext<&mut dyn DatabaseExt>,
         call_traces: Vec<Call>,
+        record_top_call: bool,
     ) {
         // NISH
         fn trace_call_recursive(
@@ -219,21 +219,12 @@ impl InspectorExt for TraceCollector {
                 false
             };
 
-            tracing::info!("is_first_non_system_call: {:?}", is_first_non_system_call);
-
             // We ignore traces from system addresses, the default account abstraction calls on
             // caller address, and the original call (identified when neither `to` or
             // `from` are system addresses) since it is already included in EVM trace.
             let record_trace = !is_first_non_system_call &&
                 !foundry_zksync_core::is_system_address(inputs.target_address) &&
                 inputs.target_address != context.env.tx.caller;
-
-            tracing::info!("record_trace: {:?}", record_trace);
-
-            let (new_depth, overflow) = context.journaled_state.depth.overflowing_add(1);
-            if !overflow && record_trace {
-                context.journaled_state.depth = new_depth;
-            }
 
             let mut outcome = if let Some(reason) = &call.revert_reason {
                 CallOutcome {
@@ -277,6 +268,13 @@ impl InspectorExt for TraceCollector {
                 }
             }
 
+            // We increment the depth after the start of the span to avoid being deeper for single
+            // calls like when using cast call.
+            let (new_depth, overflow) = context.journaled_state.depth.overflowing_add(1);
+            if !overflow && record_trace {
+                context.journaled_state.depth = new_depth;
+            }
+
             // recurse into inner calls
             // record extra gas from ignored traces, to add it at end
             let mut extra_gas = if record_trace { 0u64 } else { call.gas_used };
@@ -288,6 +286,10 @@ impl InspectorExt for TraceCollector {
                     suppressed_top_call || is_first_non_system_call,
                 );
                 extra_gas = extra_gas.saturating_add(inner_extra_gas);
+            }
+
+            if !overflow && record_trace {
+                context.journaled_state.depth = context.journaled_state.depth.saturating_sub(1);
             }
 
             // finish span
@@ -322,15 +324,20 @@ impl InspectorExt for TraceCollector {
                 }
             }
 
-            if !overflow && record_trace {
-                context.journaled_state.depth = context.journaled_state.depth.saturating_sub(1);
-            }
-
             extra_gas
         }
 
+        let (new_depth, overflow) = context.journaled_state.depth.overflowing_add(1);
+        if !overflow && !record_top_call {
+            context.journaled_state.depth = new_depth;
+        }
+
         for call in call_traces {
-            trace_call_recursive(&mut self.inner, context, call, false);
+            trace_call_recursive(&mut self.inner, context, call, record_top_call);
+        }
+
+        if !overflow && !record_top_call {
+            context.journaled_state.depth = context.journaled_state.depth.saturating_sub(1);
         }
     }
 }

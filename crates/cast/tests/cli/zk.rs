@@ -359,7 +359,7 @@ casttest!(test_zk_cast_call_trace, async |_prj, cmd| {
     let node = ZkSyncNode::start().await;
     let url = node.url();
 
-    let (addr, private_key) = ZkSyncNode::rich_wallets()
+    let (_, private_key) = ZkSyncNode::rich_wallets()
         .next()
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
@@ -545,4 +545,47 @@ casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
         .assert_success()
         .get_output()
         .stdout_lossy();
+});
+
+casttest!(test_zk_cast_call_with_trace, async |_prj, cmd| {
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    let (_, private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
+
+    // Deploy counter
+    cmd.cast_fuse()
+        .args([
+            "rpc",
+            "hardhat_setCode",
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            COUNTER_BYTECODE,
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success();
+
+    cmd.cast_fuse()
+        .args([
+            "call",
+            "--trace",
+            "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "number()",
+            "--rpc-url",
+            &url,
+            "--private-key",
+            private_key,
+            "--zksync",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy()
+        .contains(
+            "Traces:
+  [43369] 0x70997970C51812dc3A010C7d01b50e0d17dc79C8::number()
+    └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000001",
+        );
 });

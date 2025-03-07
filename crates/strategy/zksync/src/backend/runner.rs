@@ -58,8 +58,11 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
 
         let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
 
+        // patch evm context with real caller
+        evm_context.env.tx.caller = env.tx.caller;
+
         result.map(|(result, call_traces)| {
-            inspector.trace_zksync(&mut evm_context, call_traces);
+            inspector.trace_zksync(&mut evm_context, call_traces, true);
             result
         })
     }
