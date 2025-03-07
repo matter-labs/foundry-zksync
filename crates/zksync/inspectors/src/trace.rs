@@ -328,6 +328,7 @@ impl InspectorExt for TraceCollector {
         }
 
         let (new_depth, overflow) = context.journaled_state.depth.overflowing_add(1);
+        // If we are going to record the top call then we don't want to change the call depth
         if !overflow && !record_top_call {
             context.journaled_state.depth = new_depth;
         }
