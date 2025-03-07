@@ -10,6 +10,10 @@ ignore = [
     # Used by boojum
     # derivative is unmaintained
     "RUSTSEC-2024-0388",
+    # deprecated paste used by alloy-primitives
+    "RUSTSEC-2024-0436",
+    # protobuf in trezor_client
+    "RUSTSEC-2024-0437"
 ]
 
 # This section is considered when running `cargo deny check bans`.
@@ -104,8 +108,7 @@ allow-git = [
     "https://github.com/bluealloy/revm",
     "https://github.com/RustCrypto/hashes",
     "https://github.com/popzxc/alloy-zksync",
-    "https://github.com/nbaztec/proptest",
 ]
 
 [sources.allow-org]
-github = ["matter-labs", "Moonsong-Labs"]
+github = ["matter-labs"]
