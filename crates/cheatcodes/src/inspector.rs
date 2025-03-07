@@ -154,7 +154,7 @@ pub trait CheatcodesExecutor {
             },
             precompiles: Default::default(),
         };
-        inspector.trace_zksync(&mut ecx_inner, call_traces);
+        inspector.trace_zksync(&mut ecx_inner, call_traces, false);
 
         // re-apply the modified fields to the original ecx.
         let env = std::mem::take(&mut ecx_inner.env);
