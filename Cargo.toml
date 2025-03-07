@@ -251,8 +251,7 @@ syn-solidity = "0.8.18"
 
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
-alloy-zksync = "0.11.0"
-
+alloy-zksync = { git = "https://github.com/MBerguer/alloy-zksync.git", rev = "13224e6fffe2ba481158f0122062e995af0cdaf6" }
 alloy-trie = "0.7.0"
 
 ## op-alloy

@@ -5,12 +5,14 @@ use crate::{
     BroadcastableTransaction, Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Error, Result,
     Vm::*,
 };
-use alloy_consensus::TxEnvelope;
 use alloy_genesis::{Genesis, GenesisAccount};
 use alloy_primitives::{Address, Bytes, B256, U256};
-use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
-use foundry_common::fs::{read_json_file, write_json_file};
+use foundry_common::{
+    fs::{read_json_file, write_json_file},
+    TransactionMaybeSigned,
+};
+
 use foundry_evm_core::{
     backend::{DatabaseExt, RevertStateSnapshotAction},
     constants::{CALLER, CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, TEST_CONTRACT_ADDRESS},
@@ -769,20 +771,40 @@ impl Cheatcode for getStateDiffJsonCall {
 
 impl Cheatcode for broadcastRawTransactionCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
-        let tx = TxEnvelope::decode(&mut self.data.as_ref())
-            .map_err(|err| fmt_err!("failed to decode RLP-encoded transaction: {err}"))?;
+        // let s = ccx.ecx.db.get_strategy();
+        // // let db = ccx.ecx.db;
+        // // db.active_fork_id();
+        // // db.basic(address);
+        // // let fork = ccx.ecx.db.get_fork_info();
+        // // let back: Backend = Backend::new(
+        // //     ccx.ecx.,
+        // //     ccx.ecx.env.clone(),
+        // //     s,
+        // // );
 
-        ccx.ecx.db.transact_from_tx(
-            &tx.clone().into(),
+        // let tx = s.runner.transact_from_tx(
+        //     self.data,
+        //     (*ccx.ecx.env).clone(),
+        //     &mut ccx.ecx.journaled_state,
+        //     &mut *executor.get_inspector(ccx.state),
+        // );
+
+        let tx = ccx.ecx.db.transact_from_tx(
+            self.data.clone(),
             (*ccx.ecx.env).clone(),
             &mut ccx.ecx.journaled_state,
             &mut *executor.get_inspector(ccx.state),
         )?;
 
+        let maybe: TransactionMaybeSigned = tx
+            .clone()
+            .try_into()
+            .map_err(|_| Error::from("2. failed to decode RLP-encoded transaction"))?;
+
         if ccx.state.broadcast.is_some() {
             ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
                 rpc: ccx.db.active_fork_url(),
-                transaction: tx.try_into()?,
+                transaction: maybe,
             });
         }
 

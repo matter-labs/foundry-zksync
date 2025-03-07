@@ -1,12 +1,20 @@
 use std::any::Any;
 
-use alloy_primitives::{Address, U256};
-use eyre::Result;
+use crate::backend::{
+    context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
+    merge::{ZksyncBackendMerge, ZksyncMergeState},
+};
+use alloy_network::eip2718::Decodable2718;
+use alloy_primitives::{Address, Bytes, U256};
+use alloy_rpc_types::TransactionRequest;
+use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
+use eyre::{Context, Result};
 use foundry_evm::{
     backend::{
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        Backend, DatabaseExt,
+        update_state, Backend, DatabaseExt,
     },
+    utils::{configure_tx_req_env, new_evm_with_inspector},
     InspectorExt,
 };
 use foundry_evm_core::backend::{
@@ -14,16 +22,11 @@ use foundry_evm_core::backend::{
     BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
 };
 use revm::{
-    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
-    JournaledState,
+    primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
+    DatabaseCommit, JournaledState,
 };
 use serde::{Deserialize, Serialize};
-
-use crate::backend::{
-    context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
-    merge::{ZksyncBackendMerge, ZksyncMergeState},
-};
-
+use tracing::trace;
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZksyncBackendStrategyRunner;
@@ -124,6 +127,62 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         let zk_state =
             &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
+    }
+
+    fn transact_from_tx(
+        &self,
+        back: &mut Backend,
+        data: Bytes,
+        mut env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+    ) -> eyre::Result<TransactionRequest> {
+        let decoded =
+            ZkTxEnvelope::decode_2718(&mut data.as_ref()).wrap_err("Failed to decode tx")?;
+
+        trace!(?decoded, "execute signed transaction");
+        print!("2. >>>>>>>>> {:?}", decoded);
+
+        // let opt: Option<&
+        // alloy_consensus::Signed<alloy_zksync::network::unsigned_tx::eip712::TxEip712>> =
+        let tx_712 = decoded.as_eip712();
+        let parts = tx_712.unwrap().clone().into_parts().0;
+
+        let transaction_request: TransactionRequest = TransactionRequest {
+            from: Some(parts.from),
+            max_fee_per_gas: Some(parts.max_fee_per_gas),
+            max_priority_fee_per_gas: Some(parts.max_priority_fee_per_gas),
+            max_fee_per_blob_gas: Default::default(),
+            gas: Some(parts.gas),
+            input: Some(parts.input).into(),
+            chain_id: Some(parts.chain_id),
+            access_list: Default::default(),
+            transaction_type: Default::default(),
+            blob_versioned_hashes: Default::default(),
+            sidecar: Default::default(),
+            authorization_list: Default::default(),
+            to: Some(alloy_primitives::TxKind::Call(parts.to)),
+            value: Some(parts.value),
+            nonce: Some(parts.nonce.try_into().unwrap_or_default()),
+            gas_price: Default::default(),
+        };
+
+        back.commit(journaled_state.state.clone());
+
+        let res = {
+            configure_tx_req_env(&mut env, &transaction_request, None)?;
+            let env = back.env_with_handler_cfg(env);
+
+            let mut db = back.clone();
+            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
+            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
+            evm.transact()?
+        };
+
+        back.commit(res.state);
+        update_state(&mut journaled_state.state, back, None)?;
+
+        Ok(transaction_request)
     }
 }
 

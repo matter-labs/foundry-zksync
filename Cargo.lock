@@ -1044,8 +1044,7 @@ dependencies = [
 [[package]]
 name = "alloy-zksync"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "234c2873428afc5c3a01ea501689feb50d6652cd742dd644a5a42ba7d4458513"
+source = "git+https://github.com/MBerguer/alloy-zksync.git?rev=13224e6fffe2ba481158f0122062e995af0cdaf6#13224e6fffe2ba481158f0122062e995af0cdaf6"
 dependencies = [
  "alloy",
  "async-trait",
@@ -4622,14 +4621,12 @@ dependencies = [
 name = "foundry-cheatcodes"
 version = "0.0.10"
 dependencies = [
- "alloy-consensus 0.11.1",
  "alloy-dyn-abi",
  "alloy-genesis",
  "alloy-json-abi",
  "alloy-network 0.11.1",
  "alloy-primitives",
  "alloy-provider",
- "alloy-rlp",
  "alloy-rpc-types",
  "alloy-signer 0.11.1",
  "alloy-signer-local 0.11.1",
@@ -5171,6 +5168,7 @@ name = "foundry-strategy-zksync"
 version = "0.0.10"
 dependencies = [
  "alloy-json-abi",
+ "alloy-network 0.11.1",
  "alloy-primitives",
  "alloy-rpc-types",
  "alloy-sol-types",

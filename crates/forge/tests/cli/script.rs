@@ -1,6 +1,6 @@
 //! Contains various tests related to `forge script`.
 
-use crate::constants::TEMPLATE_CONTRACT;
+use crate::{constants::TEMPLATE_CONTRACT, foundry_test_utils::util::OutputExt};
 use alloy_primitives::{address, hex, Address, Bytes};
 use anvil::{spawn, NodeConfig};
 use forge_script_sequence::ScriptSequence;
@@ -8,7 +8,7 @@ use foundry_test_utils::{
     rpc::{self, next_http_rpc_endpoint},
     snapbox::IntoData,
     util::{OTHER_SOLC_VERSION, SOLC_VERSION},
-    ScriptOutcome, ScriptTester,
+    ScriptOutcome, ScriptTester, ZkSyncNode,
 };
 use regex::Regex;
 use serde_json::Value;
@@ -2174,6 +2174,122 @@ forgetest_async!(can_deploy_library_create2_different_sender, |prj, cmd| {
         .broadcast(ScriptOutcome::OkBroadcast)
         .assert_nonce_increment(&[(2, 2)])
         .await;
+});
+
+//         vm.zkVm(True);
+
+// <https://github.com/foundry-rs/foundry/issues/8993>
+forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    println!("1. url: {:?}", url);
+
+    let (_, private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
+
+    // println!("2. private_key: {:?}", private_key);
+
+    // let output = cmd
+    //     .cast_fuse()
+    //     .args([
+    //         "mktx",
+    //         "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    //         "deposit()",
+    //         "--rpc-url",
+    //         &url,
+    //         "--private-key",
+    //         private_key,
+    //         "--zksync",
+    //     ])
+    //     .assert_success()
+    //     .get_output()
+    //     .stdout_lossy();
+
+    // println!("3. output: {:?}", output);
+
+    foundry_test_utils::util::initialize(prj.root());
+    prj.add_script(
+        "Foo",
+        r#"
+import "forge-std/Script.sol";
+
+contract SimpleScript is Script {
+    function run() external {
+        // vm.zkVm(True);
+        // send funds to create2 factory deployer
+        vm.startBroadcast();
+        payable(0x3fAB184622Dc19b6109349B94811493BF2a45362).call{value: 10000000 gwei}("");
+        // deploy create2 factory
+
+        // zk raw transaction
+        vm.broadcastRawTransaction(
+            hex"71f88580808402b275d08304d71894c02aaa39b223fe8d0a0e5c4f27ead9083c756cc28084d0e30db001a0649623b32d669de5124b623cdf0c181fdc12d218904cf3e8e2e7ba6065966fc0a05721be7b129e744a23f425c7fd89bfc236a22d2d74215e8617abef506807b57782010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
+        );
+
+    }
+}
+"#,
+    )
+    .unwrap();
+
+    println!("4. prj.root(): {:?}", prj.root());
+
+    cmd.args([
+        "script",
+        "--zksync",
+        "--private-key",
+        private_key,
+        "--rpc-url",
+        &url,
+        "--broadcast",
+        "--slow",
+        "SimpleScript",
+    ]);
+
+    println!("5. cmd: {:?}", "ok");
+
+    cmd.assert_success().stdout_eq(str![[r#"
+[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
+Script ran successfully.
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 31337
+
+[ESTIMATED_GAS_PRICE]
+
+[ESTIMATED_TOTAL_GAS_USED]
+
+[ESTIMATED_AMOUNT_REQUIRED]
+
+==========================
+
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+[SAVED_TRANSACTIONS]
+
+[SAVED_SENSITIVE_VALUES]
+
+
+"#]]);
+
+    println!("6. cmd: {:?}", "ok");
+
+    // assert!(!api
+    //     .get_code(address!("4e59b44847b379578588920cA78FbF26c0B4956C"), Default::default())
+    //     .await
+    //     .unwrap()
+    //     .is_empty());
 });
 
 // <https://github.com/foundry-rs/foundry/issues/8993>

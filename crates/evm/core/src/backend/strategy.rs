@@ -1,16 +1,25 @@
 use std::{any::Any, fmt::Debug};
 
-use crate::InspectorExt;
-
 use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
-use alloy_primitives::{Address, U256};
+use crate::{
+    backend::update_state,
+    utils::{configure_tx_req_env, new_evm_with_inspector},
+    InspectorExt,
+};
+use alloy_consensus::TxEnvelope;
+use alloy_primitives::{Address, Bytes, U256};
+use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
 use revm::{
     db::CacheDB,
-    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
+    primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
     DatabaseRef, JournaledState,
 };
 use serde::{Deserialize, Serialize};
+
+use revm::DatabaseCommit;
+
+use alloy_network::eip2718::Decodable2718;
 
 pub struct BackendStrategyForkInfo<'a> {
     pub active_fork: Option<&'a Fork>,
@@ -100,6 +109,15 @@ pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt 
         active: &ForkDB,
         fork_db: &mut ForkDB,
     );
+
+    fn transact_from_tx(
+        &self,
+        back: &mut Backend,
+        data: Bytes,
+        env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+    ) -> eyre::Result<TransactionRequest>;
 }
 
 pub trait BackendStrategyRunnerExt {
@@ -180,6 +198,38 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         fork_db: &mut ForkDB,
     ) {
         EvmBackendMergeStrategy::merge_db_account_data(addr, active, fork_db);
+    }
+
+    fn transact_from_tx(
+        &self,
+        back: &mut Backend,
+        data: Bytes,
+        mut env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+    ) -> eyre::Result<TransactionRequest> {
+        let envelope: TxEnvelope = TxEnvelope::decode_2718(&mut data.as_ref())
+            .wrap_err("Failed to decode transaction envelope")?;
+
+        let tx: &TransactionRequest = &envelope.clone().into();
+        trace!(?tx, "execute signed transaction");
+
+        back.commit(journaled_state.state.clone());
+
+        let res = {
+            configure_tx_req_env(&mut env, tx, None)?;
+            let env = back.env_with_handler_cfg(env);
+
+            let mut db = back.clone();
+            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
+            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
+            evm.transact()?
+        };
+
+        back.commit(res.state);
+        update_state(&mut journaled_state.state, back, None)?;
+
+        Ok(tx.clone())
     }
 }
 

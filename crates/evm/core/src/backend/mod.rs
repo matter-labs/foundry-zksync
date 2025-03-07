@@ -4,7 +4,7 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
-    utils::{configure_tx_env, configure_tx_req_env, new_evm_with_inspector},
+    utils::configure_tx_env,
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
@@ -235,11 +235,11 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
     /// Executes a given TransactionRequest, commits the new state to the DB
     fn transact_from_tx(
         &mut self,
-        transaction: &TransactionRequest,
+        data: Bytes,
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<()>;
+    ) -> eyre::Result<TransactionRequest>;
 
     /// Returns the `ForkId` that's currently used in the database, if fork mode is on
     fn active_fork_id(&self) -> Option<LocalForkId>;
@@ -798,7 +798,7 @@ impl Backend {
     }
 
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
-    fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
+    pub fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
         EnvWithHandlerCfg::new_with_spec_id(Box::new(env), self.inner.spec_id)
     }
 
@@ -1352,29 +1352,13 @@ impl DatabaseExt for Backend {
 
     fn transact_from_tx(
         &mut self,
-        tx: &TransactionRequest,
-        mut env: Env,
+        data: Bytes,
+        env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<()> {
-        trace!(?tx, "execute signed transaction");
-
-        self.commit(journaled_state.state.clone());
-
-        let res = {
-            configure_tx_req_env(&mut env, tx, None)?;
-            let env = self.env_with_handler_cfg(env);
-
-            let mut db = self.clone();
-            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
-            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
-            evm.transact()?
-        };
-
-        self.commit(res.state);
-        update_state(&mut journaled_state.state, self, None)?;
-
-        Ok(())
+    ) -> eyre::Result<TransactionRequest> {
+        let runner = self.strategy.runner;
+        Ok(runner.transact_from_tx(self, data, env, journaled_state, inspector)?)
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {
