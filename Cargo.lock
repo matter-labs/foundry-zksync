@@ -5271,7 +5271,6 @@ dependencies = [
  "foundry-evm-traces",
  "foundry-zksync-core",
  "revm",
- "tracing",
 ]
 
 [[package]]

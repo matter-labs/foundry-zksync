@@ -193,7 +193,6 @@ impl InspectorExt for TraceCollector {
         call_traces: Vec<Call>,
         record_top_call: bool,
     ) {
-        // NISH
         fn trace_call_recursive(
             tracer: &mut TracingInspector,
             context: &mut EvmContext<&mut dyn DatabaseExt>,
