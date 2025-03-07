@@ -337,7 +337,6 @@ impl InspectorExt for TraceCollector {
             trace_call_recursive(&mut self.inner, context, call, record_top_call);
         }
 
-        // We then decrement the call depth so `call_end`/`create_end` has the correct context
         if !overflow && !record_top_call {
             context.journaled_state.depth = context.journaled_state.depth.saturating_sub(1);
         }
