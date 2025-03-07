@@ -1,6 +1,5 @@
 use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::{TxKind, U256};
-use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
 use alloy_serde::OtherFields;
 use cast::{traces::TraceKind, Cast, ZkCast, ZkTransactionOpts};
