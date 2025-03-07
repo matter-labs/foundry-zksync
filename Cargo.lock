@@ -4621,12 +4621,14 @@ dependencies = [
 name = "foundry-cheatcodes"
 version = "0.0.10"
 dependencies = [
+ "alloy-consensus 0.11.1",
  "alloy-dyn-abi",
  "alloy-genesis",
  "alloy-json-abi",
  "alloy-network 0.11.1",
  "alloy-primitives",
  "alloy-provider",
+ "alloy-rlp",
  "alloy-rpc-types",
  "alloy-signer 0.11.1",
  "alloy-signer-local 0.11.1",

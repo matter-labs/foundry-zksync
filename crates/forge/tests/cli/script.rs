@@ -1,6 +1,6 @@
 //! Contains various tests related to `forge script`.
 
-use crate::{constants::TEMPLATE_CONTRACT, foundry_test_utils::util::OutputExt};
+use crate::constants::TEMPLATE_CONTRACT;
 use alloy_primitives::{address, hex, Address, Bytes};
 use anvil::{spawn, NodeConfig};
 use forge_script_sequence::ScriptSequence;
