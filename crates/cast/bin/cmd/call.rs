@@ -222,10 +222,10 @@ impl CallArgs {
                     serde_json::to_value(metadata)
                         .expect("Failed to serialize ZkTransactionMetadata"),
                 );
-            }
 
-            let ctx = strategy.context.as_mut();
-            strategy.runner.zksync_set_transaction_context(ctx, other_fields);
+                let ctx = strategy.context.as_mut();
+                strategy.runner.zksync_set_transaction_context(ctx, other_fields);
+            }
 
             let create2_deployer = evm_opts.create2_deployer;
             let (mut env, fork, chain, odyssey) =
