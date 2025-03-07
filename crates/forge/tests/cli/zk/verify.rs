@@ -140,7 +140,7 @@ fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: Te
         let contract_path = "src/Verify.sol:Verify";
         let address = deploy_contract(&info, contract_path, prj, &mut cmd);
 
-        let mut args = vec![
+        let args = vec![
             "--chain-id".to_string(),
             info.chain.to_string(),
             address,
@@ -148,8 +148,8 @@ fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: Te
             "--zksync".to_string(),
             "--verifier-url".to_string(),
             "https://explorer.sepolia.era.zksync.dev/contract_verification".to_string(),
-            "--verifier",
-            "zksync",
+            "--verifier".to_string(),
+            "zksync".to_string(),
         ];
 
         cmd.forge_fuse().arg("verify-contract").root_arg().args(args);
