@@ -543,8 +543,11 @@ casttest!(test_zk_cast_call_with_trace, async |_prj, cmd| {
         .get_output()
         .stdout_lossy()
         .contains(
-            "Traces:
-  [43369] 0x70997970C51812dc3A010C7d01b50e0d17dc79C8::number()
-    └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000001",
+            format!(
+                "Traces:
+  [43369] {COUNTER_ADDRESS}::number()
+    └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000001"
+            )
+            .as_str(),
         );
 });
