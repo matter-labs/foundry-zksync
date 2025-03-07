@@ -267,8 +267,8 @@ impl InspectorExt for TraceCollector {
                 }
             }
 
-            // We increment the depth after the start of the span to avoid being deeper for single
-            // calls like when using cast call.
+            // We increment the depth for inner calls as normally traces are processed
+            // during execution, where the environment takes care of updating the context
             let (new_depth, overflow) = context.journaled_state.depth.overflowing_add(1);
             if !overflow && record_trace {
                 context.journaled_state.depth = new_depth;
