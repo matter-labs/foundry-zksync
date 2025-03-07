@@ -76,9 +76,9 @@ pub struct DependencyInstallOpts {
     #[arg(long)]
     pub no_git: bool,
 
-    /// Do not create a commit.
+    /// Create a commit after installing the dependencies.
     #[arg(long)]
-    pub no_commit: bool,
+    pub commit: bool,
 
     /// Install ZKsync specific libraries.
     #[arg(long)]
@@ -95,12 +95,11 @@ impl DependencyInstallOpts {
     /// See also [`Self::install`].
     ///
     /// Returns true if any dependency was installed.
-    pub fn install_missing_dependencies(mut self, config: &mut Config) -> bool {
+    pub fn install_missing_dependencies(self, config: &mut Config) -> bool {
         let lib = config.install_lib_dir();
         if self.git(config).has_missing_dependencies(Some(lib)).unwrap_or(false) {
             // The extra newline is needed, otherwise the compiler output will overwrite the message
             let _ = sh_println!("Missing dependencies found. Installing now...\n");
-            self.no_commit = true;
             if self.install(config, Vec::new()).is_err() {
                 let _ =
                     sh_warn!("Your project has missing dependencies that could not be installed.");
@@ -113,7 +112,7 @@ impl DependencyInstallOpts {
 
     /// Installs all dependencies
     pub fn install(self, config: &mut Config, dependencies: Vec<Dependency>) -> Result<()> {
-        let Self { no_git, no_commit, .. } = self;
+        let Self { no_git, commit, .. } = self;
 
         let git = self.git(config);
 
@@ -142,7 +141,7 @@ impl DependencyInstallOpts {
 
         fs::create_dir_all(&libs)?;
 
-        let installer = Installer { git, no_commit };
+        let installer = Installer { git, commit };
         for dep in dependencies {
             let path = libs.join(dep.name());
             let rel_path = path
@@ -161,7 +160,7 @@ impl DependencyInstallOpts {
             if no_git {
                 installed_tag = installer.install_as_folder(&dep, &path)?;
             } else {
-                if !no_commit {
+                if commit {
                     git.ensure_clean()?;
                 }
                 installed_tag = installer.install_as_submodule(&dep, &path)?;
@@ -177,14 +176,16 @@ impl DependencyInstallOpts {
                             .exec()?;
                     }
 
-                    // update .gitmodules which is at the root of the repo,
-                    // not necessarily at the root of the current Foundry project
-                    let root = Git::root_of(git.root)?;
-                    git.root(&root).add(Some(".gitmodules"))?;
+                    if commit {
+                        // update .gitmodules which is at the root of the repo,
+                        // not necessarily at the root of the current Foundry project
+                        let root = Git::root_of(git.root)?;
+                        git.root(&root).add(Some(".gitmodules"))?;
+                    }
                 }
 
                 // commit the installation
-                if !no_commit {
+                if commit {
                     let mut msg = String::with_capacity(128);
                     msg.push_str("forge install: ");
                     msg.push_str(dep.name());
@@ -220,7 +221,7 @@ pub fn install_missing_dependencies(config: &mut Config) -> bool {
 #[derive(Clone, Copy, Debug)]
 struct Installer<'a> {
     git: Git<'a>,
-    no_commit: bool,
+    commit: bool,
 }
 
 impl Installer<'_> {
@@ -279,7 +280,7 @@ impl Installer<'_> {
             std::iter::empty::<PathBuf>(),
         )?;
 
-        if !self.no_commit {
+        if self.commit {
             self.git.add(Some(path))?;
         }
 
@@ -306,7 +307,7 @@ impl Installer<'_> {
             for &prefix in common_prefixes {
                 if let Some(rem) = tag.strip_prefix(prefix) {
                     maybe_semver = rem;
-                    break
+                    break;
                 }
             }
             match Version::parse(maybe_semver) {
@@ -362,7 +363,7 @@ impl Installer<'_> {
             if e.to_string().contains("did not match any file(s) known to git") {
                 e = eyre::eyre!("Tag: \"{tag}\" not found for repo \"{url}\"!")
             }
-            return Err(e)
+            return Err(e);
         }
 
         if is_branch {
@@ -376,7 +377,7 @@ impl Installer<'_> {
     fn match_tag(self, tag: &str, path: &Path) -> Result<String> {
         // only try to match if it looks like a version tag
         if !DEPENDENCY_VERSION_TAG_REGEX.is_match(tag) {
-            return Ok(tag.into())
+            return Ok(tag.into());
         }
 
         // generate candidate list by filtering `git tag` output, valid ones are those "starting
@@ -394,13 +395,13 @@ impl Installer<'_> {
 
         // no match found, fall back to the user-provided tag
         if candidates.is_empty() {
-            return Ok(tag.into())
+            return Ok(tag.into());
         }
 
         // have exact match
         for candidate in candidates.iter() {
             if candidate == tag {
-                return Ok(tag.into())
+                return Ok(tag.into());
             }
         }
 
@@ -410,7 +411,7 @@ impl Installer<'_> {
             let input = prompt!(
                 "Found a similar version tag: {matched_tag}, do you want to use this instead? [Y/n] "
             )?;
-            return if match_yn(input) { Ok(matched_tag.clone()) } else { Ok(tag.into()) }
+            return if match_yn(input) { Ok(matched_tag.clone()) } else { Ok(tag.into()) };
         }
 
         // multiple candidates, ask the user to choose one or skip
@@ -433,7 +434,7 @@ impl Installer<'_> {
                 Ok(i) if (1..=n_candidates).contains(&i) => {
                     let c = &candidates[i];
                     sh_println!("[{i}] {c} selected")?;
-                    return Ok(c.clone())
+                    return Ok(c.clone());
                 }
                 _ => continue,
             }
@@ -456,13 +457,13 @@ impl Installer<'_> {
 
         // no match found, fall back to the user-provided tag
         if candidates.is_empty() {
-            return Ok(None)
+            return Ok(None);
         }
 
         // have exact match
         for candidate in candidates.iter() {
             if candidate == tag {
-                return Ok(Some(tag.to_string()))
+                return Ok(Some(tag.to_string()));
             }
         }
 
@@ -472,7 +473,7 @@ impl Installer<'_> {
             let input = prompt!(
                 "Found a similar branch: {matched_tag}, do you want to use this instead? [Y/n] "
             )?;
-            return if match_yn(input) { Ok(Some(matched_tag.clone())) } else { Ok(None) }
+            return if match_yn(input) { Ok(Some(matched_tag.clone())) } else { Ok(None) };
         }
 
         // multiple candidates, ask the user to choose one or skip
@@ -492,7 +493,7 @@ impl Installer<'_> {
         // default selection, return None
         if input.is_empty() {
             sh_println!("Canceled branch matching")?;
-            return Ok(None)
+            return Ok(None);
         }
 
         // match user input, 0 indicates skipping and use original tag
@@ -526,7 +527,7 @@ mod tests {
     fn get_oz_tags() {
         let tmp = tempdir().unwrap();
         let git = Git::new(tmp.path());
-        let installer = Installer { git, no_commit: true };
+        let installer = Installer { git, commit: false };
 
         git.init().unwrap();
 

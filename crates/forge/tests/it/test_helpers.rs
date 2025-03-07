@@ -572,7 +572,6 @@ pub async fn run_zk_script_test(
     if let Some(deps) = dependencies {
         let mut install_args = vec!["install"];
         install_args.extend(deps.split_whitespace());
-        install_args.push("--no-commit");
         cmd.args(&install_args).assert_success();
     }
 
