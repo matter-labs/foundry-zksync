@@ -5025,6 +5025,7 @@ dependencies = [
  "alloy-network 0.11.1",
  "alloy-primitives",
  "alloy-provider",
+ "alloy-rlp",
  "alloy-rpc-types",
  "alloy-sol-types",
  "auto_impl",
