@@ -115,15 +115,10 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
     let node = ZkSyncNode::start().await;
     let url = node.url();
 
-    println!("1. url: {:?}", url);
-
     let (_, private_key) = ZkSyncNode::rich_wallets()
         .next()
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
-
-    //print private key
-    println!("1. private_key: {:?}", private_key);
 
     prj.add_source(
         "Counter.sol",
@@ -174,8 +169,6 @@ contract SimpleScript is Script {
     )
     .unwrap();
 
-    println!("4. prj.root(): {:?}", prj.root());
-
     cmd.args([
         "script",
         "--zksync",
@@ -189,10 +182,7 @@ contract SimpleScript is Script {
         "SimpleScript",
     ]);
 
-    println!("5. cmd: {:?}", "ok");
-
     let output = cmd.assert_success().get_output().stdout_lossy();
-    println!("6. output: {:?}", output);
 
     assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
 });

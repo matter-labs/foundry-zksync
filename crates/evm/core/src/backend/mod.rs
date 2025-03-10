@@ -800,6 +800,8 @@ impl Backend {
         self.strategy.runner.inspect(self, env, inspector, inspect_ctx)
     }
 
+    /// Note(zk): we had to male this public to be able to call it from the strategy.
+    /// See transact_from_tx for more details.
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
     pub fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
         EnvWithHandlerCfg::new_with_spec_id(Box::new(env), self.inner.spec_id)
@@ -1353,12 +1355,14 @@ impl DatabaseExt for Backend {
         )
     }
 
-    // Note(zk): This function in upstream code is not implemented as part of the strategy pattern, but
-    // is instead a standalone function. We have moved it here to make it part of the strategy, as there is
-    // some abstraction in the middle since the envelopes, and types are different.
-    // The changes are:
-    // - The function signature has been changed to take a `Bytes` instead of `the TransactionRequest`
-    // - The function signature has been changed to return a `TransactionMaybeSigned` instead of empty tuple
+    // Note(zk): This function in upstream code is not implemented as part of the strategy pattern,
+    // but is instead a standalone function. We have moved it here to make it part of the
+    // strategy, as there is some abstraction in the middle since the envelopes, and types are
+    // different. The changes are:
+    // - The function signature has been changed to take a `Bytes` instead of `the
+    //   TransactionRequest`
+    // - The function signature has been changed to return a `TransactionMaybeSigned` instead of
+    //   empty tuple
     // - Avoids some cloning of the backend state
     // See new transact_from_tx evm implementation in: crates/evm/core/src/backend/strategy.rs
     // See zk implementation in: crates/strategy/zksync/src/backend/runner.rs
@@ -1370,7 +1374,7 @@ impl DatabaseExt for Backend {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<TransactionMaybeSigned> {
         let runner = self.strategy.runner;
-        Ok(runner.transact_from_tx(self, data, env, journaled_state, inspector)?)
+        runner.transact_from_tx(self, data, env, journaled_state, inspector)
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {
