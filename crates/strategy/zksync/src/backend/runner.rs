@@ -159,7 +159,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             authorization_list: Default::default(),
             to: Some(alloy_primitives::TxKind::Call(parts.to)),
             value: Some(parts.value),
-            nonce: Some(parts.nonce.try_into().unwrap_or_default()),
+            nonce: Some(journaled_state.state.get(&parts.from).unwrap().info.nonce),
             gas_price: Default::default(),
         };
 

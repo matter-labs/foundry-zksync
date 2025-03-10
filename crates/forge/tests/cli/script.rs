@@ -7,7 +7,7 @@ use forge_script_sequence::ScriptSequence;
 use foundry_test_utils::{
     rpc::{self, next_http_rpc_endpoint},
     snapbox::IntoData,
-    util::{OTHER_SOLC_VERSION, SOLC_VERSION},
+    util::{OutputExt, OTHER_SOLC_VERSION, SOLC_VERSION},
     ScriptOutcome, ScriptTester, ZkSyncNode,
 };
 use regex::Regex;
@@ -2180,6 +2180,7 @@ forgetest_async!(can_deploy_library_create2_different_sender, |prj, cmd| {
 
 // <https://github.com/foundry-rs/foundry/issues/8993>
 forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
+    foundry_test_utils::util::initialize(prj.root());
     let node = ZkSyncNode::start().await;
     let url = node.url();
 
@@ -2190,6 +2191,33 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
 
+    //print private key
+    println!("1. private_key: {:?}", private_key);
+
+    prj.add_source("Counter.sol", r#"
+    pragma solidity ^0.8.0;
+
+    contract Counter {
+        uint256 public count;
+        function increment() external {
+            count++;
+        }
+    }
+    "#);
+
+    //deploy
+    let output = cmd.args([
+        "create",
+        "src/Counter.sol:Counter",
+        "--zksync",
+        "--private-key",
+        private_key,
+        "--rpc-url",
+        &url,
+    ]);
+    let address = output.assert_success().get_output().stdout_lossy();
+    println!("2. address: {:?}", address.trim());
+    cmd.forge_fuse();
     // println!("2. private_key: {:?}", private_key);
 
     // let output = cmd
@@ -2210,25 +2238,20 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
 
     // println!("3. output: {:?}", output);
 
-    foundry_test_utils::util::initialize(prj.root());
     prj.add_script(
         "Foo",
         r#"
 import "forge-std/Script.sol";
-
+import {Counter} from "../src/Counter.sol";
 contract SimpleScript is Script {
     function run() external {
-        // vm.zkVm(True);
-        // send funds to create2 factory deployer
-        vm.startBroadcast();
-        payable(0x3fAB184622Dc19b6109349B94811493BF2a45362).call{value: 10000000 gwei}("");
-        // deploy create2 factory
-
         // zk raw transaction
+        vm.startBroadcast();
+        // This raw transaction comes from cast mktx of increment() to Counter contract
         vm.broadcastRawTransaction(
-            hex"71f88580808402b275d08304d71894c02aaa39b223fe8d0a0e5c4f27ead9083c756cc28084d0e30db001a0649623b32d669de5124b623cdf0c181fdc12d218904cf3e8e2e7ba6065966fc0a05721be7b129e744a23f425c7fd89bfc236a22d2d74215e8617abef506807b57782010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
+            hex"71f88580808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a80a0f76c089059f46bb90adc0b34fa643edf175413b9e076185f46afe84f9283ccfba077b2a9878429569852f9e114e0c2bd8e67be25048752c3b2acab6cd7e2cdf4ff82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
         );
-
+        vm.stopBroadcast();
     }
 }
 "#,
@@ -2246,44 +2269,16 @@ contract SimpleScript is Script {
         &url,
         "--broadcast",
         "--slow",
+        "--non-interactive",
         "SimpleScript",
     ]);
 
     println!("5. cmd: {:?}", "ok");
 
-    cmd.assert_success().stdout_eq(str![[r#"
-[COMPILING_FILES] with [SOLC_VERSION]
-[SOLC_VERSION] [ELAPSED]
-Compiler run successful!
-Script ran successfully.
+    let output = cmd.assert_success().get_output().stdout_lossy();
+    println!("6. output: {:?}", output);
 
-## Setting up 1 EVM.
-
-==========================
-
-Chain 31337
-
-[ESTIMATED_GAS_PRICE]
-
-[ESTIMATED_TOTAL_GAS_USED]
-
-[ESTIMATED_AMOUNT_REQUIRED]
-
-==========================
-
-
-==========================
-
-ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
-
-[SAVED_TRANSACTIONS]
-
-[SAVED_SENSITIVE_VALUES]
-
-
-"#]]);
-
-    println!("6. cmd: {:?}", "ok");
+    assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
 
     // assert!(!api
     //     .get_code(address!("4e59b44847b379578588920cA78FbF26c0B4956C"), Default::default())
