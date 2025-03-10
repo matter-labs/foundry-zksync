@@ -14,5 +14,5 @@ pub async fn estimate_gas(
 ) -> Result<u64> {
     let zk_provider = utils::get_provider_zksync(config)?;
     let tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
-    Ok(zk_provider.estimate_gas(&tx).await?)
+    Ok(zk_provider.estimate_gas(tx).await?)
 }

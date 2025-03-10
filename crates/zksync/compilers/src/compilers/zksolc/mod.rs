@@ -478,6 +478,9 @@ impl ZkSolc {
         cmd.arg("--standard-json");
         cmd.stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());
 
+        let input_str = serde_json::to_string(input).unwrap_or_else(|e| e.to_string());
+        fs::write("input.json", input_str).unwrap();
+
         trace!(input=%serde_json::to_string(input).unwrap_or_else(|e| e.to_string()));
         debug!(?cmd, "compiling");
 
