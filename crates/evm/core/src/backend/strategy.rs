@@ -7,6 +7,7 @@ use crate::{
     InspectorExt,
 };
 use alloy_consensus::TxEnvelope;
+use alloy_rlp::Decodable;
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
@@ -19,8 +20,6 @@ use revm::{
 use serde::{Deserialize, Serialize};
 
 use revm::DatabaseCommit;
-
-use alloy_network::eip2718::Decodable2718;
 
 pub struct BackendStrategyForkInfo<'a> {
     pub active_fork: Option<&'a Fork>,
@@ -220,7 +219,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<TransactionMaybeSigned> {
-        let envelope: TxEnvelope = TxEnvelope::decode_2718(&mut data.as_ref())
+        let envelope: TxEnvelope = TxEnvelope::decode(&mut data.as_ref())
             .wrap_err("Failed to decode transaction envelope")?;
 
         let tx: &TransactionRequest = &envelope.clone().into();
