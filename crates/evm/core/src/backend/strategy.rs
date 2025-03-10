@@ -7,26 +7,23 @@ use crate::{
     InspectorExt,
 };
 use alloy_consensus::TxEnvelope;
-use alloy_rlp::Decodable;
 use alloy_primitives::{Address, Bytes, U256};
+use alloy_rlp::Decodable;
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
 use foundry_common::TransactionMaybeSigned;
 use revm::{
     db::CacheDB,
     primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
-    DatabaseRef, JournaledState,
+    DatabaseCommit, DatabaseRef, JournaledState,
 };
 use serde::{Deserialize, Serialize};
-
-use revm::DatabaseCommit;
 
 pub struct BackendStrategyForkInfo<'a> {
     pub active_fork: Option<&'a Fork>,
     pub active_type: ForkType,
     pub target_type: ForkType,
 }
-
 /// Context for [BackendStrategyRunner].
 pub trait BackendStrategyContext: Debug + Send + Sync + Any {
     /// Clone the strategy context.
@@ -220,7 +217,8 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<TransactionMaybeSigned> {
         let envelope: TxEnvelope = TxEnvelope::decode(&mut data.as_ref())
-            .wrap_err("Failed to decode transaction envelope")?;
+            // .map_err(|err| fmt_err!("failed to decode RLP-encoded transaction: {err}"))?;
+            .map_err(|err| eyre::eyre!("failed to decode RLP-encoded transaction: {err}"))?;
 
         let tx: &TransactionRequest = &envelope.clone().into();
         trace!(?tx, "execute signed transaction");
