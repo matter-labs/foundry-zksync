@@ -109,7 +109,6 @@ contract DeployScript is Script {
     assert_eq!(transactions.len(), 3);
 });
 
-// <https://github.com/foundry-rs/foundry/issues/8993>
 forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
     foundry_test_utils::util::initialize(prj.root());
     let node = ZkSyncNode::start().await;

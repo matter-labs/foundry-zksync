@@ -767,6 +767,10 @@ impl Cheatcode for getStateDiffJsonCall {
 
 impl Cheatcode for broadcastRawTransactionCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
+        // Note(zk): The function transact_from_tx has a different signature compered to upstream.
+        // It was changed to allow passing EIP-712 data for zkSync. This is handled inside the
+        // strategy. We are now delegating the tx decoding step to the runner (which know
+        // which strategy to use)
         let tx = ccx.ecx.db.transact_from_tx(
             &self.data,
             (*ccx.ecx.env).clone(),

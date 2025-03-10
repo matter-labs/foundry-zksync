@@ -217,7 +217,6 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<TransactionMaybeSigned> {
         let envelope: TxEnvelope = TxEnvelope::decode(&mut data.as_ref())
-            // .map_err(|err| fmt_err!("failed to decode RLP-encoded transaction: {err}"))?;
             .map_err(|err| eyre::eyre!("failed to decode RLP-encoded transaction: {err}"))?;
 
         let tx: &TransactionRequest = &envelope.clone().into();
