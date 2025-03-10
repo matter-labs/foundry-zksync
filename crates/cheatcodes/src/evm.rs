@@ -768,7 +768,7 @@ impl Cheatcode for getStateDiffJsonCall {
 impl Cheatcode for broadcastRawTransactionCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let tx = ccx.ecx.db.transact_from_tx(
-            self.data.clone(),
+            &self.data,
             (*ccx.ecx.env).clone(),
             &mut ccx.ecx.journaled_state,
             &mut *executor.get_inspector(ccx.state),

@@ -196,7 +196,7 @@ impl DatabaseExt for CowBackend<'_> {
 
     fn transact_from_tx(
         &mut self,
-        data: Bytes,
+        data: &Bytes,
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,

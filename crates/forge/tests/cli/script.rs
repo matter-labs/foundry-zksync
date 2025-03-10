@@ -2203,7 +2203,7 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
             count++;
         }
     }
-    "#);
+    "#).unwrap();
 
     //deploy
     let output = cmd.args([

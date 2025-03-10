@@ -132,8 +132,8 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
 
     fn transact_from_tx(
         &self,
-        back: &mut Backend,
-        data: Bytes,
+        backend: &mut Backend,
+        data: &Bytes,
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
@@ -165,20 +165,19 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
 
         trace!(?tx, "execute signed transaction");
 
-        back.commit(journaled_state.state.clone());
+        backend.commit(journaled_state.state.clone());
 
         let res = {
             configure_tx_req_env(&mut env, &tx, None)?;
-            let env = back.env_with_handler_cfg(env);
+            let env = backend.env_with_handler_cfg(env);
 
-            let mut db = back.clone();
-            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
+            let mut evm = new_evm_with_inspector(backend, env, inspector);
             evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
             evm.transact()?
         };
 
-        back.commit(res.state);
-        update_state(&mut journaled_state.state, back, None)?;
+        backend.commit(res.state);
+        update_state(&mut journaled_state.state, backend, None)?;
 
         Ok(tx.into())
     }
