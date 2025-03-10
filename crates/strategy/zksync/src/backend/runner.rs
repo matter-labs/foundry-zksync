@@ -4,8 +4,8 @@ use crate::backend::{
     context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
     merge::{ZksyncBackendMerge, ZksyncMergeState},
 };
+use alloy_network::eip2718::Decodable2718;
 use alloy_primitives::{Address, Bytes, U256};
-use alloy_rlp::Decodable;
 use alloy_rpc_types::TransactionRequest;
 use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
 use eyre::{Context, Result};
@@ -145,7 +145,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<TransactionMaybeSigned> {
         let envelope: ZkTxEnvelope =
-            ZkTxEnvelope::decode(&mut data.as_ref()).wrap_err("Failed to decode tx")?;
+            ZkTxEnvelope::decode_2718(&mut data.as_ref()).wrap_err("Failed to decode tx")?;
 
         let tx_712 = envelope.as_eip712();
         let parts = tx_712.unwrap().clone().into_parts().0;
