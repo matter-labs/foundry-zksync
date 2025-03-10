@@ -233,6 +233,8 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<()>;
 
+    /// Note(zk): This function in upstream code is not implemented as part of the strategy pattern.
+    /// See the actual implementation below in this same file for more details about what changed.
     /// Executes a given TransactionRequest, commits the new state to the DB
     fn transact_from_tx(
         &mut self,
@@ -1351,6 +1353,15 @@ impl DatabaseExt for Backend {
         )
     }
 
+    // Note(zk): This function in upstream code is not implemented as part of the strategy pattern, but
+    // is instead a standalone function. We have moved it here to make it part of the strategy, as there is
+    // some abstraction in the middle since the envelopes, and types are different.
+    // The changes are:
+    // - The function signature has been changed to take a `Bytes` instead of `the TransactionRequest`
+    // - The function signature has been changed to return a `TransactionMaybeSigned` instead of empty tuple
+    // - Avoids some cloning of the backend state
+    // See new transact_from_tx evm implementation in: crates/evm/core/src/backend/strategy.rs
+    // See zk implementation in: crates/strategy/zksync/src/backend/runner.rs
     fn transact_from_tx(
         &mut self,
         data: &Bytes,

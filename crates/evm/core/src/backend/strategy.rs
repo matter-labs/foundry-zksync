@@ -201,6 +201,15 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         EvmBackendMergeStrategy::merge_db_account_data(addr, active, fork_db);
     }
 
+    // Note(zk): This function in upstream code is not implemented as part of the strategy pattern, but
+    // is instead a standalone function. We have moved it here to make it part of the strategy, as there is
+    // some abstraction in the middle since the envelopes, and types are different.
+    // The changes are:
+    // - The function signature has been changed to take a `Bytes` instead of `the TransactionRequest`
+    // - The function signature has been changed to return a `TransactionMaybeSigned` instead of empty tuple
+    // - Avoids some cloning of the backend state
+    // See the main function in entrypoint: crates/evm/core/src/backend/mod.rs
+    // See zk implementation in: crates/strategy/zksync/src/backend/runner.rs
     fn transact_from_tx(
         &self,
         backend: &mut Backend,
@@ -221,8 +230,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
             configure_tx_req_env(&mut env, tx, None)?;
             let env = backend.env_with_handler_cfg(env);
 
-            let mut db = backend.clone();
-            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
+            let mut evm = new_evm_with_inspector(backend, env, inspector);
             evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
             evm.transact()?
         };
