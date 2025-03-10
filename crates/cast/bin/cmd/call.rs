@@ -1,6 +1,7 @@
 use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::{TxKind, U256};
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
+use alloy_serde::OtherFields;
 use cast::{traces::TraceKind, Cast, ZkCast, ZkTransactionOpts};
 use clap::Parser;
 use eyre::Result;
@@ -135,7 +136,7 @@ impl CallArgs {
         let mut config = Config::from_provider(figment)?.sanitized();
         config.zksync.compile = is_zk;
 
-        let strategy = utils::get_executor_strategy(&config);
+        let mut strategy = utils::get_executor_strategy(&config);
 
         let Self {
             to,
@@ -199,6 +200,31 @@ impl CallArgs {
             if let Some(BlockId::Number(BlockNumberOrTag::Number(block_number))) = self.block {
                 // Override Config `fork_block_number` (if set) with CLI value.
                 config.fork_block_number = Some(block_number);
+            }
+
+            let mut other_fields = OtherFields::default();
+
+            if is_zk {
+                let metadata = foundry_zksync_core::ZkTransactionMetadata {
+                    factory_deps: zk_tx.factory_deps.iter().map(|x| x.to_vec()).collect(),
+                    paymaster_data: zk_tx
+                        .paymaster_input
+                        .clone()
+                        .filter(|data| !data.is_empty())
+                        .map(|data| zksync_types::transaction_request::PaymasterParams {
+                            paymaster: Default::default(),
+                            paymaster_input: data.to_vec(),
+                        }),
+                };
+
+                other_fields.insert(
+                    foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                    serde_json::to_value(metadata)
+                        .expect("Failed to serialize ZkTransactionMetadata"),
+                );
+
+                let ctx = strategy.context.as_mut();
+                strategy.runner.zksync_set_transaction_context(ctx, other_fields);
             }
 
             let create2_deployer = evm_opts.create2_deployer;
