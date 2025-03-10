@@ -159,13 +159,13 @@ casttest!(finds_block, |_prj, cmd| {
 
 // tests that we can create a new wallet with keystore
 casttest!(new_wallet_keystore_with_password, |_prj, cmd| {
-    cmd.args(["wallet", "new", ".", "--unsafe-password", "test"]).assert_success().stdout_eq(str![
-        [r#"
+    cmd.args(["wallet", "new", ".", "test-account", "--unsafe-password", "test"])
+        .assert_success()
+        .stdout_eq(str![[r#"
 Created new encrypted keystore file: [..]
 [ADDRESS]
 
-"#]
-    ]);
+"#]]);
 });
 
 // tests that we can get the address of a keystore file
@@ -876,6 +876,41 @@ blobGasPrice
 blobGasUsed          
 to                   0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45
 revertReason         [..]Transaction too old, data: "0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000135472616e73616374696f6e20746f6f206f6c6400000000000000000000000000"
+
+"#]]);
+});
+
+// tests that the revert reason is loaded using the correct `from` address.
+casttest!(revert_reason_from, |_prj, cmd| {
+    let rpc = next_rpc_endpoint(NamedChain::Sepolia);
+    // https://sepolia.etherscan.io/tx/0x10ee70cf9f5ced5c515e8d53bfab5ea9f5c72cd61b25fba455c8355ee286c4e4
+    cmd.args([
+        "receipt",
+        "0x10ee70cf9f5ced5c515e8d53bfab5ea9f5c72cd61b25fba455c8355ee286c4e4",
+        "--rpc-url",
+        rpc.as_str(),
+    ])
+    .assert_success()
+    .stdout_eq(str![[r#"
+
+blockHash            0x32663d7730c9ea8e1de6d99854483e25fcc05bb56c91c0cc82f9f04944fbffc1
+blockNumber          7823353
+contractAddress      
+cumulativeGasUsed    7500797
+effectiveGasPrice    14296851013
+from                 0x3583fF95f96b356d716881C871aF7Eb55ea34a93
+gasUsed              25815
+logs                 []
+logsBloom            0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+root                 
+status               0 (failed)
+transactionHash      0x10ee70cf9f5ced5c515e8d53bfab5ea9f5c72cd61b25fba455c8355ee286c4e4
+transactionIndex     96
+type                 0
+blobGasPrice         
+blobGasUsed          
+to                   0x91b5d4111a4C038153b24e31F75ccdC47123595d
+revertReason         Counter is too large, data: "0x08c379a000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000014436f756e74657220697320746f6f206c61726765000000000000000000000000"
 
 "#]]);
 });
