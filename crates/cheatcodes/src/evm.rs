@@ -769,29 +769,29 @@ impl Cheatcode for getStateDiffJsonCall {
 
 impl Cheatcode for broadcastRawTransactionCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
-        // let tx = TxEnvelope::decode(&mut self.data.as_ref())
-        //     .map_err(|err| fmt_err!("failed to decode RLP-encoded transaction: {err}"))?;
+        let tx = TxEnvelope::decode(&mut self.data.as_ref())
+            .map_err(|err| fmt_err!("failed to decode RLP-encoded transaction: {err}"))?;
 
-        // ccx.ecx.db.transact_from_tx(
-        //     &tx.clone().into(),
-        //     (*ccx.ecx.env).clone(),
-        //     &mut ccx.ecx.journaled_state,
-        //     &mut *executor.get_inspector(ccx.state),
-        // )?;
-
-        // if ccx.state.broadcast.is_some() {
-        //     ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
-        //         rpc: ccx.db.active_fork_url(),
-        //         transaction: tx.try_into()?,
-        //     });
-        // }
-
-        ccx.ecx.db.transact_from_tx_zk(
-            &self.data,
+        ccx.ecx.db.transact_from_tx(
+            &tx.clone().into(),
             (*ccx.ecx.env).clone(),
             &mut ccx.ecx.journaled_state,
             &mut *executor.get_inspector(ccx.state),
         )?;
+
+        if ccx.state.broadcast.is_some() {
+            ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
+                rpc: ccx.db.active_fork_url(),
+                transaction: tx.try_into()?,
+            });
+        }
+
+        // ccx.ecx.db.transact_from_tx_zk(
+        //     &self.data,
+        //     (*ccx.ecx.env).clone(),
+        //     &mut ccx.ecx.journaled_state,
+        //     &mut *executor.get_inspector(ccx.state),
+        // )?;
 
         Ok(Default::default())
     }

@@ -3,14 +3,15 @@ use std::any::TypeId;
 use alloy_primitives::U256;
 use alloy_sol_types::SolValue;
 use foundry_cheatcodes::{
-    make_acc_non_empty, CheatcodesExecutor, CheatsCtxt, DealRecord, DynCheatcode, Error, Result,
+    make_acc_non_empty, BroadcastableTransaction, CheatcodesExecutor, CheatsCtxt, DealRecord,
+    DynCheatcode, Error, Result,
     Vm::{
-        createFork_0Call, createFork_1Call, createFork_2Call, createSelectFork_0Call,
-        createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall, getCodeCall,
-        getNonce_0Call, mockCallRevert_0Call, mockCall_0Call, resetNonceCall, rollCall,
-        selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall, zkGetDeploymentNonceCall,
-        zkGetTransactionNonceCall, zkRegisterContractCall, zkUseFactoryDepCall, zkUsePaymasterCall,
-        zkVmCall, zkVmSkipCall,
+        broadcastRawTransactionCall, createFork_0Call, createFork_1Call, createFork_2Call,
+        createSelectFork_0Call, createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall,
+        getCodeCall, getNonce_0Call, mockCallRevert_0Call, mockCall_0Call, resetNonceCall,
+        rollCall, selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall,
+        zkGetDeploymentNonceCall, zkGetTransactionNonceCall, zkRegisterContractCall,
+        zkUseFactoryDepCall, zkUsePaymasterCall, zkVmCall, zkVmSkipCall,
     },
 };
 use foundry_compilers::info::ContractInfo;
@@ -331,6 +332,23 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 // We need to return the fork ID.
                 Ok(encoded_fork_id)
+            }
+            t if using_zk_vm && is::<broadcastRawTransactionCall>(t) => {
+                let broadcastRawTransactionCall { data } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+                let tx = ccx.ecx.db.transact_from_tx_zk(
+                    &data,
+                    (*ccx.ecx.env).clone(),
+                    &mut ccx.ecx.journaled_state,
+                    &mut *executor.get_inspector(ccx.state),
+                )?;
+                if ccx.state.broadcast.is_some() {
+                    ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
+                        rpc: ccx.db.active_fork_url(),
+                        transaction: tx,
+                    });
+                }
+                Ok(Default::default())
             }
             _ => {
                 // Not custom, just invoke the default behavior
