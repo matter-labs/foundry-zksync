@@ -115,7 +115,7 @@ where
             });
 
         let system_factory_deps =
-            contracts.into_iter().map(|(hash, contract)| (*hash, contract.bytecode.clone()));
+            contracts.iter().map(|(hash, contract)| (*hash, contract.bytecode.clone()));
 
         let state_to_factory_deps =
             ecx.journaled_state.state.values().flat_map(|account| {
@@ -288,9 +288,7 @@ where
                 .values()
                 .find_map(|account| {
                     if account.info.code_hash == hash_b256 {
-                        return Some(
-                            account.info.code.clone().map(|code| code.bytecode().to_vec()),
-                        );
+                        return Some(account.info.code.clone().map(|code| code.bytecode().to_vec()));
                     }
                     None
                 })
