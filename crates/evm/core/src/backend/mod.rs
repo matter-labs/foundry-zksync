@@ -1415,7 +1415,7 @@ impl DatabaseExt for Backend {
             authorization_list: Default::default(),
             to: Some(alloy_primitives::TxKind::Call(parts.to)),
             value: Some(parts.value),
-            nonce: Some(journaled_state.state.get(&parts.from).unwrap().info.nonce),
+            nonce: Some(parts.nonce.as_limbs()[0]),
             gas_price: Default::default(),
         };
 
