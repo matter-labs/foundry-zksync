@@ -13,7 +13,7 @@ ignore = [
     # deprecated paste used by alloy-primitives
     "RUSTSEC-2024-0436",
     # protobuf in trezor_client
-    "RUSTSEC-2024-0437"
+    "RUSTSEC-2024-0437",
     # humantime is unmainstained, used by env_logger
     "RUSTSEC-2025-0014"
 ]
