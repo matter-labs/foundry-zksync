@@ -36,6 +36,9 @@ skip = []
 # dependencies starting at the specified crate, up to a certain depth, which is
 # by default infinite
 skip-tree = []
+deny = [
+    "openssl" # Only use rust-tls in the project
+]
 
 [licenses]
 version = 2

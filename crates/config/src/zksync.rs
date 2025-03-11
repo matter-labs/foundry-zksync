@@ -1,4 +1,3 @@
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
@@ -10,12 +9,10 @@ use foundry_zksync_compilers::{
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
-            get_solc_version_info,
-            settings::{
+            get_solc_version_info, settings::{
                 BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata,
                 ZkSolcSettings,
-            },
-            ZkSettings, ZkSolc, ZkSolcCompiler,
+            }, ErrorType, WarningType, ZkSettings, ZkSolc, ZkSolcCompiler
         },
     },
 };

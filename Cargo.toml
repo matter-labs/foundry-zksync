@@ -267,17 +267,17 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" }       # https://github.com/matter-labs/anvil-zksync/pull/510
-anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" }      # https://github.com/matter-labs/anvil-zksync/pull/510
-anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" }     # https://github.com/matter-labs/anvil-zksync/pull/510
-anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "b21c4898d44e3b775423b8d698d425fc43a85981" } # https://github.com/matter-labs/anvil-zksync/pull/510
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
-zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v25.4.0" }
-era-solc = { git = "https://github.com/matter-labs/era-compiler-solidity.git", tag = "1.5.11", package = "era-solc" }
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" }       # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" }      # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" }     # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" } # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" } # https://github.com/matter-labs/anvil-zksync/pull/510
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
+zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
 
 # macros
 proc-macro2 = "1.0"
@@ -331,7 +331,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.128", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
 soldeer-commands = "=0.5.2"
-strum = "0.27"
+strum = "0.26"
 tempfile = "3.13"
 tikv-jemallocator = "0.6"
 tokio = "1"
@@ -379,3 +379,9 @@ yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
 # alloy-transport-http = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
 # alloy-transport-ipc = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
 # alloy-transport-ws = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+
+[patch."https://github.com/matter-labs/zksync-telemetry"]
+zksync_telemetry = { git = "https://github.com/nbaztec/zksync-telemetry", branch = "nish-unpin-serde-patch" }
+
+[patch.crates-io]
+alloy-zksync = { git = "https://github.com/nbaztec/alloy-zksync", branch = "remove-openssl" }

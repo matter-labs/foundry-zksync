@@ -33,7 +33,9 @@ use std::os::unix::fs::PermissionsExt;
 
 pub mod input;
 pub mod settings;
+mod types;
 pub use settings::{ZkSettings, ZkSolcSettings};
+pub use types::{WarningType, ErrorType};
 
 /// ZKsync solc release used for all ZKsync solc versions
 pub const ZKSYNC_SOLC_RELEASE: Version = Version::new(1, 0, 1);

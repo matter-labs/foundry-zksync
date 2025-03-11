@@ -1,6 +1,5 @@
 //! zksolc input
-use super::{settings::ZkSolcSettings, ZkSettings};
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
+use super::{settings::ZkSolcSettings, types::{ErrorType, WarningType}, ZkSettings};
 use foundry_compilers::{
     artifacts::{Remapping, Source, Sources},
     compilers::{solc::SolcLanguage, CompilerInput},
