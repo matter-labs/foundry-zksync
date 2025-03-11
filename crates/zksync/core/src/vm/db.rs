@@ -27,7 +27,11 @@ use super::storage_recorder::{AccountAccess, AccountAccesses, CallType, StorageA
 
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
-static CACHED_SYSTEM_CONTRACTS: LazyLock<HashMap<H256, zksync_types::block::DeployedContract>> =
+
+// NOTE: we use vec instead of hashmap as 2 contracts share the same bytecode hash
+// (BOOTLOADER and 0x00 share "empty contract")
+// and vec allows us to preserve both contracts
+static CACHED_SYSTEM_CONTRACTS: LazyLock<Vec<(H256, zksync_types::block::DeployedContract)>> =
     LazyLock::new(|| {
         let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
             &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
