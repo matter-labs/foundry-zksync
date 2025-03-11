@@ -36,6 +36,7 @@ alloy-rpc-types.workspace = true
 alloy-sol-types.workspace = true
 # NOTE(zk): dependency introduced to be used in strategy crate
 alloy-rlp.workspace = true
+alloy-zksync.workspace = true
 foundry-fork-db.workspace = true
 
 revm = { workspace = true, features = [

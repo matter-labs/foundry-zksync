@@ -130,57 +130,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
     }
 
-    fn transact_from_tx(
-        &self,
-        backend: &mut Backend,
-        data: &Bytes,
-        mut env: Env,
-        journaled_state: &mut JournaledState,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionMaybeSigned> {
-        let envelope: ZkTxEnvelope =
-            ZkTxEnvelope::decode_2718(&mut data.as_ref()).wrap_err("Failed to decode tx")?;
-
-        let tx_712 = envelope.as_eip712();
-        let parts = tx_712.unwrap().clone().into_parts().0;
-
-        let tx: TransactionRequest = TransactionRequest {
-            from: Some(parts.from),
-            max_fee_per_gas: Some(parts.max_fee_per_gas),
-            max_priority_fee_per_gas: Some(parts.max_priority_fee_per_gas),
-            max_fee_per_blob_gas: Default::default(),
-            gas: Some(parts.gas),
-            input: Some(parts.input).into(),
-            chain_id: Some(parts.chain_id),
-            access_list: Default::default(),
-            transaction_type: Default::default(),
-            blob_versioned_hashes: Default::default(),
-            sidecar: Default::default(),
-            authorization_list: Default::default(),
-            to: Some(alloy_primitives::TxKind::Call(parts.to)),
-            value: Some(parts.value),
-            nonce: Some(journaled_state.state.get(&parts.from).unwrap().info.nonce),
-            gas_price: Default::default(),
-        };
-
-        trace!(?tx, "execute signed transaction");
-
-        backend.commit(journaled_state.state.clone());
-
-        let res = {
-            configure_tx_req_env(&mut env, &tx, None)?;
-            let env = backend.env_with_handler_cfg(env);
-
-            let mut evm = new_evm_with_inspector(backend, env, inspector);
-            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
-            evm.transact()?
-        };
-
-        backend.commit(res.state);
-        update_state(&mut journaled_state.state, backend, None)?;
-
-        Ok(tx.into())
-    }
+    
 }
 
 impl ZksyncBackendStrategyRunner {

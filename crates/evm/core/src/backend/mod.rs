@@ -4,14 +4,15 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
-    utils::configure_tx_env,
+    utils::{configure_tx_env, configure_tx_req_env, new_evm_with_inspector},
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
-use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
+use alloy_network::{eip2718::Decodable2718, AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
 use alloy_primitives::{keccak256, map::HashMap, uint, Address, Bytes, B256, U256};
 use alloy_provider::Provider;
-use alloy_rpc_types::{BlockNumberOrTag, Transaction};
+use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
+use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
 use eyre::Context;
 use foundry_common::{
     is_known_system_sender, provider::try_get_zksync_http_provider, TransactionMaybeSigned,
@@ -233,11 +234,16 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<()>;
 
-    /// NOTE(zk): we changed the type signature to pass the raw data to the strategy directly
-    /// See the actual implementation below in this same file for more details about what changed.
-    /// Executes a given TransactionRequest, commits the new state to the DB
     fn transact_from_tx(
         &mut self,
+        tx: &TransactionRequest,
+        env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+    ) -> eyre::Result<()>;
+
+    fn transact_from_tx_zk(
+        &self,
         data: &Bytes,
         env: Env,
         journaled_state: &mut JournaledState,
@@ -1354,19 +1360,84 @@ impl DatabaseExt for Backend {
         )
     }
 
-    // NOTE(zk): We implement this function via strategy pattern, letting the strategy decide how to
-    // decode the data. The changes are:
-    // - `tx` type changed from`TransactionRequest` to `Bytes`, and renamed to `data`
-    // - function now returns `TransactionMaybeSigned`
     fn transact_from_tx(
         &mut self,
+        tx: &TransactionRequest,
+        mut env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+    ) -> eyre::Result<()> {
+        trace!(?tx, "execute signed transaction");
+
+        self.commit(journaled_state.state.clone());
+
+        let res = {
+            configure_tx_req_env(&mut env, tx, None)?;
+            let env = self.env_with_handler_cfg(env);
+
+            let mut db = self.clone();
+            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
+            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
+            evm.transact()?
+        };
+
+        self.commit(res.state);
+        update_state(&mut journaled_state.state, self, None)?;
+
+        Ok(())
+    }
+
+    fn transact_from_tx_zk(
+        &self,
         data: &Bytes,
-        env: Env,
+        mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<TransactionMaybeSigned> {
-        let runner = self.strategy.runner;
-        runner.transact_from_tx(self, data, env, journaled_state, inspector)
+        let envelope: ZkTxEnvelope =
+            ZkTxEnvelope::decode_2718(&mut data.as_ref()).wrap_err("Failed to decode tx")?;
+
+        let tx_712 = envelope.as_eip712();
+        let parts = tx_712.unwrap().clone().into_parts().0;
+
+        let tx: TransactionRequest = TransactionRequest {
+            from: Some(parts.from),
+            max_fee_per_gas: Some(parts.max_fee_per_gas),
+            max_priority_fee_per_gas: Some(parts.max_priority_fee_per_gas),
+            max_fee_per_blob_gas: Default::default(),
+            gas: Some(parts.gas),
+            input: Some(parts.input).into(),
+            chain_id: Some(parts.chain_id),
+            access_list: Default::default(),
+            transaction_type: Default::default(),
+            blob_versioned_hashes: Default::default(),
+            sidecar: Default::default(),
+            authorization_list: Default::default(),
+            to: Some(alloy_primitives::TxKind::Call(parts.to)),
+            value: Some(parts.value),
+            nonce: Some(journaled_state.state.get(&parts.from).unwrap().info.nonce),
+            gas_price: Default::default(),
+        };
+
+        trace!(?tx, "execute signed transaction");
+        let mut db = self.clone();
+
+        db.commit(journaled_state.state.clone());
+
+        let res = {
+            configure_tx_req_env(&mut env, &tx, None)?;
+            let env = self.env_with_handler_cfg(env);
+
+            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
+            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
+            evm.transact()?
+        };
+
+        db.commit(res.state);
+
+        update_state(&mut journaled_state.state, &mut db, None)?;
+
+        Ok(tx.into())
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {

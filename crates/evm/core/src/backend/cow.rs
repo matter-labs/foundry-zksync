@@ -10,6 +10,7 @@ use crate::{
 };
 use alloy_genesis::GenesisAccount;
 use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_rpc_types::TransactionRequest;
 use foundry_common::TransactionMaybeSigned;
 use foundry_fork_db::DatabaseError;
 use revm::{
@@ -194,15 +195,14 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend_mut(&env).transact(id, transaction, env, journaled_state, inspector)
     }
 
-    // NOTE(zk): we changed the type signature to pass the raw data to the strategy directly
     fn transact_from_tx(
         &mut self,
-        data: &Bytes,
+        tx: &TransactionRequest,
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionMaybeSigned> {
-        self.backend_mut(&env).transact_from_tx(data, env, journaled_state, inspector)
+    ) -> eyre::Result<()> {
+        self.backend_mut(&env).transact_from_tx(tx, env, journaled_state, inspector)
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {
@@ -280,6 +280,16 @@ impl DatabaseExt for CowBackend<'_> {
 
     fn get_test_contract_address(&self) -> Option<Address> {
         self.backend.get_test_contract_address()
+    }
+
+    fn transact_from_tx_zk(
+        &self,
+        data: &Bytes,
+        env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+    ) -> eyre::Result<TransactionMaybeSigned> {
+        self.backend.transact_from_tx_zk(data, env, journaled_state, inspector)
     }
 }
 

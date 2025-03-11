@@ -1,20 +1,13 @@
 use std::{any::Any, fmt::Debug};
 
 use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
-use crate::{
-    backend::update_state,
-    utils::{configure_tx_req_env, new_evm_with_inspector},
-    InspectorExt,
-};
-use alloy_consensus::TxEnvelope;
-use alloy_primitives::{Address, Bytes, U256};
-use alloy_rlp::Decodable;
+use crate::InspectorExt;
+use alloy_primitives::{Address, U256};
 use eyre::{Context, Result};
-use foundry_common::TransactionMaybeSigned;
 use revm::{
     db::CacheDB,
-    primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
-    DatabaseCommit, DatabaseRef, JournaledState,
+    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
+    DatabaseRef, JournaledState,
 };
 use serde::{Deserialize, Serialize};
 
@@ -105,15 +98,6 @@ pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt 
         active: &ForkDB,
         fork_db: &mut ForkDB,
     );
-
-    fn transact_from_tx(
-        &self,
-        backend: &mut Backend,
-        data: &Bytes,
-        env: Env,
-        journaled_state: &mut JournaledState,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionMaybeSigned>;
 }
 
 pub trait BackendStrategyRunnerExt {
@@ -194,39 +178,6 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         fork_db: &mut ForkDB,
     ) {
         EvmBackendMergeStrategy::merge_db_account_data(addr, active, fork_db);
-    }
-
-    // NOTE(zk): This is the equivalent of the original EVM implementation for `transact_from_tx`,
-    // with some backend cloning optimization.
-    fn transact_from_tx(
-        &self,
-        backend: &mut Backend,
-        data: &Bytes,
-        mut env: Env,
-        journaled_state: &mut JournaledState,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionMaybeSigned> {
-        let envelope: TxEnvelope = TxEnvelope::decode(&mut data.as_ref())
-            .map_err(|err| eyre::eyre!("failed to decode RLP-encoded transaction: {err}"))?;
-
-        let tx = envelope.clone().into();
-        trace!(?tx, "execute signed transaction");
-
-        backend.commit(journaled_state.state.clone());
-
-        let res = {
-            configure_tx_req_env(&mut env, &tx, None)?;
-            let env = backend.env_with_handler_cfg(env);
-
-            let mut evm = new_evm_with_inspector(backend, env, inspector);
-            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
-            evm.transact()?
-        };
-
-        backend.commit(res.state);
-        update_state(&mut journaled_state.state, backend, None)?;
-
-        Ok(envelope.try_into()?)
     }
 }
 
