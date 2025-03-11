@@ -41,9 +41,7 @@ alloy-signer-local = { workspace = true, features = [
 ] }
 parking_lot.workspace = true
 alloy-network.workspace = true
-# Note(zk): This is now commented out because we are using the alloy-concencus crate within the strategy
-# to be able to abstract the function signature and decode the zkSync transactions that have a different
-# type. See the strategy crate for more information.
+# NOTE(zk): dependency moved to strategy crate would
 # alloy-consensus = { workspace = true, features = ["k256"] }
 
 

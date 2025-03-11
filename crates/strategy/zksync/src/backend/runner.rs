@@ -130,12 +130,6 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
     }
 
-    // Note(zk): This function in upstream code is not implemented as part of the strategy pattern,
-    // but is instead a standalone function. We have moved it here to make it part of the
-    // strategy, as there is some abstraction in the middle since the envelopes, and types are
-    // different. See new transact_from_tx evm implementation in:
-    // crates/evm/core/src/backend/strategy.rs See the main function in entrypoint:
-    // crates/evm/core/src/backend/mod.rs
     fn transact_from_tx(
         &self,
         backend: &mut Backend,

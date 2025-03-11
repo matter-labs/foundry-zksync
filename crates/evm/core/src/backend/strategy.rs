@@ -197,17 +197,8 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         EvmBackendMergeStrategy::merge_db_account_data(addr, active, fork_db);
     }
 
-    // Note(zk): This function in upstream code is not implemented as part of the strategy pattern,
-    // but is instead a standalone function. We have moved it here to make it part of the
-    // strategy, as there is some abstraction in the middle since the envelopes, and types are
-    // different. The changes are:
-    // - The function signature has been changed to take a `Bytes` instead of `the
-    //   TransactionRequest`
-    // - The function signature has been changed to return a `TransactionMaybeSigned` instead of
-    //   empty tuple
-    // - Avoids some cloning of the backend state
-    // See the main function in entrypoint: crates/evm/core/src/backend/mod.rs
-    // See zk implementation in: crates/strategy/zksync/src/backend/runner.rs
+    // NOTE(zk): This is the equivalent of the original EVM implementation for `transact_from_tx`,
+    // with some backend cloning optimization.
     fn transact_from_tx(
         &self,
         backend: &mut Backend,
@@ -219,13 +210,13 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         let envelope: TxEnvelope = TxEnvelope::decode(&mut data.as_ref())
             .map_err(|err| eyre::eyre!("failed to decode RLP-encoded transaction: {err}"))?;
 
-        let tx: &TransactionRequest = &envelope.clone().into();
+        let tx = envelope.clone().into();
         trace!(?tx, "execute signed transaction");
 
         backend.commit(journaled_state.state.clone());
 
         let res = {
-            configure_tx_req_env(&mut env, tx, None)?;
+            configure_tx_req_env(&mut env, &tx, None)?;
             let env = backend.env_with_handler_cfg(env);
 
             let mut evm = new_evm_with_inspector(backend, env, inspector);

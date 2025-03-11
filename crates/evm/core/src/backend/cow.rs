@@ -194,6 +194,7 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend_mut(&env).transact(id, transaction, env, journaled_state, inspector)
     }
 
+    // NOTE(zk): we changed the type signature to pass the raw data to the strategy directly
     fn transact_from_tx(
         &mut self,
         data: &Bytes,
