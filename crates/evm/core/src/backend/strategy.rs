@@ -9,7 +9,6 @@ use crate::{
 use alloy_consensus::TxEnvelope;
 use alloy_primitives::{Address, Bytes, U256};
 use alloy_rlp::Decodable;
-use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
 use foundry_common::TransactionMaybeSigned;
 use revm::{
