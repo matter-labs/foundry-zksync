@@ -135,17 +135,20 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
     .unwrap();
 
     //deploy
-    let output = cmd.args([
-        "create",
-        "src/Counter.sol:Counter",
-        "--zksync",
-        "--private-key",
-        private_key,
-        "--rpc-url",
-        &url,
-    ]);
-    let address = output.assert_success().get_output().stdout_lossy();
-    println!("2. address: {:?}", address.trim());
+    let _ = cmd
+        .args([
+            "create",
+            "src/Counter.sol:Counter",
+            "--zksync",
+            "--private-key",
+            private_key,
+            "--rpc-url",
+            &url,
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
     cmd.forge_fuse();
 
     prj.add_script(
@@ -158,6 +161,7 @@ contract SimpleScript is Script {
         // zk raw transaction
         vm.startBroadcast();
         // This raw transaction comes from cast mktx of increment() to Counter contract
+        // cast mktx "0x9086C95769C51E15D6a77672251Cf13Ce7ebf3AE" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync
         vm.broadcastRawTransaction(
             hex"71f88580808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a80a0f76c089059f46bb90adc0b34fa643edf175413b9e076185f46afe84f9283ccfba077b2a9878429569852f9e114e0c2bd8e67be25048752c3b2acab6cd7e2cdf4ff82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
         );
