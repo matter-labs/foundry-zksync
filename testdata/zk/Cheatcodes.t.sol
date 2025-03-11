@@ -134,6 +134,7 @@ contract ZkCheatcodesTest is DSTest {
 
         vm.roll(ERA_FORK_BLOCK + 1);
         require(block.number == ERA_FORK_BLOCK + 1, "era block number mismatch");
+        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp unchanged with roll");
     }
 
     function testZkCheatcodesWarp() public {
@@ -142,6 +143,7 @@ contract ZkCheatcodesTest is DSTest {
 
         vm.warp(ERA_FORK_BLOCK_TS + 1);
         require(block.timestamp == ERA_FORK_BLOCK_TS + 1, "era block timestamp mismatch");
+        require(block.number == ERA_FORK_BLOCK, "era block number unchanged with warp");
     }
 
     function testZkCheatcodesDeal() public {
