@@ -337,7 +337,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let broadcastRawTransactionCall { data } =
                     cheatcode.as_any().downcast_ref().unwrap();
                 let tx = ccx.ecx.db.transact_from_tx_zk(
-                    &data,
+                    data,
                     (*ccx.ecx.env).clone(),
                     &mut ccx.ecx.journaled_state,
                     &mut *executor.get_inspector(ccx.state),

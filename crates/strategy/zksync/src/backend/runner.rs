@@ -4,18 +4,13 @@ use crate::backend::{
     context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
     merge::{ZksyncBackendMerge, ZksyncMergeState},
 };
-use alloy_network::eip2718::Decodable2718;
-use alloy_primitives::{Address, Bytes, U256};
-use alloy_rpc_types::TransactionRequest;
-use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
-use eyre::{Context, Result};
-use foundry_common::TransactionMaybeSigned;
+use alloy_primitives::{Address, U256};
+use eyre::Result;
 use foundry_evm::{
     backend::{
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        update_state, Backend, DatabaseExt,
+        Backend, DatabaseExt,
     },
-    utils::{configure_tx_req_env, new_evm_with_inspector},
     InspectorExt,
 };
 use foundry_evm_core::backend::{
@@ -23,11 +18,11 @@ use foundry_evm_core::backend::{
     BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
 };
 use revm::{
-    primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
-    DatabaseCommit, JournaledState,
+    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
+    JournaledState,
 };
 use serde::{Deserialize, Serialize};
-use tracing::trace;
+
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZksyncBackendStrategyRunner;
@@ -129,8 +124,6 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
     }
-
-    
 }
 
 impl ZksyncBackendStrategyRunner {

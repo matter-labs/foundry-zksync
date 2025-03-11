@@ -186,6 +186,5 @@ contract SimpleScript is Script {
     ]);
 
     let output = cmd.assert_success().get_output().stdout_lossy();
-    println!("eueueueu{}", output);
     assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
 });
