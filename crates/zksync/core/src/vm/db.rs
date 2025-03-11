@@ -27,6 +27,18 @@ use super::storage_recorder::{AccountAccess, AccountAccesses, CallType, StorageA
 
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
+static CACHED_SYSTEM_CONTRACTS: LazyLock<HashMap<H256, zksync_types::block::DeployedContract>> =
+    LazyLock::new(|| {
+        let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
+            &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
+            false,
+        );
+
+        contracts
+            .into_iter()
+            .map(|contract| (hash_bytecode(&contract.bytecode), contract))
+            .collect()
+    });
 
 pub struct ZKVMData<'a, DB: Database> {
     ecx: &'a mut InnerEvmContext<DB>,
@@ -85,26 +97,9 @@ where
         }
     }
 
-    fn cached_system_contracts() -> &'static HashMap<H256, zksync_types::block::DeployedContract> {
-        static DEPLOYED_CONTRACTS: LazyLock<HashMap<H256, zksync_types::block::DeployedContract>> =
-            LazyLock::new(|| {
-                let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
-                    &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
-                    false,
-                );
-
-                contracts
-                    .into_iter()
-                    .map(|contract| (hash_bytecode(&contract.bytecode), contract))
-                    .collect()
-            });
-
-        &DEPLOYED_CONTRACTS
-    }
-
     /// Create a new instance of [ZKEVMData] with system contracts.
     pub fn new_with_system_contracts(ecx: &'a mut EvmContext<DB>, chain_id: L2ChainId) -> Self {
-        let contracts = Self::cached_system_contracts();
+        let contracts = &CACHED_SYSTEM_CONTRACTS;
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let mut override_keys = HashMap::default();
