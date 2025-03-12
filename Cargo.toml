@@ -385,4 +385,4 @@ yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
 zksync_telemetry = { git = "https://github.com/nbaztec/zksync-telemetry", branch = "nish-unpin-serde-patch" }
 
 [patch.crates-io]
-alloy-zksync = { git = "https://github.com/nbaztec/alloy-zksync", branch = "remove-openssl" }
+alloy-zksync = { git = "https://github.com/nbaztec/alloy-zksync", branch = "remove-openssl" } # pending 0.12.1 release

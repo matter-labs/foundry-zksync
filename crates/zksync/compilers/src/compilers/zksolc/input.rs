@@ -1,5 +1,9 @@
 //! zksolc input
-use super::{settings::ZkSolcSettings, types::{ErrorType, WarningType}, ZkSettings};
+use super::{
+    settings::ZkSolcSettings,
+    types::{ErrorType, WarningType},
+    ZkSettings,
+};
 use foundry_compilers::{
     artifacts::{Remapping, Source, Sources},
     compilers::{solc::SolcLanguage, CompilerInput},

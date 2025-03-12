@@ -24,8 +24,8 @@ use zksync_multivm::{
 };
 use zksync_types::{
     bytecode::BytecodeHash, get_nonce_key, h256_to_address, l2::L2Tx,
-    transaction_request::PaymasterParams, PackedEthSignature, StorageKey,
-    Transaction, ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
+    transaction_request::PaymasterParams, PackedEthSignature, StorageKey, Transaction,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 

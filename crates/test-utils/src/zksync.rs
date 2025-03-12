@@ -1,11 +1,5 @@
 //! Contains in-memory implementation of anvil-zksync.
-use std::{
-    future::{Future},
-    net::SocketAddr,
-    pin::Pin,
-    str::FromStr,
-    sync::Arc,
-};
+use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use anvil_zksync_api_server::NodeServerBuilder;
 use anvil_zksync_config::{
@@ -145,10 +139,10 @@ impl Fork {
 }
 
 fn new_fork_config(url: &str) -> ForkConfig {
-    const MAINNET_URL: &'static str = "https://mainnet.era.zksync.io:443";
-    const SEPOLIA_TESTNET_URL: &'static str = "https://sepolia.era.zksync.dev:443";
-    const ABSTRACT_MAINNET_URL: &'static str = "https://api.mainnet.abs.xyz";
-    const ABSTRACT_TESTNET_URL: &'static str = "https://api.testnet.abs.xyz";
+    const MAINNET_URL: &str = "https://mainnet.era.zksync.io:443";
+    const SEPOLIA_TESTNET_URL: &str = "https://sepolia.era.zksync.dev:443";
+    const ABSTRACT_MAINNET_URL: &str = "https://api.mainnet.abs.xyz";
+    const ABSTRACT_TESTNET_URL: &str = "https://api.testnet.abs.xyz";
 
     match url {
         "mainnet" => ForkConfig {

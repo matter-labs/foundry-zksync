@@ -9,10 +9,12 @@ use foundry_zksync_compilers::{
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
-            get_solc_version_info, settings::{
+            get_solc_version_info,
+            settings::{
                 BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata,
                 ZkSolcSettings,
-            }, ErrorType, WarningType, ZkSettings, ZkSolc, ZkSolcCompiler
+            },
+            ErrorType, WarningType, ZkSettings, ZkSolc, ZkSolcCompiler,
         },
     },
 };

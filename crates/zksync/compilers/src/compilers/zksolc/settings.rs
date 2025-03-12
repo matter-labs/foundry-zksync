@@ -17,7 +17,10 @@ use std::{
     str::FromStr,
 };
 
-use super::{types::{ErrorType, WarningType}, ZkSolc};
+use super::{
+    types::{ErrorType, WarningType},
+    ZkSolc,
+};
 ///
 /// The Solidity compiler codegen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

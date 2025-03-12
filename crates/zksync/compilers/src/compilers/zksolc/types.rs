@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 ///
 /// The compiler warning type.
-///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum WarningType {
@@ -15,12 +14,8 @@ pub enum WarningType {
 impl WarningType {
     ///
     /// Converts string arguments into an array of warnings.
-    ///
     pub fn try_from_strings(strings: &[String]) -> Result<Vec<Self>, eyre::Error> {
-        strings
-            .iter()
-            .map(|string| Self::from_str(string))
-            .collect()
+        strings.iter().map(|string| Self::from_str(string)).collect()
     }
 }
 
@@ -47,7 +42,6 @@ impl std::fmt::Display for WarningType {
 
 ///
 /// The compiler error type.
-///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ErrorType {
@@ -60,12 +54,8 @@ pub enum ErrorType {
 impl ErrorType {
     ///
     /// Converts string arguments into an array of errors.
-    ///
     pub fn try_from_strings(strings: &[String]) -> Result<Vec<Self>, eyre::Error> {
-        strings
-            .iter()
-            .map(|string| Self::from_str(string))
-            .collect()
+        strings.iter().map(|string| Self::from_str(string)).collect()
     }
 }
 
