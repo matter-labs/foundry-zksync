@@ -58,7 +58,7 @@ impl CallDepth {
 
     /// Decrement [CallDepth] until the value of `0`.
     #[inline]
-    pub(crate) fn decrement(self) -> CallDepth {
+    pub(crate) fn decrement(&self) -> CallDepth {
         CallDepth(self.0.saturating_sub(1))
     }
 }
@@ -97,15 +97,16 @@ impl CallActions {
 
     /// Track pending [CallAction]s, decrementing the depth if it's not ready.
     pub(crate) fn track(&mut self) {
-        let mut pending_actions = vec![];
-        for (depth, action) in self.pending.iter().cloned() {
+        let len = self.pending.len();
+        let pending_actions = std::mem::replace(&mut self.pending, Vec::with_capacity(len));
+
+        for (depth, action) in pending_actions.into_iter() {
             if depth == CallDepth::current() {
                 self.immediate.push(action);
             } else {
-                pending_actions.push((depth.decrement(), action));
+                self.pending.push((depth.decrement(), action));
             }
         }
-        self.pending = pending_actions;
     }
 
     /// Consume the immediate actions.
