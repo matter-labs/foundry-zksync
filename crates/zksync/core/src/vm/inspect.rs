@@ -503,13 +503,14 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 ) -> InnerZkVmResult {
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
 
-    let baseline_contracts =
-        SYSTEM_CONTRACTS.contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false);
-    let system_env = create_system_env(baseline_contracts.clone(), chain_id);
+    let baseline_contracts = SYSTEM_CONTRACTS
+        .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
+        .clone();
+    let system_env = create_system_env(baseline_contracts, chain_id);
 
-    let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env.clone(), system_env, storage.clone());
+    let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env, system_env, storage.clone());
 
-    let tx: Transaction = l2_tx.clone().into();
+    let tx: Transaction = l2_tx.into();
     let initiator = tx.initiator_account();
 
     let call_tracer_result = Arc::default();
