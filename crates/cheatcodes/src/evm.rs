@@ -787,13 +787,6 @@ impl Cheatcode for broadcastRawTransactionCall {
             });
         }
 
-        // ccx.ecx.db.transact_from_tx_zk(
-        //     &self.data,
-        //     (*ccx.ecx.env).clone(),
-        //     &mut ccx.ecx.journaled_state,
-        //     &mut *executor.get_inspector(ccx.state),
-        // )?;
-
         Ok(Default::default())
     }
 }

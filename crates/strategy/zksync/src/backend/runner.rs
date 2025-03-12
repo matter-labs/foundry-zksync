@@ -1,9 +1,5 @@
 use std::any::Any;
 
-use crate::backend::{
-    context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
-    merge::{ZksyncBackendMerge, ZksyncMergeState},
-};
 use alloy_primitives::{Address, U256};
 use eyre::Result;
 use foundry_evm::{
@@ -22,6 +18,11 @@ use revm::{
     JournaledState,
 };
 use serde::{Deserialize, Serialize};
+
+use crate::backend::{
+    context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
+    merge::{ZksyncBackendMerge, ZksyncMergeState},
+};
 
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

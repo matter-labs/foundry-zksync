@@ -1,6 +1,5 @@
 //! Forge tests for cheatcodes.
 
-// use foundry_zksync_core::utils::MAX_L2_GAS_LIMIT;
 use std::path::Path;
 
 use crate::{
