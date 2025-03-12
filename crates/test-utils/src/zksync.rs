@@ -236,6 +236,9 @@ impl ZkSyncNode {
         stop_guard: tokio::sync::oneshot::Receiver<()>,
         fork_client: Option<ForkClient>,
     ) {
+        // We need to init telemetry else anvil-zksync will panic.
+        zksync_telemetry::init_telemetry("", "", "", None, None, None).await.ok();
+
         const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 
         let config = TestNodeConfig::default().with_cache_config(Some(CacheConfig::Memory));

@@ -6100,6 +6100,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "zksync_telemetry",
  "zksync_types",
 ]
 

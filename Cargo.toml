@@ -273,6 +273,7 @@ anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", 
 anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" }     # https://github.com/matter-labs/anvil-zksync/pull/510
 anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" } # https://github.com/matter-labs/anvil-zksync/pull/510
 anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" } # https://github.com/matter-labs/anvil-zksync/pull/510
+zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "d5c35951843263765079545c31c908dcbaab1f30" }
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
 zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
