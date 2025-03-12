@@ -491,8 +491,11 @@ struct InnerZkVmResult {
     recorded_immutables: rHashMap<H160, rHashMap<rU256, FixedBytes<32>>>,
 }
 
-static SYSTEM_CONTRACTS: LazyLock<SystemContracts> =
-    LazyLock::new(|| SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false));
+static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = LazyLock::new(|| {
+    SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false)
+        .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
+        .clone()
+});
 
 fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     l2_tx: L2Tx,
@@ -503,10 +506,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 ) -> InnerZkVmResult {
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
 
-    let baseline_contracts = SYSTEM_CONTRACTS
-        .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
-        .clone();
-    let system_env = create_system_env(baseline_contracts, chain_id);
+    let system_env = create_system_env(BASELINE_CONTRACTS.clone(), chain_id);
 
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env, system_env, storage.clone());
 
