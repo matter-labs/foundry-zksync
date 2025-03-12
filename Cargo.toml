@@ -252,7 +252,7 @@ syn-solidity = "0.8.22"
 
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
-alloy-zksync = { git = "https://github.com/Jrigada/alloy-zksync.git", branch = "jrigada-alloy-0.12"}
+alloy-zksync = "0.12.1"
 
 alloy-trie = "0.7.0"
 

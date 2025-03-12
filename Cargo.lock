@@ -1053,7 +1053,8 @@ dependencies = [
 [[package]]
 name = "alloy-zksync"
 version = "0.12.1"
-source = "git+https://github.com/Jrigada/alloy-zksync.git?branch=jrigada-alloy-0.12#fb92dce797c55e27120447b6b981bca561fe5d7b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a0f6e19452ea0e19a8e3bb99f2be756d454f10ffcdfa7d8067a9caf00461f85"
 dependencies = [
  "alloy",
  "async-trait",
