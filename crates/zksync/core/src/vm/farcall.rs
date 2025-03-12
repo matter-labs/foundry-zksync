@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use std::{collections::HashMap, default, fmt::Debug};
+use std::{collections::HashMap, default, fmt::Debug, ops::Deref};
 
 use alloy_primitives::{hex, Address};
 use itertools::Itertools;
@@ -26,7 +26,7 @@ use zksync_vm_interface::storage::{StoragePtr, WriteStorage};
 
 use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256};
 
-use super::tracers::cheatcode::{get_calldata, SELECTOR_EXECUTE_TRANSACTION};
+use super::tracers::cheatcode::SELECTOR_EXECUTE_TRANSACTION;
 
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 type CallStackEntry = vm_state::CallStackEntry<8, EncodingModeProduction>;
@@ -204,11 +204,11 @@ impl FarCallHandler {
 
     /// Tracks the call stack for the actual transaction execution starting at `executeTransaction`.
     /// Returns the current tx status and any subsequent call start and end statuses.
-    pub(crate) fn track_tx_execution<H: HistoryMode>(
+    pub(crate) fn track_tx_execution(
         &mut self,
         state: &VmLocalStateData<'_>,
         data: &AfterExecutionData,
-        memory: &SimpleMemory<H>,
+        calldata: &impl Deref<Target = Vec<u8>>,
     ) -> CurrentTxExecutionStatus {
         match data.opcode.variant.opcode {
             Opcode::NearCall(_) => match self.tx_execution_tracker.status {
@@ -228,18 +228,16 @@ impl FarCallHandler {
             },
             Opcode::FarCall(opcode) => {
                 let current = state.vm_local_state.callstack.current;
-
-                let calldata = get_calldata(state, memory);
+                let calldata = calldata.deref();
 
                 match self.tx_execution_tracker.status {
                     TxExecutionStatus::Pending => {
-                        let calldata = get_calldata(state, memory);
                         if calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION) {
                             self.tx_execution_tracker.status = TxExecutionStatus::Executing;
                             self.tx_execution_tracker.call_tracker.push(TrackedCall {
                                 opcode,
                                 address: current.code_address.to_address(),
-                                calldata,
+                                calldata: calldata.clone(),
                                 num_near_calls: 0,
                             });
 
@@ -257,11 +255,10 @@ impl FarCallHandler {
                         }
                     }
                     TxExecutionStatus::Executing => {
-                        let calldata = get_calldata(state, memory);
                         self.tx_execution_tracker.call_tracker.push(TrackedCall {
                             opcode,
                             address: current.code_address.to_address(),
-                            calldata,
+                            calldata: calldata.clone(),
                             num_near_calls: 0,
                         });
 
