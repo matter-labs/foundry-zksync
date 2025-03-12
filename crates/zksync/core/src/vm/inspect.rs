@@ -604,6 +604,18 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         })
         .collect();
 
+    let log_parser = ConsoleLogParser::new();
+    let console_logs = log_parser.get_logs(&call_traces, true);
+
+    for log in console_logs {
+        tx_result.logs.events.push(VmEvent {
+            location: Default::default(),
+            address: H160::zero(),
+            indexed_topics: log.topics().iter().map(|topic| H256::from(topic.0)).collect(),
+            value: log.data.data.to_vec(),
+        });
+    }
+
     if tracing::enabled!(target: "anvil_zksync_core::formatter", tracing::Level::INFO) {
         let mut formatter = Formatter::new();
         let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
@@ -611,17 +623,6 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 
         formatter.print_vm_details(&tx_result);
 
-        let log_parser = ConsoleLogParser::new();
-        let console_logs = log_parser.get_logs(&call_traces, true);
-
-        for log in console_logs {
-            tx_result.logs.events.push(VmEvent {
-                location: Default::default(),
-                address: H160::zero(),
-                indexed_topics: log.topics().iter().map(|topic| H256::from(topic.0)).collect(),
-                value: log.data.data.to_vec(),
-            });
-        }
         for (i, call) in call_traces.iter().enumerate() {
             let is_last = i == call_traces.len() - 1;
             formatter.print_call(
