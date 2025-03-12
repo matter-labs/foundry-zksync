@@ -56,7 +56,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             }
             t if using_zk_vm && is::<warpCall>(t) => {
                 let &warpCall { newTimestamp } = cheatcode.as_any().downcast_ref().unwrap();
-                ccx.ecx.env.block.number = newTimestamp;
+                ccx.ecx.env.block.timestamp = newTimestamp;
                 foundry_zksync_core::cheatcodes::warp(newTimestamp, ccx.ecx);
                 Ok(Default::default())
             }

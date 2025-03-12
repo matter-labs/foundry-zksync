@@ -15,6 +15,8 @@ const EMPTY_CONTRACT_WITH_CONSTRUCTOR_BYTECODE: &str = "000000600310027000000010
 
 const COUNTER_BYTECODE: &str = "0x0000008003000039000000400030043f0000000100200190000000150000c13d000000000201001900000010002001980000002d0000613d000000000101043b000000e001100270000000110010009c000000200000613d000000120010009c0000002d0000c13d0000000001000416000000000001004b0000002d0000c13d000000000100041a000000ff0110018f000000800010043f0000001501000041000000370001042e0000000001000416000000000001004b0000002d0000c13d000000000200041a0000001601200197000000000010041b0000002001000039000001000010044300000120000004430000000f01000041000000370001042e0000000001000416000000000001004b0000002d0000c13d000000000100041a000000ff0210018f000000ff0020008c0000002f0000c13d0000001301000041000000000010043f0000001101000039000000040010043f000000140100004100000038000104300000000001000019000000380001043000000016021001970000000101100039000000ff0110018f000000000121019f000000000010041b0000000001000019000000370001042e0000003600000432000000370001042e0000003800010430000000000000000000000000000000000000000000000000000000020000000000000000000000000000004000000100000000000000000000000000000000000000000000000000fffffffc00000000000000000000000000000000000000000000000000000000000000000000000000000000d09de08a000000000000000000000000000000000000000000000000000000008381f58a4e487b710000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000020000000800000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000027b95d8697efbdb44a7508247e8c640a64fb3ead050f40cb23deb1910c501315";
 
+const COUNTER_ADDRESS: &str = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+
 casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
     let node = ZkSyncNode::start().await;
     let url = node.url();
@@ -417,10 +419,9 @@ casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
 
-    let counter_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
     // Deploy counter
     cmd.cast_fuse()
-        .args(["rpc", "hardhat_setCode", counter_address, COUNTER_BYTECODE, "--rpc-url", &url])
+        .args(["rpc", "hardhat_setCode", COUNTER_ADDRESS, COUNTER_BYTECODE, "--rpc-url", &url])
         .assert_success();
 
     cmd.forge_fuse()
@@ -510,4 +511,43 @@ casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
         .assert_success()
         .get_output()
         .stdout_lossy();
+});
+
+casttest!(test_zk_cast_call_with_trace, async |_prj, cmd| {
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    let (_, private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
+
+    // Deploy counter
+    cmd.cast_fuse()
+        .args(["rpc", "hardhat_setCode", COUNTER_ADDRESS, COUNTER_BYTECODE, "--rpc-url", &url])
+        .assert_success();
+
+    cmd.cast_fuse()
+        .args([
+            "call",
+            "--trace",
+            COUNTER_ADDRESS,
+            "number()",
+            "--rpc-url",
+            &url,
+            "--private-key",
+            private_key,
+            "--zksync",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy()
+        .contains(
+            format!(
+                "Traces:
+  [43369] {COUNTER_ADDRESS}::number()
+    └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000001"
+            )
+            .as_str(),
+        );
 });

@@ -7,16 +7,15 @@ yanked = "warn"
 ignore = [
     # proc-macro-error is unmaintained
     "RUSTSEC-2024-0370",
-    # instant is unmaintained
-    "RUSTSEC-2024-0384",
-    # rustls advisory, only servers affected
-    "RUSTSEC-2024-0399",
     # Used by boojum
     # derivative is unmaintained
     "RUSTSEC-2024-0388",
-    # Used by era-test-node
-    # net2 is unmaintained
-    "RUSTSEC-2020-0016",
+    # deprecated paste used by alloy-primitives
+    "RUSTSEC-2024-0436",
+    # protobuf in trezor_client
+    "RUSTSEC-2024-0437",
+    # humantime is unmainstained, used by env_logger
+    "RUSTSEC-2025-0014"
 ]
 
 # This section is considered when running `cargo deny check bans`.
@@ -114,8 +113,7 @@ allow-git = [
     "https://github.com/bluealloy/revm",
     "https://github.com/RustCrypto/hashes",
     "https://github.com/popzxc/alloy-zksync",
-    "https://github.com/nbaztec/proptest",
 ]
 
 [sources.allow-org]
-github = ["matter-labs", "Moonsong-Labs"]
+github = ["matter-labs"]

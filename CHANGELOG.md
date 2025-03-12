@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.11](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.10...foundry-zksync-v0.0.11) (2025-03-10)
+
+
+### Features
+
+* add support for custom signature in cast fields ([#935](https://github.com/matter-labs/foundry-zksync/issues/935)) ([4b59d03](https://github.com/matter-labs/foundry-zksync/commit/4b59d03591fccb6ecd3a21a8605e83c52122d969))
+* cast call --trace support ([#953](https://github.com/matter-labs/foundry-zksync/issues/953)) ([0ff41b2](https://github.com/matter-labs/foundry-zksync/commit/0ff41b2be31c9bdc886327649793104fce12fbb0))
+* upstream 4974a08 ([#946](https://github.com/matter-labs/foundry-zksync/issues/946)) ([f3a9825](https://github.com/matter-labs/foundry-zksync/commit/f3a9825a9b07bee979c94bc26cc80ccc96942eb5))
+
+
+### Bug Fixes
+
+* **inspector:** missing field in default ([f3a9825](https://github.com/matter-labs/foundry-zksync/commit/f3a9825a9b07bee979c94bc26cc80ccc96942eb5))
+
 ## [0.0.10](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.9...foundry-zksync-v0.0.10) (2025-02-26)
 
 

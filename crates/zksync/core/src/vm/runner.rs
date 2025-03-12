@@ -11,6 +11,7 @@ use zksync_types::{
     ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, CONTRACT_DEPLOYER_ADDRESS,
     CREATE2_FACTORY_ADDRESS, U256,
 };
+use zksync_vm_interface::Call;
 
 use core::convert::Into;
 use std::{cmp::min, fmt::Debug};
@@ -34,7 +35,7 @@ pub fn transact<'a, DB>(
     env: &'a mut Env,
     zk_env: &ZkEnv,
     db: &'a mut DB,
-) -> eyre::Result<ResultAndState>
+) -> eyre::Result<(ResultAndState, Vec<Call>)>
 where
     DB: Database + ?Sized,
     <DB as Database>::Error: Debug,
@@ -99,8 +100,8 @@ where
     };
 
     match inspect::<_, DB::Error>(tx, &mut ecx, &mut ccx, call_ctx) {
-        Ok(ZKVMExecutionResult { execution_result: result, .. }) => {
-            Ok(ResultAndState { result, state: ecx.journaled_state.finalize().0 })
+        Ok(ZKVMExecutionResult { execution_result: result, call_traces, .. }) => {
+            Ok((ResultAndState { result, state: ecx.journaled_state.finalize().0 }, call_traces))
         }
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }

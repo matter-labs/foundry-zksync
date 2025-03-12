@@ -1085,11 +1085,17 @@ impl InspectorExt for InspectorStackRefMut<'_> {
         self.inner.create2_deployer
     }
 
-    fn trace_zksync(&mut self, ecx: &mut EvmContext<&mut dyn DatabaseExt>, call_traces: Vec<Call>) {
+    fn trace_zksync(
+        &mut self,
+        ecx: &mut EvmContext<&mut dyn DatabaseExt>,
+        call_traces: Vec<Call>,
+        record_top_call: bool,
+    ) {
         call_inspectors!([&mut self.tracer], |inspector| InspectorExt::trace_zksync(
             inspector,
             ecx,
-            call_traces
+            call_traces,
+            record_top_call
         ));
     }
 }
@@ -1197,6 +1203,15 @@ impl InspectorExt for InspectorStack {
 
     fn create2_deployer(&self) -> Address {
         self.create2_deployer
+    }
+
+    fn trace_zksync(
+        &mut self,
+        ecx: &mut EvmContext<&mut dyn DatabaseExt>,
+        call_traces: Vec<Call>,
+        record_top_call: bool,
+    ) {
+        self.as_mut().trace_zksync(ecx, call_traces, record_top_call);
     }
 }
 
