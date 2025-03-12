@@ -28,9 +28,12 @@ use super::storage_recorder::{AccountAccess, AccountAccesses, CallType, StorageA
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
 
-// NOTE: we use vec instead of hashmap as 2 contracts share the same bytecode hash
-// (BOOTLOADER and 0x00 share "empty contract")
-// and vec allows us to preserve both contracts
+// NOTE: we use vec instead of hashmap because the loaded [BOOTLOADER] and [0 address] share the
+// same bytecode, thus they would share the same bytecode hash (key in map) resulting in the first
+// `DeployedContract` to be discarded from the resulting map. This is a problem when we compute the
+// override keys as the discarded contract won't have an associated generated override
+// TL;DR: we want to keep _all_ instances of `DeployedContract` even if they share the same bytecode
+// hash
 static CACHED_SYSTEM_CONTRACTS: LazyLock<Vec<(H256, zksync_types::block::DeployedContract)>> =
     LazyLock::new(|| {
         let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
@@ -103,11 +106,10 @@ where
 
     /// Create a new instance of [ZKEVMData] with system contracts.
     pub fn new_with_system_contracts(ecx: &'a mut EvmContext<DB>, chain_id: L2ChainId) -> Self {
-        let contracts = &CACHED_SYSTEM_CONTRACTS;
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let mut override_keys = HashMap::default();
-        contracts
+        CACHED_SYSTEM_CONTRACTS
             .iter()
             .map(|(hash, contract)| {
                 let deployer_code_key = get_code_key(contract.account_id.address());
@@ -118,8 +120,9 @@ where
                 (log.is_write()).then_some(override_keys.insert(log.key, log.value));
             });
 
-        let system_factory_deps =
-            contracts.iter().map(|(hash, contract)| (*hash, contract.bytecode.clone()));
+        let system_factory_deps = CACHED_SYSTEM_CONTRACTS
+            .iter()
+            .map(|(hash, contract)| (*hash, contract.bytecode.clone()));
 
         let state_to_factory_deps =
             ecx.journaled_state.state.values().flat_map(|account| {
