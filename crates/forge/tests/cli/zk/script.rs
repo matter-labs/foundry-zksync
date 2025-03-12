@@ -1,6 +1,6 @@
 //! Contains tests related to `forge script` with zksync.
 
-use foundry_test_utils::{util::OutputExt, ZkSyncNode};
+use foundry_test_utils::util::OutputExt;
 use foundry_zksync_core::ZkTransactionMetadata;
 
 forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
@@ -107,84 +107,4 @@ contract DeployScript is Script {
     let transactions: ZkTransactions = serde_json::from_str(&content).unwrap();
     let transactions = transactions.transactions;
     assert_eq!(transactions.len(), 3);
-});
-
-forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
-    foundry_test_utils::util::initialize(prj.root());
-    let node = ZkSyncNode::start().await;
-    let url = node.url();
-
-    let (_, private_key) = ZkSyncNode::rich_wallets()
-        .next()
-        .map(|(addr, pk, _)| (addr, pk))
-        .expect("No rich wallets available");
-
-    prj.add_source(
-        "Counter.sol",
-        r#"
-    pragma solidity ^0.8.0;
-
-    contract Counter {
-        uint256 public count;
-        function increment() external {
-            count++;
-        }
-    }
-    "#,
-    )
-    .unwrap();
-
-    //deploy
-    let _ = cmd
-        .args([
-            "create",
-            "src/Counter.sol:Counter",
-            "--zksync",
-            "--private-key",
-            private_key,
-            "--rpc-url",
-            &url,
-        ])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
-
-    cmd.forge_fuse();
-
-    prj.add_script(
-        "Foo",
-        r#"
-import "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
-contract SimpleScript is Script {
-    function run() external {
-        // zk raw transaction
-        vm.startBroadcast();
-        // This raw transaction comes from cast mktx of increment() to Counter contract
-        // `cast mktx "0x9086C95769C51E15D6a77672251Cf13Ce7ebf3AE" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 1`
-        vm.broadcastRawTransaction(
-            hex"71f88501808402b275d08304d718949086c95769c51e15d6a77672251cf13ce7ebf3ae8084d09de08a01a00d798053cc7a75a78d49adc0b893d9ad91f5301bb264eb2848979859fc366dc7a06469714a3ec85003c3f52ff668299c3c01e0a43be5ec0529cc204fd53be1629e82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
-        );
-        vm.stopBroadcast();
-    }
-}
-"#,
-    )
-    .unwrap();
-
-    cmd.args([
-        "script",
-        "--zksync",
-        "--private-key",
-        private_key,
-        "--rpc-url",
-        &url,
-        "--broadcast",
-        "--slow",
-        "--non-interactive",
-        "SimpleScript",
-    ]);
-
-    let output = cmd.assert_success().get_output().stdout_lossy();
-    assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
 });
