@@ -380,7 +380,7 @@ contract SimpleScript is Script {
 
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
     let txns = json["transactions"].as_array().expect("broadcastable txs");
-    
+
     // check that the txs have the correct function and contract address
     assert_eq!(txns.len(), 1);
     txns[0]["function"].as_str().expect("function name").contains("increment");
