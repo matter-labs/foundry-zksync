@@ -43,7 +43,7 @@ pub async fn estimate_gas<P: Provider<AnyNetwork>>(
     tx.gas = None;
 
     tx.set_gas_limit(
-        provider.estimate_gas(tx).await.wrap_err("Failed to estimate gas for tx")? *
+        provider.estimate_gas(tx.clone()).await.wrap_err("Failed to estimate gas for tx")? *
             estimate_multiplier /
             100,
     );
@@ -356,7 +356,7 @@ impl BundledState {
                             (Some(provider.get_gas_price().await?), None)
                         } else {
                             let mut fees = provider
-                                .estimate_eip1559_fees(None)
+                                .estimate_eip1559_fees()
                                 .await
                                 .wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
 
