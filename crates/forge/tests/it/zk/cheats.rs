@@ -319,8 +319,6 @@ forgetest_async!(script_zk_broadcast_raw_create2_deployer, |prj, cmd| {
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
 
-    
-
     let _ = cmd
         .args([
             "create",
@@ -335,7 +333,7 @@ forgetest_async!(script_zk_broadcast_raw_create2_deployer, |prj, cmd| {
         .get_output()
         .stdout_lossy();
 
-    // cmd.forge_fuse();
+    cmd.forge_fuse();
 
     prj.add_script(
         "SimpleScript.s.sol",
@@ -368,8 +366,11 @@ contract SimpleScript is Script {
         "--broadcast",
         "--slow",
         "--non-interactive",
-        "SimpleScript.s.sol",
-    ]);
+        "SimpleScript",
+    ])
+    .assert_success()
+    .get_output()
+    .stdout_lossy();
 
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))
@@ -379,7 +380,14 @@ contract SimpleScript is Script {
 
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
     let txns = json["transactions"].as_array().expect("broadcastable txs");
+    
+    // check that the txs have the correct function and contract address
     assert_eq!(txns.len(), 1);
+    txns[0]["function"].as_str().expect("function name").contains("increment");
+    txns[0]["contractAddress"]
+        .as_str()
+        .expect("contract address")
+        .contains("0x9086c95769c51e15d6a77672251cf13ce7ebf3ae");
 
     // check that the txs have strictly monotonically increasing nonces
     assert!(txns.iter().filter_map(|tx| tx["nonce"].as_u64()).is_sorted_by(|a, b| a + 1 == *b));
