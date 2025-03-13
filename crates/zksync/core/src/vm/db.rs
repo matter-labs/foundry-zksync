@@ -4,7 +4,7 @@
 /// in the Database object.
 /// This code doesn't do any mutatios to Database: after each transaction run, the Revm
 /// is usually collecting all the diffs - and applies them to database itself.
-use std::{collections::HashMap as sHashMap, fmt::Debug};
+use std::{collections::HashMap as sHashMap, fmt::Debug, sync::LazyLock};
 
 use alloy_primitives::{map::HashMap, Address, U256 as rU256};
 use foundry_cheatcodes_common::record::RecordAccess;
@@ -27,6 +27,31 @@ use super::storage_recorder::{AccountAccess, AccountAccesses, CallType, StorageA
 
 /// Default chain id
 pub(crate) const DEFAULT_CHAIN_ID: u32 = 31337;
+
+// NOTE: we use vec instead of hashmap because the loaded [BOOTLOADER] and [0 address] share the
+// same bytecode, thus they would share the same bytecode hash (key in map) resulting in the first
+// `DeployedContract` to be discarded from the resulting map. This is a problem when we compute the
+// override keys as the discarded contract won't have an associated generated override
+// TL;DR: we want to keep _all_ instances of `DeployedContract` even if they share the same bytecode
+// hash
+struct DeployedSystemContract {
+    deployed_contract: zksync_types::block::DeployedContract,
+    deployed_contract_hash: H256,
+}
+static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLock::new(|| {
+    let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
+        &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
+        false,
+    );
+
+    contracts
+        .into_iter()
+        .map(|contract| DeployedSystemContract {
+            deployed_contract_hash: hash_bytecode(&contract.bytecode),
+            deployed_contract: contract,
+        })
+        .collect()
+});
 
 pub struct ZKVMData<'a, DB: Database> {
     ecx: &'a mut InnerEvmContext<DB>,
@@ -87,42 +112,42 @@ where
 
     /// Create a new instance of [ZKEVMData] with system contracts.
     pub fn new_with_system_contracts(ecx: &'a mut EvmContext<DB>, chain_id: L2ChainId) -> Self {
-        let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
-            &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
-            false,
-        );
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let mut override_keys = HashMap::default();
-        contracts
+        DEPLOYED_SYSTEM_CONTRACTS
             .iter()
-            .map(|contract| {
-                let deployer_code_key = get_code_key(contract.account_id.address());
-                StorageLog::new_write_log(deployer_code_key, hash_bytecode(&contract.bytecode))
+            .map(|c| {
+                let deployer_code_key = get_code_key(c.deployed_contract.account_id.address());
+                StorageLog::new_write_log(deployer_code_key, c.deployed_contract_hash)
             })
             .chain(system_context_init_log)
             .for_each(|log| {
                 (log.is_write()).then_some(override_keys.insert(log.key, log.value));
             });
 
-        let mut factory_deps = contracts
-            .into_iter()
-            .map(|contract| (hash_bytecode(&contract.bytecode), contract.bytecode))
-            .collect::<HashMap<_, _>>();
-        factory_deps.extend(ecx.journaled_state.state.values().flat_map(|account| {
-            if account.info.is_empty_code_hash() {
-                None
-            } else {
-                account
-                    .info
-                    .code
-                    .as_ref()
-                    .map(|code| (H256::from(account.info.code_hash.0), code.bytecode().to_vec()))
-            }
-        }));
+        let system_factory_deps = DEPLOYED_SYSTEM_CONTRACTS
+            .iter()
+            .map(|c| (c.deployed_contract_hash, c.deployed_contract.bytecode.clone()));
+
+        let state_to_factory_deps =
+            ecx.journaled_state.state.values().flat_map(|account| {
+                if account.info.is_empty_code_hash() {
+                    None
+                } else {
+                    account.info.code.as_ref().map(|code| {
+                        (H256::from(account.info.code_hash.0), code.bytecode().to_vec())
+                    })
+                }
+            });
+
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
-        factory_deps.insert(empty_code_hash, empty_code);
+
+        let factory_deps = system_factory_deps
+            .chain(state_to_factory_deps)
+            .chain([(empty_code_hash, empty_code)])
+            .collect();
 
         Self {
             ecx,
