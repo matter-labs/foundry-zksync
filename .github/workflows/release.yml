@@ -174,7 +174,7 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          RUSTFLAGS='-C target-feature=+crt-static' OPENSSL_STATIC=1 cross build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          cross build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
