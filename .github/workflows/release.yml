@@ -265,15 +265,15 @@ jobs:
       #       ${{ steps.artifacts.outputs.file_name }}
       #       ${{ steps.man.outputs.foundry_man }}
 
-  retry-on-failure:
-    if: failure() && fromJSON(github.run_attempt) < 3
-    needs: [release]
-    runs-on: ubuntu-latest
-    steps:
-      - env:
-          GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run retry.yml -F run_id=${{ github.run_id }}
+  # retry-on-failure:
+  #   if: failure() && fromJSON(github.run_attempt) < 3
+  #   needs: [release]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - env:
+  #         GH_REPO: ${{ github.repository }}
+  #         GH_TOKEN: ${{ github.token }}
+  #       run: gh workflow run retry.yml -F run_id=${{ github.run_id }}
 
   cleanup:
     name: Release cleanup
@@ -301,18 +301,18 @@ jobs:
             await prunePrereleases({github, context})
 
   # If any of the jobs fail, this will create a high-priority issue to signal so.
-  issue:
-    name: Open an issue
-    runs-on: ubuntu-latest
-    needs: [ prepare, retry-on-failure, cleanup ]
-    if: failure()
-    steps:
-      - uses: actions/checkout@v4
-      - uses: JasonEtco/create-an-issue@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WORKFLOW_URL: |
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        with:
-          update_existing: true
-          filename: .github/RELEASE_FAILURE_ISSUE_TEMPLATE.md
+  # issue:
+  #   name: Open an issue
+  #   runs-on: ubuntu-latest
+  #   needs: [ prepare, retry-on-failure, cleanup ]
+  #   if: failure()
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: JasonEtco/create-an-issue@v2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         WORKFLOW_URL: |
+  #           ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+  #       with:
+  #         update_existing: true
+  #         filename: .github/RELEASE_FAILURE_ISSUE_TEMPLATE.md
