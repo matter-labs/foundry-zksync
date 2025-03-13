@@ -234,7 +234,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
 
     fn transact_from_tx(
         &mut self,
-        tx: &TransactionRequest,
+        transaction: &TransactionRequest,
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
@@ -1352,7 +1352,7 @@ impl DatabaseExt for Backend {
 
     fn transact_from_tx(
         &mut self,
-        tx: &TransactionRequest,
+        transaction: &TransactionRequest,
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,

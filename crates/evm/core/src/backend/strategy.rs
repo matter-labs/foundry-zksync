@@ -1,7 +1,8 @@
 use std::{any::Any, fmt::Debug};
 
-use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use crate::InspectorExt;
+
+use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_primitives::{Address, U256};
 use eyre::{Context, Result};
 use revm::{
@@ -16,6 +17,7 @@ pub struct BackendStrategyForkInfo<'a> {
     pub active_type: ForkType,
     pub target_type: ForkType,
 }
+
 /// Context for [BackendStrategyRunner].
 pub trait BackendStrategyContext: Debug + Send + Sync + Any {
     /// Clone the strategy context.

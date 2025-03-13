@@ -225,22 +225,17 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
         .expect("No rich wallets available");
 
     prj.add_source(
-        "Counter1.sol",
+        "Counter.sol",
         r#"
-    pragma solidity ^0.8.0;
-
-    contract Counter1 {
-        uint256 public count;
-        
-        function increment() external {
-            count++;
+        pragma solidity ^0.8.0;
+    
+        contract Counter {
+            uint256 public count;
+            function increment() external {
+                count++;
+            }
         }
-
-        function get_count() external view returns (uint256) {
-            return count;
-        }
-    }
-    "#,
+        "#,
     )
     .unwrap();
 
@@ -248,7 +243,7 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
     let _ = cmd
         .args([
             "create",
-            "src/Counter1.sol:Counter1",
+            "src/Counter.sol:Counter",
             "--zksync",
             "--private-key",
             private_key,
@@ -262,7 +257,7 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
     cmd.cast_fuse().args([
         "call",
         "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7",
-        "get_count()(uint256)",
+        "count()(uint256)",
         "--zksync",
         "--rpc-url",
         &url,
@@ -276,7 +271,6 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
         "Foo",
         r#"
 import "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
 contract SimpleScript is Script {
     function run() external {
         // zk raw transaction
@@ -312,7 +306,7 @@ contract SimpleScript is Script {
     cmd.cast_fuse().args([
         "call",
         "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7",
-        "get_count()(uint256)",
+        "count()(uint256)",
         "--zksync",
         "--rpc-url",
         &url,
