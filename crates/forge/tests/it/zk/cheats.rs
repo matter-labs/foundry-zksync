@@ -405,7 +405,6 @@ contract SimpleScript is Script {
     let txns = json["transactions"].as_array().expect("broadcastable txs");
 
     let broadcasted = &txns[0];
-    println!("{:?}", broadcasted);
 
     // check that the txs have the correct function and contract address
     assert_eq!(txns.len(), 1);

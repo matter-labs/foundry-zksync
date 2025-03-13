@@ -1352,7 +1352,7 @@ impl DatabaseExt for Backend {
 
     fn transact_from_tx(
         &mut self,
-        transaction: &TransactionRequest,
+        tx: &TransactionRequest,
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
