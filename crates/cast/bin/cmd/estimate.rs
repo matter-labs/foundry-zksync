@@ -115,7 +115,7 @@ impl EstimateArgs {
         let gas = if zk_tx.has_zksync_args() || zk_force {
             zksync::estimate_gas(zk_tx, tx, code, &config).await?
         } else {
-            provider.estimate_gas(&tx).block(block.unwrap_or_default()).await?
+            provider.estimate_gas(tx).block(block.unwrap_or_default()).await?
         };
 
         sh_println!("{gas}")?;
