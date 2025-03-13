@@ -735,6 +735,7 @@ impl Cheatcodes {
         let curr_depth = ecx.journaled_state.depth();
         let ecx_inner = &mut ecx.inner;
         let gas = Gas::new(input.gas_limit());
+        let curr_depth = ecx.journaled_state.depth();
 
         // Apply our prank
         if let Some(prank) = &self.get_prank(curr_depth) {
