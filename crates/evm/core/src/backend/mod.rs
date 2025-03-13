@@ -8,15 +8,13 @@ use crate::{
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
-use alloy_network::{eip2718::Decodable2718, AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
+use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
 use alloy_primitives::{keccak256, map::HashMap, uint, Address, Bytes, B256, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
-use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
 use eyre::Context;
 use foundry_common::{
-    is_known_system_sender, provider::try_get_zksync_http_provider, TransactionMaybeSigned,
-    SYSTEM_TRANSACTION_TYPE,
+    is_known_system_sender, provider::try_get_zksync_http_provider, SYSTEM_TRANSACTION_TYPE,
 };
 pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use itertools::Itertools;
@@ -241,14 +239,6 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<()>;
-
-    fn transact_from_tx_zk(
-        &self,
-        data: &Bytes,
-        env: Env,
-        journaled_state: &mut JournaledState,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionMaybeSigned>;
 
     /// Returns the `ForkId` that's currently used in the database, if fork mode is on
     fn active_fork_id(&self) -> Option<LocalForkId>;
@@ -1385,59 +1375,6 @@ impl DatabaseExt for Backend {
         update_state(&mut journaled_state.state, self, None)?;
 
         Ok(())
-    }
-
-    fn transact_from_tx_zk(
-        &self,
-        data: &Bytes,
-        mut env: Env,
-        journaled_state: &mut JournaledState,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionMaybeSigned> {
-        let envelope: ZkTxEnvelope =
-            ZkTxEnvelope::decode_2718(&mut data.as_ref()).wrap_err("Failed to decode tx")?;
-
-        let tx_712 = envelope.as_eip712();
-        let parts = tx_712.unwrap().clone().into_parts().0;
-
-        let tx: TransactionRequest = TransactionRequest {
-            from: Some(parts.from),
-            max_fee_per_gas: Some(parts.max_fee_per_gas),
-            max_priority_fee_per_gas: Some(parts.max_priority_fee_per_gas),
-            max_fee_per_blob_gas: Default::default(),
-            gas: Some(parts.gas),
-            input: Some(parts.input).into(),
-            chain_id: Some(parts.chain_id),
-            access_list: Default::default(),
-            transaction_type: Default::default(),
-            blob_versioned_hashes: Default::default(),
-            sidecar: Default::default(),
-            authorization_list: Default::default(),
-            to: Some(alloy_primitives::TxKind::Call(parts.to)),
-            value: Some(parts.value),
-            nonce: Some(parts.nonce.as_limbs()[0]),
-            gas_price: Default::default(),
-        };
-
-        trace!(?tx, "execute signed transaction");
-        let mut db = self.clone();
-
-        db.commit(journaled_state.state.clone());
-
-        let res = {
-            configure_tx_req_env(&mut env, &tx, None)?;
-            let env = self.env_with_handler_cfg(env);
-
-            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
-            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
-            evm.transact()?
-        };
-
-        db.commit(res.state);
-
-        update_state(&mut journaled_state.state, &mut db, None)?;
-
-        Ok(tx.into())
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {

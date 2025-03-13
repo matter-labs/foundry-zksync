@@ -225,14 +225,19 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
         .expect("No rich wallets available");
 
     prj.add_source(
-        "Counter.sol",
+        "Counter1.sol",
         r#"
     pragma solidity ^0.8.0;
 
-    contract Counter {
+    contract Counter1 {
         uint256 public count;
+        
         function increment() external {
             count++;
+        }
+
+        function get_count() external view returns (uint256) {
+            return count;
         }
     }
     "#,
@@ -243,7 +248,7 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
     let _ = cmd
         .args([
             "create",
-            "src/Counter.sol:Counter",
+            "src/Counter1.sol:Counter1",
             "--zksync",
             "--private-key",
             private_key,
@@ -253,6 +258,17 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer, |prj, cmd| {
         .assert_success()
         .get_output()
         .stdout_lossy();
+
+    cmd.cast_fuse().args([
+        "call",
+        "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7",
+        "get_count()(uint256)",
+        "--zksync",
+        "--rpc-url",
+        &url,
+    ]);
+
+    let starting_value = cmd.assert_success().get_output().stdout_lossy();
 
     cmd.forge_fuse();
 
@@ -266,9 +282,9 @@ contract SimpleScript is Script {
         // zk raw transaction
         vm.startBroadcast();
         // This raw transaction comes from cast mktx of increment() to Counter contract
-        // `cast mktx "0x9086C95769C51E15D6a77672251Cf13Ce7ebf3AE" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 1`
+        // `cast mktx "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 1`
         vm.broadcastRawTransaction(
-            hex"71f88501808402b275d08304d718949086c95769c51e15d6a77672251cf13ce7ebf3ae8084d09de08a01a00d798053cc7a75a78d49adc0b893d9ad91f5301bb264eb2848979859fc366dc7a06469714a3ec85003c3f52ff668299c3c01e0a43be5ec0529cc204fd53be1629e82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
+            hex"71f88501808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a01a021cfba0a1ac7d72f2b0f052a85004282f18b2a35a8451773bb8b25446a5470aba01e81a389b81f72c7dad310998d5e677727b1ce9996e512124d52fb26ea43430b82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
         );
         vm.stopBroadcast();
     }
@@ -292,6 +308,20 @@ contract SimpleScript is Script {
 
     let output = cmd.assert_success().get_output().stdout_lossy();
     assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
+
+    cmd.cast_fuse().args([
+        "call",
+        "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7",
+        "get_count()(uint256)",
+        "--zksync",
+        "--rpc-url",
+        &url,
+    ]);
+
+    let after_increment = cmd.assert_success().get_output().stdout_lossy();
+
+    assert_eq!(starting_value.trim(), "0"); // trim gets rid o the newline character
+    assert_eq!(after_increment.trim(), "1");
 });
 
 forgetest_async!(script_zk_broadcast_raw_create2_deployer, |prj, cmd| {
@@ -380,16 +410,26 @@ contract SimpleScript is Script {
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
     let txns = json["transactions"].as_array().expect("broadcastable txs");
 
+    let broadcasted = &txns[0];
+    println!("{:?}", broadcasted);
+
     // check that the txs have the correct function and contract address
     assert_eq!(txns.len(), 1);
-    txns[0]["function"].as_str().expect("function name").contains("increment");
-    txns[0]["contractAddress"]
+    broadcasted["function"].as_str().expect("function name").contains("increment");
+    broadcasted["contractAddress"]
         .as_str()
         .expect("contract address")
         .contains("0x9086c95769c51e15d6a77672251cf13ce7ebf3ae");
 
-    // check that the txs have strictly monotonically increasing nonces
-    assert!(txns.iter().filter_map(|tx| tx["nonce"].as_u64()).is_sorted_by(|a, b| a + 1 == *b));
+    broadcasted["transaction"]["from"]
+        .as_str()
+        .expect("from")
+        .contains("0xbc989fde9e54cad2ab4392af6df60f04873a033a");
+    broadcasted["transaction"]["to"]
+        .as_str()
+        .expect("to")
+        .contains("0x9086c95769c51e15d6a77672251cf13ce7ebf3ae");
+    broadcasted["transaction"]["value"].as_str().expect("value").contains("0x0");
 });
 
 fn setup_deploy_prj(prj: &mut TestProject) {

@@ -1,7 +1,11 @@
 use std::any::TypeId;
 
+use alloy_eips::eip2718::Decodable2718;
 use alloy_primitives::U256;
+use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::SolValue;
+use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
+use eyre::Context;
 use foundry_cheatcodes::{
     make_acc_non_empty, BroadcastableTransaction, CheatcodesExecutor, CheatsCtxt, DealRecord,
     DynCheatcode, Error, Result,
@@ -336,16 +340,43 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             t if using_zk_vm && is::<broadcastRawTransactionCall>(t) => {
                 let broadcastRawTransactionCall { data } =
                     cheatcode.as_any().downcast_ref().unwrap();
-                let tx = ccx.ecx.db.transact_from_tx_zk(
-                    data,
-                    (*ccx.ecx.env).clone(),
+
+                let envelope: ZkTxEnvelope = ZkTxEnvelope::decode_2718(&mut data.as_ref())
+                    .wrap_err("Failed to decode tx")?;
+
+                let tx_712 = envelope.as_eip712();
+                let parts = tx_712.unwrap().clone().into_parts().0;
+
+                let tx: TransactionRequest = TransactionRequest {
+                    from: Some(parts.from),
+                    max_fee_per_gas: Some(parts.max_fee_per_gas),
+                    max_priority_fee_per_gas: Some(parts.max_priority_fee_per_gas),
+                    max_fee_per_blob_gas: Default::default(),
+                    gas: Some(parts.gas),
+                    input: Some(parts.input).into(),
+                    chain_id: Some(parts.chain_id),
+                    access_list: Default::default(),
+                    transaction_type: Default::default(),
+                    blob_versioned_hashes: Default::default(),
+                    sidecar: Default::default(),
+                    authorization_list: Default::default(),
+                    to: Some(alloy_primitives::TxKind::Call(parts.to)),
+                    value: Some(parts.value),
+                    nonce: Some(parts.nonce.as_limbs()[0]),
+                    gas_price: Default::default(),
+                };
+
+                ccx.ecx.db.transact_from_tx(
+                    &tx,
+                    *ccx.ecx.env.clone(),
                     &mut ccx.ecx.journaled_state,
                     &mut *executor.get_inspector(ccx.state),
                 )?;
+
                 if ccx.state.broadcast.is_some() {
                     ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: ccx.db.active_fork_url(),
-                        transaction: tx,
+                        transaction: tx.try_into().wrap_err("Failed to parse MaybeSigned tx")?,
                     });
                 }
                 Ok(Default::default())

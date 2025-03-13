@@ -9,9 +9,8 @@ use crate::{
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
-use alloy_primitives::{Address, Bytes, B256, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
-use foundry_common::TransactionMaybeSigned;
 use foundry_fork_db::DatabaseError;
 use revm::{
     db::DatabaseRef,
@@ -197,12 +196,12 @@ impl DatabaseExt for CowBackend<'_> {
 
     fn transact_from_tx(
         &mut self,
-        tx: &TransactionRequest,
+        transaction: &TransactionRequest,
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<()> {
-        self.backend_mut(&env).transact_from_tx(tx, env, journaled_state, inspector)
+        self.backend_mut(&env).transact_from_tx(transaction, env, journaled_state, inspector)
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {
@@ -280,16 +279,6 @@ impl DatabaseExt for CowBackend<'_> {
 
     fn get_test_contract_address(&self) -> Option<Address> {
         self.backend.get_test_contract_address()
-    }
-
-    fn transact_from_tx_zk(
-        &self,
-        data: &Bytes,
-        env: Env,
-        journaled_state: &mut JournaledState,
-        inspector: &mut dyn InspectorExt,
-    ) -> eyre::Result<TransactionMaybeSigned> {
-        self.backend.transact_from_tx_zk(data, env, journaled_state, inspector)
     }
 }
 
