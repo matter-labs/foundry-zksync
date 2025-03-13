@@ -491,6 +491,12 @@ struct InnerZkVmResult {
     recorded_immutables: rHashMap<H160, rHashMap<rU256, FixedBytes<32>>>,
 }
 
+static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = LazyLock::new(|| {
+    SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false)
+        .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
+        .clone()
+});
+
 fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     l2_tx: L2Tx,
     storage: StoragePtr<StorageView<S>>,
@@ -500,14 +506,11 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 ) -> InnerZkVmResult {
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
 
-    let system_contracts = SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false);
-    let baseline_contracts =
-        system_contracts.contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false);
-    let system_env = create_system_env(baseline_contracts.clone(), chain_id);
+    let system_env = create_system_env(BASELINE_CONTRACTS.clone(), chain_id);
 
-    let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env.clone(), system_env, storage.clone());
+    let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env, system_env, storage.clone());
 
-    let tx: Transaction = l2_tx.clone().into();
+    let tx: Transaction = l2_tx.into();
     let initiator = tx.initiator_account();
 
     let call_tracer_result = Arc::default();
@@ -588,11 +591,19 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         bootloader_debug,
     };
 
-    let mut formatter = Formatter::new();
+    let deployed_bytecode_hashes = tx_result
+        .logs
+        .events
+        .iter()
+        .filter(|event| event.address == CONTRACT_DEPLOYER_ADDRESS)
+        .map(|event| {
+            (
+                event.indexed_topics.get(3).cloned().unwrap_or_default().to_h160(),
+                event.indexed_topics.get(2).cloned().unwrap_or_default(),
+            )
+        })
+        .collect();
 
-    formatter.print_vm_details(&tx_result);
-
-    info!("=== Console Logs: ");
     let log_parser = ConsoleLogParser::new();
     let console_logs = log_parser.get_logs(&call_traces, true);
 
@@ -604,34 +615,32 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
             value: log.data.data.to_vec(),
         });
     }
-    let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
-    let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
-    info!("=== Calls: ");
-    for (i, call) in call_traces.iter().enumerate() {
-        let is_last = i == call_traces.len() - 1;
-        formatter.print_call(
-            initiator,
-            None,
-            call,
-            is_last,
-            &ShowCalls::All,
-            show_outputs,
-            resolve_hashes,
-        );
-    }
 
-    let mut deployed_bytecode_hashes = HashMap::<H160, H256>::default();
-    info!("==== {}", format!("{} events", tx_result.logs.events.len()));
-    for (i, event) in tx_result.logs.events.iter().enumerate() {
-        let is_last = i == tx_result.logs.events.len() - 1;
-        if event.address == CONTRACT_DEPLOYER_ADDRESS {
-            deployed_bytecode_hashes.insert(
-                event.indexed_topics.get(3).cloned().unwrap_or_default().to_h160(),
-                event.indexed_topics.get(2).cloned().unwrap_or_default(),
+    if tracing::enabled!(target: "anvil_zksync_core::formatter", tracing::Level::INFO) {
+        let mut formatter = Formatter::new();
+        let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
+        let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
+
+        formatter.print_vm_details(&tx_result);
+
+        for (i, call) in call_traces.iter().enumerate() {
+            let is_last = i == call_traces.len() - 1;
+            formatter.print_call(
+                initiator,
+                None,
+                call,
+                is_last,
+                &ShowCalls::All,
+                show_outputs,
+                resolve_hashes,
             );
         }
 
-        formatter.print_event(event, resolve_hashes, is_last);
+        for (i, event) in tx_result.logs.events.iter().enumerate() {
+            let is_last = i == tx_result.logs.events.len() - 1;
+
+            formatter.print_event(event, resolve_hashes, is_last);
+        }
     }
 
     let bytecodes = compressed_bytecodes

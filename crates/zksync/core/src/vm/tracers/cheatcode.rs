@@ -235,7 +235,12 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         storage: StoragePtr<S>,
     ) {
         self.farcall_handler.track_call_actions(&state, &data);
-        let tx_tracking = self.farcall_handler.track_tx_execution(&state, &data, memory);
+
+        // We try to read calldata as late as possible since it's a very
+        // slow operation. When we do read it, we do it only once per call
+        // thru this cell
+        let calldata = std::cell::LazyCell::new(|| get_calldata(&state, memory));
+        let tx_tracking = self.farcall_handler.track_tx_execution(&state, &data, &calldata);
 
         if self.call_context.record_storage_accesses {
             // Record account accesses
@@ -274,7 +279,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                         .unwrap_or_else(|| current.msg_sender.to_address());
 
                     let value = U256::from(current.context_u128_value);
-                    let calldata = get_calldata(&state, memory);
                     let to = current.code_address;
 
                     let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS &&
@@ -318,7 +322,7 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
 
                         (CallType::Create(bytecode_hash), address, constructor_input.to_vec())
                     } else {
-                        (CallType::Call, to.to_address(), calldata)
+                        (CallType::Call, to.to_address(), calldata.clone())
                     };
 
                     match call_status {
@@ -346,8 +350,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
             if let Some(expected_calls_for_target) =
                 self.expected_calls.get_mut(&current.code_address.to_address())
             {
-                let calldata = get_calldata(&state, memory);
-
                 // We skip recording the base call for `expectCall` cheatcode that initiated this
                 // transaction. The initial call is recorded in revm when it was
                 // made, and before being dispatched to zkEVM.
@@ -355,7 +357,7 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     self.call_context
                         .input
                         .as_ref()
-                        .map(|input| input.0.to_vec() == calldata)
+                        .map(|input| input.0.as_ref() == calldata.as_slice())
                         .unwrap_or_default();
 
                 if !is_base_call {
@@ -381,7 +383,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         // Handle mocked calls
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
-            let call_input = get_calldata(&state, memory);
             let call_contract = current.code_address.to_address();
             let call_value = U256::from(current.context_u128_value).to_ru256();
 
@@ -389,7 +390,7 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
             if let Some(mocks) = self.mocked_calls.get_mut(&call_contract) {
                 had_mocks = true;
                 let ctx = MockCallDataContext {
-                    calldata: Bytes::from(call_input.clone()),
+                    calldata: Bytes::copy_from_slice(&calldata),
                     value: Some(call_value),
                 };
                 if let Some(return_data_queue) = match mocks.get_mut(&ctx) {
@@ -397,7 +398,7 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     None => mocks
                         .iter_mut()
                         .find(|(mock, _)| {
-                            call_input.get(..mock.calldata.len()) == Some(&mock.calldata[..]) &&
+                            calldata.get(..mock.calldata.len()) == Some(&mock.calldata[..]) &&
                                 mock.value.is_none_or(|value| value == call_value)
                         })
                         .map(|(_, v)| v),
@@ -412,7 +413,7 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                         let return_data = return_data.data.clone().to_vec();
                         tracing::info!(
                             "returning mocked value {:?} for {:?}",
-                            hex::encode(&call_input),
+                            hex::encode(calldata.as_slice()),
                             hex::encode(&return_data)
                         );
                         self.farcall_handler.set_immediate_return(return_data);
@@ -423,7 +424,7 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
 
             // if we get here there was no matching mock call,
             // so we check if there's no code at the mocked address
-            if self.has_empty_code(&storage, call_contract, &call_input, call_value) {
+            if self.has_empty_code(&storage, call_contract, calldata.as_slice(), call_value) {
                 // issue a more targeted
                 // error if we already had some mocks there
                 let had_mocks_message =
@@ -431,7 +432,7 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
 
                 tracing::error!(
                     target = ?call_contract,
-                    calldata = hex::encode(&call_input),
+                    calldata = hex::encode(calldata.as_slice()),
                     "call may fail or behave unexpectedly due to empty code{}",
                     had_mocks_message
                 );
@@ -443,7 +444,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         // TODO remove this and verify once we are stable.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.get_current_stack();
-            let calldata = get_calldata(&state, memory);
 
             if current.code_address == CONTRACT_DEPLOYER_ADDRESS &&
                 calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
@@ -462,7 +462,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         // correct nonce update in the bootloader. So we handle it by modifying the storage
         // post-execution.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
 
             if current.msg_sender == BOOTLOADER_ADDRESS &&
@@ -477,7 +476,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
 
         // Override block number and timestamp for the transaction
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS {
@@ -497,7 +495,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         // `L1BatchEnv` but a value of `0` is auto-translated to `1`, so we ensure that it will
         // always be `0`.
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
@@ -511,7 +508,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
 
         // Override blockhash
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-            let calldata = get_calldata(&state, memory);
             let current = state.vm_local_state.callstack.current;
 
             if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
@@ -531,7 +527,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         // record immutables for an address during creates
         if self.call_context.is_create {
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-                let calldata = get_calldata(&state, memory);
                 let current = state.vm_local_state.callstack.current;
 
                 if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS &&
