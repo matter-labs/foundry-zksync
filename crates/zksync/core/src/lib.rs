@@ -85,18 +85,6 @@ pub fn hash_bytecode(bytecode: &[u8]) -> H256 {
     BytecodeHash::for_bytecode(bytecode).value()
 }
 
-// TODO: The approach towards bytecode has changed in core, so the same function was removed there.
-// There is a chance that this function is no longer needed.
-pub(crate) fn be_words_to_bytes(words: &[U256]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(words.len() * 32);
-    for word in words {
-        let mut payload = [0u8; 32];
-        word.to_big_endian(&mut payload);
-        bytes.extend_from_slice(&payload);
-    }
-    bytes
-}
-
 /// Represents additional data for ZK transactions that require a paymaster.
 #[derive(Clone, Debug, Default)]
 pub struct ZkPaymasterData {
