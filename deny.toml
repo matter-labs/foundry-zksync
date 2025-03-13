@@ -110,7 +110,6 @@ unknown-git = "deny"
 allow-git = [
     "https://github.com/foundry-rs/foundry",
     "https://github.com/nbaztec/zksync-telemetry",
-    "https://github.com/nbaztec/alloy-zksync",
     "https://github.com/Romsters/posthog-rs",
 ]
 

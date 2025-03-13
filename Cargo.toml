@@ -332,7 +332,11 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.128", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
 soldeer-commands = "=0.5.2"
+
+# NOTE(zk): we cannot update this to 0.27 currently due to alloy-chains updating this in their patch version bump
+# We need to migrate over all the transitive dependencies to a more recent alloy version before we can bump this
 strum = "0.26"
+
 tempfile = "3.13"
 tikv-jemallocator = "0.6"
 tokio = "1"
@@ -383,6 +387,3 @@ yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
 
 [patch."https://github.com/matter-labs/zksync-telemetry"]
 zksync_telemetry = { git = "https://github.com/nbaztec/zksync-telemetry", branch = "nish-unpin-serde-patch" }
-
-[patch.crates-io]
-alloy-zksync = { git = "https://github.com/nbaztec/alloy-zksync", branch = "remove-openssl" } # pending 0.12.1 release
