@@ -215,16 +215,32 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
 });
 
 forgetest_async!(test_zk_broadcast_raw_create2_deployer_contract, |prj, cmd| {
-    util::initialize(prj.root());
+    foundry_test_utils::util::initialize(prj.root());
     let node = ZkSyncNode::start().await;
     let url = node.url();
+
     let (_, private_key) = ZkSyncNode::rich_wallets()
         .next()
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
 
+    prj.add_source(
+        "Counter.sol",
+        r#"
+        pragma solidity ^0.8.0;
+    
+        contract Counter {
+            uint256 public count;
+            function increment() external {
+                count++;
+            }
+        }
+        "#,
+    )
+    .unwrap();
+
     //deploy
-    let out = cmd
+    let _ = cmd
         .args([
             "create",
             "src/Counter.sol:Counter",
@@ -238,84 +254,49 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer_contract, |prj, cmd| {
         .get_output()
         .stdout_lossy();
 
-    println!("ooooo {} <<<<<<<<<<<<<<<<<", out);
-
-    cmd.cast_fuse();
-
-    // let code = cmd
-    //     .cast_fuse()
-    //     .args(["getcode", "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7", "--rpc-url", &url])
-    //     .assert_success()
-    //     .get_output()
-    //     .stdout_lossy();
-
-    // println!("Código del contrato: {}", code);
-
-    cmd.cast_fuse();
-
-    // the rpc url should be dynamic as well
-    let raw_tx = cmd
-        .cast_fuse()
-        .args([
-            "mktx",
-            "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7",
-            "increment()",
-            "--rpc-url",
-            &url,
-            "--private-key",
-            private_key,
-            "--zksync",
-            "--nonce",
-            "1",
-        ])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
-
-    println!("url: {} test_zk_cast_mktx {}", url, raw_tx);
-
-    // remove the 0x at the beginning of the raw_tx
-    let raw_tx_after = raw_tx.trim_start_matches("0x");
-    //remove the \n at the end of the raw_tx
-    let raw_tx_after = raw_tx_after.trim_end_matches("\n");
-    println!("raw_tx: {} \n raw_tx_after {}", raw_tx, raw_tx_after);
-
     cmd.forge_fuse();
 
-    let script = r#"
-import "forge-std/Test.sol";
+    prj.add_script(
+        "Foo",
+        r#"
+import "forge-std/Script.sol";
 import {Counter} from "../src/Counter.sol";
+contract SimpleScript is Script {
+    function run() external {
+        // zk raw transaction
+        vm.startBroadcast();
+        Counter counter = Counter(0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7);
+        uint256 prev = counter.count();
 
-contract ZkBroadcastRaw is Test {
-function testJuani() public {
+        // This raw transaction comes from cast mktx of increment() to Counter contract
+        // `cast mktx "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 2`
+        vm.broadcastRawTransaction(
+            hex"71f88502808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a80a02a1409aaf433e81541b593d44b82caff60ca164c851e492126c38dca73bd6b09a02ca9753b48b67ef0bd585c63fbfbced44d4e47ddbe547338ab7569d5815cbc6382010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
+        );
+        require(counter.count() == prev + 1);
 
-vm.createSelectFork("{{url}}");
-
-
-Counter counter = Counter(0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7);
-uint256 initial = counter.number();
-
-// This raw transaction comes from cast mktx of increment() to Counter contract
-// `cast mktx "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 1`
-vm.broadcastRawTransaction(
-    hex"{{raw_tx}}"
-);
-
-assertEq(initial + 1, counter.number());
+        vm.stopBroadcast();
+    }
 }
-}
-"#;
-    let script = script.replace("{{raw_tx}}", &raw_tx_after).replace("{{url}}", &url);
+"#,
+    )
+    .unwrap();
 
-    println!("script: {}", script);
+    cmd.args([
+        "script",
+        "--zksync",
+        "--private-key",
+        private_key,
+        "--rpc-url",
+        &url,
+        "--broadcast",
+        "--slow",
+        "--non-interactive",
+        "SimpleScript",
+    ]);
 
-    prj.add_test("ZkBroadcastRaw.t.sol", script.as_str()).unwrap();
-
-    cmd.args(["test", "-vvvvv", "--zksync", "--evm-version", "shanghai", "--mc", "ZkBroadcastRaw"])
-        // cmd.args(["test", "--zksync", "--rpc-url", &url, "ZkBroadcastRaw"])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
+    let output = cmd.assert_success().get_output().stdout_lossy();
+    assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
 });
 
 forgetest_async!(script_zk_broadcast_raw_create2_deployer, |prj, cmd| {
