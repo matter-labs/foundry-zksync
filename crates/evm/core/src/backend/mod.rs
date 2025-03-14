@@ -232,6 +232,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<()>;
 
+    /// Executes a given TransactionRequest, commits the new state to the DB
     fn transact_from_tx(
         &mut self,
         transaction: &TransactionRequest,

@@ -18,6 +18,7 @@ use foundry_cheatcodes::{
         zkUseFactoryDepCall, zkUsePaymasterCall, zkVmCall, zkVmSkipCall,
     },
 };
+use foundry_common::TransactionMaybeSigned;
 use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
@@ -26,7 +27,7 @@ use revm::interpreter::InstructionResult;
 use tracing::{info, warn};
 
 use crate::cheatcode::{
-    runner::{get_context, utils::get_artifact_code},
+    runner::{get_context, utils::get_artifact_code, WithOtherFields},
     ZksyncCheatcodeInspectorStrategyRunner,
 };
 
@@ -376,7 +377,10 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 if ccx.state.broadcast.is_some() {
                     ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: ccx.db.active_fork_url(),
-                        transaction: tx.try_into().wrap_err("Failed to parse MaybeSigned tx")?,
+                        transaction: TransactionMaybeSigned::new(WithOtherFields {
+                            inner: tx,
+                            other: Default::default(),
+                        }),
                     });
                 }
                 Ok(Default::default())
