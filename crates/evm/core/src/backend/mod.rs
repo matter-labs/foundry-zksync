@@ -797,8 +797,9 @@ impl Backend {
         self.strategy.runner.inspect(self, env, inspector, inspect_ctx)
     }
 
+    /// NOTE(zk): made public to be callable from strategy
     /// Returns the `EnvWithHandlerCfg` with the current `spec_id` set.
-    fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
+    pub fn env_with_handler_cfg(&self, env: Env) -> EnvWithHandlerCfg {
         EnvWithHandlerCfg::new_with_spec_id(Box::new(env), self.inner.spec_id)
     }
 

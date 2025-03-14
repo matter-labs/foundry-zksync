@@ -1,18 +1,24 @@
 use std::any::TypeId;
 
+use alloy_eips::eip2718::Decodable2718;
 use alloy_primitives::U256;
+use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::SolValue;
+use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
+use eyre::Context;
 use foundry_cheatcodes::{
-    make_acc_non_empty, CheatcodesExecutor, CheatsCtxt, DealRecord, DynCheatcode, Error, Result,
+    make_acc_non_empty, BroadcastableTransaction, CheatcodesExecutor, CheatsCtxt, DealRecord,
+    DynCheatcode, Error, Result,
     Vm::{
-        createFork_0Call, createFork_1Call, createFork_2Call, createSelectFork_0Call,
-        createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall, getCodeCall,
-        getNonce_0Call, mockCallRevert_0Call, mockCall_0Call, resetNonceCall, rollCall,
-        selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall, zkGetDeploymentNonceCall,
-        zkGetTransactionNonceCall, zkRegisterContractCall, zkUseFactoryDepCall, zkUsePaymasterCall,
-        zkVmCall, zkVmSkipCall,
+        broadcastRawTransactionCall, createFork_0Call, createFork_1Call, createFork_2Call,
+        createSelectFork_0Call, createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall,
+        getCodeCall, getNonce_0Call, mockCallRevert_0Call, mockCall_0Call, resetNonceCall,
+        rollCall, selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall,
+        zkGetDeploymentNonceCall, zkGetTransactionNonceCall, zkRegisterContractCall,
+        zkUseFactoryDepCall, zkUsePaymasterCall, zkVmCall, zkVmSkipCall,
     },
 };
+use foundry_common::TransactionMaybeSigned;
 use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
@@ -21,7 +27,7 @@ use revm::interpreter::InstructionResult;
 use tracing::{info, warn};
 
 use crate::cheatcode::{
-    runner::{get_context, utils::get_artifact_code},
+    runner::{get_context, utils::get_artifact_code, WithOtherFields},
     ZksyncCheatcodeInspectorStrategyRunner,
 };
 
@@ -331,6 +337,53 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 // We need to return the fork ID.
                 Ok(encoded_fork_id)
+            }
+            t if using_zk_vm && is::<broadcastRawTransactionCall>(t) => {
+                let broadcastRawTransactionCall { data } =
+                    cheatcode.as_any().downcast_ref().unwrap();
+
+                let envelope: ZkTxEnvelope = ZkTxEnvelope::decode_2718(&mut data.as_ref())
+                    .wrap_err("Failed to decode tx")?;
+
+                let tx_712 = envelope.as_eip712();
+                let parts = tx_712.unwrap().clone().into_parts().0;
+
+                let tx: TransactionRequest = TransactionRequest {
+                    from: Some(parts.from),
+                    max_fee_per_gas: Some(parts.max_fee_per_gas),
+                    max_priority_fee_per_gas: Some(parts.max_priority_fee_per_gas),
+                    max_fee_per_blob_gas: Default::default(),
+                    gas: Some(parts.gas),
+                    input: Some(parts.input).into(),
+                    chain_id: Some(parts.chain_id),
+                    access_list: Default::default(),
+                    transaction_type: Default::default(),
+                    blob_versioned_hashes: Default::default(),
+                    sidecar: Default::default(),
+                    authorization_list: Default::default(),
+                    to: Some(alloy_primitives::TxKind::Call(parts.to)),
+                    value: Some(parts.value),
+                    nonce: Some(parts.nonce.as_limbs()[0]),
+                    gas_price: Default::default(),
+                };
+
+                ccx.ecx.db.transact_from_tx(
+                    &tx,
+                    *ccx.ecx.env.clone(),
+                    &mut ccx.ecx.journaled_state,
+                    &mut *executor.get_inspector(ccx.state),
+                )?;
+
+                if ccx.state.broadcast.is_some() {
+                    ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
+                        rpc: ccx.db.active_fork_url(),
+                        transaction: TransactionMaybeSigned::new(WithOtherFields {
+                            inner: tx,
+                            other: Default::default(),
+                        }),
+                    });
+                }
+                Ok(Default::default())
             }
             _ => {
                 // Not custom, just invoke the default behavior
