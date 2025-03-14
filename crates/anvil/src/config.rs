@@ -26,7 +26,7 @@ use alloy_signer_local::{
     coins_bip39::{English, Mnemonic},
     MnemonicBuilder, PrivateKeySigner,
 };
-use alloy_transport::{Transport, TransportError};
+use alloy_transport::TransportError;
 use anvil_server::ServerConfig;
 use eyre::{Context, Result};
 use foundry_common::{
@@ -1149,7 +1149,7 @@ impl NodeConfig {
         };
 
         let block = provider
-            .get_block(BlockNumberOrTag::Number(fork_block_number).into(), false.into())
+            .get_block(BlockNumberOrTag::Number(fork_block_number).into())
             .await
             .wrap_err("failed to get fork block")?;
 
@@ -1340,10 +1340,8 @@ async fn derive_block_and_transactions(
 
             // Get the block pertaining to the fork transaction
             let transaction_block = provider
-                .get_block_by_number(
-                    transaction_block_number.into(),
-                    alloy_rpc_types::BlockTransactionsKind::Full,
-                )
+                .get_block_by_number(transaction_block_number.into())
+                .full()
                 .await?
                 .ok_or_else(|| eyre::eyre!("failed to get fork block by number"))?;
 
@@ -1512,7 +1510,7 @@ pub fn anvil_tmp_dir() -> Option<PathBuf> {
 ///
 /// This fetches the "latest" block and checks whether the `Block` is fully populated (`hash` field
 /// is present). This prevents edge cases where anvil forks the "latest" block but `eth_getBlockByNumber` still returns a pending block, <https://github.com/foundry-rs/foundry/issues/2036>
-async fn find_latest_fork_block<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+async fn find_latest_fork_block<P: Provider<AnyNetwork>>(
     provider: P,
 ) -> Result<u64, TransportError> {
     let mut num = provider.get_block_number().await?;
@@ -1520,7 +1518,7 @@ async fn find_latest_fork_block<P: Provider<T, AnyNetwork>, T: Transport + Clone
     // walk back from the head of the chain, but at most 2 blocks, which should be more than enough
     // leeway
     for _ in 0..2 {
-        if let Some(block) = provider.get_block(num.into(), false.into()).await? {
+        if let Some(block) = provider.get_block(num.into()).await? {
             if !block.header.hash.is_zero() {
                 break;
             }

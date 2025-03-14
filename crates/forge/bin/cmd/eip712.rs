@@ -25,7 +25,7 @@ pub struct Eip712Args {
 impl Eip712Args {
     pub fn run(self) -> Result<()> {
         let config = self.load_config()?;
-        let mut project = config.create_project(false, true)?;
+        let mut project = config.ephemeral_project()?;
         let target_path = dunce::canonicalize(self.target_path)?;
         project.update_output_selection(|selection| {
             *selection = OutputSelection::ast_output_selection();
@@ -57,8 +57,8 @@ impl Eip712Args {
             collector.0
         };
 
-        for (id, _) in structs_in_target {
-            if let Some(resolved) = resolver.resolve_struct_eip712(id)? {
+        for id in structs_in_target.keys() {
+            if let Some(resolved) = resolver.resolve_struct_eip712(*id)? {
                 sh_println!("{resolved}\n")?;
             }
         }

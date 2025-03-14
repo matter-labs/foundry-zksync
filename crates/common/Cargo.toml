@@ -74,11 +74,8 @@ terminal_size.workspace = true
 
 [build-dependencies]
 chrono.workspace = true
-vergen = { workspace = true, features = [
-    "build",
-    "git",
-    "gitcl",
-] }
+vergen = { workspace = true, features = ["build", "git", "gitcl"] }
+cargo_metadata = "0.19.2"
 
 [dev-dependencies]
 similar-asserts.workspace = true

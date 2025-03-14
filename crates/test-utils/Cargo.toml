@@ -23,6 +23,7 @@ alloy-primitives.workspace = true
 alloy-provider.workspace = true
 
 eyre.workspace = true
+futures.workspace = true
 fd-lock = "4.0"
 parking_lot.workspace = true
 regex.workspace = true
@@ -34,12 +35,15 @@ snapbox = { version = "0.6", features = ["json", "regex", "term-svg"] }
 tokio.workspace = true
 tempfile.workspace = true
 tower-http = { version = "0.6.2", features = ["cors"] }
+anyhow = "1.0"
 
 # zk
 zksync_types.workspace = true
+zksync_telemetry.workspace = true
 anvil_zksync_core.workspace = true
 anvil_zksync_api_server.workspace = true
 anvil_zksync_config.workspace = true
+anvil_zksync_l1_sidecar.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

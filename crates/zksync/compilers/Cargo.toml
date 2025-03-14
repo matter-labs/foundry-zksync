@@ -24,13 +24,13 @@ itertools.workspace = true
 walkdir.workspace = true
 reqwest.workspace = true
 yansi.workspace = true
+eyre.workspace = true
 fs4 = "0.8.2"
 dirs = "5"
 path-slash = "0.2"
 
 # zk
 zksync_types.workspace = true
-era-solc.workspace = true
 
 [dev-dependencies]
 similar-asserts.workspace = true

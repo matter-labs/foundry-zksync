@@ -8,7 +8,7 @@ use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
-use alloy_transport::{Transport, TransportError};
+use alloy_transport::TransportError;
 use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
 use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs};
@@ -33,7 +33,7 @@ use foundry_config::{
     merge_impl_figment_convert, Config,
 };
 use serde_json::json;
-use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc};
+use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
 
 mod zksync;
 
@@ -275,7 +275,7 @@ impl CreateArgs {
 
     /// Deploys the contract
     #[allow(clippy::too_many_arguments)]
-    async fn deploy<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+    async fn deploy<P: Provider<AnyNetwork>>(
         self,
         abi: JsonAbi,
         bin: BytecodeObject,
@@ -324,7 +324,7 @@ impl CreateArgs {
         deployer.tx.set_gas_limit(if let Some(gas_limit) = self.tx.gas_limit {
             Ok(gas_limit.to())
         } else {
-            provider.estimate_gas(&deployer.tx).await
+            provider.estimate_gas(deployer.tx.clone()).await
         }?);
 
         if is_legacy {
@@ -335,7 +335,7 @@ impl CreateArgs {
             };
             deployer.tx.set_gas_price(gas_price);
         } else {
-            let estimate = provider.estimate_eip1559_fees(None).await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
+            let estimate = provider.estimate_eip1559_fees().await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
             let priority_fee = if let Some(priority_fee) = self.tx.priority_gas_price {
                 priority_fee.to()
             } else {
@@ -499,7 +499,7 @@ impl figment::Provider for CreateArgs {
 /// compatibility with less-abstract Contracts.
 ///
 /// For full usage docs, see [`DeploymentTxFactory`].
-pub type ContractFactory<P, T> = DeploymentTxFactory<Arc<P>, P, T>;
+pub type ContractFactory<P> = DeploymentTxFactory<P>;
 
 /// Helper which manages the deployment transaction of a smart contract. It
 /// wraps a deployment transaction, and retrieves the contract address output
@@ -508,67 +508,39 @@ pub type ContractFactory<P, T> = DeploymentTxFactory<Arc<P>, P, T>;
 /// Currently, we recommend using the [`ContractDeployer`] type alias.
 #[derive(Debug)]
 #[must_use = "ContractDeploymentTx does nothing unless you `send` it"]
-pub struct ContractDeploymentTx<B, P, T, C> {
+pub struct ContractDeploymentTx<P, C> {
     /// the actual deployer, exposed for overriding the defaults
-    pub deployer: Deployer<B, P, T>,
+    pub deployer: Deployer<P>,
     /// marker for the `Contract` type to create afterwards
     ///
     /// this type will be used to construct it via `From::from(Contract)`
     _contract: PhantomData<C>,
 }
 
-impl<B, P, T, C> Clone for ContractDeploymentTx<B, P, T, C>
-where
-    B: Clone,
-{
+impl<P: Clone, C> Clone for ContractDeploymentTx<P, C> {
     fn clone(&self) -> Self {
         Self { deployer: self.deployer.clone(), _contract: self._contract }
     }
 }
 
-impl<B, P, T, C> From<Deployer<B, P, T>> for ContractDeploymentTx<B, P, T, C> {
-    fn from(deployer: Deployer<B, P, T>) -> Self {
+impl<P, C> From<Deployer<P>> for ContractDeploymentTx<P, C> {
+    fn from(deployer: Deployer<P>) -> Self {
         Self { deployer, _contract: PhantomData }
     }
 }
 
 /// Helper which manages the deployment transaction of a smart contract
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[must_use = "Deployer does nothing unless you `send` it"]
-pub struct Deployer<B, P, T> {
+pub struct Deployer<P> {
     /// The deployer's transaction, exposed for overriding the defaults
     pub tx: WithOtherFields<TransactionRequest>,
-    abi: JsonAbi,
-    client: B,
+    client: P,
     confs: usize,
     timeout: u64,
-    _p: PhantomData<P>,
-    _t: PhantomData<T>,
 }
 
-impl<B, P, T> Clone for Deployer<B, P, T>
-where
-    B: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            tx: self.tx.clone(),
-            abi: self.abi.clone(),
-            client: self.client.clone(),
-            confs: self.confs,
-            timeout: self.timeout,
-            _p: PhantomData,
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<B, P, T> Deployer<B, P, T>
-where
-    B: Borrow<P> + Clone,
-    P: Provider<T, AnyNetwork>,
-    T: Transport + Clone,
-{
+impl<P: Provider<AnyNetwork>> Deployer<P> {
     /// Broadcasts the contract deployment transaction and after waiting for it to
     /// be sufficiently confirmed (default: 1), it returns a tuple with
     /// the [`Contract`](crate::Contract) struct at the deployed contract's address
@@ -582,6 +554,7 @@ where
             .send_transaction(self.tx)
             .await?
             .with_required_confirmations(self.confs as u64)
+            .with_timeout(Some(Duration::from_secs(self.timeout)))
             .get_receipt()
             .await?;
 
@@ -628,43 +601,20 @@ where
 /// println!("{}", contract.address());
 /// # Ok(())
 /// # }
-#[derive(Debug)]
-pub struct DeploymentTxFactory<B, P, T> {
-    client: B,
+#[derive(Clone, Debug)]
+pub struct DeploymentTxFactory<P> {
+    client: P,
     abi: JsonAbi,
     bytecode: Bytes,
     timeout: u64,
-    _p: PhantomData<P>,
-    _t: PhantomData<T>,
 }
 
-impl<B, P, T> Clone for DeploymentTxFactory<B, P, T>
-where
-    B: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            abi: self.abi.clone(),
-            bytecode: self.bytecode.clone(),
-            timeout: self.timeout,
-            _p: PhantomData,
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<P, T, B> DeploymentTxFactory<B, P, T>
-where
-    B: Borrow<P> + Clone,
-    P: Provider<T, AnyNetwork>,
-    T: Transport + Clone,
-{
+impl<P: Provider<AnyNetwork> + Clone> DeploymentTxFactory<P> {
     /// Creates a factory for deployment of the Contract with bytecode, and the
     /// constructor defined in the abi. The client will be used to send any deployment
     /// transaction.
-    pub fn new(abi: JsonAbi, bytecode: Bytes, client: B, timeout: u64) -> Self {
-        Self { client, abi, bytecode, timeout, _p: PhantomData, _t: PhantomData }
+    pub fn new(abi: JsonAbi, bytecode: Bytes, client: P, timeout: u64) -> Self {
+        Self { client, abi, bytecode, timeout }
     }
 
     /// Create a deployment tx using the provided tokens as constructor
@@ -672,10 +622,7 @@ where
     pub fn deploy_tokens(
         self,
         params: Vec<DynSolValue>,
-    ) -> Result<Deployer<B, P, T>, ContractDeploymentError>
-    where
-        B: Clone,
-    {
+    ) -> Result<Deployer<P>, ContractDeploymentError> {
         // Encode the constructor args & concatenate with the bytecode if necessary
         let data: Bytes = match (self.abi.constructor(), params.is_empty()) {
             (None, false) => return Err(ContractDeploymentError::ConstructorError),
@@ -693,15 +640,7 @@ where
         // create the tx object. Since we're deploying a contract, `to` is `None`
         let tx = WithOtherFields::new(TransactionRequest::default().input(data.into()));
 
-        Ok(Deployer {
-            client: self.client.clone(),
-            abi: self.abi,
-            tx,
-            confs: 1,
-            timeout: self.timeout,
-            _p: PhantomData,
-            _t: PhantomData,
-        })
+        Ok(Deployer { client: self.client.clone(), tx, confs: 1, timeout: self.timeout })
     }
 }
 

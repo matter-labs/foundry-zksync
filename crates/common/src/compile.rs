@@ -15,6 +15,7 @@ use foundry_compilers::{
         solc::{Solc, SolcCompiler},
         Compiler,
     },
+    info::ContractInfo as CompilerContractInfo,
     report::{BasicStdoutReporter, NoReporter, Report},
     solc::SolcSettings,
     Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
@@ -26,6 +27,7 @@ use std::{
     fmt::Display,
     io::IsTerminal,
     path::{Path, PathBuf},
+    str::FromStr,
     time::Instant,
 };
 
@@ -37,6 +39,9 @@ mod zksync;
 /// settings.
 #[must_use = "ProjectCompiler does nothing unless you call a `compile*` method"]
 pub struct ProjectCompiler {
+    /// The root of the project.
+    project_root: PathBuf,
+
     /// Whether we are going to verify the contracts after compilation.
     verify: Option<bool>,
 
@@ -74,6 +79,7 @@ impl ProjectCompiler {
     #[inline]
     pub fn new() -> Self {
         Self {
+            project_root: PathBuf::new(),
             verify: None,
             print_names: None,
             print_sizes: None,
@@ -140,6 +146,8 @@ impl ProjectCompiler {
         mut self,
         project: &Project<C>,
     ) -> Result<ProjectCompileOutput<C>> {
+        self.project_root = project.root().clone();
+
         // TODO: Avoid process::exit
         if !project.paths.has_input_files() && self.files.is_empty() {
             sh_println!("Nothing to compile")?;
@@ -258,32 +266,45 @@ impl ProjectCompiler {
                 zksync: self.zksync,
             };
 
-            let artifacts: BTreeMap<_, _> = output
-                .artifact_ids()
-                .filter(|(id, _)| {
-                    // filter out forge-std specific contracts
-                    !id.source.to_string_lossy().contains("/forge-std/src/")
-                })
-                .map(|(id, artifact)| (id.name, artifact))
-                .collect();
+            let mut artifacts: BTreeMap<String, Vec<_>> = BTreeMap::new();
+            for (id, artifact) in output.artifact_ids().filter(|(id, _)| {
+                // filter out forge-std specific contracts
+                !id.source.to_string_lossy().contains("/forge-std/src/")
+            }) {
+                artifacts.entry(id.name.clone()).or_default().push((id.source.clone(), artifact));
+            }
 
-            for (name, artifact) in artifacts {
-                let runtime_size = contract_size(artifact, false).unwrap_or_default();
-                let init_size = contract_size(artifact, true).unwrap_or_default();
+            for (name, artifact_list) in artifacts {
+                for (path, artifact) in &artifact_list {
+                    let runtime_size = contract_size(*artifact, false).unwrap_or_default();
+                    let init_size = contract_size(*artifact, true).unwrap_or_default();
 
-                let dev_functions =
-                    artifact.abi.as_ref().map(|abi| abi.functions()).into_iter().flatten().filter(
-                        |func| {
-                            func.name.is_any_test() ||
-                                func.name.eq("IS_TEST") ||
-                                func.name.eq("IS_SCRIPT")
-                        },
+                    let is_dev_contract = artifact
+                        .abi
+                        .as_ref()
+                        .map(|abi| {
+                            abi.functions().any(|f| {
+                                f.test_function_kind().is_known() ||
+                                    matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
+                            })
+                        })
+                        .unwrap_or(false);
+
+                    let unique_name = if artifact_list.len() > 1 {
+                        format!(
+                            "{} ({})",
+                            name,
+                            path.strip_prefix(&self.project_root).unwrap_or(path).display()
+                        )
+                    } else {
+                        name.clone()
+                    };
+
+                    size_report.contracts.insert(
+                        unique_name,
+                        ContractInfo { runtime_size, init_size, is_dev_contract },
                     );
-
-                let is_dev_contract = dev_functions.count() > 0;
-                size_report
-                    .contracts
-                    .insert(name, ContractInfo { runtime_size, init_size, is_dev_contract });
+                }
             }
 
             let _ = sh_println!("{size_report}");
@@ -566,4 +587,93 @@ pub fn with_compilation_reporter<O>(quiet: bool, f: impl FnOnce() -> O) -> O {
     };
 
     foundry_compilers::report::with_scoped(&reporter, f)
+}
+
+/// Container type for parsing contract identifiers from CLI.
+///
+/// Passed string can be of the following forms:
+/// - `src/Counter.sol` - path to the contract file, in the case where it only contains one contract
+/// - `src/Counter.sol:Counter` - path to the contract file and the contract name
+/// - `Counter` - contract name only
+#[derive(Clone, PartialEq, Eq)]
+pub enum PathOrContractInfo {
+    /// Non-canoncalized path provided via CLI.
+    Path(PathBuf),
+    /// Contract info provided via CLI.
+    ContractInfo(CompilerContractInfo),
+}
+
+impl PathOrContractInfo {
+    /// Returns the path to the contract file if provided.
+    pub fn path(&self) -> Option<PathBuf> {
+        match self {
+            Self::Path(path) => Some(path.to_path_buf()),
+            Self::ContractInfo(info) => info.path.as_ref().map(PathBuf::from),
+        }
+    }
+
+    /// Returns the contract name if provided.
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Self::Path(_) => None,
+            Self::ContractInfo(info) => Some(&info.name),
+        }
+    }
+}
+
+impl FromStr for PathOrContractInfo {
+    type Err = eyre::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        if let Ok(contract) = CompilerContractInfo::from_str(s) {
+            return Ok(Self::ContractInfo(contract));
+        }
+        let path = PathBuf::from(s);
+        if path.extension().is_some_and(|ext| ext == "sol" || ext == "vy") {
+            return Ok(Self::Path(path));
+        }
+        Err(eyre::eyre!("Invalid contract identifier, file is not *.sol or *.vy: {}", s))
+    }
+}
+
+impl std::fmt::Debug for PathOrContractInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Path(path) => write!(f, "Path({})", path.display()),
+            Self::ContractInfo(info) => {
+                write!(f, "ContractInfo({info})")
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_contract_identifiers() {
+        let t = ["src/Counter.sol", "src/Counter.sol:Counter", "Counter"];
+
+        let i1 = PathOrContractInfo::from_str(t[0]).unwrap();
+        assert_eq!(i1, PathOrContractInfo::Path(PathBuf::from(t[0])));
+
+        let i2 = PathOrContractInfo::from_str(t[1]).unwrap();
+        assert_eq!(
+            i2,
+            PathOrContractInfo::ContractInfo(CompilerContractInfo {
+                path: Some("src/Counter.sol".to_string()),
+                name: "Counter".to_string()
+            })
+        );
+
+        let i3 = PathOrContractInfo::from_str(t[2]).unwrap();
+        assert_eq!(
+            i3,
+            PathOrContractInfo::ContractInfo(CompilerContractInfo {
+                path: None,
+                name: "Counter".to_string()
+            })
+        );
+    }
 }

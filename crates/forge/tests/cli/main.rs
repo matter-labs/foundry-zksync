@@ -16,6 +16,7 @@ mod create;
 mod debug;
 mod doc;
 mod eip712;
+mod failure_assertions;
 mod geiger;
 mod inline_config;
 mod multi_script;
@@ -29,7 +30,5 @@ mod verify_bytecode;
 mod version;
 
 mod ext_integration;
-mod zk_build;
-mod zk_cmd;
-mod zk_ext_integration;
-mod zk_script;
+
+mod zk;
