@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.0.12](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.11...foundry-zksync-v0.0.12) (2025-03-14)
+
+
+### Features
+
+* remove openssl dependency ([#967](https://github.com/matter-labs/foundry-zksync/issues/967)) ([61e3baa](https://github.com/matter-labs/foundry-zksync/commit/61e3baa773a4fed65eb47924beff408e8b5681b0))
+
+
+### Bug Fixes
+
+* **ci:** open issue after last retry fails ([#972](https://github.com/matter-labs/foundry-zksync/issues/972)) ([c75cca0](https://github.com/matter-labs/foundry-zksync/commit/c75cca066b48661c4ccb7febe1c3161adc771d67))
+* **docker:** use cross main instead 0.2.5 ([02f8c9a](https://github.com/matter-labs/foundry-zksync/commit/02f8c9a234755f0cc8cf1860399093d499c0d238))
+* **forge:** base url for custom verification providers type ([02f8c9a](https://github.com/matter-labs/foundry-zksync/commit/02f8c9a234755f0cc8cf1860399093d499c0d238))
+* **zk:warp:** only affect timestamp ([#963](https://github.com/matter-labs/foundry-zksync/issues/963)) ([9c40e44](https://github.com/matter-labs/foundry-zksync/commit/9c40e44cffab00a6035279d7de7e9395d33f3209))
+
+
+### Performance Improvements
+
+* improve zksync runtime ([#962](https://github.com/matter-labs/foundry-zksync/issues/962)) ([f14925c](https://github.com/matter-labs/foundry-zksync/commit/f14925cdfd4c618f4c642203995cf945f42cb415))
+
 ## [0.0.11](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.10...foundry-zksync-v0.0.11) (2025-03-10)
 
 
