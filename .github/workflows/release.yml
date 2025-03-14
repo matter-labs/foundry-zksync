@@ -174,7 +174,7 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          cross build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
