@@ -16,6 +16,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   IS_NIGHTLY: ${{ github.event_name == 'schedule' || inputs.tag == '' }}
+  ATTEMPTS: 3
 
 jobs:
   prepare:
@@ -285,7 +286,7 @@ jobs:
             ${{ steps.man.outputs.foundry_man }}
 
   retry-on-failure:
-    if: failure() && fromJSON(github.run_attempt) < 3
+    if: failure() && fromJSON(github.run_attempt) < ${{ env.ATTEMPTS }}
     needs: [release]
     runs-on: ubuntu-latest
     steps:
@@ -321,9 +322,10 @@ jobs:
 
   # If any of the jobs fail, this will create a high-priority issue to signal so.
   issue:
+    if: failure() && fromJSON(github.run_attempt) >= ${{ env.ATTEMPTS }}
     name: Open an issue
     runs-on: ubuntu-latest
-    needs: [ prepare, retry-on-failure, cleanup ]
+    needs: [ prepare, release, cleanup ]
     if: failure()
     steps:
       - uses: actions/checkout@v4
