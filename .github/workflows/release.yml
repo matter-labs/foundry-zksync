@@ -194,7 +194,6 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          echo cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
           cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
           bins=(cast forge)
