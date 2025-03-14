@@ -70,6 +70,7 @@ pub trait InspectorExt: for<'a> Inspector<&'a mut dyn DatabaseExt> {
         &mut self,
         _context: &mut EvmContext<&mut dyn DatabaseExt>,
         _call_traces: Vec<Call>,
+        _record_top_call: bool,
     ) {
     }
 }

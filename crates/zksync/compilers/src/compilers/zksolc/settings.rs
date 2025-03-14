@@ -1,6 +1,5 @@
 //! zksolc settings
 use crate::artifacts::output_selection::OutputSelection as ZkOutputSelection;
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_compilers::{
     artifacts::{
         output_selection::OutputSelection, serde_helpers, EvmVersion, Libraries, Remapping,
@@ -18,7 +17,10 @@ use std::{
     str::FromStr,
 };
 
-use super::ZkSolc;
+use super::{
+    types::{ErrorType, WarningType},
+    ZkSolc,
+};
 ///
 /// The Solidity compiler codegen.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

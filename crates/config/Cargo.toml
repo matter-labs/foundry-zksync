@@ -48,7 +48,6 @@ yansi.workspace = true
 
 # zksync
 foundry-zksync-compilers.workspace = true
-era-solc.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 path-slash = "0.2"
@@ -59,6 +58,4 @@ figment = { workspace = true, features = ["test"] }
 tempfile.workspace = true
 
 [features]
-default = ["rustls"]
-rustls = ["reqwest/rustls-tls-native-roots"]
 isolate-by-default = []

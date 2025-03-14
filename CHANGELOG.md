@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.0.11](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.10...foundry-zksync-v0.0.11) (2025-03-10)
+
+
+### Features
+
+* add support for custom signature in cast fields ([#935](https://github.com/matter-labs/foundry-zksync/issues/935)) ([4b59d03](https://github.com/matter-labs/foundry-zksync/commit/4b59d03591fccb6ecd3a21a8605e83c52122d969))
+* cast call --trace support ([#953](https://github.com/matter-labs/foundry-zksync/issues/953)) ([0ff41b2](https://github.com/matter-labs/foundry-zksync/commit/0ff41b2be31c9bdc886327649793104fce12fbb0))
+* upstream 4974a08 ([#946](https://github.com/matter-labs/foundry-zksync/issues/946)) ([f3a9825](https://github.com/matter-labs/foundry-zksync/commit/f3a9825a9b07bee979c94bc26cc80ccc96942eb5))
+
+
+### Bug Fixes
+
+* **inspector:** missing field in default ([f3a9825](https://github.com/matter-labs/foundry-zksync/commit/f3a9825a9b07bee979c94bc26cc80ccc96942eb5))
+
+## [0.0.10](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.9...foundry-zksync-v0.0.10) (2025-02-26)
+
+
+### Features
+
+* support state diff cheatcode ([#922](https://github.com/matter-labs/foundry-zksync/issues/922)) ([a7b05d3](https://github.com/matter-labs/foundry-zksync/commit/a7b05d38b8a3e14cbda85abdac58dbb8bc19868a))
+* Upstream 67be473 ([#924](https://github.com/matter-labs/foundry-zksync/issues/924)) ([ca9d1aa](https://github.com/matter-labs/foundry-zksync/commit/ca9d1aa4fb54e87f0e1ccad04e2b4f629b4520cc))
+
+
+### Bug Fixes
+
+* Add back test_zk_cast_call and test_zk_cast_call_create ([#933](https://github.com/matter-labs/foundry-zksync/issues/933)) ([b8a577e](https://github.com/matter-labs/foundry-zksync/commit/b8a577ed4816df84df437a5d456f9e04fe9012f5))
+* consistent nonce w/ tx batching ([#929](https://github.com/matter-labs/foundry-zksync/issues/929)) ([ae9cfd1](https://github.com/matter-labs/foundry-zksync/commit/ae9cfd10d906b5ab350258533219da1f4775c118))
+* Nonce mismatch when broadcasting in setup function  ([#923](https://github.com/matter-labs/foundry-zksync/issues/923)) ([cdef273](https://github.com/matter-labs/foundry-zksync/commit/cdef273ef198820ac6fa390bc868c6c8aa5cbab2))
+
+## [0.0.9](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.8...foundry-zksync-v0.0.9) (2025-02-20)
+
+
+### Features
+
+* add support for cast estimate ([#903](https://github.com/matter-labs/foundry-zksync/issues/903)) ([5eaf1a7](https://github.com/matter-labs/foundry-zksync/commit/5eaf1a794e98086e3ff1900e384e62b95448dd70))
+* Add support for cast send --create  ([#913](https://github.com/matter-labs/foundry-zksync/issues/913)) ([9aaddd6](https://github.com/matter-labs/foundry-zksync/commit/9aaddd6507039cf031599b81ede78fde75b28f6d))
+* cast mktx and mktx --create support ([#911](https://github.com/matter-labs/foundry-zksync/issues/911)) ([4f89e2f](https://github.com/matter-labs/foundry-zksync/commit/4f89e2fd316edb4a8ad013779679ea55ce7a4e03))
+* **cast:zk:** `call` and `call --create` support ([#917](https://github.com/matter-labs/foundry-zksync/issues/917)) ([2eaac65](https://github.com/matter-labs/foundry-zksync/commit/2eaac658af0152576ce6515db650787199a4abb7))
+* inspect command ([#906](https://github.com/matter-labs/foundry-zksync/issues/906)) ([f7059a1](https://github.com/matter-labs/foundry-zksync/commit/f7059a156c1efb2f7c8dd350521bb0cf69e8809c))
+
+
+### Bug Fixes
+
+* foundry toml invalid setting does not discard other settings ([#912](https://github.com/matter-labs/foundry-zksync/issues/912)) ([27eda8b](https://github.com/matter-labs/foundry-zksync/commit/27eda8b39ee5fef6997c6993ccea771b0439b6db))
+* Use new alchemy key to avoid rate limiting issues ([#919](https://github.com/matter-labs/foundry-zksync/issues/919)) ([89fa128](https://github.com/matter-labs/foundry-zksync/commit/89fa12899e7407576f29297b80b0fa161e6532c5))
+
 ## [0.0.8](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.7...foundry-zksync-v0.0.8) (2025-02-05)
 
 

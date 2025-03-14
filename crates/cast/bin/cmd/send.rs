@@ -5,8 +5,6 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
-use alloy_transport::Transport;
-use alloy_zksync::{network::Zksync, wallet::ZksyncWallet};
 use cast::{Cast, ZkTransactionOpts};
 use clap::Parser;
 use eyre::Result;
@@ -16,7 +14,8 @@ use foundry_cli::{
     utils::LoadConfig,
 };
 use foundry_common::ens::NameOrAddress;
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{path::PathBuf, str::FromStr};
+use zksync::send_zk_transaction;
 
 mod zksync;
 /// CLI arguments for `cast send`.
@@ -115,7 +114,7 @@ impl SendTxArgs {
 
         let blob_data = if let Some(path) = path { Some(std::fs::read(path)?) } else { None };
 
-        let mut zkcode = Default::default();
+        let mut zk_code = Default::default();
 
         let code = if let Some(SendTxSubcommands::Create {
             code,
@@ -123,7 +122,7 @@ impl SendTxArgs {
             args: constructor_args,
         }) = command
         {
-            zkcode = Some(code.clone());
+            zk_code = Some(code.clone());
             sig = constructor_sig;
             args = constructor_args;
             Some(code)
@@ -131,12 +130,9 @@ impl SendTxArgs {
             None
         };
 
-        let mut config = eth.load_config()?;
-        config.zksync.startup = zk_tx.has_zksync_args() || zk_force;
-        config.zksync.compile = zk_tx.has_zksync_args() || zk_force;
+        let config = eth.load_config()?;
 
         let provider = utils::get_provider(&config)?;
-        let zk_provider = utils::get_provider_zksync(&config)?;
 
         let builder = CastTxBuilder::new(&provider, tx, &config)
             .await?
@@ -183,29 +179,16 @@ impl SendTxArgs {
             // NOTE(zk): Avoid initializing `signer` twice as it will error out with Ledger, so we
             // move the signers to their respective blocks.
             if zk_tx.has_zksync_args() || zk_force {
-                let signer = eth.wallet.signer().await?;
-                let from = signer.address();
-                tx::validate_from_address(eth.wallet.from, from)?;
+                let zk_provider = utils::get_provider_zksync(&config)?;
+                let tx_hash =
+                    send_zk_transaction(zk_provider, builder, &eth, zk_tx, zk_code).await?;
 
-                let (tx, _) = builder.build_raw(&signer).await?;
-                let signer = Arc::new(signer);
+                let provider =
+                    ProviderBuilder::<_, _, AnyNetwork>::default().on_provider(&provider);
 
-                let zk_wallet = ZksyncWallet::from(signer.clone());
-                let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
-                    .wallet(zk_wallet.clone())
-                    .on_provider(&zk_provider);
-
-                let wallet = EthereumWallet::from(signer);
-                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                    .wallet(wallet)
-                    .on_provider(&provider);
-
-                zksync::send_zk_transaction(
-                    provider,
-                    zk_provider,
-                    tx,
-                    zk_tx,
-                    zkcode,
+                handle_transaction_result(
+                    &Cast::new(provider),
+                    &tx_hash,
                     cast_async,
                     confirmations,
                     timeout,
@@ -232,7 +215,7 @@ impl SendTxArgs {
     }
 }
 
-async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
+async fn cast_send<P: Provider<AnyNetwork>>(
     provider: P,
     tx: WithOtherFields<TransactionRequest>,
     cast_async: bool,
@@ -247,8 +230,8 @@ async fn cast_send<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
     handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
 }
 
-async fn handle_transaction_result<P: Provider<T, AnyNetwork>, T: Transport + Clone>(
-    cast: &Cast<P, T>,
+async fn handle_transaction_result<P: Provider<AnyNetwork>>(
+    cast: &Cast<P>,
     tx_hash: &TxHash,
     cast_async: bool,
     confs: u64,

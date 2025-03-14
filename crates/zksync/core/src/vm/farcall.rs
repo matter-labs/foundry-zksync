@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use std::{collections::HashMap, default, fmt::Debug};
+use std::{collections::HashMap, default, fmt::Debug, ops::Deref};
 
 use alloy_primitives::{hex, Address};
 use itertools::Itertools;
@@ -24,7 +24,9 @@ use zksync_multivm::{
 use zksync_types::MSG_VALUE_SIMULATOR_ADDRESS;
 use zksync_vm_interface::storage::{StoragePtr, WriteStorage};
 
-use crate::convert::{ConvertAddress, ConvertH256, ConvertU256};
+use crate::convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256};
+
+use super::tracers::cheatcode::SELECTOR_EXECUTE_TRANSACTION;
 
 type PcOrImm = <EncodingModeProduction as VmEncodingMode<8>>::PcOrImm;
 type CallStackEntry = vm_state::CallStackEntry<8, EncodingModeProduction>;
@@ -56,7 +58,7 @@ impl CallDepth {
 
     /// Decrement [CallDepth] until the value of `0`.
     #[inline]
-    pub(crate) fn decrement(self) -> CallDepth {
+    pub(crate) fn decrement(&self) -> CallDepth {
         CallDepth(self.0.saturating_sub(1))
     }
 }
@@ -95,21 +97,71 @@ impl CallActions {
 
     /// Track pending [CallAction]s, decrementing the depth if it's not ready.
     pub(crate) fn track(&mut self) {
-        let mut pending_actions = vec![];
-        for (depth, action) in self.pending.iter().cloned() {
+        let len = self.pending.len();
+        let pending_actions = std::mem::replace(&mut self.pending, Vec::with_capacity(len));
+
+        for (depth, action) in pending_actions.into_iter() {
             if depth == CallDepth::current() {
                 self.immediate.push(action);
             } else {
-                pending_actions.push((depth.decrement(), action));
+                self.pending.push((depth.decrement(), action));
             }
         }
-        self.pending = pending_actions;
     }
 
     /// Consume the immediate actions.
     pub(crate) fn take_immediate(&mut self) -> Vec<CallAction> {
         std::mem::take(&mut self.immediate)
     }
+}
+
+/// Call execution status.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum CallExecutionStatus {
+    /// A `FarCall` opcode started a call.
+    CallStart(TrackedCall),
+    /// A `Ret` opcode finished a call.
+    CallFinished(TrackedCall),
+}
+
+/// Transaction execution status tracking `executeTransaction` call.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub(crate) enum TxExecutionStatus {
+    /// `executeTransaction` hasn't been called yet.
+    #[default]
+    Pending,
+    /// `executeTransaction` has been called.
+    Executing,
+    /// `executeTransaction` has returned.
+    Finished,
+}
+
+/// Call tracked during transaction execution.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct TrackedCall {
+    pub(crate) opcode: FarCallOpcode,
+    pub(crate) address: Address,
+    pub(crate) calldata: Vec<u8>,
+    pub(crate) num_near_calls: u64,
+}
+
+/// Transaction execution tracker.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct TxExecutionTracker {
+    call_tracker: Vec<TrackedCall>,
+    status: TxExecutionStatus,
+}
+
+/// The currently executing transaction status, and any optional call start and ends. This is
+/// tracked per opcode and returned to the observer.
+#[derive(Debug, Clone)]
+pub(crate) struct CurrentTxExecutionStatus {
+    /// Currently executing transaction's status.
+    pub(crate) status: TxExecutionStatus,
+    /// If the status changed on the current opcode execution.
+    pub(crate) status_changed: bool,
+    /// Optional call status on the current opcode execution.
+    pub(crate) call_status: Option<CallExecutionStatus>,
 }
 
 /// Tracks state of FarCalls to be able to return from them earlier.
@@ -121,6 +173,7 @@ pub(crate) struct FarCallHandler {
     pub(crate) current_far_call: Option<FarCallOpcode>,
     pub(crate) immediate_return: Option<Vec<u8>>,
     call_actions: CallActions,
+    tx_execution_tracker: TxExecutionTracker,
 }
 
 impl FarCallHandler {
@@ -147,6 +200,134 @@ impl FarCallHandler {
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             self.call_actions.track();
         }
+    }
+
+    /// Tracks the call stack for the actual transaction execution starting at `executeTransaction`.
+    /// Returns the current tx status and any subsequent call start and end statuses.
+    pub(crate) fn track_tx_execution(
+        &mut self,
+        state: &VmLocalStateData<'_>,
+        data: &AfterExecutionData,
+        calldata: &impl Deref<Target = Vec<u8>>,
+    ) -> CurrentTxExecutionStatus {
+        match data.opcode.variant.opcode {
+            Opcode::NearCall(_) => match self.tx_execution_tracker.status {
+                TxExecutionStatus::Executing => {
+                    let last = self
+                        .tx_execution_tracker
+                        .call_tracker
+                        .last_mut()
+                        .expect("must have a matching call entry");
+
+                    last.num_near_calls = last
+                        .num_near_calls
+                        .checked_add(1)
+                        .expect("overflow tracking tx execution depth");
+                }
+                TxExecutionStatus::Pending | TxExecutionStatus::Finished => (),
+            },
+            Opcode::FarCall(opcode) => {
+                let current = state.vm_local_state.callstack.current;
+                let calldata = calldata.deref();
+
+                match self.tx_execution_tracker.status {
+                    TxExecutionStatus::Pending => {
+                        if calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION) {
+                            self.tx_execution_tracker.status = TxExecutionStatus::Executing;
+                            self.tx_execution_tracker.call_tracker.push(TrackedCall {
+                                opcode,
+                                address: current.code_address.to_address(),
+                                calldata: calldata.clone(),
+                                num_near_calls: 0,
+                            });
+
+                            return CurrentTxExecutionStatus {
+                                status: self.tx_execution_tracker.status.clone(),
+                                status_changed: true,
+                                call_status: Some(CallExecutionStatus::CallStart(
+                                    self.tx_execution_tracker
+                                        .call_tracker
+                                        .last()
+                                        .cloned()
+                                        .expect("must have a single record"),
+                                )),
+                            };
+                        }
+                    }
+                    TxExecutionStatus::Executing => {
+                        self.tx_execution_tracker.call_tracker.push(TrackedCall {
+                            opcode,
+                            address: current.code_address.to_address(),
+                            calldata: calldata.clone(),
+                            num_near_calls: 0,
+                        });
+
+                        return CurrentTxExecutionStatus {
+                            status: self.tx_execution_tracker.status.clone(),
+                            status_changed: false,
+                            call_status: Some(CallExecutionStatus::CallStart(
+                                self.tx_execution_tracker
+                                    .call_tracker
+                                    .last()
+                                    .cloned()
+                                    .expect("must have a single record"),
+                            )),
+                        };
+                    }
+                    TxExecutionStatus::Finished => {}
+                }
+            }
+            Opcode::Ret(_) => match self.tx_execution_tracker.status {
+                TxExecutionStatus::Executing => {
+                    let current = state.vm_local_state.callstack.current;
+                    let last = self
+                        .tx_execution_tracker
+                        .call_tracker
+                        .last_mut()
+                        .expect("must have a matching call entry");
+
+                    if last.num_near_calls == 0 {
+                        let finished = self
+                            .tx_execution_tracker
+                            .call_tracker
+                            .pop()
+                            .expect("must have a matching call entry");
+                        if self.tx_execution_tracker.call_tracker.is_empty() {
+                            self.tx_execution_tracker.status = TxExecutionStatus::Finished;
+
+                            return CurrentTxExecutionStatus {
+                                status: self.tx_execution_tracker.status.clone(),
+                                status_changed: true,
+                                call_status: Some(CallExecutionStatus::CallFinished(finished)),
+                            };
+                        } else {
+                            return CurrentTxExecutionStatus {
+                                status: self.tx_execution_tracker.status.clone(),
+                                status_changed: false,
+                                call_status: Some(CallExecutionStatus::CallFinished(finished)),
+                            };
+                        }
+                    } else {
+                        last.num_near_calls = last
+                            .num_near_calls
+                            .checked_sub(1)
+                            .expect("underflow tracking tx execution depth")
+                    }
+                }
+                TxExecutionStatus::Pending | TxExecutionStatus::Finished => {}
+            },
+            _ => (),
+        };
+
+        CurrentTxExecutionStatus {
+            status: self.tx_execution_tracker.status.clone(),
+            status_changed: false,
+            call_status: None,
+        }
+    }
+
+    pub(crate) fn is_tx_executing(&self) -> bool {
+        matches!(self.tx_execution_tracker.status, TxExecutionStatus::Executing)
     }
 
     /// Attempts to return the preset data ignoring any following opcodes, if set.
@@ -207,6 +388,11 @@ impl FarCallHandler {
             // Just in case to avoid any gas costs related to memory
             state.local_state.callstack.current.heap_bound = u32::MAX;
         }
+    }
+
+    /// Returns any immediate [CallAction]s for the currently active FarCall.
+    pub(crate) fn immediate_actions(&self) -> &Vec<CallAction> {
+        &self.call_actions.immediate
     }
 
     /// Returns immediate [CallAction]s for the currently active FarCall.
@@ -288,7 +474,7 @@ impl MockedCalls {
 
         for (call, call_return_data) in self.with_value.iter().chain(self.without_value.iter()) {
             if call.address == code_address {
-                let value_matches = call.value.map_or(true, |value| value == actual_value);
+                let value_matches = call.value.is_none_or(|value| value == actual_value);
                 if !value_matches {
                     continue;
                 }

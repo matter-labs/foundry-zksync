@@ -128,7 +128,7 @@ jobs:
           log: info
           logFilePath: anvil_zksync.log
           target: x86_64-unknown-linux-gnu
-          releaseTag: v0.2.1
+          releaseTag: v0.3.2
 
       - name: Setup Git config
         run: |
@@ -145,10 +145,6 @@ jobs:
 
   deny:
     uses: ithacaxyz/ci/.github/workflows/deny.yml@main
-    with:
-      # Clear out arguments to not pass `--all-features` to `cargo deny`.
-      # Many crates have an `openssl` feature which enables banned dependencies.
-      deny-flags: ""
 
 
   check-ci-install:

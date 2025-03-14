@@ -1,7 +1,7 @@
 //! # foundry-zksync
 //!
 //! Main Foundry ZKSync implementation.
-#![warn(missing_docs, unused_crate_dependencies)]
+#![warn(missing_docs)]
 
 /// Contains cheatcode implementations.
 pub mod cheatcodes;
@@ -19,8 +19,7 @@ pub mod vm;
 pub mod state;
 
 use alloy_network::TransactionBuilder;
-use alloy_primitives::{address, hex, keccak256, Address, Bytes, B256, U256 as rU256};
-use alloy_transport::Transport;
+use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
 use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
     provider::ZksyncProvider,
@@ -86,18 +85,6 @@ pub fn hash_bytecode(bytecode: &[u8]) -> H256 {
     BytecodeHash::for_bytecode(bytecode).value()
 }
 
-// TODO: The approach towards bytecode has changed in core, so the same function was removed there.
-// There is a chance that this function is no longer needed.
-pub(crate) fn be_words_to_bytes(words: &[U256]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(words.len() * 32);
-    for word in words {
-        let mut payload = [0u8; 32];
-        word.to_big_endian(&mut payload);
-        bytes.extend_from_slice(&payload);
-    }
-    bytes
-}
-
 /// Represents additional data for ZK transactions that require a paymaster.
 #[derive(Clone, Debug, Default)]
 pub struct ZkPaymasterData {
@@ -137,7 +124,7 @@ pub struct EstimatedGas {
 
 /// Estimates the gas parameters for the provided transaction.
 /// This will call `estimateFee` method on the rpc and set the gas parameters on the transaction.
-pub async fn estimate_fee<P: ZksyncProvider<T>, T: Transport + Clone>(
+pub async fn estimate_fee<P: ZksyncProvider>(
     tx: &mut ZkTransactionRequest,
     provider: P,
     estimate_multiplier: u64,
@@ -214,15 +201,15 @@ pub fn try_decode_create2(data: &[u8]) -> Result<(H256, H256, Vec<u8>)> {
 }
 
 /// Compute a CREATE address according to zksync
-pub fn compute_create_address(sender: Address, nonce: u64) -> Address {
-    get_create_zksync_address(sender.to_h160(), Nonce(nonce as u32)).to_address()
+pub fn compute_create_address(sender: Address, nonce: u32) -> Address {
+    get_create_zksync_address(sender.to_h160(), Nonce(nonce)).to_address()
 }
 
 /// Compute a CREATE2 address according to zksync
 pub fn compute_create2_address(
     sender: Address,
     bytecode_hash: H256,
-    salt: B256,
+    salt: H256,
     constructor_input: &[u8],
 ) -> Address {
     const CREATE2_PREFIX: &[u8] = b"zksyncCreate2";

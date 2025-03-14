@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Set formatted version strings
-    let pkg_version = env::var("CARGO_PKG_VERSION")?;
+    let pkg_version = upstream_version()?;
 
     // Append the profile to the version string
     let out_dir = env::var("OUT_DIR").unwrap();
@@ -87,4 +87,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-env=FOUNDRY_LONG_VERSION_3=Build Profile: {profile}");
 
     Ok(())
+}
+
+fn upstream_version() -> Result<String, Box<dyn Error>> {
+    let metadata = cargo_metadata::MetadataCommand::new().exec()?;
+    Ok(metadata.workspace_metadata["metadata"]["upstream_version"]
+        .as_str()
+        .ok_or("Unable to retrieve upstream version from metadata")?
+        .to_string())
 }

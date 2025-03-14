@@ -1,5 +1,5 @@
 use crate::{
-    provider::{VerificationContext, VerificationProvider},
+    provider::{VerificationContext, VerificationProvider, VerificationProviderType},
     retry::RETRY_CHECK_ON_VERIFY,
     verify::{VerifyArgs, VerifyCheckArgs},
     zk_provider::CompilerVerificationContext,
@@ -109,9 +109,11 @@ impl VerificationProvider for EtherscanVerificationProvider {
                         return Ok(None)
                     }
 
-                    if resp.result.starts_with("Unable to locate ContractCode at") {
+                    if resp.result.starts_with("Unable to locate ContractCode at") ||
+                        resp.result.starts_with("The address is not a smart contract")
+                    {
                         warn!("{}", resp.result);
-                        return Err(eyre!("Etherscan could not detect the deployment."))
+                        return Err(eyre!("Could not detect the deployment."))
                     }
 
                     warn!("Failed verify submission: {:?}", resp);
@@ -157,6 +159,7 @@ impl VerificationProvider for EtherscanVerificationProvider {
         let config = args.load_config()?;
         let etherscan = self.client(
             args.etherscan.chain.unwrap_or_default(),
+            &args.verifier.verifier,
             args.verifier.verifier_url.as_deref(),
             args.etherscan.key().as_deref(),
             &config,
@@ -225,6 +228,7 @@ impl EtherscanVerificationProvider {
         let config = args.load_config()?;
         let etherscan = self.client(
             args.etherscan.chain.unwrap_or_default(),
+            &args.verifier.verifier,
             args.verifier.verifier_url.as_deref(),
             args.etherscan.key().as_deref(),
             &config,
@@ -256,6 +260,7 @@ impl EtherscanVerificationProvider {
     pub(crate) fn client(
         &self,
         chain: Chain,
+        verifier_type: &VerificationProviderType,
         verifier_url: Option<&str>,
         etherscan_key: Option<&str>,
         config: &Config,
@@ -280,10 +285,13 @@ impl EtherscanVerificationProvider {
         builder = if let Some(api_url) = api_url {
             // we don't want any trailing slashes because this can cause cloudflare issues: <https://github.com/foundry-rs/foundry/pull/6079>
             let api_url = api_url.trim_end_matches('/');
-            builder
-                .with_chain_id(chain)
-                .with_api_url(api_url)?
-                .with_url(base_url.unwrap_or(api_url))?
+            let base_url = if *verifier_type != VerificationProviderType::Etherscan {
+                // If verifier is not Etherscan then set base url as api url without trialing /api.
+                api_url.strip_prefix("/api").unwrap_or(api_url)
+            } else {
+                base_url.unwrap_or(api_url)
+            };
+            builder.with_chain_id(chain).with_api_url(api_url)?.with_url(base_url)?
         } else {
             builder.chain(chain)?
         };
@@ -400,6 +408,7 @@ impl EtherscanVerificationProvider {
         let provider = get_provider(context.config())?;
         let client = self.client(
             args.etherscan.chain.unwrap_or_default(),
+            &args.verifier.verifier,
             args.verifier.verifier_url.as_deref(),
             args.etherscan.key.as_deref(),
             context.config(),
@@ -455,7 +464,6 @@ async fn ensure_solc_build_metadata(version: Version) -> Result<Version> {
 }
 
 #[cfg(test)]
-#[allow(clippy::needless_return)]
 mod tests {
     use super::*;
     use clap::Parser;
@@ -494,6 +502,7 @@ mod tests {
         let client = etherscan
             .client(
                 args.etherscan.chain.unwrap_or_default(),
+                &args.verifier.verifier,
                 args.verifier.verifier_url.as_deref(),
                 args.etherscan.key().as_deref(),
                 &config,
@@ -521,6 +530,7 @@ mod tests {
         let client = etherscan
             .client(
                 args.etherscan.chain.unwrap_or_default(),
+                &args.verifier.verifier,
                 args.verifier.verifier_url.as_deref(),
                 args.etherscan.key().as_deref(),
                 &config,
