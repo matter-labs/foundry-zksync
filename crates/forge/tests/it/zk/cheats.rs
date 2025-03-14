@@ -242,14 +242,14 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer_contract, |prj, cmd| {
 
     cmd.cast_fuse();
 
-    let code = cmd
-        .cast_fuse()
-        .args(["getcode", "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7", "--rpc-url", &url])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
+    // let code = cmd
+    //     .cast_fuse()
+    //     .args(["getcode", "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7", "--rpc-url", &url])
+    //     .assert_success()
+    //     .get_output()
+    //     .stdout_lossy();
 
-    println!("Código del contrato: {}", code);
+    // println!("Código del contrato: {}", code);
 
     cmd.cast_fuse();
 
@@ -287,7 +287,11 @@ import "forge-std/Test.sol";
 import {Counter} from "../src/Counter.sol";
 
 contract ZkBroadcastRaw is Test {
-function testBroadcastRawTransaction() public {
+function testJuani() public {
+
+vm.createSelectFork("{{url}}");
+
+
 Counter counter = Counter(0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7);
 uint256 initial = counter.number();
 
@@ -301,13 +305,13 @@ assertEq(initial + 1, counter.number());
 }
 }
 "#;
-    let script = script.replace("{{raw_tx}}", &raw_tx_after);
+    let script = script.replace("{{raw_tx}}", &raw_tx_after).replace("{{url}}", &url);
 
     println!("script: {}", script);
 
     prj.add_test("ZkBroadcastRaw.t.sol", script.as_str()).unwrap();
 
-    cmd.args(["test", "--zksync", "--evm-version", "shanghai", "--mc", "ZkBroadcastRaw"])
+    cmd.args(["test", "-vvvvv", "--zksync", "--evm-version", "shanghai", "--mc", "ZkBroadcastRaw"])
         // cmd.args(["test", "--zksync", "--rpc-url", &url, "ZkBroadcastRaw"])
         .assert_success()
         .get_output()
