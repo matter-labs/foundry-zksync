@@ -50,6 +50,13 @@ body:
               - Linux
     - type: textarea
       attributes:
+          label: System Specifications
+          description: Please provide additional details about your system (CPU, RAM, etc.)
+          placeholder: "For example: CPU: Intel i7-10700K, RAM: 32GB DDR4"
+      validations:
+          required: false
+    - type: textarea
+      attributes:
           label: Describe the bug
           description: Please include relevant Solidity snippets as well if relevant.
       validations:
