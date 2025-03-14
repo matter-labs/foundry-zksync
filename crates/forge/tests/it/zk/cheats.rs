@@ -240,7 +240,7 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer_contract, |prj, cmd| {
     .unwrap();
 
     //deploy
-    let out = cmd
+    let _ = cmd
         .args([
             "create",
             "src/Counter.sol:Counter",
