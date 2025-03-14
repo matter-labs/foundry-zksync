@@ -120,11 +120,11 @@ jobs:
             svm_target_platform: linux-amd64
             platform: linux
             arch: amd64
-          # - runner: ubuntu-24.04-github-hosted-16core
-          #   target: aarch64-unknown-linux-gnu
-          #   svm_target_platform: linux-aarch64
-          #   platform: linux
-          #   arch: arm64
+          - runner: ubuntu-24.04-github-hosted-16core
+            target: aarch64-unknown-linux-gnu
+            svm_target_platform: linux-aarch64
+            platform: linux
+            arch: arm64
           # This is pinned to `macos-13-large` to support old SDK versions.
           # If the runner is deprecated it should be pinned to the oldest available version of the runner.
           - runner: macos-13-large
@@ -154,8 +154,28 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       
-      # - name: Install cross v0.2.5 from source
-      #   run: cargo install cross --git https://github.com/cross-rs/cross --tag v0.2.5
+      - name: Apple M1 setup
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          brew install make
+          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
+          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+          
+      - name: Apple Darwin
+        if: matrix.target == 'x86_64-apple-darwin'
+        run: |
+          brew install make
+          echo "PATH=/usr/local/opt/make/libexec/gnubin:$PATH" >> $GITHUB_ENV
+          
+      - name: Linux ARM setup
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libssl-dev
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "C_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
+          echo "CPLUS_INCLUDE_PATH=/usr/aarch64-linux-gnu/include" >> $GITHUB_ENV
 
       # We diverge from upstream and build with cross as we're building static binaries
       - name: Build binaries
