@@ -240,7 +240,7 @@ forgetest_async!(test_zk_broadcast_raw_create2_deployer_contract, |prj, cmd| {
     .unwrap();
 
     //deploy
-    let _ = cmd
+    let out = cmd
         .args([
             "create",
             "src/Counter.sol:Counter",
@@ -271,7 +271,7 @@ contract SimpleScript is Script {
         // This raw transaction comes from cast mktx of increment() to Counter contract
         // `cast mktx "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 2`
         vm.broadcastRawTransaction(
-            hex"71f88502808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a80a02a1409aaf433e81541b593d44b82caff60ca164c851e492126c38dca73bd6b09a02ca9753b48b67ef0bd585c63fbfbced44d4e47ddbe547338ab7569d5815cbc6382010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
+            hex"71f88501808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a01a021cfba0a1ac7d72f2b0f052a85004282f18b2a35a8451773bb8b25446a5470aba01e81a389b81f72c7dad310998d5e677727b1ce9996e512124d52fb26ea43430b82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
         );
         require(counter.count() == prev + 1);
 
