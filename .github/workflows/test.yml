@@ -171,3 +171,14 @@ jobs:
 
       - name: Verify anvil-zksync installation
         run: anvil-zksync --version
+  
+  zk-tests-check:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify zksync tests are not removed
+        run: make zksync-tests-check
