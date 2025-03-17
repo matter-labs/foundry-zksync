@@ -6,6 +6,15 @@ import "../cheats/Vm.sol";
 import {Globals} from "./Globals.sol";
 import "../default/logs/console.sol";
 
+contract InitializableContract {
+    bool public initialized;
+
+    function initialize() public {
+        require(!initialized, "Already initialized");
+        initialized = true;
+    }
+}
+
 contract FixedSlot {
     uint8 num; // slot index: 0
 
@@ -119,6 +128,11 @@ contract ZkCheatcodesTest is DSTest {
     uint256 constant ETH_FORK_BLOCK_TS = 1707901427;
 
     address constant TEST_ADDRESS = 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a;
+
+    bytes32 constant STORAGE__INITIALIZABLE = bytes32(uint256(0));
+
+    bytes32 constant TRUE = bytes32(uint256(1));
+    bytes32 constant FALSE = bytes32(uint256(0));
 
     uint256 forkEra;
     uint256 forkEth;
@@ -333,6 +347,19 @@ contract ZkCheatcodesTest is DSTest {
         proxy.proxyCall(caller);
     }
 
+    function testExpectRevertWithExternalCallReverts() public {
+        InitializableContract initializableContract = new InitializableContract();
+
+        assertEq(vm.load(address(initializableContract), STORAGE__INITIALIZABLE), FALSE);
+
+        initializableContract.initialize();
+
+        assertEq(vm.load(address(initializableContract), STORAGE__INITIALIZABLE), TRUE);
+
+        vm.expectRevert("Already initialized");
+        initializableContract.initialize();
+    }
+
     // Utility function
     function getCodeCheck(string memory contractName, string memory outDir) internal {
         bytes memory bytecode = vm.getCode(contractName);
@@ -462,5 +489,14 @@ contract ZkCheatcodeZkVmSkipTest is DSTest {
 
         // this should auto execute in EVM
         helper2.exec();
+    }
+}
+
+contract InitializableContract {
+    bool public initialized;
+
+    function initialize() public {
+        require(!initialized, "Already initialized");
+        initialized = true;
     }
 }

@@ -825,6 +825,15 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     }
                 }
 
+                // We increase the max depth to account for the inspector calling initialize_interp
+                // for nested calls in evm. This is because the expected_revert max
+                // depth is set in this function. Given that we don't execute
+                // initialize_interp in zkEVM calls we need to account for it.
+                // For the expect_revert max depth check increasing it by one is sufficient.
+                if let Some(expected_revert) = &mut state.expected_revert {
+                    expected_revert.max_depth = ecx.journaled_state.depth() + 1;
+                }
+
                 if result.execution_result.is_success() {
                     // record storage accesses
                     self.append_recorded_accesses(state, ecx, result.account_accesses);
