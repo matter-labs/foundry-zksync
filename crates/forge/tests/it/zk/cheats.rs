@@ -214,7 +214,15 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
     ).await;
 });
 
-forgetest_async!(test_zk_broadcast_raw_create2_deployer_contract, |prj, cmd| {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_zk_raw() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new("testBroadcastTX", "ZkCheatcodesTest", ".*");
+
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
+}
+
+forgetest_async!(test_zk_broadcast_raw_executes, |prj, cmd| {
     foundry_test_utils::util::initialize(prj.root());
     let node = ZkSyncNode::start().await;
     let url = node.url();
@@ -299,7 +307,7 @@ contract SimpleScript is Script {
     assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
 });
 
-forgetest_async!(script_zk_broadcast_raw_create2_deployer, |prj, cmd| {
+forgetest_async!(script_zk_broadcast_raw_in_output_json, |prj, cmd| {
     util::initialize(prj.root());
 
     prj.add_source(
@@ -389,19 +397,22 @@ contract SimpleScript is Script {
 
     // check that the txs have the correct function and contract address
     assert_eq!(txns.len(), 1);
-    broadcasted["function"].as_str().expect("function name").contains("increment");
+    broadcasted["function"]
+        .as_str()
+        .expect("function name key was not a string")
+        .contains("increment");
     broadcasted["contractAddress"]
         .as_str()
-        .expect("contract address")
+        .expect("contract address key was not a string")
         .contains("0x9086c95769c51e15d6a77672251cf13ce7ebf3ae");
 
     broadcasted["transaction"]["from"]
         .as_str()
-        .expect("from")
+        .expect("from was key not a string")
         .contains("0xbc989fde9e54cad2ab4392af6df60f04873a033a");
     broadcasted["transaction"]["to"]
         .as_str()
-        .expect("to")
+        .expect("to was not key a string")
         .contains("0x9086c95769c51e15d6a77672251cf13ce7ebf3ae");
     broadcasted["transaction"]["value"].as_str().expect("value").contains("0x0");
 });
