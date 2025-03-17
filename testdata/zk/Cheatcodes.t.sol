@@ -133,32 +133,17 @@ contract ZkCheatcodesTest is DSTest {
         require(block.number == ERA_FORK_BLOCK, "era block number mismatch");
 
         vm.roll(ERA_FORK_BLOCK + 1);
-        require(
-            block.number == ERA_FORK_BLOCK + 1,
-            "era block number mismatch"
-        );
-        require(
-            block.timestamp == ERA_FORK_BLOCK_TS,
-            "era block timestamp unchanged with roll"
-        );
+        require(block.number == ERA_FORK_BLOCK + 1, "era block number mismatch");
+        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp unchanged with roll");
     }
 
     function testZkCheatcodesWarp() public {
         vm.selectFork(forkEra);
-        require(
-            block.timestamp == ERA_FORK_BLOCK_TS,
-            "era block timestamp mismatch"
-        );
+        require(block.timestamp == ERA_FORK_BLOCK_TS, "era block timestamp mismatch");
 
         vm.warp(ERA_FORK_BLOCK_TS + 1);
-        require(
-            block.timestamp == ERA_FORK_BLOCK_TS + 1,
-            "era block timestamp mismatch"
-        );
-        require(
-            block.number == ERA_FORK_BLOCK,
-            "era block number unchanged with warp"
-        );
+        require(block.timestamp == ERA_FORK_BLOCK_TS + 1, "era block timestamp mismatch");
+        require(block.number == ERA_FORK_BLOCK, "era block number unchanged with warp");
     }
 
     function testZkCheatcodesDeal() public {
@@ -191,18 +176,11 @@ contract ZkCheatcodesTest is DSTest {
     function testZkCheatcodesEtch() public {
         vm.selectFork(forkEra);
 
-        string memory artifact = vm.readFile(
-            "./zk/zkout/ConstantNumber.sol/ConstantNumber.json"
-        );
-        bytes memory constantNumberCode = vm.parseJsonBytes(
-            artifact,
-            ".bytecode.object"
-        );
+        string memory artifact = vm.readFile("./zk/zkout/ConstantNumber.sol/ConstantNumber.json");
+        bytes memory constantNumberCode = vm.parseJsonBytes(artifact, ".bytecode.object");
         vm.etch(TEST_ADDRESS, constantNumberCode);
 
-        (bool success, bytes memory output) = TEST_ADDRESS.call(
-            abi.encodeWithSignature("ten()")
-        );
+        (bool success, bytes memory output) = TEST_ADDRESS.call(abi.encodeWithSignature("ten()"));
         require(success, "ten() call failed");
 
         uint8 number = abi.decode(output, (uint8));
@@ -213,9 +191,7 @@ contract ZkCheatcodesTest is DSTest {
         FixedSlot fs = new FixedSlot();
         vm.record();
         fs.setSlot0(10);
-        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(
-            address(fs)
-        );
+        (bytes32[] memory reads, bytes32[] memory writes) = vm.accesses(address(fs));
         bytes32 keySlot0 = bytes32(uint256(0));
         assertEq(reads[0], keySlot0);
         assertEq(writes[0], keySlot0);
@@ -266,11 +242,7 @@ contract ZkCheatcodesTest is DSTest {
         bytes memory dataBefore = target.getBytes();
         assertEq(dataBefore, bytes(hex"abcd"));
 
-        vm.mockCall(
-            address(inner),
-            abi.encodeWithSelector(inner.getBytes.selector),
-            abi.encode(bytes(hex"a1b1"))
-        );
+        vm.mockCall(address(inner), abi.encodeWithSelector(inner.getBytes.selector), abi.encode(bytes(hex"a1b1")));
 
         bytes memory dataAfter = target.getBytes();
         assertEq(dataAfter, bytes(hex"a1b1"));
@@ -280,11 +252,7 @@ contract ZkCheatcodesTest is DSTest {
         address thisAddress = address(this);
         MyProxyCaller transactor = new MyProxyCaller(thisAddress);
 
-        vm.mockCall(
-            thisAddress,
-            abi.encodeWithSelector(IMyProxyCaller.transact.selector),
-            abi.encode()
-        );
+        vm.mockCall(thisAddress, abi.encodeWithSelector(IMyProxyCaller.transact.selector), abi.encode());
 
         transactor.transact();
     }
@@ -297,32 +265,19 @@ contract ZkCheatcodesTest is DSTest {
 
         MyProxyCaller transactor = new MyProxyCaller(mockMe);
 
-        vm.mockCall(
-            mockMe,
-            abi.encodeWithSelector(IMyProxyCaller.transact.selector),
-            abi.encode()
-        );
+        vm.mockCall(mockMe, abi.encodeWithSelector(IMyProxyCaller.transact.selector), abi.encode());
 
         transactor.transact();
     }
 
     function testZkCheatcodesCanBeUsedAfterFork() public {
-        assertEq(
-            0,
-            address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance
-        );
+        assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
 
         vm.createSelectFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
-        assertEq(
-            0,
-            address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance
-        );
+        assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
 
         vm.deal(0x4e59b44847b379578588920cA78FbF26c0B4956C, 1 ether);
-        assertEq(
-            1 ether,
-            address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance
-        );
+        assertEq(1 ether, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
     }
 
     function testRecordLogsInZkVm() public {
@@ -352,18 +307,14 @@ contract ZkCheatcodesTest is DSTest {
         vm.makePersistent(address(emitter));
 
         // ensure we are in zkvm
-        (bool _success, bytes memory _ret) = address(vm).call(
-            abi.encodeWithSignature("zkVm(bool)", true)
-        );
+        (bool _success, bytes memory _ret) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", true));
 
         vm.recordLogs();
         emitter.emitConsole("zkvm");
         Vm.Log[] memory zkvmEntries = vm.getRecordedLogs();
 
         // ensure we are NOT in zkvm
-        (_success, _ret) = address(vm).call(
-            abi.encodeWithSignature("zkVm(bool)", false)
-        );
+        (_success, _ret) = address(vm).call(abi.encodeWithSignature("zkVm(bool)", false));
 
         vm.recordLogs();
         emitter.emitConsole("evm");
@@ -376,47 +327,21 @@ contract ZkCheatcodesTest is DSTest {
         InnerProxy innerProxy = new InnerProxy();
         Proxy proxy = new Proxy(innerProxy);
         Caller caller = new Caller();
-        vm.expectCall(
-            address(proxy),
-            abi.encodeCall(proxy.proxyCall, (caller)),
-            1
-        );
-        vm.expectCall(
-            address(innerProxy),
-            abi.encodeCall(innerProxy.proxyCall, (caller)),
-            1
-        );
+        vm.expectCall(address(proxy), abi.encodeCall(proxy.proxyCall, (caller)), 1);
+        vm.expectCall(address(innerProxy), abi.encodeCall(innerProxy.proxyCall, (caller)), 1);
         vm.expectCall(address(caller), abi.encodeCall(caller.call, (10)), 1);
         proxy.proxyCall(caller);
     }
 
     // Utility function
-    function getCodeCheck(
-        string memory contractName,
-        string memory outDir
-    ) internal {
+    function getCodeCheck(string memory contractName, string memory outDir) internal {
         bytes memory bytecode = vm.getCode(contractName);
 
-        string memory artifactPath = string.concat(
-            "zk/",
-            outDir,
-            "/",
-            contractName,
-            ".sol/",
-            contractName,
-            ".json"
-        );
+        string memory artifactPath = string.concat("zk/", outDir, "/", contractName, ".sol/", contractName, ".json");
         string memory artifact = vm.readFile(artifactPath);
-        bytes memory expectedBytecode = vm.parseJsonBytes(
-            artifact,
-            ".bytecode.object"
-        );
+        bytes memory expectedBytecode = vm.parseJsonBytes(artifact, ".bytecode.object");
 
-        assertEq(
-            bytecode,
-            expectedBytecode,
-            "code for the contract was incorrect"
-        );
+        assertEq(bytecode, expectedBytecode, "code for the contract was incorrect");
     }
 
     function testBroadcastTX() external {
@@ -442,17 +367,11 @@ contract UsesCheatcodes {
         return vm.getNonce(target);
     }
 
-    function getZkTransactionNonce(
-        Vm vm,
-        address target
-    ) public view returns (uint64) {
+    function getZkTransactionNonce(Vm vm, address target) public view returns (uint64) {
         return vm.zkGetTransactionNonce(target);
     }
 
-    function getZkDeploymentNonce(
-        Vm vm,
-        address target
-    ) public view returns (uint64) {
+    function getZkDeploymentNonce(Vm vm, address target) public view returns (uint64) {
         return vm.zkGetDeploymentNonce(target);
     }
 
