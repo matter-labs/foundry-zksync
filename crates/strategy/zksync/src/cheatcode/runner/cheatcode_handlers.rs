@@ -1,7 +1,7 @@
 use std::any::TypeId;
 
 use alloy_eips::eip2718::Decodable2718;
-use alloy_primitives::{Address, U256};
+use alloy_primitives::U256;
 use alloy_rpc_types::TransactionRequest;
 use alloy_sol_types::SolValue;
 use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
@@ -385,6 +385,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     factory_deps,
                     paymaster_data,
                     zk_env: get_context(ccx.state.strategy.context.as_mut()).zk_env.clone(),
+                    target_depth: Some(ccx.ecx.journaled_state.depth + 1),
                 };
 
                 ccx.ecx.db.transact_from_tx(

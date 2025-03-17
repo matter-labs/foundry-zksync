@@ -1369,8 +1369,6 @@ impl DatabaseExt for Backend {
             let mut env = self.env_with_handler_cfg(env);
 
             let mut db = self.clone();
-            // FIXME(zk): find a way to apply the same change inside the next method
-            // evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
             db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx)?
         };
 

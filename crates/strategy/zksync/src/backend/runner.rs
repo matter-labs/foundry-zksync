@@ -61,6 +61,11 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         // patch evm context with real caller
         evm_context.env.tx.caller = env.tx.caller;
 
+        // patch evm starting depth with real depth
+        if let Some(target_depth) = inspect_ctx.target_depth {
+            evm_context.journaled_state.depth = target_depth;
+        }
+
         result.map(|(result, call_traces)| {
             inspector.trace_zksync(&mut evm_context, call_traces, true);
             result

@@ -12,7 +12,7 @@ use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
 use foundry_evm_core::{
-    backend::{DatabaseExt, RevertStateSnapshotAction},
+    backend::{strategy::EvmInspectContext, DatabaseExt, RevertStateSnapshotAction},
     constants::{CALLER, CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, TEST_CONTRACT_ADDRESS},
 };
 use foundry_evm_traces::StackSnapshotType;
@@ -773,12 +773,13 @@ impl Cheatcode for broadcastRawTransactionCall {
         let tx = TxEnvelope::decode(&mut self.data.as_ref())
             .map_err(|err| fmt_err!("failed to decode RLP-encoded transaction: {err}"))?;
 
+        let target_depth = ccx.ecx.journaled_state.depth + 1;
         ccx.ecx.db.transact_from_tx(
             &tx.clone().into(),
             (*ccx.ecx.env).clone(),
             &mut ccx.ecx.journaled_state,
             &mut *executor.get_inspector(ccx.state),
-            Box::new(()),
+            Box::new(EvmInspectContext { target_depth: Some(target_depth) }),
         )?;
 
         if ccx.state.broadcast.is_some() {

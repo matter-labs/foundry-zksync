@@ -173,6 +173,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     factory_deps: zk_tx.factory_deps.clone(),
                     paymaster_data: zk_tx.paymaster_data.clone(),
                     zk_env: ctx.zk_env.clone(),
+                    target_depth: None,
                 }),
             ),
         }
@@ -203,6 +204,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                         factory_deps: zk_tx.factory_deps,
                         paymaster_data: zk_tx.paymaster_data,
                         zk_env: ctx.zk_env.clone(),
+                        target_depth: None,
                     }),
                 )
             }

@@ -9,7 +9,10 @@ use foundry_cheatcodes::strategy::{
 use foundry_compilers::ProjectCompileOutput;
 use foundry_config::Config;
 use foundry_evm_core::{
-    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
+    backend::{
+        strategy::{BackendStrategy, EvmInspectContext},
+        Backend, BackendResult, CowBackend,
+    },
     decode::RevertDecoder,
 };
 use foundry_linking::LinkerError;
@@ -247,7 +250,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         _executor_env: &EnvWithHandlerCfg,
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState> {
-        backend.inspect(env, inspector, Box::new(()))
+        backend.inspect(env, inspector, Box::new(EvmInspectContext::default()))
     }
 
     fn transact(
@@ -258,7 +261,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         _executor_env: &EnvWithHandlerCfg,
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState> {
-        backend.inspect(env, inspector, Box::new(()))
+        backend.inspect(env, inspector, Box::new(EvmInspectContext::default()))
     }
 
     fn new_backend_strategy(&self) -> BackendStrategy {
