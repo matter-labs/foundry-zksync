@@ -491,12 +491,3 @@ contract ZkCheatcodeZkVmSkipTest is DSTest {
         helper2.exec();
     }
 }
-
-contract InitializableContract {
-    bool public initialized;
-
-    function initialize() public {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-}
