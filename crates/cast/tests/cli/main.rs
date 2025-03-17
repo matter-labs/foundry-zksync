@@ -1992,7 +1992,6 @@ forgetest_async!(cast_call_custom_chain_id, |_prj, cmd| {
 
 // https://github.com/foundry-rs/foundry/issues/9541
 forgetest_async!(
-    #[ignore = "upstream failure"]
     cast_run_impersonated_tx,
     |_prj, cmd| {
         let (_api, handle) = anvil::spawn(
