@@ -1372,9 +1372,8 @@ impl DatabaseExt for Backend {
             match db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx) {
                 Ok(ok) => ok,
                 Err(err) => {
-                    // NOTE(zk): try to retrieve the inner error (for expectRevert purposes)
-                    let backend_error = err.downcast::<BackendError>()?;
-                    return Err(backend_error.into());
+                    // NOTE(zk): try to retrieve the inner evm.transact error (for expectRevert purposes)
+                    return Err(eyre::eyre!("{}", err.chain().nth(1).expect("inner evm.transact error")));
                 }
             }
         };
