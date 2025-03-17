@@ -4,7 +4,7 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
-    utils::{configure_tx_env, configure_tx_req_env, new_evm_with_inspector},
+    utils::{configure_tx_env, configure_tx_req_env},
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
@@ -1369,7 +1369,14 @@ impl DatabaseExt for Backend {
             let mut env = self.env_with_handler_cfg(env);
 
             let mut db = self.clone();
-            db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx)?
+            match db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx) {
+                Ok(ok) => ok,
+                Err(err) => {
+                    // NOTE(zk): try to retrieve the inner error (for expectRevert purposes)
+                    let backend_error = err.downcast::<BackendError>()?;
+                    return Err(backend_error.into());
+                }
+            }
         };
 
         self.commit(res.state);
