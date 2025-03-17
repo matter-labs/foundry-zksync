@@ -419,31 +419,21 @@ contract ZkCheatcodesTest is DSTest {
         );
     }
 
-    contract Counter {
-        uint256 public count;
-        function increment() external {
-            count++;
-        }
-    }
-
     function testBroadcastTX() external {
-        vm.zkVm(true);
-
-
-
         address payer = address(0xBC989fDe9e54cAd2aB4392Af6dF60f04873A033A);
         vm.deal(payer, 2 ether);
+        vm.makePersistent(payer);
 
-        // uint256 balance = TEST_ADDRESS.balance;
+        uint256 balance = TEST_ADDRESS.balance;
 
-        uint256 prev = count;
-
-        // This raw transaction comes from cast mktx of increment() to Counter contract
-        // `cast mktx "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 1 --chain-id 260`
+        vm.zkVm(true);
+        // sends 1 ether to TEST_ADDRESS
+        // cast mktx 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a --value 1ether --private-key 0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e --zksync --rpc-url http://localhost:50686
         vm.broadcastRawTransaction(
-            hex"71f88580808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a01a02d521c213f87a483579002fba6b1ccbbaae8495fbe39273448c757cf2bf1b9faa07588588da6029c73e7b79b4f5afd936e2eb1277871aa6a088cf9183846ac43b1827a6994bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
+            hex"71f88980808402b275d08307b2f8946eb28604685b1f182dab800a1bfa4bafdba8a79a880de0b6b3a76400008080a00da060e1567e202bc057f4d93edf67da3aeb2e7593320edc4aa3e7a488200697a061a725c5f3b6641cb7f3605ba57ac385fd14dc99e43d3b61503e5e563490cdd4827a6994bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
         );
-        assertEq(count, prev + 1);
+
+        assertEq(balance + 1 ether, TEST_ADDRESS.balance);
     }
 }
 
