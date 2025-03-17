@@ -154,7 +154,6 @@ zksync_multivm.opt-level = 3
 alloy-sol-macro-expander.opt-level = "z"
 figment.opt-level = "z"
 foundry-compilers-artifacts-solc.opt-level = "z"
-foundry-config.opt-level = "z"
 html5ever.opt-level = "z"
 mdbook.opt-level = "z"
 prettyplease.opt-level = "z"
@@ -201,7 +200,7 @@ foundry-strategy-zksync = { path = "crates/strategy/zksync" }
 
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.11.0", default-features = false }
-foundry-compilers = { version = "0.13.3", default-features = false }
+foundry-compilers = { version = "0.13.5", default-features = false }
 foundry-fork-db = "0.12"
 solang-parser = "=0.3.3"
 solar-parse = { version = "=0.1.1", default-features = false }
@@ -285,8 +284,8 @@ proc-macro2 = "1.0"
 quote = "1.0"
 syn = "2.0"
 async-trait = "0.1"
-derive_more = { version = "1.0", features = ["full"] }
-thiserror = "2.0.10"
+derive_more = { version = "2.0", features = ["full"] }
+thiserror = "2"
 
 # bench
 divan = "0.1"
@@ -307,7 +306,7 @@ comfy-table = "7"
 dirs = "6"
 dunce = "1"
 evm-disassembler = "0.5"
-evmole = "0.6"
+evmole = "0.7"
 eyre = "0.6"
 figment = "0.10"
 futures = "0.3"
@@ -335,7 +334,7 @@ soldeer-commands = "=0.5.2"
 
 # NOTE(zk): we cannot update this to 0.27 currently due to alloy-chains updating this in their patch version bump
 # We need to migrate over all the transitive dependencies to a more recent alloy version before we can bump this
-strum = "0.26"
+strum = "0.27.1"
 
 tempfile = "3.13"
 tikv-jemallocator = "0.6"
