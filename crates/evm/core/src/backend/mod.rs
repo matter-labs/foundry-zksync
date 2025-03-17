@@ -239,6 +239,7 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()>;
 
     /// Returns the `ForkId` that's currently used in the database, if fork mode is on
@@ -1357,6 +1358,7 @@ impl DatabaseExt for Backend {
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()> {
         trace!(?tx, "execute signed transaction");
 
@@ -1364,12 +1366,12 @@ impl DatabaseExt for Backend {
 
         let res = {
             configure_tx_req_env(&mut env, tx, None)?;
-            let env = self.env_with_handler_cfg(env);
+            let mut env = self.env_with_handler_cfg(env);
 
             let mut db = self.clone();
-            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
-            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
-            evm.transact()?
+            // FIXME(zk): find a way to apply the same change inside the next method
+            // evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
+            db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx)?
         };
 
         self.commit(res.state);
