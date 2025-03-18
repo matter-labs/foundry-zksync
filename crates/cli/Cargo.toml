@@ -54,7 +54,6 @@ tracing-tracy = { version = "0.11", optional = true }
 
 # zk
 foundry-zksync-compilers.workspace = true
-era-solc.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
