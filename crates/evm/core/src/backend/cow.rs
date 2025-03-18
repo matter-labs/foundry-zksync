@@ -201,12 +201,7 @@ impl DatabaseExt for CowBackend<'_> {
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
     ) -> eyre::Result<()> {
-        self.backend_mut(&env).transact_from_tx(
-            transaction,
-            env,
-            journaled_state,
-            inspector,
-        )
+        self.backend_mut(&env).transact_from_tx(transaction, env, journaled_state, inspector)
     }
 
     fn zk_transact_from_tx(
