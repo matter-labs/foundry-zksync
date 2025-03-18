@@ -6,7 +6,7 @@ use eyre::{Ok, Result};
 use foundry_evm::{
     backend::{
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        Backend, DatabaseExt,
+        update_state, Backend, DatabaseExt,
     },
     InspectorExt,
 };
@@ -24,7 +24,7 @@ use crate::backend::{
     context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
     merge::{ZksyncBackendMerge, ZksyncMergeState},
 };
-
+use revm::DatabaseCommit;
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZksyncBackendStrategyRunner;
@@ -147,36 +147,46 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             );
         }
 
-        let inspect_ctx = get_inspect_context(inspect_ctx);
-        let mut persisted_factory_deps =
-            get_context(backend.strategy.context.as_mut()).persisted_factory_deps.clone();
+        backend.commit(journaled_state.state.clone());
 
-        let result = foundry_zksync_core::vm::transact(
-            Some(&mut persisted_factory_deps),
-            Some(inspect_ctx.factory_deps),
-            inspect_ctx.paymaster_data,
-            &mut env,
-            &inspect_ctx.zk_env,
-            backend,
-        );
+        let res = {
+            let inspect_ctx = get_inspect_context(inspect_ctx);
+            let mut persisted_factory_deps =
+                get_context(backend.strategy.context.as_mut()).persisted_factory_deps.clone();
 
-        let ctx = get_context(backend.strategy.context.as_mut());
-        ctx.persisted_factory_deps = persisted_factory_deps;
+            let result = foundry_zksync_core::vm::transact(
+                Some(&mut persisted_factory_deps),
+                Some(inspect_ctx.factory_deps),
+                inspect_ctx.paymaster_data,
+                &mut env,
+                &inspect_ctx.zk_env,
+                backend,
+            );
 
-        let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
+            let ctx = get_context(backend.strategy.context.as_mut());
+            ctx.persisted_factory_deps = persisted_factory_deps;
 
-        // patch evm context with real caller
-        evm_context.env.tx.caller = env.tx.caller;
+            let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
 
-        // patch evm starting depth with real depth
-        // if let Some(target_depth) = inspect_ctx.target_depth { // REMOOOOVE
-        //     evm_context.journaled_state.depth = journaled_state.depth + 1;
-        // }
-        evm_context.journaled_state.depth = journaled_state.depth + 1;
+            // patch evm context with real caller
+            evm_context.env.tx.caller = env.tx.caller;
 
-        result.map(|(result, call_traces)| {
-            inspector.trace_zksync(&mut evm_context, call_traces, true);
-        })
+            // patch evm starting depth with real depth
+            // if let Some(target_depth) = inspect_ctx.target_depth { // REMOOOOVE
+            //     evm_context.journaled_state.depth = journaled_state.depth + 1;
+            // }
+            evm_context.journaled_state.depth = journaled_state.depth + 1;
+
+            result.map(|(result, call_traces)| {
+                inspector.trace_zksync(&mut evm_context, call_traces, true);
+                result
+            })?
+        };
+
+        backend.commit(res.state);
+        update_state(&mut journaled_state.state, backend, None)?;
+
+        Ok(())
     }
 }
 

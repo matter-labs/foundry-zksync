@@ -204,7 +204,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-        inspect_ctx: Box<dyn Any>,
+        _inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()> {
         backend.commit(journaled_state.state.clone());
 
