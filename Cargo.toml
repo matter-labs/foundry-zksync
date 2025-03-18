@@ -201,7 +201,7 @@ foundry-strategy-zksync = { path = "crates/strategy/zksync" }
 
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.11.0", default-features = false }
-foundry-compilers = { version = "0.13.3", default-features = false }
+foundry-compilers = { version = "0.13.5", default-features = false }
 foundry-fork-db = "0.12"
 solang-parser = "=0.3.3"
 solar-parse = { version = "=0.1.1", default-features = false }
@@ -267,11 +267,11 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "593f57904edecea1a056c34d578f269ba86e56a5" }
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "593f57904edecea1a056c34d578f269ba86e56a5" }
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "593f57904edecea1a056c34d578f269ba86e56a5" }
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "593f57904edecea1a056c34d578f269ba86e56a5" }
+anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "593f57904edecea1a056c34d578f269ba86e56a5" }
 zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "d5c35951843263765079545c31c908dcbaab1f30" }
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
@@ -287,8 +287,8 @@ proc-macro2 = "1.0"
 quote = "1.0"
 syn = "2.0"
 async-trait = "0.1"
-derive_more = { version = "1.0", features = ["full"] }
-thiserror = "2.0.10"
+derive_more = { version = "2.0", features = ["full"] }
+thiserror = "2"
 
 # bench
 divan = "0.1"
@@ -309,7 +309,7 @@ comfy-table = "7"
 dirs = "6"
 dunce = "1"
 evm-disassembler = "0.5"
-evmole = "0.6"
+evmole = "0.7"
 eyre = "0.6"
 figment = "0.10"
 futures = "0.3"
@@ -333,7 +333,7 @@ semver = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.128", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
-soldeer-commands = "=0.5.2"
+soldeer-commands = "=0.5.3"
 strum = "0.27"
 tempfile = "3.13"
 tikv-jemallocator = "0.6"
