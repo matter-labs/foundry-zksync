@@ -33,6 +33,7 @@ forge::it:
     zk::cheats::test_zk_cheat_expect_call_works
     zk::cheats::test_zk_cheat_expect_emit_works
     zk::cheats::test_zk_cheat_expect_revert_works
+    zk::cheats::test_zk_cheat_expect_revert_works_with_external_call_reverts
     zk::cheats::test_zk_cheat_expect_revert_works_with_internal_reverts
     zk::cheats::test_zk_cheat_get_code
     zk::cheats::test_zk_cheat_mock_calls
