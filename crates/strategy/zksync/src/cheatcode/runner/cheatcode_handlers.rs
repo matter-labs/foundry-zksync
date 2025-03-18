@@ -394,7 +394,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     target_depth: Some(ccx.ecx.journaled_state.depth + 1),
                 };
 
-                ccx.ecx.db.zk_transact_from_tx(
+                ccx.ecx.db.transact_from_tx(
                     &tx,
                     *ccx.ecx.env.clone(),
                     &mut ccx.ecx.journaled_state,
