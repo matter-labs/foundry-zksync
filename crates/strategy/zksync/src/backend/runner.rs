@@ -28,6 +28,8 @@ use revm::DatabaseCommit;
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZksyncBackendStrategyRunner;
+use foundry_evm::utils::new_evm_with_inspector;
+use foundry_evm_core::utils::configure_tx_req_env;
 
 impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
     fn inspect(
@@ -150,6 +152,9 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         backend.commit(journaled_state.state.clone());
 
         let res = {
+            configure_tx_req_env(&mut env, tx, None)?;
+            let mut env = backend.env_with_handler_cfg(env);
+
             let inspect_ctx = get_inspect_context(inspect_ctx);
             let mut persisted_factory_deps =
                 get_context(backend.strategy.context.as_mut()).persisted_factory_deps.clone();
