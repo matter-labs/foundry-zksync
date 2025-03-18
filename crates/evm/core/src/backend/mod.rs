@@ -239,6 +239,8 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
+        // NOTE(zk): this allows sending the zkInspectContext down, since transact_from_tx
+        // needs to instantiate the right EvmContext depending on the transaction type
         inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()>;
 
@@ -1362,10 +1364,7 @@ impl DatabaseExt for Backend {
     ) -> eyre::Result<()> {
         trace!(?tx, "execute signed transaction");
 
-        // let mut db = self.clone();
-        // self.strategy.runner.transact_from_tx(db, tx, env, journaled_state, inspector,
-        // inspect_ctx)
-
+        // NOTE(zk): The code was moved to the strategy, see #958
         self.strategy.runner.transact_from_tx(
             self,
             tx,
@@ -1374,31 +1373,6 @@ impl DatabaseExt for Backend {
             inspector,
             inspect_ctx,
         )
-
-        // self.commit(journaled_state.state.clone());
-
-        // let res = {
-        //     configure_tx_req_env(&mut env, tx, None)?;
-        //     let mut env = self.env_with_handler_cfg(env);
-
-        //     let mut db = self.clone();
-        //     match db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx) {
-        //         Ok(ok) => ok,
-        //         Err(err) => {
-        //             // NOTE(zk): try to retrieve the inner evm.transact error (for expectRevert
-        //             // purposes)
-        //             return Err(eyre::eyre!(
-        //                 "{}",
-        //                 err.chain().nth(1).expect("inner evm.transact error")
-        //             ));
-        //         }
-        //     }
-        // };
-
-        // self.commit(res.state);
-        // update_state(&mut journaled_state.state, self, None)?;
-
-        // Ok(())
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {

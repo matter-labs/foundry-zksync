@@ -16,7 +16,7 @@ use foundry_evm_core::backend::{
 };
 use revm::{
     primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
-    JournaledState,
+    DatabaseCommit, JournaledState,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,12 +24,11 @@ use crate::backend::{
     context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
     merge::{ZksyncBackendMerge, ZksyncMergeState},
 };
-use revm::DatabaseCommit;
+use foundry_evm_core::utils::configure_tx_req_env;
+
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ZksyncBackendStrategyRunner;
-use foundry_evm::utils::new_evm_with_inspector;
-use foundry_evm_core::utils::configure_tx_req_env;
 
 impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
     fn inspect(
@@ -173,13 +172,8 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
 
             let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
 
-            // patch evm context with real caller
+            // Patch evm context with real caller
             evm_context.env.tx.caller = env.tx.caller;
-
-            // patch evm starting depth with real depth
-            // if let Some(target_depth) = inspect_ctx.target_depth { // REMOOOOVE
-            //     evm_context.journaled_state.depth = journaled_state.depth + 1;
-            // }
             evm_context.journaled_state.depth = journaled_state.depth + 1;
 
             result.map(|(result, call_traces)| {
