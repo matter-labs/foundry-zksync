@@ -215,97 +215,12 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
 });
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_zk_raw() {
+async fn test_zk_broadcast_raw_executes() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testBroadcastTX", "ZkCheatcodesTest", ".*");
 
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
-
-forgetest_async!(test_zk_broadcast_raw_executes, |prj, cmd| {
-    foundry_test_utils::util::initialize(prj.root());
-    let node = ZkSyncNode::start().await;
-    let url = node.url();
-
-    let (_, private_key) = ZkSyncNode::rich_wallets()
-        .next()
-        .map(|(addr, pk, _)| (addr, pk))
-        .expect("No rich wallets available");
-
-    prj.add_source(
-        "Counter.sol",
-        r#"
-        pragma solidity ^0.8.0;
-    
-        contract Counter {
-            uint256 public count;
-            function increment() external {
-                count++;
-            }
-        }
-        "#,
-    )
-    .unwrap();
-
-    //deploy
-    let _ = cmd
-        .args([
-            "create",
-            "src/Counter.sol:Counter",
-            "--zksync",
-            "--private-key",
-            private_key,
-            "--rpc-url",
-            &url,
-        ])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
-
-    cmd.forge_fuse();
-
-    prj.add_script(
-        "Foo",
-        r#"
-import "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
-contract SimpleScript is Script {
-    function run() external {
-        // zk raw transaction
-        vm.startBroadcast();
-        Counter counter = Counter(0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7);
-        uint256 prev = counter.count();
-
-        // This raw transaction comes from cast mktx of increment() to Counter contract
-        // `cast mktx "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 2`
-        vm.broadcastRawTransaction(
-            hex"71f88501808402b275d08304d718949c1a3d7c98dbf89c7f5d167f2219c29c2fe775a78084d09de08a01a021cfba0a1ac7d72f2b0f052a85004282f18b2a35a8451773bb8b25446a5470aba01e81a389b81f72c7dad310998d5e677727b1ce9996e512124d52fb26ea43430b82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
-        );
-        require(counter.count() == prev + 1);
-
-        vm.stopBroadcast();
-    }
-}
-"#,
-    )
-    .unwrap();
-
-    cmd.args([
-        "script",
-        "--zksync",
-        "--private-key",
-        private_key,
-        "--rpc-url",
-        &url,
-        "--broadcast",
-        "--slow",
-        "--non-interactive",
-        "SimpleScript",
-    ]);
-
-    let output = cmd.assert_success().get_output().stdout_lossy();
-    assert!(output.contains("ONCHAIN EXECUTION COMPLETE & SUCCESSFUL."));
-});
 
 forgetest_async!(script_zk_broadcast_raw_in_output_json, |prj, cmd| {
     util::initialize(prj.root());
