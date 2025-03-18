@@ -349,7 +349,13 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     .wrap_err("Failed to decode tx")?;
 
                 let tx_712 = envelope.as_eip712();
-                let parts = tx_712.unwrap().clone().into_parts().0;
+
+                let parts = match tx_712 {
+                    Some(tx) => tx.clone().into_parts().0,
+                    None => {
+                        return Err(Error::display("Failed to decode tx, no EIP712 data"));
+                    }
+                };
 
                 let tx: TransactionRequest = TransactionRequest {
                     from: Some(parts.from),
