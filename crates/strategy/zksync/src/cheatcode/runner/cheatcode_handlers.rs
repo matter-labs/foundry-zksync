@@ -26,12 +26,9 @@ use foundry_zksync_core::{PaymasterParams, ZkPaymasterData, H256};
 use revm::interpreter::InstructionResult;
 use tracing::{info, warn};
 
-use crate::{
-    backend::ZksyncInspectContext,
-    cheatcode::{
-        runner::{get_context, utils::get_artifact_code, WithOtherFields},
-        ZksyncCheatcodeInspectorStrategyRunner,
-    },
+use crate::cheatcode::{
+    runner::{get_context, utils::get_artifact_code, WithOtherFields},
+    ZksyncCheatcodeInspectorStrategyRunner,
 };
 
 impl ZksyncCheatcodeInspectorStrategyRunner {
@@ -376,30 +373,11 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     gas_price: Default::default(),
                 };
 
-                let (factory_deps, paymaster_data) = match parts.eip712_meta {
-                    None => Default::default(),
-                    Some(meta) => (
-                        meta.factory_deps.into_iter().map(|b| b.to_vec()).collect(),
-                        meta.paymaster_params.map(|params| PaymasterParams {
-                            paymaster: zksync_types::H160::from(params.paymaster.0 .0),
-                            paymaster_input: params.paymaster_input.to_vec(),
-                        }),
-                    ),
-                };
-
-                let inspect_ctx = ZksyncInspectContext {
-                    factory_deps,
-                    paymaster_data,
-                    zk_env: get_context(ccx.state.strategy.context.as_mut()).zk_env.clone(),
-                    target_depth: Some(ccx.ecx.journaled_state.depth + 1),
-                };
-
                 ccx.ecx.db.transact_from_tx(
                     &tx,
                     *ccx.ecx.env.clone(),
                     &mut ccx.ecx.journaled_state,
                     &mut *executor.get_inspector(ccx.state),
-                    Box::new(inspect_ctx),
                 )?;
 
                 if ccx.state.broadcast.is_some() {

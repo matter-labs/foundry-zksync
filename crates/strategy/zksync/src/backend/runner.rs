@@ -130,6 +130,32 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
     }
+
+    fn transact_from_tx(
+        &self,
+        backend: &mut Backend,
+        tx: &TransactionRequest,
+        mut env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+    ) -> eyre::Result<()> {
+        backend.commit(journaled_state.state.clone());
+
+        let res = {
+            configure_tx_req_env(&mut env, tx, None)?;
+            let env = backend.env_with_handler_cfg(env);
+
+            let mut db = backend.clone();
+            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
+            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
+            evm.transact()?
+        };
+
+        backend.commit(res.state);
+        update_state(&mut journaled_state.state, backend, None)?;
+
+        Ok(())
+    }
 }
 
 impl ZksyncBackendStrategyRunner {

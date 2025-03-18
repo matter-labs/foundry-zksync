@@ -4,7 +4,7 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
-    utils::{configure_tx_env, configure_tx_req_env},
+    utils::configure_tx_env,
     InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
@@ -239,7 +239,6 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()>;
 
     /// Returns the `ForkId` that's currently used in the database, if fork mode is on
@@ -1355,37 +1354,42 @@ impl DatabaseExt for Backend {
     fn transact_from_tx(
         &mut self,
         tx: &TransactionRequest,
-        mut env: Env,
+        env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()> {
         trace!(?tx, "execute signed transaction");
 
-        self.commit(journaled_state.state.clone());
+        // let mut db = self.clone();
+        // self.strategy.runner.transact_from_tx(db, tx, env, journaled_state, inspector,
+        // inspect_ctx)
 
-        let res = {
-            configure_tx_req_env(&mut env, tx, None)?;
-            let mut env = self.env_with_handler_cfg(env);
+        self.strategy.runner.transact_from_tx(self, tx, env, journaled_state, inspector)
 
-            let mut db = self.clone();
-            match db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx) {
-                Ok(ok) => ok,
-                Err(err) => {
-                    // NOTE(zk): try to retrieve the inner evm.transact error (for expectRevert
-                    // purposes)
-                    return Err(eyre::eyre!(
-                        "{}",
-                        err.chain().nth(1).expect("inner evm.transact error")
-                    ));
-                }
-            }
-        };
+        // self.commit(journaled_state.state.clone());
 
-        self.commit(res.state);
-        update_state(&mut journaled_state.state, self, None)?;
+        // let res = {
+        //     configure_tx_req_env(&mut env, tx, None)?;
+        //     let mut env = self.env_with_handler_cfg(env);
 
-        Ok(())
+        //     let mut db = self.clone();
+        //     match db.strategy.runner.inspect(&mut db, &mut env, inspector, inspect_ctx) {
+        //         Ok(ok) => ok,
+        //         Err(err) => {
+        //             // NOTE(zk): try to retrieve the inner evm.transact error (for expectRevert
+        //             // purposes)
+        //             return Err(eyre::eyre!(
+        //                 "{}",
+        //                 err.chain().nth(1).expect("inner evm.transact error")
+        //             ));
+        //         }
+        //     }
+        // };
+
+        // self.commit(res.state);
+        // update_state(&mut journaled_state.state, self, None)?;
+
+        // Ok(())
     }
 
     fn active_fork_id(&self) -> Option<LocalForkId> {
