@@ -129,11 +129,6 @@ contract ZkCheatcodesTest is DSTest {
 
     address constant TEST_ADDRESS = 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a;
 
-    bytes32 constant STORAGE__INITIALIZABLE = bytes32(uint256(0));
-
-    bytes32 constant TRUE = bytes32(uint256(1));
-    bytes32 constant FALSE = bytes32(uint256(0));
-
     uint256 forkEra;
     uint256 forkEth;
 
@@ -347,17 +342,11 @@ contract ZkCheatcodesTest is DSTest {
         proxy.proxyCall(caller);
     }
 
+    /// forge-config: default.allow_internal_expect_revert = false
     function testExpectRevertWithExternalCallReverts() public {
-        InitializableContract initializableContract = new InitializableContract();
-
-        assertEq(vm.load(address(initializableContract), STORAGE__INITIALIZABLE), FALSE);
-
-        initializableContract.initialize();
-
-        assertEq(vm.load(address(initializableContract), STORAGE__INITIALIZABLE), TRUE);
-
-        vm.expectRevert("Already initialized");
-        initializableContract.initialize();
+        Reverter reverter = new Reverter();
+        vm.expectRevert();
+        reverter.revertWithMessage();
     }
 
     // Utility function
