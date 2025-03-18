@@ -33,17 +33,6 @@ pub trait BackendStrategyContext: Debug + Send + Sync + Any {
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-/// Represents additional data for EVM transactions.
-#[derive(Clone, Debug, Default)]
-pub struct EvmInspectContext {
-    /// Target execution depth to be patched in before inspecting
-    /// the given tx.
-    pub target_depth: Option<usize>,
-}
-fn get_inspect_context(ctx: Box<dyn Any>) -> Box<EvmInspectContext> {
-    ctx.downcast().expect("expected EvmInspectContext")
-}
-
 impl BackendStrategyContext for () {
     fn new_cloned(&self) -> Box<dyn BackendStrategyContext> {
         Box::new(())
@@ -121,9 +110,10 @@ pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt 
         &self,
         backend: &mut Backend,
         tx: &TransactionRequest,
-        mut env: Env,
+        env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()>;
 }
 
@@ -154,15 +144,9 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         backend: &mut Backend,
         env: &mut EnvWithHandlerCfg,
         inspector: &mut dyn InspectorExt,
-        inspect_ctx: Box<dyn Any>,
+        _inspect_ctx: Box<dyn Any>,
     ) -> Result<ResultAndState> {
-        let inspect_ctx = get_inspect_context(inspect_ctx);
-
         let mut evm = crate::utils::new_evm_with_inspector(backend, env.clone(), inspector);
-
-        if let Some(target_depth) = &inspect_ctx.target_depth {
-            evm.context.evm.inner.journaled_state.depth = *target_depth;
-        }
 
         let res = evm.transact().wrap_err("EVM error")?;
 
@@ -220,6 +204,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()> {
         backend.commit(journaled_state.state.clone());
 

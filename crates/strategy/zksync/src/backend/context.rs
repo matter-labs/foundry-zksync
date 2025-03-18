@@ -40,8 +40,4 @@ pub(crate) struct ZksyncInspectContext {
     pub paymaster_data: Option<PaymasterParams>,
     /// Zksync environment.
     pub zk_env: ZkEnv,
-
-    /// Target execution depth to be patched in before inspecting
-    /// the given tx.
-    pub target_depth: Option<usize>,
 }
