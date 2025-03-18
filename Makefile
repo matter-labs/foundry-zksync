@@ -120,9 +120,9 @@ pr: ## Run all tests and linters in preparation for a PR.
 
 .PHONY: zksync-tests
 zksync-tests:
-	cargo nextest list -E 'test(~zk) | package(~zk)' -T human > zksync-tests
+	cargo nextest list -E 'test(~zk) | package(~zk)' -T human --color never > zksync-tests
 
 .PHONY: zksync-tests-check
 zksync-tests-check:
-	cargo nextest list -E 'test(~zk) | package(~zk)' -T human > /tmp/zksync-tests-check
+	cargo nextest list -E 'test(~zk) | package(~zk)' -T human --color never > /tmp/zksync-tests-check
 	git diff /tmp/zksync-tests-check zksync-tests
