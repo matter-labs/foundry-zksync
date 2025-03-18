@@ -346,6 +346,7 @@ tracing-subscriber = "0.3"
 url = "2"
 vergen = { version = "8", default-features = false }
 yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
+httptest = "0.16.3"
 
 ## alloy-core
 # alloy-dyn-abi = { path = "../../alloy-rs/core/crates/dyn-abi" }

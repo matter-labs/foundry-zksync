@@ -17,6 +17,12 @@ use anvil_zksync_core::{
     system_contracts::SystemContracts,
 };
 use anvil_zksync_l1_sidecar::L1Sidecar;
+use httptest::{
+    matchers::{eq, json_decoded, request},
+    responders::json_encoded,
+    Expectation, Server,
+};
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::AllowOrigin;
 use zksync_types::{L2BlockNumber, H160, U256};
@@ -347,5 +353,117 @@ impl ZkSyncNode {
 
     pub fn rich_wallets() -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
         RICH_WALLETS.iter().copied()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct RpcRequest {
+    pub jsonrpc: String,
+    pub id: u64,
+    pub method: String,
+    pub params: Option<serde_json::Value>,
+}
+
+/// A HTTP server that can be used to mock a fork source.
+pub struct MockServer {
+    /// The implementation for [httptest::Server].
+    pub inner: Server,
+}
+
+impl MockServer {
+    pub const CHAIN_ID: &str = "0x104";
+
+    /// Start the mock server.
+    pub fn run() -> Self {
+        let inner = Server::run();
+
+        inner.expect(
+            Expectation::matching(request::body(json_decoded(eq(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "eth_chainId",
+            })))))
+            .times(..)
+            .respond_with(json_encoded(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "result": Self::CHAIN_ID,
+            }))),
+        );
+
+        MockServer { inner }
+    }
+
+    /// Retrieve the mock server's url.
+    pub fn url(&self) -> String {
+        self.inner.url("").to_string()
+    }
+
+    /// Assert an exactly single call expectation with a given request and the provided response.
+    pub fn expect(
+        &self,
+        method: &str,
+        params: Option<serde_json::Value>,
+        result: serde_json::Value,
+    ) {
+        let method = method.to_string();
+        let id_matcher = Arc::new(std::sync::RwLock::new(0));
+        let id_matcher_clone = id_matcher.clone();
+        self.inner.expect(
+            Expectation::matching(request::body(json_decoded(move |request: &RpcRequest| {
+                let result = request.method == method && request.params == params;
+                if result {
+                    let mut writer = id_matcher.write().unwrap();
+                    *writer = request.id;
+                }
+                result
+            })))
+            .respond_with(move || {
+                let id = *id_matcher_clone.read().unwrap();
+                json_encoded(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "result": result,
+                    "id": id
+                }))
+            }),
+        );
+    }
+
+    pub fn expect_zks_estimate_fee(&mut self) {
+        self.inner.expect(
+            Expectation::matching(request::body(json_decoded(eq(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "zks_estimateFee",
+                "params": [
+                    {
+                        "from": "0xbc989fde9e54cad2ab4392af6df60f04873a033a",
+                        "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                        "input": "0xd0e30db0",
+                        "data": "0xd0e30db0",
+                        "nonce": "0x0",
+                        "chainId": "0x104",
+                        "type": "0x71",
+                        "eip712Meta": {
+                            "gasPerPubdata": "0x0",
+                            "factoryDeps": [],
+                            "customSignature": null,
+                            "paymasterParams": null
+                        }
+                    }
+                ]
+            })))))
+            .respond_with(json_encoded(serde_json::json!(
+            {
+              "jsonrpc": "2.0",
+              "result": {
+                "gas_limit": "0x4be4c",
+                "gas_per_pubdata_limit": "0xc47",
+                "max_fee_per_gas": "0x2b275d0",
+                "max_priority_fee_per_gas": "0x0"
+              },
+              "id": 1
+            }))),
+        );
     }
 }
