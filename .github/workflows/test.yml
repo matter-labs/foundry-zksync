@@ -186,5 +186,12 @@ jobs:
           toolchain: ${{ env.TARGET_RUST_VERSION }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
+      - name: debug
+        run: cargo nextest list -E 'test(~zk) | package(~zk)' -T human > /tmp/zksync-tests-check
+      - name: debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zksync-tests-check-dbg
+          path: /tmp/zksync-tests-check
       - name: Verify zksync tests are not removed
         run: make zksync-tests-check
