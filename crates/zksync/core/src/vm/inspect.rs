@@ -33,7 +33,7 @@ use core::convert::Into;
 use std::{
     collections::HashMap,
     fmt::Debug,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, RwLock},
 };
 
 use crate::{
@@ -516,7 +516,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     }
     let is_static = call_ctx.is_static;
     let is_create = call_ctx.is_create;
-    let bootloader_debug_tracer_result = Arc::default();
+    let bootloader_debug_tracer_result = Arc::new(RwLock::new(Err("result uninitialized".into())));
     let tracers = vec![
         ErrorTracer.into_tracer_pointer(),
         CallTracer::new(Arc::clone(&call_tracer_result)).into_tracer_pointer(),
@@ -559,8 +559,8 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     // populate gas usage info
     let bootloader_debug = Arc::try_unwrap(bootloader_debug_tracer_result)
         .unwrap()
-        .take()
-        .and_then(|result| result.ok())
+        .into_inner()
+        .unwrap()
         .expect("failed obtaining bootloader debug info");
     trace!("{bootloader_debug:?}");
 

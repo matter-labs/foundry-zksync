@@ -267,18 +267,20 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" }       # https://github.com/matter-labs/anvil-zksync/pull/510
-anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" }      # https://github.com/matter-labs/anvil-zksync/pull/510
-anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" }     # https://github.com/matter-labs/anvil-zksync/pull/510
-anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" } # https://github.com/matter-labs/anvil-zksync/pull/510
-anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "40723c93cc587bba060a14b8bba005f5fd9e4883" } # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }       # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }      # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }     # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" } # https://github.com/matter-labs/anvil-zksync/pull/510
+anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" } # https://github.com/matter-labs/anvil-zksync/pull/510
 zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "d5c35951843263765079545c31c908dcbaab1f30" }
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
-zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", tag = "core-v26.4.0" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
+zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
+
+era-solc = { git = "https://github.com/matter-labs/era-compiler-solidity.git", tag = "1.5.11", package = "era-solc" }
 
 # macros
 proc-macro2 = "1.0"
@@ -332,11 +334,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.128", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
 soldeer-commands = "=0.5.2"
-
-# NOTE(zk): we cannot update this to 0.27 currently due to alloy-chains updating this in their patch version bump
-# We need to migrate over all the transitive dependencies to a more recent alloy version before we can bump this
-strum = "0.26"
-
+strum = "0.27"
 tempfile = "3.13"
 tikv-jemallocator = "0.6"
 tokio = "1"

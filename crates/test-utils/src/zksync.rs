@@ -255,7 +255,7 @@ impl ZkSyncNode {
         );
         let storage_key_layout = StorageKeyLayout::ZkEra;
 
-        let (node_inner, storage, blockchain, time, fork) = InMemoryNodeInner::init(
+        let (inner, storage, blockchain, time, fork, vm_runner) = InMemoryNodeInner::init(
             fork_client,
             fee_input_provider.clone(),
             filters,
@@ -263,13 +263,14 @@ impl ZkSyncNode {
             impersonation.clone(),
             system_contracts.clone(),
             storage_key_layout,
+            false,
         );
 
         let mut node_service_tasks: Vec<Pin<Box<dyn Future<Output = anyhow::Result<()>>>>> =
             Vec::new();
 
         let (node_executor, node_handle) =
-            NodeExecutor::new(node_inner.clone(), system_contracts.clone(), storage_key_layout);
+            NodeExecutor::new(inner.clone(), vm_runner, storage_key_layout);
 
         let sealing_mode = BlockSealerMode::immediate(MAX_TRANSACTIONS, pool.add_tx_listener());
         let (block_sealer, block_sealer_state) =
@@ -277,7 +278,7 @@ impl ZkSyncNode {
         node_service_tasks.push(Box::pin(block_sealer.run()));
 
         let node: InMemoryNode = InMemoryNode::new(
-            node_inner,
+            inner,
             blockchain,
             storage,
             fork,
