@@ -267,11 +267,11 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
-anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "daniyar/configurable-anvil" }
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
+anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
 zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "d5c35951843263765079545c31c908dcbaab1f30" }
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
