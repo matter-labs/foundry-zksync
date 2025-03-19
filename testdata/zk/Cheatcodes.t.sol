@@ -343,7 +343,7 @@ contract ZkCheatcodesTest is DSTest {
     }
 
     /// forge-config: default.allow_internal_expect_revert = false
-    function testExpectRevertWithExternalCallReverts() public {
+    function testExpectRevertWithNestedCallReverts() public {
         Reverter reverter = new Reverter();
         vm.expectRevert();
         reverter.revertWithMessage();
