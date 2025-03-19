@@ -103,22 +103,6 @@ impl MakeTxArgs {
 
         let config = eth.load_config()?;
 
-        // Retrieve the signer, and bail if it can't be constructed.
-        // NOTE(zk): if custom signature is sent, signer is not used so
-        // we do not bail in that case, the Result is kept instead
-        let (from, maybe_signer) = if zk_tx.custom_signature.is_some() {
-            if let Some(from) = eth.wallet.from {
-                (from, None)
-            } else {
-                eyre::bail!("expected address via --from option to be used for custom signature");
-            }
-        } else {
-            let signer = eth.wallet.signer().await?;
-            let from = signer.address();
-            tx::validate_from_address(eth.wallet.from, from)?;
-            (from, Some(signer))
-        };
-
         let provider = get_provider(&config)?;
 
         // NOTE(zk): tx is built in two steps as signer might have a different type
@@ -138,6 +122,22 @@ impl MakeTxArgs {
             sh_println!("{raw_tx}")?;
             return Ok(());
         }
+
+        // Retrieve the signer, and bail if it can't be constructed.
+        // NOTE(zk): if custom signature is sent, signer is not used so
+        // we do not bail in that case, the Result is kept instead
+        let (from, maybe_signer) = if zk_tx.custom_signature.is_some() {
+            if let Some(from) = eth.wallet.from {
+                (from, None)
+            } else {
+                eyre::bail!("expected address via --from option to be used for custom signature");
+            }
+        } else {
+            let signer = eth.wallet.signer().await?;
+            let from = signer.address();
+            tx::validate_from_address(eth.wallet.from, from)?;
+            (from, Some(signer))
+        };
 
         let (tx, _) = if zk_tx.custom_signature.is_some() {
             builder.build_raw(SenderKind::Address(from)).await?
