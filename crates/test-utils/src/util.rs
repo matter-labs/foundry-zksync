@@ -300,7 +300,14 @@ pub fn initialize(target: &Path) {
 /// Clones a remote repository into the specified directory. Panics if the command fails.
 pub fn clone_remote(repo_url: &str, target_dir: &str) {
     let mut cmd = Command::new("git");
-    cmd.args(["clone", "--no-tags", "--recursive", "--shallow-submodules"]);
+    cmd.args([
+        "clone",
+        "--no-tags",
+        "--recursive",
+        "--shallow-submodules",
+        "--depth=1",
+        "--no-single-branch",
+    ]);
     cmd.args([repo_url, target_dir]);
     println!("{cmd:?}");
     let status = cmd.status().unwrap();
