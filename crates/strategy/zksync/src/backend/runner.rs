@@ -172,7 +172,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
 
             let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
 
-            // Patch evm context with real caller
+            // Patch evm context with real caller and real depth
             evm_context.env.tx.caller = env.tx.caller;
             evm_context.journaled_state.depth = journaled_state.depth + 1;
 

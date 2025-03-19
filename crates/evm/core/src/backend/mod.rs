@@ -233,14 +233,14 @@ pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
     ) -> eyre::Result<()>;
 
     /// Executes a given TransactionRequest, commits the new state to the DB
+    /// NOTE(zk): the inspect_ctx param is used to set factory dependencies or paymaster
+    /// parameters as needed.
     fn transact_from_tx(
         &mut self,
         transaction: &TransactionRequest,
         env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
-        // NOTE(zk): this allows sending the zkInspectContext down, since transact_from_tx
-        // needs to instantiate the right EvmContext depending on the transaction type
         inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()>;
 

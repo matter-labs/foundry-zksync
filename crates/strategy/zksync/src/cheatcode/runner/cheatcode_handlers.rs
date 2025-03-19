@@ -22,7 +22,9 @@ use foundry_common::TransactionMaybeSigned;
 use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
-use foundry_zksync_core::{PaymasterParams, ZkPaymasterData, H256};
+use foundry_zksync_core::{
+    PaymasterParams, ZkPaymasterData, H256, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+};
 use revm::interpreter::InstructionResult;
 use tracing::{info, warn};
 
@@ -401,13 +403,16 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     Box::new(inspect_ctx),
                 )?;
 
+                let mut tx_with_fields = WithOtherFields::new(tx.clone());
+                tx_with_fields.other.insert(
+                    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                    serde_json::to_value(&tx).expect("failed encoding json"),
+                );
+
                 if ccx.state.broadcast.is_some() {
                     ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: ccx.db.active_fork_url(),
-                        transaction: TransactionMaybeSigned::new(WithOtherFields {
-                            inner: tx,
-                            other: Default::default(),
-                        }),
+                        transaction: { TransactionMaybeSigned::new(tx_with_fields) },
                     });
                 }
                 Ok(Default::default())
