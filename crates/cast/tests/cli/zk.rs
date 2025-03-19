@@ -226,12 +226,11 @@ casttest!(test_zk_cast_mktx, async |_prj, cmd| {
 
     let (signer_addr, signer_private_key) = ZkSyncNode::rich_wallets()
         .next()
-        .map(|(addr, pk, _)| (addr, pk))
+        .map(|(addr, pk, _)| (addr.to_lowercase(), pk))
         .expect("No rich wallets available");
-    let from_addr = format!("{}", signer_addr.to_lowercase());
     mock_server.expect(
         "eth_getTransactionCount",
-        Some(serde_json::json!([from_addr, "latest"])),
+        Some(serde_json::json!([signer_addr, "latest"])),
         serde_json::json!(0),
     );
 
@@ -241,7 +240,7 @@ casttest!(test_zk_cast_mktx, async |_prj, cmd| {
     mock_server.expect(
         "zks_estimateFee",
         Some(serde_json::json!([{
-            "from": from_addr,
+            "from": signer_addr,
             "to": format!("{contract_addr}"),
             "input": format!("{method_selector}"),
             "data": format!("{method_selector}"),
@@ -288,9 +287,8 @@ casttest!(test_zk_cast_mktx_contract_deploy, async |_prj, cmd| {
 
     let (signer_addr, signer_private_key) = ZkSyncNode::rich_wallets()
         .next()
-        .map(|(addr, pk, _)| (addr, pk))
+        .map(|(addr, pk, _)| (addr.to_lowercase(), pk))
         .expect("No rich wallets available");
-    let signer_addr = format!("{}", signer_addr.to_lowercase());
     mock_server.expect(
         "eth_getTransactionCount",
         Some(serde_json::json!([signer_addr, "latest"])),
@@ -358,6 +356,7 @@ casttest!(test_zk_cast_mktx_contract_deploy, async |_prj, cmd| {
         Some(serde_json::json!([signer_addr, "latest"])),
         serde_json::json!(1),
     );
+
     let method = "constructor(uint256)";
     let method_params = "1";
     let constructor_input = {
