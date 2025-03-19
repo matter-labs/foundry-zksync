@@ -247,7 +247,9 @@ impl ZkSyncNode {
 
         const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 
-        let config = TestNodeConfig::default().with_cache_config(Some(CacheConfig::Memory));
+        let config = TestNodeConfig::default()
+            .with_cache_config(Some(CacheConfig::Memory))
+            .with_bytecode_compression(Some(false));
 
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);

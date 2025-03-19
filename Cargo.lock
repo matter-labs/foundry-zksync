@@ -1541,7 +1541,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_api_decl"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anvil_zksync_types",
  "jsonrpsee",
@@ -1553,7 +1553,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_api_server"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anvil_zksync_api_decl",
  "anvil_zksync_common",
@@ -1580,7 +1580,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_common"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1589,7 +1589,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_config"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "alloy 0.9.2",
  "anvil_zksync_common",
@@ -1609,7 +1609,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_core"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "alloy 0.9.2",
  "anvil_zksync_common",
@@ -1650,7 +1650,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_l1_sidecar"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "alloy 0.9.2",
  "anvil_zksync_common",
@@ -1674,7 +1674,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_types"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "clap",
  "serde",
@@ -13447,7 +13447,7 @@ dependencies = [
 [[package]]
 name = "zksync_error"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=daniyar%2Fconfigurable-anvil#2fc5ddb0647c63ecc5996f38630ccba95f00c0f0"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anyhow",
  "lazy_static",
