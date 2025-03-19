@@ -60,6 +60,8 @@ allow = [
     "ISC",
     "Unicode-3.0",
     "Unlicense",
+    "OpenSSL",
+    "Apache-2.0 WITH LLVM-exception",
     "WTFPL",
     "BSL-1.0",
     "0BSD",
