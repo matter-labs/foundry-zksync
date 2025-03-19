@@ -428,42 +428,4 @@ impl MockServer {
             }),
         );
     }
-
-    pub fn expect_zks_estimate_fee(&mut self) {
-        self.inner.expect(
-            Expectation::matching(request::body(json_decoded(eq(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "zks_estimateFee",
-                "params": [
-                    {
-                        "from": "0xbc989fde9e54cad2ab4392af6df60f04873a033a",
-                        "to": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
-                        "input": "0xd0e30db0",
-                        "data": "0xd0e30db0",
-                        "nonce": "0x0",
-                        "chainId": "0x104",
-                        "type": "0x71",
-                        "eip712Meta": {
-                            "gasPerPubdata": "0x0",
-                            "factoryDeps": [],
-                            "customSignature": null,
-                            "paymasterParams": null
-                        }
-                    }
-                ]
-            })))))
-            .respond_with(json_encoded(serde_json::json!(
-            {
-              "jsonrpc": "2.0",
-              "result": {
-                "gas_limit": "0x4be4c",
-                "gas_per_pubdata_limit": "0xc47",
-                "max_fee_per_gas": "0x2b275d0",
-                "max_priority_fee_per_gas": "0x0"
-              },
-              "id": 1
-            }))),
-        );
-    }
 }
