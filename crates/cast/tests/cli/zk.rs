@@ -296,7 +296,7 @@ casttest!(test_zk_cast_mktx_contract_deploy, async |_prj, cmd| {
     );
 
     let input = {
-        let hash = foundry_zksync_core::hash_bytecode(&hex::decode(&COUNTER_BYTECODE).unwrap());
+        let hash = foundry_zksync_core::hash_bytecode(&hex::decode(COUNTER_BYTECODE).unwrap());
         let selector = get_func("create(bytes32, bytes32, bytes)").unwrap().selector().encode_hex();
         let params = hex::encode(ethabi::encode(&[
             ethabi::Token::FixedBytes([0; 32].into()),
@@ -318,7 +318,7 @@ casttest!(test_zk_cast_mktx_contract_deploy, async |_prj, cmd| {
             "eip712Meta": {
                 "gasPerPubdata": "0x0",
                 "factoryDeps": [
-                    hex::decode(&COUNTER_BYTECODE).unwrap()
+                    hex::decode(COUNTER_BYTECODE).unwrap()
                 ],
                 "customSignature": null,
                 "paymasterParams": null
@@ -368,13 +368,13 @@ casttest!(test_zk_cast_mktx_contract_deploy, async |_prj, cmd| {
         format!("0x{EMPTY_CONTRACT_WITH_CONSTRUCTOR_BYTECODE}{}", constructor_input.encode_hex());
     let input = {
         let hash = foundry_zksync_core::hash_bytecode(
-            &hex::decode(&EMPTY_CONTRACT_WITH_CONSTRUCTOR_BYTECODE).unwrap(),
+            &hex::decode(EMPTY_CONTRACT_WITH_CONSTRUCTOR_BYTECODE).unwrap(),
         );
         let selector = get_func("create(bytes32, bytes32, bytes)").unwrap().selector().encode_hex();
         let params = hex::encode(ethabi::encode(&[
             ethabi::Token::FixedBytes([0; 32].into()),
             ethabi::Token::FixedBytes(hash.0.into()),
-            ethabi::Token::Bytes(constructor_input.into()),
+            ethabi::Token::Bytes(constructor_input),
         ]));
         format!("0x{selector}{params}")
     };
@@ -391,7 +391,7 @@ casttest!(test_zk_cast_mktx_contract_deploy, async |_prj, cmd| {
             "eip712Meta": {
                 "gasPerPubdata": "0x0",
                 "factoryDeps": [
-                    hex::decode(&EMPTY_CONTRACT_WITH_CONSTRUCTOR_BYTECODE).unwrap()
+                    hex::decode(EMPTY_CONTRACT_WITH_CONSTRUCTOR_BYTECODE).unwrap()
                 ],
                 "customSignature": null,
                 "paymasterParams": null
