@@ -130,7 +130,6 @@ tempfile.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 alloy-signer-local.workspace = true
-eval-macro = "0.5.0"
 
 [features]
 default = ["jemalloc"]

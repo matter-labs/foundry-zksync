@@ -7,33 +7,73 @@ fn test_zk_aave_di() {
         .run()
 }
 
-eval_macro::eval! {
-    let repos: &[(&[&str], &str, &str)] = &[
-        (&[r#"#[ignore = "https://github.com/rhinestonewtf/modulekit/issues/181"]"#], "email-recovery", "."),
-        (&[r#"#[ignore = "computed CREATE2 address differs from zksync's"]"#], "email-signer", "contracts"),
-        (&[r#"#[ignore = "only contains scripts"]"#], "email-wallet-contracts", "."),
-        (&[r#"#[ignore = "uses EXTCODECOPY in EmailApprover.t.sol"]"#], "email-approver", "packages/contracts"),
-        (&[], "email-wallet", "packages/contracts"),
-        (&[], "proof-of-twitter", "packages/contracts"),
-        (&[], "email-tx-builder-template", "contracts"),
-    ];
+#[ignore = "https://github.com/rhinestonewtf/modulekit/issues/181"]
+#[test]
+fn test_zk_zkemail_email_recovery() {
+    ExtTester::new("zkemail", "email-recovery", "main")
+        .args(["--zksync", "--root", "."])
+        .install_command(&["yarn", "install"])
+        .run()
+}
 
-    for (attrs, name, path) in repos {
-        let snake_name = name.replace('-', "_");
-        let attrs = format!("{}", attrs.join("\n"));
-        output! {
-            {{attrs}}
-            #[test]
-            fn test_zk_zkemail_{{snake_name}}() {
-                ExtTester::new("zkemail", "{name}", "main")
-                    .args(["--zksync", "--root", "{path}"])
-                    .install_command(&["yarn", "install"])
-                    // .install_command(&["pnpm", "install", "--prefer-offline"])
-                    // .install_command(&["npm", "install", "--prefer-offline"])
-                    .run()
-            }
-        }
-    }
+#[ignore = "computed CREATE2 address differs from zksync's"]
+#[test]
+fn test_zk_zkemail_email_signer() {
+    ExtTester::new("zkemail", "email-signer", "main")
+        .args(["--zksync", "--root", "contracts"])
+        .install_command(&["yarn", "install"])
+        .run()
+}
+
+#[ignore = "only contains scripts"]
+#[test]
+fn test_zk_zkemail_email_wallet_contracts() {
+    ExtTester::new("zkemail", "email-wallet-contracts", "main")
+        .args(["--zksync", "--root", "."])
+        .install_command(&["yarn", "install"])
+        .run()
+}
+
+#[ignore = "uses EXTCODECOPY in `EmailApprover.t.sol`"]
+#[test]
+fn test_zk_zkemail_email_approver() {
+    ExtTester::new("zkemail", "email-approver", "main")
+        .args(["--zksync", "--root", "packages/contracts"])
+        .install_command(&["yarn", "install"])
+        .run()
+}
+
+#[ignore = "only contains scripts"]
+#[test]
+fn test_zk_zkemail_email_tx_builder_template() {
+    ExtTester::new("zkemail", "email-tx-builder-template", "main")
+        .args(["--zksync", "--root", "contracts"])
+        .install_command(&["yarn", "install"])
+        .run()
+}
+
+#[test]
+#[ignore = "uses CODECOPY in `EmailWalletCore.sol`"]
+fn test_zk_zkemail_email_wallet() {
+    ExtTester::new("zkemail", "email-wallet", "main")
+        .args([
+            "--zksync",
+            "--root",
+            "packages/contracts",
+            "--zk-suppressed-errors",
+            "sendtransfer",
+        ])
+        .install_command(&["yarn", "install"])
+        .run()
+}
+
+#[test]
+#[ignore = "has outdated yarn.lock, fails to fetch deps"]
+fn test_zk_zkemail_proof_of_twitter() {
+    ExtTester::new("zkemail", "proof-of-twitter", "main")
+        .args(["--zksync", "--root", "packages/contracts"])
+        .install_command(&["yarn", "install"])
+        .run()
 }
 
 #[test]
