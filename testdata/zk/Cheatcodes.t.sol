@@ -52,6 +52,12 @@ contract Reverter {
     }
 }
 
+contract RevertOnCreate {
+    constructor() {
+        revert("constructor reverted");
+    }
+}
+
 interface IMyProxyCaller {
     function transact(uint8 _data) external;
 }
@@ -347,6 +353,12 @@ contract ZkCheatcodesTest is DSTest {
         Reverter reverter = new Reverter();
         vm.expectRevert();
         reverter.revertWithMessage();
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = false
+    function testExpectRevertWithNestedCreateReverts() public {
+        vm.expectRevert();
+        new RevertOnCreate();
     }
 
     // Utility function

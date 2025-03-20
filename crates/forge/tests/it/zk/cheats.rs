@@ -96,6 +96,14 @@ async fn test_zk_cheat_expect_revert_works_with_nested_call_reverts() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_zk_cheat_expect_revert_works_with_nested_create_reverts() {
+    let runner = TEST_DATA_DEFAULT.runner_zksync();
+    let filter = Filter::new("testExpectRevertWithNestedCreateReverts", "ZkCheatcodesTest", ".*");
+
+    TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheat_expect_revert_works_with_internal_reverts() {
     let mut runner = TEST_DATA_DEFAULT.runner_zksync();
     let mut config = runner.config.as_ref().clone();
