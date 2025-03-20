@@ -4605,26 +4605,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eval-macro"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aff06b934ad6caf230c90e39e1e7292e1ef8b978e5688492299a1f3eb07f7a51"
-dependencies = [
- "eval-macro-internal",
-]
-
-[[package]]
-name = "eval-macro-internal"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37a98a63b3ddf635d78695661ff8d7b362d85c68411524ba90d7da1c2cfad2a6"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.99",
-]
-
-[[package]]
 name = "event-listener"
 version = "4.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4841,7 +4821,6 @@ dependencies = [
  "comfy-table",
  "dialoguer",
  "dunce",
- "eval-macro",
  "evm-disassembler",
  "eyre",
  "forge-doc",
