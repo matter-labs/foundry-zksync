@@ -7,8 +7,8 @@ fn test_zk_aave_di() {
         .run()
 }
 
-#[ignore = "https://github.com/rhinestonewtf/modulekit/issues/181"]
 #[test]
+#[ignore = "https://github.com/rhinestonewtf/modulekit/issues/181"]
 fn test_zk_zkemail_email_recovery() {
     ExtTester::new("zkemail", "email-recovery", "main")
         .args(["--zksync", "--root", "."])
@@ -16,8 +16,8 @@ fn test_zk_zkemail_email_recovery() {
         .run()
 }
 
-#[ignore = "computed CREATE2 address differs from zksync's"]
 #[test]
+#[ignore = "computed CREATE2 address differs from zksync's"]
 fn test_zk_zkemail_email_signer() {
     ExtTester::new("zkemail", "email-signer", "main")
         .args(["--zksync", "--root", "contracts"])
@@ -25,8 +25,8 @@ fn test_zk_zkemail_email_signer() {
         .run()
 }
 
-#[ignore = "only contains scripts"]
 #[test]
+#[ignore = "only contains scripts"]
 fn test_zk_zkemail_email_wallet_contracts() {
     ExtTester::new("zkemail", "email-wallet-contracts", "main")
         .args(["--zksync", "--root", "."])
@@ -34,8 +34,8 @@ fn test_zk_zkemail_email_wallet_contracts() {
         .run()
 }
 
-#[ignore = "uses EXTCODECOPY in `EmailApprover.t.sol`"]
 #[test]
+#[ignore = "uses EXTCODECOPY in `EmailApprover.t.sol`"]
 fn test_zk_zkemail_email_approver() {
     ExtTester::new("zkemail", "email-approver", "main")
         .args(["--zksync", "--root", "packages/contracts"])
@@ -43,8 +43,8 @@ fn test_zk_zkemail_email_approver() {
         .run()
 }
 
-#[ignore = "only contains scripts"]
 #[test]
+#[ignore = "only contains scripts"]
 fn test_zk_zkemail_email_tx_builder_template() {
     ExtTester::new("zkemail", "email-tx-builder-template", "main")
         .args(["--zksync", "--root", "contracts"])
