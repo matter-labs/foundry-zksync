@@ -407,7 +407,6 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let mut tx_with_fields = WithOtherFields::new(tx.clone());
                 tx_with_fields.other.insert(
                     ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-                    // serde_json::to_value(&tx).expect("failed encoding json"),
                     serde_json::to_value(ZkTransactionMetadata::new(factory_deps, paymaster_data))
                         .expect("failed encoding json"),
                 );
