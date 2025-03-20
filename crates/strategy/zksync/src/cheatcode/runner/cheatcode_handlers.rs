@@ -348,17 +348,12 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let broadcastRawTransactionCall { data } =
                     cheatcode.as_any().downcast_ref().unwrap();
 
-                let envelope: ZkTxEnvelope = ZkTxEnvelope::decode_2718(&mut data.as_ref())
+                let envelope = ZkTxEnvelope::decode_2718(&mut data.as_ref())
                     .wrap_err("Failed to decode tx")?;
-
-                let tx_712 = envelope.as_eip712();
-
-                let parts = match tx_712 {
-                    Some(tx) => tx.clone().into_parts().0,
-                    None => {
-                        return Err(Error::display("Failed to decode tx, no EIP712 data"));
-                    }
-                };
+                let parts = match envelope {
+                    ZkTxEnvelope::Eip712(signed) => Ok(signed.into_parts().0),
+                    _ => Err(Error::display("not a valid eip712 tx")),
+                }?;
 
                 let tx: TransactionRequest = TransactionRequest {
                     from: Some(parts.from),

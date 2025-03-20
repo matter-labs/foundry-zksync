@@ -297,7 +297,6 @@ contract SimpleScript is Script {
     .get_output()
     .stdout_lossy();
 
-    // printing broadcast
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))
         .expect("No broadcast artifacts");
@@ -313,12 +312,13 @@ contract SimpleScript is Script {
         .contains("0x0000000000000000000000000000000000008006");
     deployment["transaction"]["from"]
         .as_str()
-        .expect("from key was not found")
+        .expect("from key was not a string")
         .contains("0xbc989fde9e54cad2ab4392af6df60f04873a033a");
 
-    let zksync = deployment["transaction"]["zksync"].as_object().expect("zksync key was not found");
-    let factory_depts = zksync["factoryDeps"].as_array().expect("factoryDeps was not an array");
-    assert!(!factory_depts.is_empty());
+    let zksync =
+        deployment["transaction"]["zksync"].as_object().expect("zksync key was not an object");
+    let factory_deps = zksync["factoryDeps"].as_array().expect("factoryDeps was not an array");
+    assert!(!factory_deps.is_empty());
 
     let broadcasted = &txns[1];
 
@@ -341,7 +341,7 @@ contract SimpleScript is Script {
         .as_str()
         .expect("to was not key a string")
         .contains("0x9c1a3d7c98dbf89c7f5d167f2219c29c2fe775a7");
-    broadcasted["transaction"]["value"].as_str().expect("value").contains("0x0");
+    broadcasted["transaction"]["value"].as_str().expect("value was not a string").contains("0x0");
 });
 
 fn setup_deploy_prj(prj: &mut TestProject) {
