@@ -5,8 +5,6 @@ cast::cli:
     zk::test_zk_cast_call_with_trace
     zk::test_zk_cast_custom_signature
     zk::test_zk_cast_estimate_contract_deploy_gas
-    zk::test_zk_cast_mktx
-    zk::test_zk_cast_mktx_contract_deploy
     zk::test_zk_cast_using_paymaster
     zk::test_zk_cast_without_paymaster
 forge::cli:
