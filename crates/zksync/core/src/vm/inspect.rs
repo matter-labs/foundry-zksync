@@ -641,8 +641,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
                 })
                 .await;
 
-                let inner_result = blocking_result.expect("spawn_blocking failed");
-                inner_result
+                blocking_result.expect("spawn_blocking failed")
             });
 
             let filtered_arena = filter_call_trace_arena(&arena, 2);
