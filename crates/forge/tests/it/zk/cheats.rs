@@ -10,7 +10,7 @@ use forge::revm::primitives::SpecId;
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::{
     forgetest_async,
-    util::{self, OutputExt},
+    util::{self},
     Filter, TestProject, ZkSyncNode,
 };
 
@@ -293,9 +293,7 @@ contract SimpleScript is Script {
         "--non-interactive",
         "SimpleScript",
     ])
-    .assert_success()
-    .get_output()
-    .stdout_lossy();
+    .assert_success();
 
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
         .find(|file| file.ends_with("run-latest.json"))
