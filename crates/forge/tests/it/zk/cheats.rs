@@ -245,90 +245,24 @@ contract Counter {
     )
     .unwrap();
 
-    // le pido el code, no funciona
-    // let output = cmd
-    //     .args(["code", "src/Counter.sol:Counter", "-vvvvv", "--zksync"])
-    //     .assert_success()
-    //     .get_output()
-    //     .stdout_lossy();
-
-    // println!(">>>>>>>> {}", output);
-
     prj.add_script(
-    "SimpleScript1.s.sol",
+    "SimpleScript.s.sol",
     r#"
-import "forge-std/Script.sol";
-import {Counter} from "../src/Counter.sol";
-contract SimpleScript1 is Script {
-    function run() external {
-
-
-        // Esto me da el bytecode
-        // vm.getCode("Counter.sol:Counter");
-        // 0x0000008003000039000000400030043f0000000100200190000000130000c13d0000000d00100198000000270000613d000000000101043b000000e0011002700000000e0010009c0000001b0000613d0000000f0010009c000000270000c13d0000000001000416000000000001004b000000270000c13d000000000100041a000000800010043f00000012010000410000002d0001042e0000000001000416000000000001004b000000270000c13d0000002001000039000001000010044300000120000004430000000c010000410000002d0001042e0000000001000416000000000001004b000000270000c13d000000000100041a000000010110003a000000290000c13d0000001001000041000000000010043f0000001101000039000000040010043f00000011010000410000002e0001043000000000010000190000002e00010430000000000010041b00000000010000190000002d0001042e0000002c000004320000002d0001042e0000002e000104300000000000000000000000020000000000000000000000000000004000000100000000000000000000000000000000000000000000000000fffffffc00000000000000000000000000000000000000000000000000000000000000000000000000000000d09de08a0000000000000000000000000000000000000000000000000000000006661abd4e487b7100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002400000000000000000000000000000000000000000000000000000000000000200000008000000000000000000000000000000000000000000000000000000000000000000000000000000000b34d28be4c2607700146bb47d0b91f49fda73afa4b2b4cccde86e0ea842d71ed
-
-        // zk raw transaction
-        vm.startBroadcast();
-        cast mktx --rpc-url &url --private-key &private_key --zksync --create  "0x000000800300003900 .... "
-        vm.broadcastRawTransaction(
-        hex"71f903ab80808402b275d0834020b694000000000000000000000000000000000000800680b8849c4d535b000000000000000000000000000000000000000000000000000000000000000001000015eef9c25753fdda281d958bddd70867399645894ec102744c554999fd0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000001a0d4bf28f047104228a1af7d4b1fac5d62ee8222d05068ac8555630f630092303ba07898ef04d2075cd2b478e7a72cd081e331a125add4eb533a0386ecd6c4a36a0c82010494bc989fde9e54cad2ab4392af6df60f04873a033a80f902a3b902a00000008003000039000000400030043f0000000100200190000000130000c13d0000000d00100198000000270000613d000000000101043b000000e0011002700000000e0010009c0000001b0000613d0000000f0010009c000000270000c13d0000000001000416000000000001004b000000270000c13d000000000100041a000000800010043f00000012010000410000002d0001042e0000000001000416000000000001004b000000270000c13d0000002001000039000001000010044300000120000004430000000c010000410000002d0001042e0000000001000416000000000001004b000000270000c13d000000000100041a000000010110003a000000290000c13d0000001001000041000000000010043f0000001101000039000000040010043f00000011010000410000002e0001043000000000010000190000002e00010430000000000010041b00000000010000190000002d0001042e0000002c000004320000002d0001042e0000002e000104300000000000000000000000020000000000000000000000000000004000000100000000000000000000000000000000000000000000000000fffffffc00000000000000000000000000000000000000000000000000000000000000000000000000000000d09de08a0000000000000000000000000000000000000000000000000000000006661abd4e487b7100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002400000000000000000000000000000000000000000000000000000000000000200000008000000000000000000000000000000000000000000000000000000000000000000000000000000000b34d28be4c2607700146bb47d0b91f49fda73afa4b2b4cccde86e0ea842d71ed8080"
-        );
-        vm.stopBroadcast();
-    }
-}
-"#,
-)
-.unwrap();
-
-    let output1 = cmd
-        .args([
-            "script",
-            "-vvvvv",
-            "--zksync",
-            "--private-key",
-            private_key,
-            "--rpc-url",
-            node.url().as_str(),
-            "--broadcast",
-            "--slow",
-            "--non-interactive",
-            "SimpleScript1",
-        ])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
-
-    println!(">>>>>>>>output1 {}", output1);
-    println!("SDLFGHLKSADJHGLKSAJDFGLKJSDHFGL");
-
-    let sensitive_values_saved1 = output1
-        .lines()
-        .find(|line| line.contains("Transactions saved to:"))
-        .expect("No sensitive values saved to");
-
-    let sensitive_values_saved1 =
-        foundry_common::fs::read_to_string(sensitive_values_saved1.split(": ").nth(1).unwrap())
-            .unwrap();
-
-    println!("sensitive_values_saved1: {}", sensitive_values_saved1);
-
-    prj.add_script(
-        "SimpleScript.s.sol",
-        r#"
 import "forge-std/Script.sol";
 import {Counter} from "../src/Counter.sol";
 contract SimpleScript is Script {
     function run() external {
         // zk raw transaction
         vm.startBroadcast();
-        // // This raw transaction comes from cast mktx of increment() to Counter contract
-        // // `cast mktx "0x9086C95769C51E15D6a77672251Cf13Ce7ebf3AE" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 1`
-        // vm.broadcastRawTransaction(
-        //     hex"71f88501808402b275d08304d718949086c95769c51e15d6a77672251cf13ce7ebf3ae8084d09de08a01a00d798053cc7a75a78d49adc0b893d9ad91f5301bb264eb2848979859fc366dc7a06469714a3ec85003c3f52ff668299c3c01e0a43be5ec0529cc204fd53be1629e82010494bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
-        // );
+        // cast mktx --rpc-url &url --private-key &private_key --zksync --create  "0x000000800300003900 .... "
+        vm.broadcastRawTransaction(
+        hex"71f903ae80808402b275d0834020b694000000000000000000000000000000000000800680b8849c4d535b000000000000000000000000000000000000000000000000000000000000000001000015eef9c25753fdda281d958bddd70867399645894ec102744c554999fd0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000080a005820228fcbfc5a16562ad38e4f7976de211f827c9f8b554f0f4587002d3cd3ba05de935fcae8d2e93fe31029a3c1cb9f6d3c6255e979917e030f5731f6383495782010494bc989fde9e54cad2ab4392af6df60f04873a033a830f4240f902a3b902a00000008003000039000000400030043f0000000100200190000000130000c13d0000000d00100198000000270000613d000000000101043b000000e0011002700000000e0010009c0000001b0000613d0000000f0010009c000000270000c13d0000000001000416000000000001004b000000270000c13d000000000100041a000000800010043f00000012010000410000002d0001042e0000000001000416000000000001004b000000270000c13d0000002001000039000001000010044300000120000004430000000c010000410000002d0001042e0000000001000416000000000001004b000000270000c13d000000000100041a000000010110003a000000290000c13d0000001001000041000000000010043f0000001101000039000000040010043f00000011010000410000002e0001043000000000010000190000002e00010430000000000010041b00000000010000190000002d0001042e0000002c000004320000002d0001042e0000002e000104300000000000000000000000020000000000000000000000000000004000000100000000000000000000000000000000000000000000000000fffffffc00000000000000000000000000000000000000000000000000000000000000000000000000000000d09de08a0000000000000000000000000000000000000000000000000000000006661abd4e487b7100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002400000000000000000000000000000000000000000000000000000000000000200000008000000000000000000000000000000000000000000000000000000000000000000000000000000000b34d28be4c2607700146bb47d0b91f49fda73afa4b2b4cccde86e0ea842d71ed8080"
+        );
 
         Counter counter = Counter(0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7);
         uint256 prev = counter.count();
+        require(prev == 0);
+
         // This raw transaction comes from cast mktx of increment() to Counter contract
         // `cast mktx "0x9c1a3d7C98dBF89c7f5d167F2219C29c2fe775A7" "increment()" --rpc-url http://127.0.0.1:49204 --private-key "0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e" --zksync --nonce 1`
         vm.broadcastRawTransaction(
@@ -345,61 +279,24 @@ contract SimpleScript is Script {
     )
     .unwrap();
 
-    let output2 = cmd
-        .args([
-            "script",
-            "-vvvvv",
-            "--zksync",
-            "--private-key",
-            private_key,
-            "--rpc-url",
-            node.url().as_str(),
-            "--broadcast",
-            "--slow",
-            "--non-interactive",
-            "SimpleScript",
-        ])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
+    cmd.forge_fuse();
 
-    println!(">>>>>>>> {}", output2);
-
-    // output 2 has this as rows:
-    // Transactions saved to:
-    // /private/var/folders/6j/32rm_n4s37x_wmkgds7r8hqw0000gn/T/
-    // script_zk_broadcast_raw_in_output_json-0FUEOBu/broadcast/SimpleScript.s.sol/260/run-latest.
-    // json Sensitive values saved to:
-    // /private/var/folders/6j/32rm_n4s37x_wmkgds7r8hqw0000gn/T/
-    // script_zk_broadcast_raw_in_output_json-0FUEOBu/cache/SimpleScript.s.sol/260/run-latest.json
-
-    // get these files path from the output and and check the content
-    let trasactions_saved = output2
-        .lines()
-        .find(|line| line.contains("Transactions saved to:"))
-        .expect("No transactions saved to");
-
-    let sensitive_values_saved = output2
-        .lines()
-        .find(|line| line.contains("Sensitive values saved to:"))
-        .expect("No sensitive values saved to");
-
-    let transactions_saved =
-        foundry_common::fs::read_to_string(trasactions_saved.split(": ").nth(1).unwrap()).unwrap();
-    let sensitive_values_saved =
-        foundry_common::fs::read_to_string(sensitive_values_saved.split(": ").nth(1).unwrap())
-            .unwrap();
-
-    println!("transactions_saved: {}", transactions_saved);
-
-    // check that the txs have the correct function and contract address
-    let json_ts: serde_json::Value = serde_json::from_str(&transactions_saved).unwrap();
-    let txns_ts = json_ts["transactions"].as_array().expect("broadcastable txs");
-    println!("txns_ts: {:?}", txns_ts);
-
-    let json_sv: serde_json::Value = serde_json::from_str(&sensitive_values_saved).unwrap();
-    let txns_sv = json_sv["transactions"].as_array().expect("broadcastable txs");
-    println!("txns_sv: {:?}", txns_sv);
+    cmd.args([
+        "script",
+        "-vvvvv",
+        "--zksync",
+        "--private-key",
+        private_key,
+        "--rpc-url",
+        node.url().as_str(),
+        "--broadcast",
+        "--slow",
+        "--non-interactive",
+        "SimpleScript",
+    ])
+    .assert_success()
+    .get_output()
+    .stdout_lossy();
 
     // printing broadcast
     let run_latest = foundry_common::fs::json_files(prj.root().join("broadcast").as_path())
@@ -407,16 +304,27 @@ contract SimpleScript is Script {
         .expect("No broadcast artifacts");
 
     let content = foundry_common::fs::read_to_string(run_latest).unwrap();
-
     let json: serde_json::Value = serde_json::from_str(&content).unwrap();
     let txns = json["transactions"].as_array().expect("broadcastable txs");
 
-    let broadcasted = &txns[0];
+    let deployment = &txns[0];
+    deployment["contractAddress"]
+        .as_str()
+        .expect("contract address key was not a string")
+        .contains("0x0000000000000000000000000000000000008006");
+    deployment["transaction"]["from"]
+        .as_str()
+        .expect("from key was not found")
+        .contains("0xbc989fde9e54cad2ab4392af6df60f04873a033a");
 
-    println!("broadcasted: {:?}", broadcasted);
+    let zksync = deployment["transaction"]["zksync"].as_object().expect("zksync key was not found");
+    let factory_depts = zksync["factoryDeps"].as_array().expect("factoryDeps was not an array");
+    assert!(factory_depts.len() > 0);
 
-    // check that the txs have the correct function and contract address
-    assert_eq!(txns.len(), 1);
+    let broadcasted = &txns[1];
+
+    // check that the broadcasted tx have the correct function and contract address
+    assert_eq!(txns.len(), 2);
     broadcasted["function"]
         .as_str()
         .expect("function name key was not a string")
@@ -424,7 +332,7 @@ contract SimpleScript is Script {
     broadcasted["contractAddress"]
         .as_str()
         .expect("contract address key was not a string")
-        .contains("0x9086c95769c51e15d6a77672251cf13ce7ebf3ae");
+        .contains("0x9c1a3d7c98dbf89c7f5d167f2219c29c2fe775a7");
 
     broadcasted["transaction"]["from"]
         .as_str()
@@ -433,7 +341,7 @@ contract SimpleScript is Script {
     broadcasted["transaction"]["to"]
         .as_str()
         .expect("to was not key a string")
-        .contains("0x9086c95769c51e15d6a77672251cf13ce7ebf3ae");
+        .contains("0x9c1a3d7c98dbf89c7f5d167f2219c29c2fe775a7");
     broadcasted["transaction"]["value"].as_str().expect("value").contains("0x0");
 });
 

@@ -23,7 +23,8 @@ use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{
-    PaymasterParams, ZkPaymasterData, H256, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+    PaymasterParams, ZkPaymasterData, ZkTransactionMetadata, H256,
+    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use revm::interpreter::InstructionResult;
 use tracing::{info, warn};
@@ -381,7 +382,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let (factory_deps, paymaster_data) = match parts.eip712_meta {
                     None => Default::default(),
                     Some(meta) => (
-                        meta.factory_deps.into_iter().map(|b| b.to_vec()).collect(),
+                        meta.factory_deps.into_iter().map(|b| b.to_vec()).collect::<Vec<_>>(),
                         meta.paymaster_params.map(|params| PaymasterParams {
                             paymaster: zksync_types::H160::from(params.paymaster.0 .0),
                             paymaster_input: params.paymaster_input.to_vec(),
@@ -390,8 +391,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 };
 
                 let inspect_ctx = ZksyncInspectContext {
-                    factory_deps,
-                    paymaster_data,
+                    factory_deps: factory_deps.clone(),
+                    paymaster_data: paymaster_data.clone(),
                     zk_env: get_context(ccx.state.strategy.context.as_mut()).zk_env.clone(),
                 };
 
@@ -406,7 +407,9 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let mut tx_with_fields = WithOtherFields::new(tx.clone());
                 tx_with_fields.other.insert(
                     ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-                    serde_json::to_value(&tx).expect("failed encoding json"),
+                    // serde_json::to_value(&tx).expect("failed encoding json"),
+                    serde_json::to_value(ZkTransactionMetadata::new(factory_deps, paymaster_data))
+                        .expect("failed encoding json"),
                 );
 
                 if ccx.state.broadcast.is_some() {
