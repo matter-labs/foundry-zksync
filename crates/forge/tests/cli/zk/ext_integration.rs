@@ -13,7 +13,6 @@ eval_macro::eval! {
         (&[r#"#[ignore = "computed CREATE2 address differs from zksync's"]"#], "email-signer", "contracts"),
         (&[r#"#[ignore = "only contains scripts"]"#], "email-wallet-contracts", "."),
         (&[r#"#[ignore = "uses EXTCODECOPY in EmailApprover.t.sol"]"#], "email-approver", "packages/contracts"),
-        (&[], "jwt-tx-builder", "packages/contracts"),
         (&[], "email-wallet", "packages/contracts"),
         (&[], "proof-of-twitter", "packages/contracts"),
         (&[], "email-tx-builder-template", "contracts"),
@@ -58,8 +57,23 @@ fn test_zk_zkemail_email_tx_builder() {
             // computes differing CREATE2 addresses than zksync
             "EmailSignerFactory",
             "--nmp",
-            // unfortunately library fails consistently
+            // affected by https://github.com/matter-labs/foundry-zksync/issues/987
             "StringUtils",
+        ])
+        .install_command(&["yarn", "install"])
+        .run()
+}
+
+#[test]
+fn test_zk_zkemail_jwt_tx_builder() {
+    ExtTester::new("zkemail", "jwt-tx-builder", "main")
+        .args([
+            "--zksync",
+            "--root",
+            "packages/contracts",
+            "--nmt",
+            // public.json generation fails
+            "testFail|verifyEmailProof",
         ])
         .install_command(&["yarn", "install"])
         .run()
