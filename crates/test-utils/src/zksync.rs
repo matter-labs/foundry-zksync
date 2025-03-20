@@ -403,7 +403,7 @@ impl MockServer {
             }))),
         );
 
-        MockServer { inner }
+        Self { inner }
     }
 
     /// Retrieve the mock server's url.
