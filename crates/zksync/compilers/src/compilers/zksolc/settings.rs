@@ -435,14 +435,13 @@ impl SettingsMetadata {
 }
 
 /// Determines the hash method for the metadata hash that is appended to the bytecode.
-/// Zksolc only supports keccak256
 #[derive(Clone, Debug, Default, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BytecodeHash {
     /// Do not include bytecode hash.
-    #[default]
     #[serde(rename = "none")]
     None,
     /// The default keccak256 hash.
+    #[default]
     #[serde(rename = "keccak256")]
     Keccak256,
     /// The `ipfs` hash.

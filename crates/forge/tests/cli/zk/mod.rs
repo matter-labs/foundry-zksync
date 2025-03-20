@@ -5,3 +5,4 @@ mod ext_integration;
 mod inspect;
 mod script;
 mod verify;
+mod verify_bytecode;
