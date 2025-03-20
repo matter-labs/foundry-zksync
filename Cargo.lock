@@ -101,7 +101,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89ec9b8795b2083585293bd3d19033e9d67e725917c95c44cb154e3400529ccd"
 dependencies = [
  "alloy-consensus 0.12.1",
- "alloy-contract 0.12.5",
+ "alloy-contract",
  "alloy-core",
  "alloy-eips 0.12.5",
  "alloy-network 0.12.5",
@@ -117,14 +117,14 @@ dependencies = [
 
 [[package]]
 name = "alloy-chains"
-version = "0.1.57"
+version = "0.1.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ab9d1367c6ffb90c93fb4a9a4989530aa85112438c6f73a734067255d348469"
+checksum = "963fc7ac17f25d92c237448632330eb87b39ba8aa0209d4b517069a05b57db62"
 dependencies = [
  "alloy-primitives",
  "num_enum 0.7.3",
  "serde",
- "strum 0.26.3",
+ "strum 0.27.1",
 ]
 
 [[package]]
@@ -141,7 +141,6 @@ dependencies = [
  "auto_impl",
  "c-kzg",
  "derive_more 1.0.0",
- "k256 0.13.4",
  "serde",
 ]
 
@@ -198,27 +197,6 @@ dependencies = [
 
 [[package]]
 name = "alloy-contract"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f21886c1fea0626f755a49b2ac653b396fb345233f6170db2da3d0ada31560c"
-dependencies = [
- "alloy-dyn-abi",
- "alloy-json-abi",
- "alloy-network 0.9.2",
- "alloy-network-primitives 0.9.2",
- "alloy-primitives",
- "alloy-provider 0.9.2",
- "alloy-pubsub 0.9.2",
- "alloy-rpc-types-eth 0.9.2",
- "alloy-sol-types",
- "alloy-transport 0.9.2",
- "futures 0.3.31",
- "futures-util",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "alloy-contract"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a0fa0584d13dd0c4e79288d411222c4d7c3411c71b7fa637cefda9dcf9bb1f9"
@@ -230,7 +208,7 @@ dependencies = [
  "alloy-network-primitives 0.12.5",
  "alloy-primitives",
  "alloy-provider 0.12.5",
- "alloy-pubsub 0.12.5",
+ "alloy-pubsub",
  "alloy-rpc-types-eth 0.12.5",
  "alloy-sol-types",
  "alloy-transport 0.12.5",
@@ -351,19 +329,6 @@ dependencies = [
  "once_cell",
  "serde",
  "sha2",
-]
-
-[[package]]
-name = "alloy-genesis"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7d2a7fe5c1a9bd6793829ea21a636f30fc2b3f5d2e7418ba86d96e41dd1f460"
-dependencies = [
- "alloy-eips 0.9.2",
- "alloy-primitives",
- "alloy-serde 0.9.2",
- "alloy-trie",
- "serde",
 ]
 
 [[package]]
@@ -502,7 +467,7 @@ version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb8702df5255ed061ccb452511328edf267ff8b1c356623e8f93a5b708d57273"
 dependencies = [
- "alloy-genesis 0.12.5",
+ "alloy-genesis",
  "alloy-network 0.12.5",
  "alloy-primitives",
  "alloy-signer 0.12.5",
@@ -560,15 +525,10 @@ dependencies = [
  "alloy-network 0.9.2",
  "alloy-network-primitives 0.9.2",
  "alloy-primitives",
- "alloy-pubsub 0.9.2",
  "alloy-rpc-client 0.9.2",
- "alloy-rpc-types-debug 0.9.2",
+ "alloy-rpc-types-anvil 0.9.2",
  "alloy-rpc-types-eth 0.9.2",
- "alloy-rpc-types-trace 0.9.2",
  "alloy-transport 0.9.2",
- "alloy-transport-http 0.9.2",
- "alloy-transport-ipc 0.9.2",
- "alloy-transport-ws 0.9.2",
  "async-stream",
  "async-trait",
  "auto_impl",
@@ -578,14 +538,12 @@ dependencies = [
  "lru 0.12.5",
  "parking_lot",
  "pin-project 1.1.10",
- "reqwest 0.12.12",
  "schnellru",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
  "tokio",
  "tracing",
- "url",
  "wasmtimer",
 ]
 
@@ -602,17 +560,17 @@ dependencies = [
  "alloy-network 0.12.5",
  "alloy-network-primitives 0.12.5",
  "alloy-primitives",
- "alloy-pubsub 0.12.5",
+ "alloy-pubsub",
  "alloy-rpc-client 0.12.5",
- "alloy-rpc-types-debug 0.12.5",
+ "alloy-rpc-types-debug",
  "alloy-rpc-types-eth 0.12.5",
- "alloy-rpc-types-trace 0.12.5",
- "alloy-rpc-types-txpool 0.12.5",
+ "alloy-rpc-types-trace",
+ "alloy-rpc-types-txpool",
  "alloy-sol-types",
  "alloy-transport 0.12.5",
  "alloy-transport-http 0.12.5",
- "alloy-transport-ipc 0.12.5",
- "alloy-transport-ws 0.12.5",
+ "alloy-transport-ipc",
+ "alloy-transport-ws",
  "async-stream",
  "async-trait",
  "auto_impl",
@@ -630,25 +588,6 @@ dependencies = [
  "tracing",
  "url",
  "wasmtimer",
-]
-
-[[package]]
-name = "alloy-pubsub"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2269fd635f7b505f27c63a3cb293148cd02301efce4c8bdd9ff54fbfc4a20e23"
-dependencies = [
- "alloy-json-rpc 0.9.2",
- "alloy-primitives",
- "alloy-transport 0.9.2",
- "bimap",
- "futures 0.3.31",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tower 0.5.2",
- "tracing",
 ]
 
 [[package]]
@@ -700,21 +639,16 @@ checksum = "d06a292b37e182e514903ede6e623b9de96420e8109ce300da288a96d88b7e4b"
 dependencies = [
  "alloy-json-rpc 0.9.2",
  "alloy-primitives",
- "alloy-pubsub 0.9.2",
  "alloy-transport 0.9.2",
  "alloy-transport-http 0.9.2",
- "alloy-transport-ipc 0.9.2",
- "alloy-transport-ws 0.9.2",
  "futures 0.3.31",
  "pin-project 1.1.10",
- "reqwest 0.12.12",
  "serde",
  "serde_json",
  "tokio",
  "tokio-stream",
  "tower 0.5.2",
  "tracing",
- "url",
  "wasmtimer",
 ]
 
@@ -726,11 +660,11 @@ checksum = "6213829d8eabc239c2f9572452a5993ebdf78b04c020abc450ae48c54261d4ce"
 dependencies = [
  "alloy-json-rpc 0.12.5",
  "alloy-primitives",
- "alloy-pubsub 0.12.5",
+ "alloy-pubsub",
  "alloy-transport 0.12.5",
  "alloy-transport-http 0.12.5",
- "alloy-transport-ipc 0.12.5",
- "alloy-transport-ws 0.12.5",
+ "alloy-transport-ipc",
+ "alloy-transport-ws",
  "futures 0.3.31",
  "pin-project 1.1.10",
  "reqwest 0.12.12",
@@ -754,8 +688,6 @@ dependencies = [
  "alloy-rpc-types-anvil 0.9.2",
  "alloy-rpc-types-engine 0.9.2",
  "alloy-rpc-types-eth 0.9.2",
- "alloy-rpc-types-trace 0.9.2",
- "alloy-rpc-types-txpool 0.9.2",
  "alloy-serde 0.9.2",
  "serde",
 ]
@@ -770,8 +702,8 @@ dependencies = [
  "alloy-rpc-types-anvil 0.12.5",
  "alloy-rpc-types-engine 0.12.5",
  "alloy-rpc-types-eth 0.12.5",
- "alloy-rpc-types-trace 0.12.5",
- "alloy-rpc-types-txpool 0.12.5",
+ "alloy-rpc-types-trace",
+ "alloy-rpc-types-txpool",
  "alloy-serde 0.12.5",
  "serde",
 ]
@@ -824,16 +756,6 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-debug"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "358d6a8d7340b9eb1a7589a6c1fb00df2c9b26e90737fa5ed0108724dd8dac2c"
-dependencies = [
- "alloy-primitives",
- "serde",
-]
-
-[[package]]
-name = "alloy-rpc-types-debug"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fa8f6e27d47b4c56c627cb03dc91624c26bd814f6609bb1d1a836148b76fc9b"
@@ -854,8 +776,6 @@ dependencies = [
  "alloy-rlp",
  "alloy-serde 0.9.2",
  "derive_more 1.0.0",
- "jsonwebtoken",
- "rand 0.8.5",
  "serde",
  "strum 0.26.3",
 ]
@@ -920,20 +840,6 @@ dependencies = [
 
 [[package]]
 name = "alloy-rpc-types-trace"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd38207e056cc7d1372367fbb4560ddf9107cbd20731743f641246bf0dede149"
-dependencies = [
- "alloy-primitives",
- "alloy-rpc-types-eth 0.9.2",
- "alloy-serde 0.9.2",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "alloy-rpc-types-trace"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ef4bba67ec601730ceb23e542980d73ae9f718819604dfdd8289b13a506e762"
@@ -944,18 +850,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.12",
-]
-
-[[package]]
-name = "alloy-rpc-types-txpool"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7fd456a3fa9ea732d1c0611c9d52b5326ee29f4d02d01b07dac453ed68d9eb5"
-dependencies = [
- "alloy-primitives",
- "alloy-rpc-types-eth 0.9.2",
- "alloy-serde 0.9.2",
- "serde",
 ]
 
 [[package]]
@@ -1150,7 +1044,6 @@ dependencies = [
  "async-trait",
  "coins-bip32",
  "coins-bip39",
- "eth-keystore",
  "k256 0.13.4",
  "rand 0.8.5",
  "thiserror 2.0.12",
@@ -1173,23 +1066,6 @@ dependencies = [
  "k256 0.13.4",
  "rand 0.8.5",
  "thiserror 2.0.12",
-]
-
-[[package]]
-name = "alloy-signer-trezor"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e7d0c000abd591c9cceac5c07f785f101c9a8c879c6ccd300feca1ae03bdef6"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-signer 0.9.2",
- "async-trait",
- "semver 1.0.26",
- "thiserror 2.0.12",
- "tracing",
- "trezor-client",
 ]
 
 [[package]]
@@ -1327,12 +1203,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e1509599021330a31c4a6816b655e34bf67acb1cc03c564e09fd8754ff6c5de"
 dependencies = [
- "alloy-json-rpc 0.9.2",
  "alloy-transport 0.9.2",
- "reqwest 0.12.12",
- "serde_json",
- "tower 0.5.2",
- "tracing",
  "url",
 ]
 
@@ -1353,31 +1224,12 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport-ipc"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa4da44bc9a5155ab599666d26decafcf12204b72a80eeaba7c5e234ee8ac205"
-dependencies = [
- "alloy-json-rpc 0.9.2",
- "alloy-pubsub 0.9.2",
- "alloy-transport 0.9.2",
- "bytes",
- "futures 0.3.31",
- "interprocess",
- "pin-project 1.1.10",
- "serde_json",
- "tokio",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "alloy-transport-ipc"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e61e2b5cbf16f7588e4420848b61824f6514944773732534f4129ba6a251e059"
 dependencies = [
  "alloy-json-rpc 0.12.5",
- "alloy-pubsub 0.12.5",
+ "alloy-pubsub",
  "alloy-transport 0.12.5",
  "bytes",
  "futures 0.3.31",
@@ -1393,29 +1245,11 @@ dependencies = [
 
 [[package]]
 name = "alloy-transport-ws"
-version = "0.9.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58011745b2f17b334db40df9077d75b181f78360a5bc5c35519e15d4bfce15e2"
-dependencies = [
- "alloy-pubsub 0.9.2",
- "alloy-transport 0.9.2",
- "futures 0.3.31",
- "http 1.2.0",
- "rustls 0.23.23",
- "serde_json",
- "tokio",
- "tokio-tungstenite 0.24.0",
- "tracing",
- "ws_stream_wasm",
-]
-
-[[package]]
-name = "alloy-transport-ws"
 version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67ddcf4b98b3448eb998e057dc5a27345997863d6544ee7f0f79957616768dd3"
 dependencies = [
- "alloy-pubsub 0.12.5",
+ "alloy-pubsub",
  "alloy-transport 0.12.5",
  "futures 0.3.31",
  "http 1.2.0",
@@ -1587,16 +1421,16 @@ version = "0.0.11"
 dependencies = [
  "alloy-chains",
  "alloy-consensus 0.12.1",
- "alloy-contract 0.12.5",
+ "alloy-contract",
  "alloy-dyn-abi",
  "alloy-eips 0.12.5",
- "alloy-genesis 0.12.5",
+ "alloy-genesis",
  "alloy-json-abi",
  "alloy-json-rpc 0.12.5",
  "alloy-network 0.12.5",
  "alloy-primitives",
  "alloy-provider 0.12.5",
- "alloy-pubsub 0.12.5",
+ "alloy-pubsub",
  "alloy-rlp",
  "alloy-rpc-client 0.12.5",
  "alloy-rpc-types 0.12.5",
@@ -1605,12 +1439,12 @@ dependencies = [
  "alloy-signer-local 0.12.5",
  "alloy-sol-types",
  "alloy-transport 0.12.5",
- "alloy-transport-ipc 0.12.5",
- "alloy-transport-ws 0.12.5",
+ "alloy-transport-ipc",
+ "alloy-transport-ws",
  "alloy-trie",
- "anvil-core 0.0.11",
- "anvil-rpc 0.0.11",
- "anvil-server 0.0.11",
+ "anvil-core",
+ "anvil-rpc",
+ "anvil-server",
  "async-trait",
  "axum",
  "bytes",
@@ -1622,10 +1456,10 @@ dependencies = [
  "eyre",
  "fdlimit",
  "flate2",
- "foundry-cli 0.0.11",
- "foundry-common 0.0.11",
- "foundry-config 0.0.11",
- "foundry-evm 0.0.11",
+ "foundry-cli",
+ "foundry-common",
+ "foundry-config",
+ "foundry-evm",
  "foundry-test-utils",
  "futures 0.3.31",
  "hyper 1.6.0",
@@ -1652,67 +1486,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anvil"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-chains",
- "alloy-consensus 0.9.2",
- "alloy-contract 0.9.2",
- "alloy-dyn-abi",
- "alloy-eips 0.9.2",
- "alloy-genesis 0.9.2",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-provider 0.9.2",
- "alloy-rlp",
- "alloy-rpc-types 0.9.2",
- "alloy-serde 0.9.2",
- "alloy-signer 0.9.2",
- "alloy-signer-local 0.9.2",
- "alloy-sol-types",
- "alloy-transport 0.9.2",
- "alloy-trie",
- "anvil-core 1.0.0",
- "anvil-rpc 1.0.0",
- "anvil-server 1.0.0",
- "async-trait",
- "axum",
- "bytes",
- "chrono",
- "clap",
- "clap_complete",
- "clap_complete_fig",
- "ctrlc",
- "eyre",
- "fdlimit",
- "flate2",
- "foundry-cli 1.0.0",
- "foundry-common 1.0.0",
- "foundry-config 1.0.0",
- "foundry-evm 1.0.0",
- "futures 0.3.31",
- "hyper 1.6.0",
- "itertools 0.14.0",
- "k256 0.13.4",
- "maili-consensus",
- "parking_lot",
- "rand 0.8.5",
- "revm",
- "serde",
- "serde_json",
- "serde_repr",
- "tempfile",
- "thiserror 2.0.12",
- "tikv-jemallocator",
- "tokio",
- "tower 0.5.2",
- "tracing",
- "tracing-subscriber",
- "yansi",
-]
-
-[[package]]
 name = "anvil-core"
 version = "0.0.11"
 dependencies = [
@@ -1726,8 +1499,8 @@ dependencies = [
  "alloy-serde 0.12.5",
  "alloy-trie",
  "bytes",
- "foundry-common 0.0.11",
- "foundry-evm 0.0.11",
+ "foundry-common",
+ "foundry-evm",
  "op-alloy-consensus",
  "rand 0.8.5",
  "revm",
@@ -1737,42 +1510,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "anvil-core"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-dyn-abi",
- "alloy-eips 0.9.2",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-rlp",
- "alloy-rpc-types 0.9.2",
- "alloy-serde 0.9.2",
- "alloy-trie",
- "bytes",
- "foundry-common 1.0.0",
- "foundry-evm 1.0.0",
- "maili-consensus",
- "rand 0.8.5",
- "revm",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "anvil-rpc"
 version = "0.0.11"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "anvil-rpc"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
 dependencies = [
  "serde",
  "serde_json",
@@ -1782,29 +1521,7 @@ dependencies = [
 name = "anvil-server"
 version = "0.0.11"
 dependencies = [
- "anvil-rpc 0.0.11",
- "async-trait",
- "axum",
- "bytes",
- "clap",
- "futures 0.3.31",
- "interprocess",
- "parking_lot",
- "pin-project 1.1.10",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio-util",
- "tower-http",
- "tracing",
-]
-
-[[package]]
-name = "anvil-server"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "anvil-rpc 1.0.0",
+ "anvil-rpc",
  "async-trait",
  "axum",
  "bytes",
@@ -1824,7 +1541,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_api_decl"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anvil_zksync_types",
  "jsonrpsee",
@@ -1836,7 +1553,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_api_server"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anvil_zksync_api_decl",
  "anvil_zksync_common",
@@ -1863,7 +1580,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_common"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1872,7 +1589,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_config"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "alloy 0.9.2",
  "anvil_zksync_common",
@@ -1892,7 +1609,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_core"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "alloy 0.9.2",
  "anvil_zksync_common",
@@ -1924,6 +1641,7 @@ dependencies = [
  "zksync-error-description",
  "zksync_contracts",
  "zksync_error",
+ "zksync_mini_merkle_tree",
  "zksync_multivm",
  "zksync_types",
  "zksync_web3_decl",
@@ -1932,28 +1650,31 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_l1_sidecar"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "alloy 0.9.2",
- "anvil 1.0.0",
+ "anvil_zksync_common",
  "anvil_zksync_core",
  "anvil_zksync_types",
  "anyhow",
- "foundry-common 1.0.0",
+ "hex",
+ "semver 1.0.26",
  "serde",
+ "serde_json",
  "serde_with 1.14.0",
  "serde_yaml",
  "tempfile",
  "tokio",
  "tracing",
  "zksync_contracts",
+ "zksync_mini_merkle_tree",
  "zksync_types",
 ]
 
 [[package]]
 name = "anvil_zksync_types"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "clap",
  "serde",
@@ -3076,7 +2797,7 @@ version = "0.0.11"
 dependencies = [
  "alloy-chains",
  "alloy-consensus 0.12.1",
- "alloy-contract 0.12.5",
+ "alloy-contract",
  "alloy-dyn-abi",
  "alloy-json-abi",
  "alloy-json-rpc 0.12.5",
@@ -3092,7 +2813,7 @@ dependencies = [
  "alloy-sol-types",
  "alloy-transport 0.12.5",
  "alloy-zksync",
- "anvil 0.0.11",
+ "anvil",
  "async-trait",
  "aws-sdk-kms",
  "chrono",
@@ -3105,13 +2826,13 @@ dependencies = [
  "evmole",
  "eyre",
  "foundry-block-explorers",
- "foundry-cli 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cli",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm 0.0.11",
+ "foundry-config",
+ "foundry-evm",
  "foundry-test-utils",
- "foundry-wallets 0.0.11",
+ "foundry-wallets",
  "foundry-zksync-core",
  "futures 0.3.31",
  "indicatif",
@@ -3189,12 +2910,12 @@ dependencies = [
  "clap",
  "dirs 6.0.0",
  "eyre",
- "forge-fmt 0.0.11",
- "foundry-cli 0.0.11",
- "foundry-common 0.0.11",
+ "forge-fmt",
+ "foundry-cli",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm 0.0.11",
+ "foundry-config",
+ "foundry-evm",
  "foundry-strategy-zksync",
  "regex",
  "reqwest 0.12.12",
@@ -3206,7 +2927,7 @@ dependencies = [
  "serial_test",
  "solang-parser",
  "solar-parse",
- "strum 0.26.3",
+ "strum 0.27.1",
  "tikv-jemallocator",
  "time",
  "tokio",
@@ -4810,7 +4531,7 @@ dependencies = [
  "alloy-sol-macro-input",
  "alloy-transport 0.12.5",
  "alloy-zksync",
- "anvil 0.0.11",
+ "anvil",
  "async-trait",
  "axum",
  "chrono",
@@ -4824,22 +4545,22 @@ dependencies = [
  "evm-disassembler",
  "eyre",
  "forge-doc",
- "forge-fmt 0.0.11",
+ "forge-fmt",
  "forge-script",
- "forge-script-sequence 0.0.11",
+ "forge-script-sequence",
  "forge-sol-macro-gen",
  "forge-verify",
  "foundry-block-explorers",
- "foundry-cli 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cli",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-debugger 0.0.11",
- "foundry-evm 0.0.11",
- "foundry-evm-abi 0.0.11",
- "foundry-linking 0.0.11",
+ "foundry-config",
+ "foundry-debugger",
+ "foundry-evm",
+ "foundry-evm-abi",
+ "foundry-linking",
  "foundry-test-utils",
- "foundry-wallets 0.0.11",
+ "foundry-wallets",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
  "futures 0.3.31",
@@ -4859,7 +4580,7 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest 0.12.12",
- "revm-inspectors 0.16.0",
+ "revm-inspectors",
  "rustls 0.23.23",
  "semver 1.0.26",
  "serde",
@@ -4869,7 +4590,7 @@ dependencies = [
  "solang-parser",
  "solar-parse",
  "soldeer-commands",
- "strum 0.26.3",
+ "strum 0.27.1",
  "svm-rs",
  "tempfile",
  "thiserror 2.0.12",
@@ -4894,10 +4615,10 @@ dependencies = [
  "alloy-primitives",
  "derive_more 1.0.0",
  "eyre",
- "forge-fmt 0.0.11",
- "foundry-common 0.0.11",
+ "forge-fmt",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
+ "foundry-config",
  "itertools 0.14.0",
  "mdbook",
  "rayon",
@@ -4916,7 +4637,7 @@ version = "0.0.11"
 dependencies = [
  "alloy-primitives",
  "ariadne",
- "foundry-config 0.0.11",
+ "foundry-config",
  "itertools 0.14.0",
  "similar-asserts",
  "solang-parser",
@@ -4924,20 +4645,6 @@ dependencies = [
  "toml 0.8.20",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "forge-fmt"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-primitives",
- "ariadne",
- "foundry-config 1.0.0",
- "itertools 0.14.0",
- "solang-parser",
- "thiserror 2.0.12",
- "tracing",
 ]
 
 [[package]]
@@ -4960,25 +4667,25 @@ dependencies = [
  "dialoguer",
  "dunce",
  "eyre",
- "forge-script-sequence 0.0.11",
+ "forge-script-sequence",
  "forge-verify",
- "foundry-cheatcodes 0.0.11",
- "foundry-cli 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cheatcodes",
+ "foundry-cli",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-debugger 0.0.11",
- "foundry-evm 0.0.11",
- "foundry-linking 0.0.11",
+ "foundry-config",
+ "foundry-debugger",
+ "foundry-evm",
+ "foundry-linking",
  "foundry-strategy-zksync",
- "foundry-wallets 0.0.11",
+ "foundry-wallets",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
  "futures 0.3.31",
  "indicatif",
  "itertools 0.14.0",
  "parking_lot",
- "revm-inspectors 0.16.0",
+ "revm-inspectors",
  "semver 1.0.26",
  "serde",
  "serde_json",
@@ -4996,30 +4703,11 @@ dependencies = [
  "alloy-primitives",
  "alloy-rpc-types 0.12.5",
  "eyre",
- "foundry-common 0.0.11",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
+ "foundry-config",
  "foundry-zksync-core",
- "revm-inspectors 0.16.0",
- "serde",
- "serde_json",
- "tracing",
- "walkdir",
-]
-
-[[package]]
-name = "forge-script-sequence"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-rpc-types 0.9.2",
- "eyre",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-config 1.0.0",
- "revm-inspectors 0.14.1",
+ "revm-inspectors",
  "serde",
  "serde_json",
  "tracing",
@@ -5034,7 +4722,7 @@ dependencies = [
  "alloy-sol-macro-expander",
  "alloy-sol-macro-input",
  "eyre",
- "foundry-common 0.0.11",
+ "foundry-common",
  "prettyplease",
  "proc-macro2",
  "quote",
@@ -5056,11 +4744,11 @@ dependencies = [
  "clap",
  "eyre",
  "foundry-block-explorers",
- "foundry-cli 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cli",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm 0.0.11",
+ "foundry-config",
+ "foundry-evm",
  "foundry-test-utils",
  "foundry-zksync-compilers",
  "futures 0.3.31",
@@ -5110,7 +4798,7 @@ version = "0.0.11"
 dependencies = [
  "alloy-consensus 0.12.1",
  "alloy-dyn-abi",
- "alloy-genesis 0.12.5",
+ "alloy-genesis",
  "alloy-json-abi",
  "alloy-network 0.12.5",
  "alloy-primitives",
@@ -5124,15 +4812,15 @@ dependencies = [
  "dialoguer",
  "ecdsa 0.16.9",
  "eyre",
- "forge-script-sequence 0.0.11",
+ "forge-script-sequence",
  "foundry-cheatcodes-common",
- "foundry-cheatcodes-spec 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cheatcodes-spec",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm-core 0.0.11",
- "foundry-evm-traces 0.0.11",
- "foundry-wallets 0.0.11",
+ "foundry-config",
+ "foundry-evm-core",
+ "foundry-evm-traces",
+ "foundry-wallets",
  "foundry-zksync-core",
  "foundry-zksync-inspectors",
  "itertools 0.14.0",
@@ -5144,55 +4832,7 @@ dependencies = [
  "proptest",
  "rand 0.8.5",
  "revm",
- "revm-inspectors 0.16.0",
- "semver 1.0.26",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "toml 0.8.20",
- "tracing",
- "walkdir",
-]
-
-[[package]]
-name = "foundry-cheatcodes"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-dyn-abi",
- "alloy-genesis 0.9.2",
- "alloy-json-abi",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-provider 0.9.2",
- "alloy-rlp",
- "alloy-rpc-types 0.9.2",
- "alloy-signer 0.9.2",
- "alloy-signer-local 0.9.2",
- "alloy-sol-types",
- "base64 0.22.1",
- "dialoguer",
- "ecdsa 0.16.9",
- "eyre",
- "forge-script-sequence 1.0.0",
- "foundry-cheatcodes-spec 1.0.0",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-config 1.0.0",
- "foundry-evm-core 1.0.0",
- "foundry-evm-traces 1.0.0",
- "foundry-wallets 1.0.0",
- "itertools 0.14.0",
- "jsonpath_lib",
- "k256 0.13.4",
- "memchr",
- "p256",
- "parking_lot",
- "proptest",
- "rand 0.8.5",
- "revm",
- "revm-inspectors 0.14.1",
+ "revm-inspectors",
  "semver 1.0.26",
  "serde",
  "serde_json",
@@ -5215,20 +4855,10 @@ name = "foundry-cheatcodes-spec"
 version = "0.0.11"
 dependencies = [
  "alloy-sol-types",
- "foundry-macros 0.0.11",
+ "foundry-macros",
  "schemars",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "foundry-cheatcodes-spec"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-sol-types",
- "foundry-macros 1.0.0",
- "serde",
 ]
 
 [[package]]
@@ -5247,14 +4877,14 @@ dependencies = [
  "color-eyre",
  "dotenvy",
  "eyre",
- "forge-fmt 0.0.11",
- "foundry-common 0.0.11",
+ "forge-fmt",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-debugger 0.0.11",
- "foundry-evm 0.0.11",
+ "foundry-config",
+ "foundry-debugger",
+ "foundry-evm",
  "foundry-strategy-zksync",
- "foundry-wallets 0.0.11",
+ "foundry-wallets",
  "foundry-zksync-compilers",
  "futures 0.3.31",
  "indicatif",
@@ -5264,7 +4894,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strsim 0.11.1",
- "strum 0.26.3",
+ "strum 0.27.1",
  "tempfile",
  "tokio",
  "tracing",
@@ -5274,50 +4904,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "foundry-cli"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-chains",
- "alloy-dyn-abi",
- "alloy-eips 0.9.2",
- "alloy-json-abi",
- "alloy-primitives",
- "alloy-provider 0.9.2",
- "alloy-rlp",
- "alloy-transport 0.9.2",
- "clap",
- "color-eyre",
- "dotenvy",
- "eyre",
- "forge-fmt 1.0.0",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-config 1.0.0",
- "foundry-debugger 1.0.0",
- "foundry-evm 1.0.0",
- "foundry-wallets 1.0.0",
- "futures 0.3.31",
- "indicatif",
- "itertools 0.14.0",
- "rayon",
- "regex",
- "serde",
- "serde_json",
- "strsim 0.11.1",
- "strum 0.26.3",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "yansi",
-]
-
-[[package]]
 name = "foundry-common"
 version = "0.0.11"
 dependencies = [
  "alloy-consensus 0.12.1",
- "alloy-contract 0.12.5",
+ "alloy-contract",
  "alloy-dyn-abi",
  "alloy-eips 0.12.5",
  "alloy-json-abi",
@@ -5325,15 +4916,15 @@ dependencies = [
  "alloy-network 0.12.5",
  "alloy-primitives",
  "alloy-provider 0.12.5",
- "alloy-pubsub 0.12.5",
+ "alloy-pubsub",
  "alloy-rpc-client 0.12.5",
  "alloy-rpc-types 0.12.5",
  "alloy-serde 0.12.5",
  "alloy-sol-types",
  "alloy-transport 0.12.5",
  "alloy-transport-http 0.12.5",
- "alloy-transport-ipc 0.12.5",
- "alloy-transport-ws 0.12.5",
+ "alloy-transport-ipc",
+ "alloy-transport-ws",
  "alloy-zksync",
  "anstream",
  "anstyle",
@@ -5346,9 +4937,9 @@ dependencies = [
  "dunce",
  "eyre",
  "foundry-block-explorers",
- "foundry-common-fmt 0.0.11",
+ "foundry-common-fmt",
  "foundry-compilers",
- "foundry-config 0.0.11",
+ "foundry-config",
  "foundry-zksync-compilers",
  "itertools 0.14.0",
  "num-format",
@@ -5357,58 +4948,6 @@ dependencies = [
  "serde",
  "serde_json",
  "similar-asserts",
- "terminal_size",
- "thiserror 2.0.12",
- "tokio",
- "tower 0.5.2",
- "tracing",
- "url",
- "vergen",
- "walkdir",
- "yansi",
-]
-
-[[package]]
-name = "foundry-common"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-contract 0.9.2",
- "alloy-dyn-abi",
- "alloy-eips 0.9.2",
- "alloy-json-abi",
- "alloy-json-rpc 0.9.2",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-provider 0.9.2",
- "alloy-pubsub 0.9.2",
- "alloy-rpc-client 0.9.2",
- "alloy-rpc-types 0.9.2",
- "alloy-serde 0.9.2",
- "alloy-sol-types",
- "alloy-transport 0.9.2",
- "alloy-transport-http 0.9.2",
- "alloy-transport-ipc 0.9.2",
- "alloy-transport-ws 0.9.2",
- "anstream",
- "anstyle",
- "async-trait",
- "chrono",
- "clap",
- "comfy-table",
- "dunce",
- "eyre",
- "foundry-block-explorers",
- "foundry-common-fmt 1.0.0",
- "foundry-compilers",
- "foundry-config 1.0.0",
- "itertools 0.14.0",
- "num-format",
- "reqwest 0.12.12",
- "semver 1.0.26",
- "serde",
- "serde_json",
  "terminal_size",
  "thiserror 2.0.12",
  "tokio",
@@ -5432,30 +4971,11 @@ dependencies = [
  "alloy-serde 0.12.5",
  "chrono",
  "comfy-table",
- "foundry-macros 0.0.11",
+ "foundry-macros",
  "revm-primitives",
  "serde",
  "serde_json",
  "similar-asserts",
- "yansi",
-]
-
-[[package]]
-name = "foundry-common-fmt"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-dyn-abi",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-rpc-types 0.9.2",
- "alloy-serde 0.9.2",
- "chrono",
- "comfy-table",
- "revm-primitives",
- "serde",
- "serde_json",
  "yansi",
 ]
 
@@ -5606,74 +5126,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "foundry-config"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "Inflector",
- "alloy-chains",
- "alloy-primitives",
- "dirs 6.0.0",
- "dunce",
- "eyre",
- "figment",
- "foundry-block-explorers",
- "foundry-compilers",
- "glob",
- "globset",
- "itertools 0.14.0",
- "mesc",
- "number_prefix",
- "path-slash",
- "regex",
- "reqwest 0.12.12",
- "revm-primitives",
- "semver 1.0.26",
- "serde",
- "serde_json",
- "serde_regex",
- "solar-parse",
- "thiserror 2.0.12",
- "toml 0.8.20",
- "toml_edit 0.22.24",
- "tracing",
- "walkdir",
- "yansi",
-]
-
-[[package]]
 name = "foundry-debugger"
 version = "0.0.11"
 dependencies = [
  "alloy-primitives",
  "crossterm",
  "eyre",
- "foundry-common 0.0.11",
+ "foundry-common",
  "foundry-compilers",
- "foundry-evm-core 0.0.11",
- "foundry-evm-traces 0.0.11",
+ "foundry-evm-core",
+ "foundry-evm-traces",
  "ratatui",
  "revm",
- "revm-inspectors 0.16.0",
- "serde",
- "tracing",
-]
-
-[[package]]
-name = "foundry-debugger"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-primitives",
- "crossterm",
- "eyre",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-evm-core 1.0.0",
- "foundry-evm-traces 1.0.0",
- "ratatui",
- "revm",
- "revm-inspectors 0.14.1",
+ "revm-inspectors",
  "serde",
  "tracing",
 ]
@@ -5688,15 +5153,15 @@ dependencies = [
  "alloy-serde 0.12.5",
  "alloy-sol-types",
  "eyre",
- "foundry-cheatcodes 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cheatcodes",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm-core 0.0.11",
- "foundry-evm-coverage 0.0.11",
- "foundry-evm-fuzz 0.0.11",
- "foundry-evm-traces 0.0.11",
- "foundry-linking 0.0.11",
+ "foundry-config",
+ "foundry-evm-core",
+ "foundry-evm-coverage",
+ "foundry-evm-fuzz",
+ "foundry-evm-traces",
+ "foundry-linking",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
  "foundry-zksync-inspectors",
@@ -5704,35 +5169,7 @@ dependencies = [
  "parking_lot",
  "proptest",
  "revm",
- "revm-inspectors 0.16.0",
- "serde",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
-name = "foundry-evm"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-dyn-abi",
- "alloy-json-abi",
- "alloy-primitives",
- "alloy-sol-types",
- "eyre",
- "foundry-cheatcodes 1.0.0",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-config 1.0.0",
- "foundry-evm-core 1.0.0",
- "foundry-evm-coverage 1.0.0",
- "foundry-evm-fuzz 1.0.0",
- "foundry-evm-traces 1.0.0",
- "indicatif",
- "parking_lot",
- "proptest",
- "revm",
- "revm-inspectors 0.14.1",
+ "revm-inspectors",
  "serde",
  "thiserror 2.0.12",
  "tracing",
@@ -5745,22 +5182,9 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "derive_more 1.0.0",
- "foundry-common-fmt 0.0.11",
- "foundry-macros 0.0.11",
+ "foundry-common-fmt",
+ "foundry-macros",
  "foundry-test-utils",
- "itertools 0.14.0",
-]
-
-[[package]]
-name = "foundry-evm-abi"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-types",
- "derive_more 1.0.0",
- "foundry-common-fmt 1.0.0",
- "foundry-macros 1.0.0",
  "itertools 0.14.0",
 ]
 
@@ -5770,7 +5194,7 @@ version = "0.0.11"
 dependencies = [
  "alloy-consensus 0.12.1",
  "alloy-dyn-abi",
- "alloy-genesis 0.12.5",
+ "alloy-genesis",
  "alloy-json-abi",
  "alloy-network 0.12.5",
  "alloy-primitives",
@@ -5779,53 +5203,18 @@ dependencies = [
  "alloy-sol-types",
  "auto_impl",
  "eyre",
- "foundry-cheatcodes-spec 0.0.11",
- "foundry-common 0.0.11",
- "foundry-config 0.0.11",
- "foundry-evm-abi 0.0.11",
- "foundry-fork-db 0.12.0",
+ "foundry-cheatcodes-spec",
+ "foundry-common",
+ "foundry-config",
+ "foundry-evm-abi",
+ "foundry-fork-db",
  "foundry-test-utils",
  "foundry-zksync-core",
  "futures 0.3.31",
  "itertools 0.14.0",
  "parking_lot",
  "revm",
- "revm-inspectors 0.16.0",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "tracing",
- "url",
-]
-
-[[package]]
-name = "foundry-evm-core"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-dyn-abi",
- "alloy-genesis 0.9.2",
- "alloy-json-abi",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-provider 0.9.2",
- "alloy-rpc-types 0.9.2",
- "alloy-sol-types",
- "alloy-transport 0.9.2",
- "auto_impl",
- "eyre",
- "foundry-cheatcodes-spec 1.0.0",
- "foundry-common 1.0.0",
- "foundry-config 1.0.0",
- "foundry-evm-abi 1.0.0",
- "foundry-fork-db 0.10.0",
- "futures 0.3.31",
- "itertools 0.14.0",
- "parking_lot",
- "revm",
- "revm-inspectors 0.14.1",
+ "revm-inspectors",
  "serde",
  "serde_json",
  "thiserror 2.0.12",
@@ -5840,25 +5229,9 @@ version = "0.0.11"
 dependencies = [
  "alloy-primitives",
  "eyre",
- "foundry-common 0.0.11",
+ "foundry-common",
  "foundry-compilers",
- "foundry-evm-core 0.0.11",
- "rayon",
- "revm",
- "semver 1.0.26",
- "tracing",
-]
-
-[[package]]
-name = "foundry-evm-coverage"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-primitives",
- "eyre",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-evm-core 1.0.0",
+ "foundry-evm-core",
  "rayon",
  "revm",
  "semver 1.0.26",
@@ -5873,12 +5246,12 @@ dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
  "eyre",
- "foundry-common 0.0.11",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm-core 0.0.11",
- "foundry-evm-coverage 0.0.11",
- "foundry-evm-traces 0.0.11",
+ "foundry-config",
+ "foundry-evm-core",
+ "foundry-evm-coverage",
+ "foundry-evm-traces",
  "foundry-zksync-core",
  "itertools 0.14.0",
  "parking_lot",
@@ -5891,31 +5264,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "foundry-evm-fuzz"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-dyn-abi",
- "alloy-json-abi",
- "alloy-primitives",
- "eyre",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-config 1.0.0",
- "foundry-evm-core 1.0.0",
- "foundry-evm-coverage 1.0.0",
- "foundry-evm-traces 1.0.0",
- "itertools 0.14.0",
- "parking_lot",
- "proptest",
- "rand 0.8.5",
- "revm",
- "serde",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
 name = "foundry-evm-traces"
 version = "0.0.11"
 dependencies = [
@@ -5925,76 +5273,23 @@ dependencies = [
  "alloy-sol-types",
  "eyre",
  "foundry-block-explorers",
- "foundry-cheatcodes-spec 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cheatcodes-spec",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm-core 0.0.11",
- "foundry-linking 0.0.11",
+ "foundry-config",
+ "foundry-evm-core",
+ "foundry-linking",
  "futures 0.3.31",
  "itertools 0.14.0",
  "rayon",
  "revm",
- "revm-inspectors 0.16.0",
+ "revm-inspectors",
  "serde",
  "serde_json",
  "solar-parse",
  "tempfile",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "foundry-evm-traces"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-dyn-abi",
- "alloy-json-abi",
- "alloy-primitives",
- "alloy-sol-types",
- "eyre",
- "foundry-block-explorers",
- "foundry-common 1.0.0",
- "foundry-compilers",
- "foundry-config 1.0.0",
- "foundry-evm-core 1.0.0",
- "foundry-linking 1.0.0",
- "futures 0.3.31",
- "itertools 0.14.0",
- "rayon",
- "revm",
- "revm-inspectors 0.14.1",
- "serde",
- "serde_json",
- "solar-parse",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "foundry-fork-db"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89a794c8a78ba20568a0c86b035768da7e81fed3c51cecea57f81523123cbcfa"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-primitives",
- "alloy-provider 0.9.2",
- "alloy-rpc-types 0.9.2",
- "alloy-serde 0.9.2",
- "alloy-transport 0.9.2",
- "eyre",
- "futures 0.3.31",
- "parking_lot",
- "revm",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
- "tokio",
- "tracing",
- "url",
 ]
 
 [[package]]
@@ -6033,30 +5328,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "foundry-linking"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-primitives",
- "foundry-compilers",
- "semver 1.0.26",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "foundry-macros"
 version = "0.0.11"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 2.0.99",
-]
-
-[[package]]
-name = "foundry-macros"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -6074,13 +5347,13 @@ dependencies = [
  "alloy-sol-types",
  "alloy-zksync",
  "eyre",
- "foundry-cheatcodes 0.0.11",
- "foundry-common 0.0.11",
+ "foundry-cheatcodes",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
- "foundry-evm 0.0.11",
- "foundry-evm-core 0.0.11",
- "foundry-linking 0.0.11",
+ "foundry-config",
+ "foundry-evm",
+ "foundry-evm-core",
+ "foundry-linking",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
  "itertools 0.14.0",
@@ -6107,9 +5380,9 @@ dependencies = [
  "eyre",
  "fd-lock",
  "foundry-block-explorers",
- "foundry-common 0.0.11",
+ "foundry-common",
  "foundry-compilers",
- "foundry-config 0.0.11",
+ "foundry-config",
  "futures 0.3.31",
  "parking_lot",
  "rand 0.8.5",
@@ -6138,7 +5411,7 @@ dependencies = [
  "alloy-signer-gcp 0.12.5",
  "alloy-signer-ledger 0.12.5",
  "alloy-signer-local 0.12.5",
- "alloy-signer-trezor 0.12.5",
+ "alloy-signer-trezor",
  "alloy-sol-types",
  "async-trait",
  "aws-config",
@@ -6147,39 +5420,12 @@ dependencies = [
  "derive_builder",
  "eth-keystore",
  "eyre",
- "foundry-config 0.0.11",
+ "foundry-config",
  "gcloud-sdk 0.26.3",
  "rpassword",
  "serde",
  "thiserror 2.0.12",
  "tokio",
- "tracing",
-]
-
-[[package]]
-name = "foundry-wallets"
-version = "1.0.0"
-source = "git+https://github.com/foundry-rs/foundry?rev=v1.0.0#8692e926198056d0228c1e166b1b6c34a5bed66c"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-dyn-abi",
- "alloy-network 0.9.2",
- "alloy-primitives",
- "alloy-signer 0.9.2",
- "alloy-signer-ledger 0.9.2",
- "alloy-signer-local 0.9.2",
- "alloy-signer-trezor 0.9.2",
- "alloy-sol-types",
- "async-trait",
- "aws-sdk-kms",
- "clap",
- "derive_builder",
- "eth-keystore",
- "eyre",
- "foundry-config 1.0.0",
- "rpassword",
- "serde",
- "thiserror 2.0.12",
  "tracing",
 ]
 
@@ -6225,8 +5471,8 @@ dependencies = [
  "anvil_zksync_types",
  "eyre",
  "foundry-cheatcodes-common",
- "foundry-common 0.0.11",
- "foundry-evm-abi 0.0.11",
+ "foundry-common",
+ "foundry-evm-abi",
  "itertools 0.14.0",
  "revm",
  "serde",
@@ -6244,8 +5490,8 @@ name = "foundry-zksync-inspectors"
 version = "0.0.11"
 dependencies = [
  "alloy-primitives",
- "foundry-evm-core 0.0.11",
- "foundry-evm-traces 0.0.11",
+ "foundry-evm-core",
+ "foundry-evm-traces",
  "foundry-zksync-core",
  "revm",
 ]
@@ -8258,20 +7504,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 
 [[package]]
-name = "maili-consensus"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6c278346ab9cfef7688510e28a042d8a23c953380e7361a1286920ccbd0d847"
-dependencies = [
- "alloy-consensus 0.9.2",
- "alloy-eips 0.9.2",
- "alloy-primitives",
- "alloy-rlp",
- "alloy-serde 0.9.2",
- "serde",
-]
-
-[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10114,31 +9346,13 @@ dependencies = [
 
 [[package]]
 name = "revm-inspectors"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc873bc873e12a1723493e1a35804fa79b673a0bfb1c19cfee659d46def8be42"
-dependencies = [
- "alloy-primitives",
- "alloy-rpc-types-eth 0.9.2",
- "alloy-rpc-types-trace 0.9.2",
- "alloy-sol-types",
- "anstyle",
- "colorchoice",
- "revm",
- "serde",
- "serde_json",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "revm-inspectors"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6a43423d81f4bef634469bfb2d9ebe36a9ea9167f20ab3a7d1ff1e05fa63099"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-eth 0.12.5",
- "alloy-rpc-types-trace 0.12.5",
+ "alloy-rpc-types-trace",
  "alloy-sol-types",
  "anstyle",
  "colorchoice",
@@ -12180,12 +11394,8 @@ checksum = "edc5f74e248dc973e0dbb7b74c7e0d6fcc301c694ff50049504004ef4d0cdcd9"
 dependencies = [
  "futures-util",
  "log",
- "rustls 0.23.23",
- "rustls-pki-types",
  "tokio",
- "tokio-rustls 0.26.2",
  "tungstenite 0.24.0",
- "webpki-roots 0.26.8",
 ]
 
 [[package]]
@@ -12561,8 +11771,6 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.8.5",
- "rustls 0.23.23",
- "rustls-pki-types",
  "sha1",
  "thiserror 1.0.69",
  "utf-8",
@@ -14042,7 +13250,7 @@ dependencies = [
 [[package]]
 name = "zksync-error-codegen"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-error?rev=92d1b60d18686e0e261f04dc7efd74db60e112f1#92d1b60d18686e0e261f04dc7efd74db60e112f1"
+source = "git+https://github.com/matter-labs/zksync-error?rev=76e8e471b048461d2754092fa159c87a47db5972#76e8e471b048461d2754092fa159c87a47db5972"
 dependencies = [
  "cargo_metadata 0.18.1",
  "derive_more 2.0.1",
@@ -14069,7 +13277,7 @@ dependencies = [
 [[package]]
 name = "zksync-error-description"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-error?rev=92d1b60d18686e0e261f04dc7efd74db60e112f1#92d1b60d18686e0e261f04dc7efd74db60e112f1"
+source = "git+https://github.com/matter-labs/zksync-error?rev=76e8e471b048461d2754092fa159c87a47db5972#76e8e471b048461d2754092fa159c87a47db5972"
 dependencies = [
  "serde",
  "serde_json",
@@ -14079,7 +13287,7 @@ dependencies = [
 [[package]]
 name = "zksync-error-model"
 version = "0.1.0"
-source = "git+https://github.com/matter-labs/zksync-error?rev=92d1b60d18686e0e261f04dc7efd74db60e112f1#92d1b60d18686e0e261f04dc7efd74db60e112f1"
+source = "git+https://github.com/matter-labs/zksync-error?rev=76e8e471b048461d2754092fa159c87a47db5972#76e8e471b048461d2754092fa159c87a47db5972"
 dependencies = [
  "derive_more 2.0.1",
  "serde",
@@ -14091,7 +13299,7 @@ dependencies = [
 [[package]]
 name = "zksync_basic_types"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "chrono",
@@ -14155,7 +13363,7 @@ dependencies = [
 [[package]]
 name = "zksync_config"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "rand 0.8.5",
@@ -14182,7 +13390,7 @@ dependencies = [
 [[package]]
 name = "zksync_contracts"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "envy",
  "hex",
@@ -14196,7 +13404,7 @@ dependencies = [
 [[package]]
 name = "zksync_crypto_primitives"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "blake2",
@@ -14213,7 +13421,7 @@ dependencies = [
 [[package]]
 name = "zksync_error"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=40723c93cc587bba060a14b8bba005f5fd9e4883#40723c93cc587bba060a14b8bba005f5fd9e4883"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?branch=db%2Fadd-config-for-bytecode-compression#ef53baf0a213aea93571e173fb3284305065b817"
 dependencies = [
  "anyhow",
  "lazy_static",
@@ -14255,7 +13463,7 @@ dependencies = [
 [[package]]
 name = "zksync_mini_merkle_tree"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -14265,7 +13473,7 @@ dependencies = [
 [[package]]
 name = "zksync_multivm"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "circuit_sequencer_api",
@@ -14305,7 +13513,7 @@ dependencies = [
 [[package]]
 name = "zksync_system_constants"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -14331,7 +13539,7 @@ dependencies = [
 [[package]]
 name = "zksync_types"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -14357,7 +13565,7 @@ dependencies = [
 [[package]]
 name = "zksync_utils"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "once_cell",
@@ -14388,7 +13596,7 @@ dependencies = [
 [[package]]
 name = "zksync_vm_interface"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -14405,7 +13613,7 @@ dependencies = [
 [[package]]
 name = "zksync_web3_decl"
 version = "26.3.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?tag=core-v26.4.0#5da5be9d57c2bba602dd8035d59662a254ca971a"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=7a3fea5ebb8e90cedff749a45f3b78538443b3d6#7a3fea5ebb8e90cedff749a45f3b78538443b3d6"
 dependencies = [
  "anyhow",
  "async-trait",

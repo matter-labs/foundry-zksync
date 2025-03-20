@@ -3,7 +3,10 @@ use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use anvil_zksync_api_server::NodeServerBuilder;
 use anvil_zksync_config::{
-    constants::{DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR},
+    constants::{
+        DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
+        DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
+    },
     types::{CacheConfig, SystemContractsOptions},
     TestNodeConfig,
 };
@@ -19,7 +22,7 @@ use anvil_zksync_core::{
 use anvil_zksync_l1_sidecar::L1Sidecar;
 use tokio::sync::RwLock;
 use tower_http::cors::AllowOrigin;
-use zksync_types::{L2BlockNumber, H160, U256};
+use zksync_types::{L2BlockNumber, DEFAULT_ERA_CHAIN_ID, H160, U256};
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [
@@ -241,7 +244,15 @@ impl ZkSyncNode {
 
         const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 
-        let config = TestNodeConfig::default().with_cache_config(Some(CacheConfig::Memory));
+        let config = TestNodeConfig::default()
+            .with_l1_gas_price(Some(DEFAULT_L1_GAS_PRICE))
+            .with_l2_gas_price(Some(DEFAULT_L2_GAS_PRICE))
+            .with_price_scale(Some(DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR))
+            .with_gas_limit_scale(Some(DEFAULT_ESTIMATE_GAS_SCALE_FACTOR))
+            .with_l1_pubdata_price(Some(DEFAULT_FAIR_PUBDATA_PRICE))
+            .with_chain_id(Some(DEFAULT_ERA_CHAIN_ID))
+            .with_cache_config(Some(CacheConfig::Memory))
+            .with_bytecode_compression(Some(true)); // This currently is a inverted boolean bug on anvil-zksync and should be fixed
 
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);
@@ -255,7 +266,7 @@ impl ZkSyncNode {
         );
         let storage_key_layout = StorageKeyLayout::ZkEra;
 
-        let (node_inner, storage, blockchain, time, fork) = InMemoryNodeInner::init(
+        let (inner, storage, blockchain, time, fork, vm_runner) = InMemoryNodeInner::init(
             fork_client,
             fee_input_provider.clone(),
             filters,
@@ -263,13 +274,14 @@ impl ZkSyncNode {
             impersonation.clone(),
             system_contracts.clone(),
             storage_key_layout,
+            false,
         );
 
         let mut node_service_tasks: Vec<Pin<Box<dyn Future<Output = anyhow::Result<()>>>>> =
             Vec::new();
 
         let (node_executor, node_handle) =
-            NodeExecutor::new(node_inner.clone(), system_contracts.clone(), storage_key_layout);
+            NodeExecutor::new(inner.clone(), vm_runner, storage_key_layout);
 
         let sealing_mode = BlockSealerMode::immediate(MAX_TRANSACTIONS, pool.add_tx_listener());
         let (block_sealer, block_sealer_state) =
@@ -277,7 +289,7 @@ impl ZkSyncNode {
         node_service_tasks.push(Box::pin(block_sealer.run()));
 
         let node: InMemoryNode = InMemoryNode::new(
-            node_inner,
+            inner,
             blockchain,
             storage,
             fork,
