@@ -825,6 +825,16 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     }
                 }
 
+                // We only increment the depth by one because that is sufficient to signal the check
+                // in handle_expect_revert that the call has happened at a depth
+                // deeper than the cheatcode, therefore tracking the depth in zkEVM
+                // calls is not necessary. Normally adjusting the max depth would happen in
+                // initialize_interp for each EVM call.
+                if let Some(expected_revert) = &mut state.expected_revert {
+                    expected_revert.max_depth =
+                        std::cmp::max(ecx.journaled_state.depth() + 1, expected_revert.max_depth);
+                }
+
                 if result.execution_result.is_success() {
                     // record storage accesses
                     self.append_recorded_accesses(state, ecx, result.account_accesses);

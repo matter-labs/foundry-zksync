@@ -6,6 +6,15 @@ import "../cheats/Vm.sol";
 import {Globals} from "./Globals.sol";
 import "../default/logs/console.sol";
 
+contract InitializableContract {
+    bool public initialized;
+
+    function initialize() public {
+        require(!initialized, "Already initialized");
+        initialized = true;
+    }
+}
+
 contract FixedSlot {
     uint8 num; // slot index: 0
 
@@ -331,6 +340,13 @@ contract ZkCheatcodesTest is DSTest {
         vm.expectCall(address(innerProxy), abi.encodeCall(innerProxy.proxyCall, (caller)), 1);
         vm.expectCall(address(caller), abi.encodeCall(caller.call, (10)), 1);
         proxy.proxyCall(caller);
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = false
+    function testExpectRevertWithNestedCallReverts() public {
+        Reverter reverter = new Reverter();
+        vm.expectRevert();
+        reverter.revertWithMessage();
     }
 
     // Utility function
