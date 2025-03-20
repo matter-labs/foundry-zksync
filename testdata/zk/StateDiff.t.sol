@@ -533,8 +533,8 @@ contract ZkStateDiffTest is DSTest {
     function testStateDiffReturnedForTransfer() external {
         vm.startStateDiffRecording();
 
-        // fails for 65536 and lower.
-        (bool success,) = payable(address(65537)).call{value: 1 ether}("");
+        // fails for 65536 and lower. This seems to fail now below 65544.
+        (bool success,) = payable(address(65557)).call{value: 1 ether}("");
         require(success);
 
         Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
@@ -544,7 +544,7 @@ contract ZkStateDiffTest is DSTest {
         expected[0] = Vm.AccountAccess({
             depth: 1,
             kind: Vm.AccountAccessKind.Call,
-            account: address(65537),
+            account: address(65557),
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
             data: hex"",
             deployedCode: hex"",
@@ -563,8 +563,8 @@ contract ZkStateDiffTest is DSTest {
     function testStateDiffReturnedForNestedTransfer() external {
         vm.startStateDiffRecording();
 
-        // fails for 65536 and lower.
-        bool success = transferDelegator.transferDelegation1Eth(address(65537));
+        // fails for 65536 and lower. This seems to fail now below 65544.
+        bool success = transferDelegator.transferDelegation1Eth(address(65557));
         require(success);
 
         Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
@@ -576,7 +576,7 @@ contract ZkStateDiffTest is DSTest {
             kind: Vm.AccountAccessKind.Call,
             account: 0x24b38E0835586dFd1716Cd263F9890ba0306dCa8,
             accessor: 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496,
-            data: hex"7a8e32ca0000000000000000000000000000000000000000000000000000000000010001",
+            data: hex"7a8e32ca0000000000000000000000000000000000000000000000000000000000010015",
             deployedCode: hex"",
             value: 0,
             oldBalance: 5000000000000000000,
@@ -589,7 +589,7 @@ contract ZkStateDiffTest is DSTest {
         expected[1] = Vm.AccountAccess({
             depth: 2,
             kind: Vm.AccountAccessKind.Call,
-            account: address(65537),
+            account: address(65557),
             accessor: 0x24b38E0835586dFd1716Cd263F9890ba0306dCa8,
             data: hex"",
             deployedCode: hex"",

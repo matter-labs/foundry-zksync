@@ -29,7 +29,7 @@ pub use script::{ScriptOutcome, ScriptTester};
 
 // TODO: remove once anvil supports zksync node
 mod zksync;
-pub use zksync::{Fork, ZkSyncNode};
+pub use zksync::{Fork, MockServer, ZkSyncNode};
 
 // re-exports for convenience
 pub use foundry_compilers;
