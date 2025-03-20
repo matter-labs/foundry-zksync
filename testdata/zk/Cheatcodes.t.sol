@@ -43,6 +43,12 @@ contract Reverter {
     }
 }
 
+contract RevertOnCreate {
+    constructor() {
+        revert("constructor reverted");
+    }
+}
+
 interface IMyProxyCaller {
     function transact(uint8 _data) external;
 }
@@ -331,6 +337,19 @@ contract ZkCheatcodesTest is DSTest {
         vm.expectCall(address(innerProxy), abi.encodeCall(innerProxy.proxyCall, (caller)), 1);
         vm.expectCall(address(caller), abi.encodeCall(caller.call, (10)), 1);
         proxy.proxyCall(caller);
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = false
+    function testExpectRevertWithNestedCallReverts() public {
+        Reverter reverter = new Reverter();
+        vm.expectRevert();
+        reverter.revertWithMessage();
+    }
+
+    /// forge-config: default.allow_internal_expect_revert = false
+    function testExpectRevertWithNestedCreateReverts() public {
+        vm.expectRevert();
+        new RevertOnCreate();
     }
 
     // Utility function

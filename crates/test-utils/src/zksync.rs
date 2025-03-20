@@ -3,7 +3,10 @@ use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use anvil_zksync_api_server::NodeServerBuilder;
 use anvil_zksync_config::{
-    constants::{DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR},
+    constants::{
+        DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
+        DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
+    },
     types::{CacheConfig, SystemContractsOptions},
     TestNodeConfig,
 };
@@ -25,7 +28,7 @@ use httptest::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::AllowOrigin;
-use zksync_types::{L2BlockNumber, H160, U256};
+use zksync_types::{L2BlockNumber, DEFAULT_ERA_CHAIN_ID, H160, U256};
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [
@@ -248,8 +251,14 @@ impl ZkSyncNode {
         const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 
         let config = TestNodeConfig::default()
+            .with_l1_gas_price(Some(DEFAULT_L1_GAS_PRICE))
+            .with_l2_gas_price(Some(DEFAULT_L2_GAS_PRICE))
+            .with_price_scale(Some(DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR))
+            .with_gas_limit_scale(Some(DEFAULT_ESTIMATE_GAS_SCALE_FACTOR))
+            .with_l1_pubdata_price(Some(DEFAULT_FAIR_PUBDATA_PRICE))
+            .with_chain_id(Some(DEFAULT_ERA_CHAIN_ID))
             .with_cache_config(Some(CacheConfig::Memory))
-            .with_bytecode_compression(Some(false));
+            .with_bytecode_compression(Some(true)); // This currently is a inverted boolean bug on anvil-zksync and should be fixed
 
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);
