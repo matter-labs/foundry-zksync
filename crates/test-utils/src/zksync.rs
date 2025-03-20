@@ -2,12 +2,13 @@
 use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use anvil_zksync_api_server::NodeServerBuilder;
+use anvil_zksync_common::cache::CacheConfig;
 use anvil_zksync_config::{
     constants::{
         DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
         DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
     },
-    types::{CacheConfig, SystemContractsOptions},
+    types::SystemContractsOptions,
     TestNodeConfig,
 };
 use anvil_zksync_core::{
@@ -258,7 +259,7 @@ impl ZkSyncNode {
             .with_l1_pubdata_price(Some(DEFAULT_FAIR_PUBDATA_PRICE))
             .with_chain_id(Some(DEFAULT_ERA_CHAIN_ID))
             .with_cache_config(Some(CacheConfig::Memory))
-            .with_bytecode_compression(Some(true)); // This currently is a inverted boolean bug on anvil-zksync and should be fixed
+            .with_enforce_bytecode_compression(Some(false));
 
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);

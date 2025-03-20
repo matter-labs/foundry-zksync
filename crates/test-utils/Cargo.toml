@@ -43,6 +43,7 @@ anyhow = "1.0"
 zksync_types.workspace = true
 zksync_telemetry.workspace = true
 anvil_zksync_core.workspace = true
+anvil_zksync_common.workspace = true
 anvil_zksync_api_server.workspace = true
 anvil_zksync_config.workspace = true
 anvil_zksync_l1_sidecar.workspace = true
