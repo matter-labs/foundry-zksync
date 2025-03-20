@@ -6,15 +6,6 @@ import "../cheats/Vm.sol";
 import {Globals} from "./Globals.sol";
 import "../default/logs/console.sol";
 
-contract InitializableContract {
-    bool public initialized;
-
-    function initialize() public {
-        require(!initialized, "Already initialized");
-        initialized = true;
-    }
-}
-
 contract FixedSlot {
     uint8 num; // slot index: 0
 
