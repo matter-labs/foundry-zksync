@@ -318,7 +318,7 @@ contract SimpleScript is Script {
 
     let zksync = deployment["transaction"]["zksync"].as_object().expect("zksync key was not found");
     let factory_depts = zksync["factoryDeps"].as_array().expect("factoryDeps was not an array");
-    assert!(factory_depts.len() > 0);
+    assert!(!factory_depts.is_empty());
 
     let broadcasted = &txns[1];
 

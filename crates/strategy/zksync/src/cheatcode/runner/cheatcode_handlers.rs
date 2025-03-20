@@ -404,7 +404,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     Box::new(inspect_ctx),
                 )?;
 
-                let mut tx_with_fields = WithOtherFields::new(tx.clone());
+                let mut tx_with_fields = WithOtherFields::new(tx);
                 tx_with_fields.other.insert(
                     ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
                     serde_json::to_value(ZkTransactionMetadata::new(factory_deps, paymaster_data))
