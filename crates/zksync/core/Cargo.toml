@@ -20,6 +20,8 @@ alloy-network.workspace = true
 alloy-sol-types.workspace = true
 alloy-transport.workspace = true
 alloy-zksync.workspace = true
+tokio.workspace = true
+futures.workspace = true
 itertools.workspace = true
 revm = { workspace = true, default-features = false, features = [
     "std",
@@ -38,6 +40,7 @@ serde.workspace = true
 anvil_zksync_core.workspace = true
 anvil_zksync_types.workspace = true
 anvil_zksync_config.workspace = true
+anvil_zksync_traces.workspace = true
 zksync_multivm.workspace = true
 zksync_basic_types.workspace = true
 zksync_types.workspace = true

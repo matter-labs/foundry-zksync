@@ -267,11 +267,13 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
-anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
-anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
-anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
-anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", branch = "db/add-config-for-bytecode-compression" }
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "ff18d025d7f278a2389b6f9f0266917570d727a3" }
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "ff18d025d7f278a2389b6f9f0266917570d727a3" }
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "ff18d025d7f278a2389b6f9f0266917570d727a3" }
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "ff18d025d7f278a2389b6f9f0266917570d727a3" }
+anvil_zksync_common = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "ff18d025d7f278a2389b6f9f0266917570d727a3" }
+anvil_zksync_traces = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "ff18d025d7f278a2389b6f9f0266917570d727a3" }
+anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "ff18d025d7f278a2389b6f9f0266917570d727a3" }
 zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "d5c35951843263765079545c31c908dcbaab1f30" }
 zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
 zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
@@ -346,6 +348,7 @@ tracing-subscriber = "0.3"
 url = "2"
 vergen = { version = "8", default-features = false }
 yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
+httptest = "0.16.3"
 
 ## alloy-core
 # alloy-dyn-abi = { path = "../../alloy-rs/core/crates/dyn-abi" }

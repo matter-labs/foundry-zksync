@@ -1,11 +1,12 @@
 use std::any::Any;
 
 use alloy_primitives::{Address, U256};
-use eyre::Result;
+use alloy_rpc_types::TransactionRequest;
+use eyre::{Ok, Result};
 use foundry_evm::{
     backend::{
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        Backend, DatabaseExt,
+        update_state, Backend, DatabaseExt,
     },
     InspectorExt,
 };
@@ -14,8 +15,8 @@ use foundry_evm_core::backend::{
     BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
 };
 use revm::{
-    primitives::{EnvWithHandlerCfg, HashSet, ResultAndState},
-    JournaledState,
+    primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
+    DatabaseCommit, JournaledState,
 };
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +24,7 @@ use crate::backend::{
     context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
     merge::{ZksyncBackendMerge, ZksyncMergeState},
 };
+use foundry_evm_core::utils::configure_tx_req_env;
 
 /// ZKsync implementation for [BackendStrategyRunner].
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -124,6 +126,66 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         let zk_state =
             &ZksyncMergeState { persistent_immutable_keys: &ctx.persistent_immutable_keys };
         ZksyncBackendMerge::merge_zk_account_data(addr, active, fork_db, zk_state);
+    }
+
+    fn transact_from_tx(
+        &self,
+        backend: &mut Backend,
+        tx: &TransactionRequest,
+        mut env: Env,
+        journaled_state: &mut JournaledState,
+        inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
+    ) -> eyre::Result<()> {
+        if !is_zksync_inspect_context(inspect_ctx.as_ref()) {
+            return EvmBackendStrategyRunner.transact_from_tx(
+                backend,
+                tx,
+                env,
+                journaled_state,
+                inspector,
+                inspect_ctx,
+            );
+        }
+
+        backend.commit(journaled_state.state.clone());
+
+        let res = {
+            configure_tx_req_env(&mut env, tx, None)?;
+            let mut env = backend.env_with_handler_cfg(env);
+
+            let inspect_ctx = get_inspect_context(inspect_ctx);
+            let mut persisted_factory_deps =
+                get_context(backend.strategy.context.as_mut()).persisted_factory_deps.clone();
+
+            let result = foundry_zksync_core::vm::transact(
+                Some(&mut persisted_factory_deps),
+                Some(inspect_ctx.factory_deps),
+                inspect_ctx.paymaster_data,
+                &mut env,
+                &inspect_ctx.zk_env,
+                backend,
+            );
+
+            let ctx = get_context(backend.strategy.context.as_mut());
+            ctx.persisted_factory_deps = persisted_factory_deps;
+
+            let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
+
+            // Patch evm context with real caller and real depth
+            evm_context.env.tx.caller = env.tx.caller;
+            evm_context.journaled_state.depth = journaled_state.depth + 1;
+
+            result.map(|(result, call_traces)| {
+                inspector.trace_zksync(&mut evm_context, call_traces, true);
+                result
+            })?
+        };
+
+        backend.commit(res.state);
+        update_state(&mut journaled_state.state, backend, None)?;
+
+        Ok(())
     }
 }
 
