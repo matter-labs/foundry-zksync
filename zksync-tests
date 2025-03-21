@@ -27,6 +27,8 @@ forge::it:
     zk::basic::test_zk_address_balance_is_consistent
     zk::basic::test_zk_block_information_is_consistent
     zk::basic::test_zk_propagated_block_env_is_consistent
+    zk::cheats::script_zk_broadcast_raw_in_output_json
+    zk::cheats::test_zk_broadcast_raw_executes
     zk::cheats::test_zk_can_mock_modifiers
     zk::cheats::test_zk_cheat_deal_works
     zk::cheats::test_zk_cheat_etch_works
