@@ -1,5 +1,4 @@
 use crate::{
-    etherscan::EtherscanVerificationProvider,
     types::VerificationType,
     utils::{BytecodeType, JsonResult},
     VerifyBytecodeArgs,
@@ -8,10 +7,9 @@ use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
 use eyre::{OptionExt, Result};
-use foundry_block_explorers::{contract::Metadata, Response};
+use foundry_block_explorers::Response;
 use foundry_cli::utils::{self, LoadConfig};
 use foundry_common::{compile::ProjectCompiler, shell};
-use foundry_config::Config;
 use foundry_zksync_compilers::compilers::zksolc::settings::{BytecodeHash, ZkSettings};
 use serde::{Deserialize, Deserializer, Serialize};
 use yansi::Paint;
@@ -46,15 +44,16 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
 
     let mut json_results: Vec<JsonResult> = vec![];
 
-    let onchain_settings = block_explorer_contract_source_code(
+    let block_explorer_metadata = block_explorer_contract_source_code(
         &args.verifier.verifier_url.clone().unwrap(),
         args.address,
     )
     .await?;
-    let onchain_bytecode_hash = onchain_settings
+    let onchain_bytecode_hash = block_explorer_metadata
         .source_code
         .settings
         .metadata
+        .as_ref()
         .map(|m| m.hash_type.unwrap_or_default())
         .unwrap_or_default();
 
@@ -81,7 +80,14 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
         onchain_bytecode_hash,
     );
 
-    print_result(&args, match_type, BytecodeType::Runtime, &mut json_results, &config).await;
+    print_result(
+        match_type,
+        BytecodeType::Runtime,
+        &mut json_results,
+        &block_explorer_metadata,
+        &project.settings.settings,
+    )
+    .await;
 
     if shell::is_json() {
         sh_println!("{}", serde_json::to_string(&json_results)?)?;
@@ -173,11 +179,11 @@ fn extract_metadata_hash(bytecode: &[u8], hash_type: BytecodeHash) -> &[u8] {
 }
 
 async fn print_result(
-    args: &VerifyBytecodeArgs,
     res: Option<VerificationType>,
     bytecode_type: BytecodeType,
     json_results: &mut Vec<JsonResult>,
-    config: &Config,
+    block_explorer_metadata: &Metadata,
+    zk_solc_settings: &ZkSettings,
 ) {
     if let Some(res) = res {
         if !shell::is_json() {
@@ -194,13 +200,7 @@ async fn print_result(
         let _ = sh_err!(
             "{bytecode_type:?} code did not match - this may be due to varying compiler settings"
         );
-        let mismatches = match try_get_settings_and_find_mismatch(args, config).await {
-            Ok(m) => m,
-            Err(e) => {
-                let _ = sh_err!("Failed getting settings from block explorers to compare: {e}");
-                vec![]
-            }
-        };
+        let mismatches = find_mismatch_in_settings(block_explorer_metadata, zk_solc_settings);
         for mismatch in mismatches {
             let _ = sh_eprintln!("{}", mismatch.red().bold());
         }
@@ -216,50 +216,74 @@ async fn print_result(
     }
 }
 
-async fn try_get_settings_and_find_mismatch(
-    args: &VerifyBytecodeArgs,
-    config: &Config,
-) -> Result<Vec<String>> {
-    let etherscan = EtherscanVerificationProvider.client(
-        args.etherscan.chain.unwrap_or_default(),
-        args.verifier.verifier_url.as_deref(),
-        None,
-        config,
-    )?;
-
-    let source_code = etherscan.contract_source_code(args.address).await?;
-    let etherscan_config = source_code.items.first().unwrap();
-    Ok(find_mismatch_in_settings(etherscan_config, config))
-}
-
 fn find_mismatch_in_settings(
-    etherscan_settings: &Metadata,
-    local_settings: &Config,
+    block_explorer_metadata: &Metadata,
+    local_settings: &ZkSettings,
 ) -> Vec<String> {
+    let block_explorer_settings = &block_explorer_metadata.source_code.settings;
     let mut mismatches: Vec<String> = vec![];
-    if etherscan_settings.evm_version != local_settings.evm_version.to_string().to_lowercase() {
+
+    if local_settings.evm_version != block_explorer_settings.evm_version {
         let str = format!(
             "EVM version mismatch: local={}, onchain={}",
-            local_settings.evm_version, etherscan_settings.evm_version
+            local_settings.evm_version.unwrap_or_default(),
+            block_explorer_settings.evm_version.unwrap_or_default()
         );
         mismatches.push(str);
     }
-    let local_optimizer: u64 = if local_settings.optimizer == Some(true) { 1 } else { 0 };
-    if etherscan_settings.optimization_used != local_optimizer {
+
+    if local_settings.codegen != block_explorer_settings.codegen {
         let str = format!(
-            "Optimizer mismatch: local={}, onchain={}",
-            local_settings.optimizer.unwrap_or(false),
-            etherscan_settings.optimization_used
+            "Codegen mismatch: local={:?}, onchain={:?}",
+            local_settings.codegen, block_explorer_settings.codegen
         );
         mismatches.push(str);
     }
-    if local_settings.optimizer_runs.is_some_and(|runs| etherscan_settings.runs != runs as u64) ||
-        (local_settings.optimizer_runs.is_none() && etherscan_settings.runs > 0)
-    {
+
+    let local_llvm_options = local_settings.llvm_options.clone().join(",");
+    let block_explorer_llvm_options = block_explorer_settings.llvm_options.clone().join(",");
+    if local_llvm_options != block_explorer_llvm_options {
         let str = format!(
-            "Optimizer runs mismatch: local={}, onchain={}",
-            local_settings.optimizer_runs.unwrap(),
-            etherscan_settings.runs
+            "LLVM options mismatch: local={local_llvm_options}, onchain={block_explorer_llvm_options}"
+        );
+        mismatches.push(str);
+    }
+
+    // Compare enable_eravm_extensions
+    if local_settings.enable_eravm_extensions != block_explorer_settings.enable_eravm_extensions {
+        let str = format!(
+            "EraVM extensions mismatch: local={}, onchain={}",
+            local_settings.enable_eravm_extensions, block_explorer_settings.enable_eravm_extensions
+        );
+        mismatches.push(str);
+    }
+
+    // Compare optimizer settings
+    let local_optimizer = local_settings.optimizer.enabled.unwrap_or_default();
+    let block_explorer_optimizer = block_explorer_settings.optimizer.enabled.unwrap_or_default();
+    if block_explorer_optimizer != local_optimizer {
+        let str = format!(
+            "Optimizer mismatch: local={local_optimizer}, onchain={block_explorer_optimizer}"
+        );
+        mismatches.push(str);
+    }
+
+    let local_optimizer_mode = local_settings.optimizer.mode.unwrap_or('3');
+    let block_explorer_optimizer_mode = block_explorer_settings.optimizer.mode.unwrap_or('3');
+    if block_explorer_optimizer_mode != local_optimizer_mode {
+        let str = format!(
+            "Optimizer mode mismatch: local={local_optimizer_mode}, onchain={block_explorer_optimizer_mode}",
+        );
+        mismatches.push(str);
+    }
+
+    // Compare fallback_to_optimizing_for_size
+    let local_foz = local_settings.optimizer.fallback_to_optimizing_for_size.unwrap_or_default();
+    let block_explorer_foz =
+        block_explorer_settings.optimizer.fallback_to_optimizing_for_size.unwrap_or_default();
+    if local_foz != block_explorer_foz {
+        let str = format!(
+            "Optimizer fallback_to_optimizing_for_size mismatch: local={local_foz}, onchain={block_explorer_foz}"
         );
         mismatches.push(str);
     }
@@ -269,9 +293,9 @@ fn find_mismatch_in_settings(
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-struct SourceCode {
+struct Metadata {
     #[serde(deserialize_with = "deserialize_source_code")]
-    pub source_code: SCMetadata,
+    pub source_code: SourceCodeMetadata,
     pub contract_name: String,
     pub compiler_version: String,
     pub optimization_used: String,
@@ -280,7 +304,7 @@ struct SourceCode {
 
 /// Contains metadata and path mapped source code.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct SCMetadata {
+struct SourceCodeMetadata {
     pub settings: ZkSettings,
 }
 
@@ -293,12 +317,12 @@ struct SCMetadata {
 /// - Normal source code string: `{ "SourceCode": "// SPDX-License-Identifier: ...", .. }`
 fn deserialize_source_code<'de, D: Deserializer<'de>>(
     deserializer: D,
-) -> std::result::Result<SCMetadata, D::Error> {
+) -> std::result::Result<SourceCodeMetadata, D::Error> {
     #[derive(Deserialize)]
     #[serde(untagged)]
     enum SourceCode {
-        String(String), // this must come first
-        Obj(SCMetadata),
+        String(String),
+        Obj(SourceCodeMetadata),
     }
     let s = SourceCode::deserialize(deserializer)?;
     match s {
@@ -321,9 +345,9 @@ fn deserialize_source_code<'de, D: Deserializer<'de>>(
 async fn block_explorer_contract_source_code(
     verifier_url: &str,
     address: Address,
-) -> Result<SourceCode> {
+) -> Result<Metadata> {
     let req_url = format!("{verifier_url}?module=contract&action=getsourcecode&address={address}");
-    let res: Response<Vec<SourceCode>> = reqwest::get(req_url).await?.json().await?;
+    let res: Response<Vec<Metadata>> = reqwest::get(req_url).await?.json().await?;
     Ok(res.result.into_iter().next().unwrap())
 }
 
@@ -371,10 +395,10 @@ mod tests {
     }
 
     #[test]
-    fn test_zk_extract_and_compare_bytecodes_none_ifps() {
+    fn test_zk_extract_and_compare_bytecodes_none_ipfs() {
         let local = &[1; 32];
-        let ifps = hex::decode("0000000000000000000000000000000000000000a164697066735822122071ce7744d916cec3c85e1da3504c3491bd01991069dba309504d2d578dfcb8f4002a").unwrap();
-        let remote = &[&[1; 32][..], &ifps[..]].concat();
+        let ipfs = hex::decode("0000000000000000000000000000000000000000a164697066735822122071ce7744d916cec3c85e1da3504c3491bd01991069dba309504d2d578dfcb8f4002a").unwrap();
+        let remote = &[&[1; 32][..], &ipfs[..]].concat();
 
         assert!(extract_and_compare_bytecode(
             local,
