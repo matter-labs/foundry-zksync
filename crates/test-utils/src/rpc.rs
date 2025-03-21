@@ -238,8 +238,10 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
     // Note(zk): We try using the env variable if present to avoid rate limiting issues from Foundry
     // upstream
     let key = if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
+        println!("Using ALCHEMY_API_KEY");
         (false, &*Box::leak(alchemy_key.into_boxed_str()))
     } else {
+        eprintln!("Falling back to existing key rotation logic");
         // Fall back to existing key rotation logic
         let idx = next_idx() % (INFURA_KEYS.len() + ALCHEMY_KEYS.len());
         let is_infura = idx < INFURA_KEYS.len();
