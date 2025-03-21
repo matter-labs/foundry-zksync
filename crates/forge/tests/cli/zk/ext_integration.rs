@@ -8,11 +8,13 @@ fn test_zk_aave_di() {
 }
 
 #[test]
-#[ignore = "https://github.com/rhinestonewtf/modulekit/issues/181"]
+#[ignore = "uses `EXTCODECOPY` in multiple tests"]
 fn test_zk_zkemail_email_recovery() {
     ExtTester::new("zkemail", "email-recovery", "main")
         .args(["--zksync", "--root", "."])
-        .install_command(&["yarn", "install"])
+        // repo uses 0.5.2, affected by:
+        // https://github.com/rhinestonewtf/modulekit/issues/181
+        .install_command(&["npm", "install", "@rhinestone/modulekit@0.5.8"])
         .run()
 }
 
