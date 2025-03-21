@@ -253,7 +253,7 @@ syn-solidity = "0.8.22"
 
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
-alloy-zksync = { git = "https://github.com/popzxc/alloy-zksync", rev = "b4a25528d414fef993e781619ab6024c7350e0ce" }
+alloy-zksync = "=0.12.1"
 
 alloy-trie = "0.7.0"
 
