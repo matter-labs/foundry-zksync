@@ -5304,6 +5304,7 @@ dependencies = [
 name = "foundry-strategy-zksync"
 version = "0.0.11"
 dependencies = [
+ "alloy-eips 0.12.5",
  "alloy-json-abi",
  "alloy-primitives",
  "alloy-rpc-types 0.12.6",
@@ -5442,7 +5443,6 @@ dependencies = [
  "foundry-evm-abi",
  "futures 0.3.31",
  "itertools 0.14.0",
- "lazy_static",
  "revm",
  "serde",
  "tokio",

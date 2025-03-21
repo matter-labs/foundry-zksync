@@ -362,6 +362,23 @@ contract ZkCheatcodesTest is DSTest {
 
         assertEq(bytecode, expectedBytecode, "code for the contract was incorrect");
     }
+
+    function testBroadcastTX() external {
+        address payer = address(0xBC989fDe9e54cAd2aB4392Af6dF60f04873A033A);
+        vm.deal(payer, 2 ether);
+        vm.makePersistent(payer);
+
+        uint256 balance = TEST_ADDRESS.balance;
+
+        vm.zkVm(true);
+        // sends 1 ether to TEST_ADDRESS
+        // cast mktx 0x6Eb28604685b1F182dAB800A1Bfa4BaFdBA8a79a --value 1ether --private-key 0x3d3cbc973389cb26f657686445bcc75662b415b656078503592ac8c1abb8810e --zksync --rpc-url http://localhost:50686
+        vm.broadcastRawTransaction(
+            hex"71f88980808402b275d08307b2f8946eb28604685b1f182dab800a1bfa4bafdba8a79a880de0b6b3a76400008080a00da060e1567e202bc057f4d93edf67da3aeb2e7593320edc4aa3e7a488200697a061a725c5f3b6641cb7f3605ba57ac385fd14dc99e43d3b61503e5e563490cdd4827a6994bc989fde9e54cad2ab4392af6df60f04873a033a80c08080"
+        );
+
+        assertEq(balance + 1 ether, TEST_ADDRESS.balance);
+    }
 }
 
 contract UsesCheatcodes {
