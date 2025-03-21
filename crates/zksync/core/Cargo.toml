@@ -22,7 +22,6 @@ alloy-transport.workspace = true
 alloy-zksync.workspace = true
 tokio.workspace = true
 futures.workspace = true
-lazy_static = "1.4"
 itertools.workspace = true
 revm = { workspace = true, default-features = false, features = [
     "std",
