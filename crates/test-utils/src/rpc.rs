@@ -144,6 +144,18 @@ pub fn next_ws_archive_rpc_url() -> String {
 ///
 /// Uses either environment variables (comma separated urls) or default keys.
 fn next_archive_url(is_ws: bool) -> String {
+    // First try to use ALCHEMY_API_KEY if it exists
+    if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
+        let url = if is_ws {
+            format!("wss://eth-mainnet.g.alchemy.com/v2/{}", alchemy_key)
+        } else {
+            format!("https://eth-mainnet.g.alchemy.com/v2/{}", alchemy_key)
+        };
+        eprintln!("--- next_archive_url(is_ws={is_ws}) = using ALCHEMY_API_KEY ---");
+        return url;
+    }
+
+    // Fall back to existing logic
     let urls = archive_urls(is_ws);
     let url = if env_archive_urls(is_ws).is_empty() {
         next(urls)
