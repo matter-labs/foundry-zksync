@@ -2,12 +2,13 @@
 use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use anvil_zksync_api_server::NodeServerBuilder;
+use anvil_zksync_common::cache::CacheConfig;
 use anvil_zksync_config::{
     constants::{
         DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
         DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
     },
-    types::{CacheConfig, SystemContractsOptions},
+    types::SystemContractsOptions,
     TestNodeConfig,
 };
 use anvil_zksync_core::{
@@ -20,6 +21,12 @@ use anvil_zksync_core::{
     system_contracts::SystemContracts,
 };
 use anvil_zksync_l1_sidecar::L1Sidecar;
+use httptest::{
+    matchers::{eq, json_decoded, request},
+    responders::json_encoded,
+    Expectation, Server,
+};
+use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::AllowOrigin;
 use zksync_types::{L2BlockNumber, DEFAULT_ERA_CHAIN_ID, H160, U256};
@@ -252,7 +259,7 @@ impl ZkSyncNode {
             .with_l1_pubdata_price(Some(DEFAULT_FAIR_PUBDATA_PRICE))
             .with_chain_id(Some(DEFAULT_ERA_CHAIN_ID))
             .with_cache_config(Some(CacheConfig::Memory))
-            .with_bytecode_compression(Some(true)); // This currently is a inverted boolean bug on anvil-zksync and should be fixed
+            .with_enforce_bytecode_compression(Some(false));
 
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);
@@ -358,5 +365,79 @@ impl ZkSyncNode {
 
     pub fn rich_wallets() -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
         RICH_WALLETS.iter().copied()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct RpcRequest {
+    pub jsonrpc: String,
+    pub id: u64,
+    pub method: String,
+    pub params: Option<serde_json::Value>,
+}
+
+/// A HTTP server that can be used to mock a fork source.
+pub struct MockServer {
+    /// The implementation for [httptest::Server].
+    pub inner: Server,
+}
+
+impl MockServer {
+    pub const CHAIN_ID: &str = "0x104";
+
+    /// Start the mock server.
+    pub fn run() -> Self {
+        let inner = Server::run();
+
+        inner.expect(
+            Expectation::matching(request::body(json_decoded(eq(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "eth_chainId",
+            })))))
+            .times(..)
+            .respond_with(json_encoded(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "result": Self::CHAIN_ID,
+            }))),
+        );
+
+        Self { inner }
+    }
+
+    /// Retrieve the mock server's url.
+    pub fn url(&self) -> String {
+        self.inner.url("").to_string()
+    }
+
+    /// Assert an exactly single call expectation with a given request and the provided response.
+    pub fn expect(
+        &self,
+        method: &str,
+        params: Option<serde_json::Value>,
+        result: serde_json::Value,
+    ) {
+        let method = method.to_string();
+        let id_matcher = Arc::new(std::sync::RwLock::new(0));
+        let id_matcher_clone = id_matcher.clone();
+        self.inner.expect(
+            Expectation::matching(request::body(json_decoded(move |request: &RpcRequest| {
+                let result = request.method == method && request.params == params;
+                if result {
+                    let mut writer = id_matcher.write().unwrap();
+                    *writer = request.id;
+                }
+                result
+            })))
+            .respond_with(move || {
+                let id = *id_matcher_clone.read().unwrap();
+                json_encoded(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "result": result,
+                    "id": id
+                }))
+            }),
+        );
     }
 }
