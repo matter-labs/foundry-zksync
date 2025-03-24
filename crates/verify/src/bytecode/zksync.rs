@@ -1,4 +1,5 @@
 use crate::{
+    etherscan::EtherscanVerificationProvider,
     types::VerificationType,
     utils::{BytecodeType, JsonResult},
     VerifyBytecodeArgs,
@@ -11,6 +12,7 @@ use foundry_block_explorers::Response;
 use foundry_cli::utils::{self, LoadConfig};
 use foundry_common::{compile::ProjectCompiler, shell};
 use foundry_zksync_compilers::compilers::zksolc::settings::{BytecodeHash, ZkSettings};
+use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize};
 use yansi::Paint;
 
@@ -21,6 +23,26 @@ use yansi::Paint;
 pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
     let config = args.load_config()?;
     let provider = utils::get_provider(&config)?;
+    // If chain is not set, we try to get it from the RPC.
+    // If RPC is not set, the default chain is used.
+    let chain = match config.get_rpc_url() {
+        Some(_) => utils::get_chain(config.chain, &provider).await?,
+        None => config.chain.unwrap_or_default(),
+    };
+
+    // Get etherscan values.
+    let etherscan_config = config.get_etherscan_config_with_chain(Some(chain))?;
+    let etherscan_key = etherscan_config.as_ref().map(|c| c.key.as_str());
+    // TODO: we just create etherscan client to get the api url which has some
+    // resolution logic baked in. We cannot reuse the client for now as most primitive methods
+    // are private and we need zksync specific deserialization.
+    let etherscan = EtherscanVerificationProvider.client(
+        chain,
+        args.verifier.verifier_url.as_deref(),
+        etherscan_key,
+        &config,
+    )?;
+    let etherscan_api_url = etherscan.etherscan_api_url();
 
     let onchain_runtime_code = match args.block {
         Some(BlockId::Number(BlockNumberOrTag::Number(block))) => {
@@ -44,11 +66,9 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
 
     let mut json_results: Vec<JsonResult> = vec![];
 
-    let block_explorer_metadata = block_explorer_contract_source_code(
-        &args.verifier.verifier_url.clone().unwrap(),
-        args.address,
-    )
-    .await?;
+    let block_explorer_metadata =
+        block_explorer_contract_source_code(etherscan_api_url, etherscan_key, args.address).await?;
+
     let onchain_bytecode_hash = block_explorer_metadata
         .source_code
         .settings
@@ -249,7 +269,6 @@ fn find_mismatch_in_settings(
         mismatches.push(str);
     }
 
-    // Compare enable_eravm_extensions
     if local_settings.enable_eravm_extensions != block_explorer_settings.enable_eravm_extensions {
         let str = format!(
             "EraVM extensions mismatch: local={}, onchain={}",
@@ -258,7 +277,6 @@ fn find_mismatch_in_settings(
         mismatches.push(str);
     }
 
-    // Compare optimizer settings
     let local_optimizer = local_settings.optimizer.enabled.unwrap_or_default();
     let block_explorer_optimizer = block_explorer_settings.optimizer.enabled.unwrap_or_default();
     if block_explorer_optimizer != local_optimizer {
@@ -277,7 +295,6 @@ fn find_mismatch_in_settings(
         mismatches.push(str);
     }
 
-    // Compare fallback_to_optimizing_for_size
     let local_foz = local_settings.optimizer.fallback_to_optimizing_for_size.unwrap_or_default();
     let block_explorer_foz =
         block_explorer_settings.optimizer.fallback_to_optimizing_for_size.unwrap_or_default();
@@ -290,6 +307,11 @@ fn find_mismatch_in_settings(
 
     mismatches
 }
+
+// TODO: structs and methods below are all adaptations of foundry-block-explorers's
+// clients to be able to deserialize into zksync specific values. Maybe it is
+// worth submitting a PR to block explorers to generalize methods or make certian
+// internals public in order to be able to reuse more of that code.
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -343,12 +365,16 @@ fn deserialize_source_code<'de, D: Deserializer<'de>>(
 }
 
 async fn block_explorer_contract_source_code(
-    verifier_url: &str,
+    verifier_url: &Url,
+    api_key: Option<&str>,
     address: Address,
 ) -> Result<Metadata> {
-    let req_url = format!("{verifier_url}?module=contract&action=getsourcecode&address={address}");
-    let res: Response<Vec<Metadata>> = reqwest::get(req_url).await?.json().await?;
-    Ok(res.result.into_iter().next().unwrap())
+    let api_key_query_param = api_key.map(|ak| format!("&apikey={ak}")).unwrap_or_default();
+    let req_url = format!(
+        "{verifier_url}?module=contract&action=getsourcecode&address={address}{api_key_query_param}"
+    );
+    let response: Response<Vec<Metadata>> = reqwest::get(req_url).await?.json().await?;
+    Ok(response.result.into_iter().next().unwrap())
 }
 
 #[cfg(test)]
