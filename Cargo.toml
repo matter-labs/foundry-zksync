@@ -29,6 +29,8 @@ resolver = "2"
 
 [workspace.metadata]
 # NOTE(zk): track upstream version after each merge
+# Test
+
 metadata.upstream_version = "1.0.0"
 
 [workspace.package]
