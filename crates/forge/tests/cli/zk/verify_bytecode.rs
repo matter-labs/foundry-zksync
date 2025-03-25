@@ -146,3 +146,39 @@ Optimizer mode mismatch: local=1, onchain=3
 "#,
     );
 });
+
+// TODO: Add etherscan test which requires an ZKsync etherscan key.
+// forgetest_async!(zk_verify_bytecode_etherscan, |prj, cmd| {
+//     let config = Config {
+//         evm_version: EvmVersion::London,
+//         solc: Some(SolcReq::Version(Version::new(0, 8, 28))),
+//         zksync: foundry_config::zksync::ZkSyncConfig {
+//             hash_type: Some(BytecodeHash::Keccak256),
+//             zksolc: Some(SolcReq::Version(Version::new(1, 5, 11))),
+//             ..Default::default()
+//         },
+//         ..Default::default()
+//     };
+//
+//     let etherscan_key = "TODO";
+//
+//     prj.add_source("Counter.sol", COUNTER_SOURCE).unwrap();
+//
+//     prj.write_config(config);
+//
+//     let args = vec![
+//         "verify-bytecode",
+//         COUNTER_ADDRESS,
+//         "Counter",
+//         "--rpc-url",
+//         "https://sepolia.era.zksync.dev",
+//         "--zksync",
+//         "--verifier-url",
+//         "https://api-sepolia-era.zksync.network/api",
+//         "--etherscan-api-key",
+//         etherscan_key,
+//     ];
+//
+//     let output = cmd.forge_fuse().args(args).assert_success().get_output().stdout_lossy();
+//     assert!(output.contains("Runtime code matched with status partial"));
+// });

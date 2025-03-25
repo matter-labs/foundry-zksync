@@ -8,10 +8,13 @@ use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
 use eyre::{OptionExt, Result};
-use foundry_block_explorers::Response;
+use foundry_block_explorers::{errors::EtherscanError, Response, ResponseData};
 use foundry_cli::utils::{self, LoadConfig};
 use foundry_common::{compile::ProjectCompiler, shell};
-use foundry_zksync_compilers::compilers::zksolc::settings::{BytecodeHash, ZkSettings};
+use foundry_compilers::artifacts::{serde_helpers, EvmVersion};
+use foundry_zksync_compilers::compilers::zksolc::settings::{
+    BytecodeHash, Codegen, Optimizer, ZkSettings,
+};
 use reqwest::Url;
 use serde::{Deserialize, Deserializer, Serialize};
 use yansi::Paint;
@@ -318,16 +321,30 @@ fn find_mismatch_in_settings(
 struct Metadata {
     #[serde(deserialize_with = "deserialize_source_code")]
     pub source_code: SourceCodeMetadata,
-    pub contract_name: String,
-    pub compiler_version: String,
-    pub optimization_used: String,
-    pub zk_compiler_version: String,
 }
 
 /// Contains metadata and path mapped source code.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct SourceCodeMetadata {
-    pub settings: ZkSettings,
+    pub settings: BEZkSettings,
+}
+
+// TODO: We need a dedicated struct because deserializing directly into ZkSettings fails
+// for etherscan. We could potentially make ZkSettings compatible with this somehow, worse
+// case scenario via a `flatten` that has this fields
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BEZkSettings {
+    pub codegen: Codegen,
+    #[serde(default, with = "serde_helpers::display_from_str_opt")]
+    pub evm_version: Option<EvmVersion>,
+    #[serde(default, rename = "LLVMOptions")]
+    pub llvm_options: Vec<String>,
+    #[serde(default, rename = "enableEraVMExtensions")]
+    pub enable_eravm_extensions: bool,
+    pub optimizer: Optimizer,
+    #[serde(default)]
+    pub metadata: Option<foundry_zksync_compilers::compilers::zksolc::settings::SettingsMetadata>,
 }
 
 /// Deserializes as JSON either:
@@ -373,8 +390,39 @@ async fn block_explorer_contract_source_code(
     let req_url = format!(
         "{verifier_url}?module=contract&action=getsourcecode&address={address}{api_key_query_param}"
     );
-    let response: Response<Vec<Metadata>> = reqwest::get(req_url).await?.json().await?;
+    let response: String = reqwest::get(req_url).await?.text().await?;
+    if response.contains("Contract source code not verified") {
+        return Err(EtherscanError::ContractCodeNotVerified(address).into());
+    }
+
+    let response = sanitize_response(&response)?;
     Ok(response.result.into_iter().next().unwrap())
+}
+
+fn sanitize_response(res: impl AsRef<str>) -> Result<Response<Vec<Metadata>>> {
+    let res = res.as_ref();
+    let res: ResponseData<Vec<Metadata>> = serde_json::from_str(res).map_err(|error| {
+        error!(target: "etherscan", ?res, "Failed to deserialize response: {}", error);
+        if res == "Page not found" {
+            EtherscanError::PageNotFound
+        } else {
+            EtherscanError::Serde { error, content: res.to_string() }
+        }
+    })?;
+
+    match res {
+        ResponseData::Error { result, message, status } => {
+            if let Some(ref result) = result {
+                if result.starts_with("Max rate limit reached") {
+                    return Err(EtherscanError::RateLimitExceeded.into());
+                } else if result.to_lowercase().contains("invalid api key") {
+                    return Err(EtherscanError::InvalidApiKey.into());
+                }
+            }
+            Err(EtherscanError::ErrorResponse { status, message, result }.into())
+        }
+        ResponseData::Success(res) => Ok(res),
+    }
 }
 
 #[cfg(test)]

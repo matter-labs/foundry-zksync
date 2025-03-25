@@ -47,12 +47,12 @@ pub struct ZkSettings {
     /// Solidity remappings
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remappings: Vec<Remapping>,
+    /// EVM version
     #[serde(
         default,
         with = "serde_helpers::display_from_str_opt",
         skip_serializing_if = "Option::is_none"
     )]
-    /// EVM version
     pub evm_version: Option<EvmVersion>,
 
     // check if the same (and use `compilers version`)
