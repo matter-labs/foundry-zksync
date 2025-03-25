@@ -314,7 +314,7 @@ fn find_mismatch_in_settings(
 
 // TODO: structs and methods below are all adaptations of foundry-block-explorers's
 // clients to be able to deserialize into zksync specific values. Maybe it is
-// worth submitting a PR to block explorers to generalize methods or make certian
+// worth submitting a PR to block explorers to generalize methods or make certain
 // internals public in order to be able to reuse more of that code.
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
