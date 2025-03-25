@@ -41,6 +41,7 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
     // are private and we need zksync specific deserialization.
     let etherscan = EtherscanVerificationProvider.client(
         chain,
+        &args.verifier.verifier,
         args.verifier.verifier_url.as_deref(),
         etherscan_key,
         &config,
