@@ -2,8 +2,8 @@ use std::{collections::HashSet, path::PathBuf};
 
 use alloy_primitives::{hex, Address, Bytes};
 use clap::Parser;
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_config::zksync::ZkSyncConfig;
+use foundry_zksync_compilers::compilers::zksolc::{ErrorType, WarningType};
 use serde::Serialize;
 
 #[derive(Clone, Debug, Default, Serialize, Parser)]

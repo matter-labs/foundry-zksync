@@ -11,7 +11,6 @@ use foundry_test_utils::foundry_compilers::{
     CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig,
 };
 
-use era_solc::standard_json::input::settings::{error_type::ErrorType, warning_type::WarningType};
 use foundry_zksync_compilers::{
     artifacts::{contract::Contract, error::Error},
     compilers::{
@@ -19,7 +18,7 @@ use foundry_zksync_compilers::{
         zksolc::{
             input::ZkSolcInput,
             settings::{BytecodeHash, SettingsMetadata},
-            ZkSolc, ZkSolcCompiler, ZkSolcSettings,
+            ErrorType, WarningType, ZkSolc, ZkSolcCompiler, ZkSolcSettings,
         },
     },
 };

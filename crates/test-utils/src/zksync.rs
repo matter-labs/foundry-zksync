@@ -1,21 +1,35 @@
 //! Contains in-memory implementation of anvil-zksync.
-use std::{net::SocketAddr, str::FromStr};
+use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use anvil_zksync_api_server::NodeServerBuilder;
+use anvil_zksync_common::cache::CacheConfig;
 use anvil_zksync_config::{
-    types::{CacheConfig, SystemContractsOptions},
+    constants::{
+        DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
+        DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
+    },
+    types::SystemContractsOptions,
     TestNodeConfig,
 };
 use anvil_zksync_core::{
-    fork::ForkDetails,
+    filters::EthFilters,
     node::{
-        BlockProducer, BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode,
-        TimestampManager, TxPool,
+        fork::{ForkClient, ForkConfig},
+        BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode, InMemoryNodeInner,
+        NodeExecutor, StorageKeyLayout, TestNodeFeeInputProvider, TxPool,
     },
     system_contracts::SystemContracts,
 };
+use anvil_zksync_l1_sidecar::L1Sidecar;
+use httptest::{
+    matchers::{eq, json_decoded, request},
+    responders::json_encoded,
+    Expectation, Server,
+};
+use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
 use tower_http::cors::AllowOrigin;
-use zksync_types::{H160, U256};
+use zksync_types::{L2BlockNumber, DEFAULT_ERA_CHAIN_ID, H160, U256};
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [
@@ -134,6 +148,41 @@ impl Fork {
     }
 }
 
+fn new_fork_config(url: &str) -> ForkConfig {
+    const MAINNET_URL: &str = "https://mainnet.era.zksync.io:443";
+    const SEPOLIA_TESTNET_URL: &str = "https://sepolia.era.zksync.dev:443";
+    const ABSTRACT_MAINNET_URL: &str = "https://api.mainnet.abs.xyz";
+    const ABSTRACT_TESTNET_URL: &str = "https://api.testnet.abs.xyz";
+
+    match url {
+        "mainnet" => ForkConfig {
+            url: MAINNET_URL.parse().unwrap(),
+            estimate_gas_price_scale_factor: 1.5,
+            estimate_gas_scale_factor: 1.3,
+        },
+        "sepolia-testnet" => ForkConfig {
+            url: SEPOLIA_TESTNET_URL.parse().unwrap(),
+            estimate_gas_price_scale_factor: 2.0,
+            estimate_gas_scale_factor: 1.3,
+        },
+        "abstract" => ForkConfig {
+            url: ABSTRACT_MAINNET_URL.parse().unwrap(),
+            estimate_gas_price_scale_factor: 1.5,
+            estimate_gas_scale_factor: 1.3,
+        },
+        "abstract-testnet" => ForkConfig {
+            url: ABSTRACT_TESTNET_URL.parse().unwrap(),
+            estimate_gas_price_scale_factor: 1.5,
+            estimate_gas_scale_factor: 1.3,
+        },
+        _ => ForkConfig {
+            url: url.parse().unwrap(),
+            estimate_gas_price_scale_factor: DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR,
+            estimate_gas_scale_factor: DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
+        },
+    }
+}
+
 /// In-memory anvil-zksync that is stopped when dropped.
 pub struct ZkSyncNode {
     port: u16,
@@ -166,10 +215,19 @@ impl ZkSyncNode {
         let (_guard, guard_rx) = tokio::sync::oneshot::channel::<()>();
         let (port_tx, port) = tokio::sync::oneshot::channel();
 
-        let fork = fork.map(|fork| {
-            ForkDetails::from_url(fork.url, fork.block, CacheConfig::Memory)
-                .expect("failed building ForkDetails")
-        });
+        let fork = if let Some(fork) = fork {
+            Some(
+                ForkClient::at_block_number(
+                    new_fork_config(&fork.url),
+                    fork.block.map(|block| L2BlockNumber(block as u32)),
+                )
+                .await
+                .expect("failed creating fork config"),
+            )
+        } else {
+            None
+        };
+
         std::thread::spawn(move || {
             // We need to spawn a thread since `run_inner` future is not `Send`.
             let runtime =
@@ -186,26 +244,70 @@ impl ZkSyncNode {
     async fn run_inner(
         port_tx: tokio::sync::oneshot::Sender<u16>,
         stop_guard: tokio::sync::oneshot::Receiver<()>,
-        fork: Option<ForkDetails>,
+        fork_client: Option<ForkClient>,
     ) {
+        // We need to init telemetry else anvil-zksync will panic.
+        zksync_telemetry::init_telemetry("", "", "", None, None, None).await.ok();
+
         const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 
-        let config = TestNodeConfig::default();
+        let config = TestNodeConfig::default()
+            .with_l1_gas_price(Some(DEFAULT_L1_GAS_PRICE))
+            .with_l2_gas_price(Some(DEFAULT_L2_GAS_PRICE))
+            .with_price_scale(Some(DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR))
+            .with_gas_limit_scale(Some(DEFAULT_ESTIMATE_GAS_SCALE_FACTOR))
+            .with_l1_pubdata_price(Some(DEFAULT_FAIR_PUBDATA_PRICE))
+            .with_chain_id(Some(DEFAULT_ERA_CHAIN_ID))
+            .with_cache_config(Some(CacheConfig::Memory))
+            .with_enforce_bytecode_compression(Some(false));
 
-        let time = TimestampManager::default();
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);
+        let fee_input_provider =
+            TestNodeFeeInputProvider::from_fork(fork_client.as_ref().map(|f| &f.details));
+        let filters = Arc::new(RwLock::new(EthFilters::default()));
+        let system_contracts = SystemContracts::from_options(
+            &SystemContractsOptions::BuiltInWithoutSecurity,
+            false,
+            false,
+        );
+        let storage_key_layout = StorageKeyLayout::ZkEra;
+
+        let (inner, storage, blockchain, time, fork, vm_runner) = InMemoryNodeInner::init(
+            fork_client,
+            fee_input_provider.clone(),
+            filters,
+            config.clone(),
+            impersonation.clone(),
+            system_contracts.clone(),
+            storage_key_layout,
+            false,
+        );
+
+        let mut node_service_tasks: Vec<Pin<Box<dyn Future<Output = anyhow::Result<()>>>>> =
+            Vec::new();
+
+        let (node_executor, node_handle) =
+            NodeExecutor::new(inner.clone(), vm_runner, storage_key_layout);
+
         let sealing_mode = BlockSealerMode::immediate(MAX_TRANSACTIONS, pool.add_tx_listener());
-        let block_sealer = BlockSealer::new(sealing_mode);
+        let (block_sealer, block_sealer_state) =
+            BlockSealer::new(sealing_mode, pool.clone(), node_handle.clone());
+        node_service_tasks.push(Box::pin(block_sealer.run()));
 
         let node: InMemoryNode = InMemoryNode::new(
+            inner,
+            blockchain,
+            storage,
             fork,
+            node_handle,
             None,
-            &config,
             time,
             impersonation,
-            pool.clone(),
-            block_sealer.clone(),
+            pool,
+            block_sealer_state,
+            system_contracts,
+            storage_key_layout,
         );
 
         for wallet in LEGACY_RICH_WALLETS.iter() {
@@ -213,44 +315,129 @@ impl ZkSyncNode {
             node.set_rich_account(
                 H160::from_str(address).unwrap(),
                 U256::from(1000u128 * 10u128.pow(18)),
-            );
+            )
+            .await;
         }
         for wallet in RICH_WALLETS.iter() {
             let address = wallet.0;
             node.set_rich_account(
                 H160::from_str(address).unwrap(),
                 U256::from(1000u128 * 10u128.pow(18)),
-            );
+            )
+            .await;
         }
 
-        let system_contracts =
-            SystemContracts::from_options(&SystemContractsOptions::BuiltInWithoutSecurity, false);
+        tokio::spawn(async move {
+            node_executor.run().await.expect("node executor failed to start");
+        });
 
-        let allow_origin = AllowOrigin::any();
-        let server_builder = NodeServerBuilder::new(node.clone(), allow_origin);
+        let server_builder =
+            NodeServerBuilder::new(node.clone(), L1Sidecar::none(), AllowOrigin::any());
 
-        let server = server_builder.build(SocketAddr::from(([0, 0, 0, 0], 0))).await;
+        let server = server_builder
+            .build(SocketAddr::from(([0, 0, 0, 0], 0)))
+            .await
+            .expect("failed building server");
+
         // if no receiver was ready to receive the spawning thread died
         port_tx.send(server.local_addr().port()).expect("failed to send port");
 
-        let block_producer_handle = BlockProducer::new(node, pool, block_sealer, system_contracts);
+        let server_handle = server.run();
 
-        let handle = server.run();
+        let node_service_stopped = futures::future::select_all(node_service_tasks);
+        let any_server_stopped = server_handle.stopped();
 
         tokio::select! {
-            _ = handle.stopped() => {
-                tracing::error!("Server stopped");
+            _ = tokio::signal::ctrl_c() => {
+                tracing::trace!("received shutdown signal, shutting down");
             },
-            _ = block_producer_handle => {
-                tracing::error!("Block producer stopped");
-            }
+            _ = any_server_stopped => {
+                tracing::trace!("node server was stopped")
+            },
+            _ = node_service_stopped => {
+                tracing::trace!("node service was stopped")
+            },
             _ = stop_guard => {
-                tracing::info!("Server stopped by guard");
+                tracing::trace!("node server was stopped by guard")
             }
         };
     }
 
     pub fn rich_wallets() -> impl Iterator<Item = (&'static str, &'static str, &'static str)> {
         RICH_WALLETS.iter().copied()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct RpcRequest {
+    pub jsonrpc: String,
+    pub id: u64,
+    pub method: String,
+    pub params: Option<serde_json::Value>,
+}
+
+/// A HTTP server that can be used to mock a fork source.
+pub struct MockServer {
+    /// The implementation for [httptest::Server].
+    pub inner: Server,
+}
+
+impl MockServer {
+    pub const CHAIN_ID: &str = "0x104";
+
+    /// Start the mock server.
+    pub fn run() -> Self {
+        let inner = Server::run();
+
+        inner.expect(
+            Expectation::matching(request::body(json_decoded(eq(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "method": "eth_chainId",
+            })))))
+            .times(..)
+            .respond_with(json_encoded(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 0,
+                "result": Self::CHAIN_ID,
+            }))),
+        );
+
+        Self { inner }
+    }
+
+    /// Retrieve the mock server's url.
+    pub fn url(&self) -> String {
+        self.inner.url("").to_string()
+    }
+
+    /// Assert an exactly single call expectation with a given request and the provided response.
+    pub fn expect(
+        &self,
+        method: &str,
+        params: Option<serde_json::Value>,
+        result: serde_json::Value,
+    ) {
+        let method = method.to_string();
+        let id_matcher = Arc::new(std::sync::RwLock::new(0));
+        let id_matcher_clone = id_matcher.clone();
+        self.inner.expect(
+            Expectation::matching(request::body(json_decoded(move |request: &RpcRequest| {
+                let result = request.method == method && request.params == params;
+                if result {
+                    let mut writer = id_matcher.write().unwrap();
+                    *writer = request.id;
+                }
+                result
+            })))
+            .respond_with(move || {
+                let id = *id_matcher_clone.read().unwrap();
+                json_encoded(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "result": result,
+                    "id": id
+                }))
+            }),
+        );
     }
 }

@@ -171,3 +171,22 @@ jobs:
 
       - name: Verify anvil-zksync installation
         run: anvil-zksync --version
+  
+  zk-tests-check:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Verify zksync tests are not removed
+        run: make zksync-tests-check
