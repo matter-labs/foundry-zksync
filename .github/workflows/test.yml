@@ -149,7 +149,7 @@ jobs:
 
   check-ci-install:
     name: CI install
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install foundry-zksync
@@ -159,7 +159,7 @@ jobs:
 
   check-ci-install-anvil:
     name: CI install anvil-zksync
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
