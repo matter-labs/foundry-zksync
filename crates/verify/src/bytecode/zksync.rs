@@ -73,7 +73,7 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
     let block_explorer_metadata =
         block_explorer_contract_source_code(etherscan_api_url, etherscan_key, args.address).await?;
 
-    let onchain_bytecode_hash = block_explorer_metadata
+    let onchain_hash_type = block_explorer_metadata
         .source_code
         .settings
         .metadata
@@ -101,7 +101,7 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
         &local_bytecode,
         &onchain_runtime_code,
         config.zksync.hash_type().unwrap_or_default(),
-        onchain_bytecode_hash,
+        onchain_hash_type,
     );
 
     print_result(
@@ -123,14 +123,14 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
 fn match_bytecodes(
     local_bytecode: &[u8],
     onchain_bytecode: &[u8],
-    local_bytecode_hash: BytecodeHash,
-    onchain_bytecode_hash: BytecodeHash,
+    local_hash_type: BytecodeHash,
+    onchain_hash_type: BytecodeHash,
 ) -> Option<VerificationType> {
     // 1. Try full match
     if local_bytecode == onchain_bytecode {
         // If the bytecode_hash = 'none' in Config. Then it's always a partial match according to
         // sourcify definitions. Ref: https://docs.sourcify.dev/docs/full-vs-partial-match/.
-        if local_bytecode_hash == BytecodeHash::None {
+        if local_hash_type == BytecodeHash::None {
             return Some(VerificationType::Partial);
         }
 
@@ -139,8 +139,8 @@ fn match_bytecodes(
         extract_and_compare_bytecode(
             local_bytecode,
             onchain_bytecode,
-            local_bytecode_hash,
-            onchain_bytecode_hash,
+            local_hash_type,
+            onchain_hash_type,
         )
         .then_some(VerificationType::Partial)
     }
@@ -188,11 +188,11 @@ fn extract_metadata_hash(bytecode: &[u8], hash_type: BytecodeHash) -> &[u8] {
         BytecodeHash::Ipfs => {
             // Get the last two bytes of the bytecode to find the length of CBOR metadata
             let metadata_len = &bytecode[bytecode.len() - 2..];
-            let metadata_len: usize =
+            let metadata_with_trailer_len: usize =
                 (u16::from_be_bytes([metadata_len[0], metadata_len[1]]) + 2).into();
-            if metadata_len <= bytecode.len() {
+            if metadata_with_trailer_len <= bytecode.len() {
                 // metadata will be 0 padded to be a multiple of 32
-                metadata_len + (32 - metadata_len % 32)
+                metadata_with_trailer_len + (32 - metadata_with_trailer_len % 32)
             } else {
                 0
             }
