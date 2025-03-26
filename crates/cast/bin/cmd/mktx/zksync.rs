@@ -5,10 +5,10 @@ use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
     provider::ZksyncProvider,
 };
-use cast::ZkTransactionOpts;
 use eyre::Result;
 use foundry_cli::utils;
 use foundry_config::Config;
+use zksync_tx_types::ZkTransactionOpts;
 
 /// Builds a complete ZkSync transaction request with fee estimation
 pub async fn build_tx(

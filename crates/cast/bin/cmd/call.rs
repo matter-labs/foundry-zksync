@@ -2,7 +2,7 @@ use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::{TxKind, U256};
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
 use alloy_serde::OtherFields;
-use cast::{traces::TraceKind, Cast, ZkCast, ZkTransactionOpts};
+use cast::{traces::TraceKind, Cast, ZkCast};
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -24,6 +24,7 @@ use foundry_evm::{
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
+use zksync_tx_types::ZkTransactionOpts;
 use std::str::FromStr;
 
 mod zksync;

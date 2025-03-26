@@ -2731,6 +2731,7 @@ dependencies = [
  "tokio",
  "tracing",
  "yansi",
+ "zksync-tx-types",
  "zksync_types",
 ]
 
@@ -4788,7 +4789,7 @@ name = "foundry-cheatcodes-spec"
 version = "0.0.12"
 dependencies = [
  "alloy-sol-types",
- "foundry-macros 0.0.11",
+ "foundry-macros 0.0.12",
  "schemars",
  "serde",
  "serde_json",
@@ -4834,6 +4835,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tracy",
  "yansi",
+ "zksync-tx-types",
 ]
 
 [[package]]
@@ -4870,7 +4872,7 @@ dependencies = [
  "dunce",
  "eyre",
  "foundry-block-explorers",
- "foundry-common-fmt 0.0.11",
+ "foundry-common-fmt 0.0.12",
  "foundry-compilers",
  "foundry-config",
  "foundry-zksync-compilers",
@@ -4904,7 +4906,7 @@ dependencies = [
  "alloy-serde 0.12.6",
  "chrono",
  "comfy-table",
- "foundry-macros 0.0.11",
+ "foundry-macros 0.0.12",
  "revm-primitives",
  "serde",
  "serde_json",
@@ -5134,8 +5136,8 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "derive_more 2.0.1",
- "foundry-common-fmt 0.0.11",
- "foundry-macros 0.0.11",
+ "foundry-common-fmt 0.0.12",
+ "foundry-macros 0.0.12",
  "foundry-test-utils",
  "itertools 0.14.0",
 ]
@@ -13491,6 +13493,25 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "vector-map",
+]
+
+[[package]]
+name = "zksync-tx-types"
+version = "0.0.12"
+dependencies = [
+ "alloy-consensus 0.12.1",
+ "alloy-dyn-abi",
+ "alloy-json-abi",
+ "alloy-network 0.12.6",
+ "alloy-primitives",
+ "alloy-provider",
+ "alloy-rpc-types 0.12.6",
+ "alloy-serde 0.12.6",
+ "alloy-zksync",
+ "clap",
+ "eyre",
+ "foundry-common",
+ "serde",
 ]
 
 [[package]]

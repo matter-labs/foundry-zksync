@@ -3,7 +3,7 @@ use alloy_network::{eip2718::Encodable2718, EthereumWallet, TransactionBuilder};
 use alloy_primitives::hex;
 use alloy_signer::Signer;
 use alloy_zksync::wallet::ZksyncWallet;
-use cast::{NoopWallet, ZkTransactionOpts};
+use cast::NoopWallet;
 use clap::Parser;
 use eyre::{OptionExt, Result};
 use foundry_cli::{
@@ -11,6 +11,7 @@ use foundry_cli::{
     utils::{get_provider, LoadConfig},
 };
 use foundry_common::ens::NameOrAddress;
+use zksync_tx_types::ZkTransactionOpts;
 use std::{path::PathBuf, str::FromStr};
 
 mod zksync;

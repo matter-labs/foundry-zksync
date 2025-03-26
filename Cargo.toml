@@ -24,6 +24,7 @@ members = [
     "crates/macros/",
     "crates/test-utils/",
     "crates/strategy/zksync/",
+    "crates/zksync-tx-types",
 ]
 resolver = "2"
 
@@ -198,6 +199,7 @@ foundry-zksync-core = { path = "crates/zksync/core" }
 foundry-zksync-compilers = { path = "crates/zksync/compilers" }
 foundry-zksync-inspectors = { path = "crates/zksync/inspectors" }
 foundry-strategy-zksync = { path = "crates/strategy/zksync" }
+zksync-tx-types = { path = "crates/zksync-tx-types" }
 
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.11.0", default-features = false }

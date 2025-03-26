@@ -2,7 +2,6 @@ use crate::tx::{CastTxBuilder, SenderKind};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockId;
-use cast::zksync::ZkTransactionOpts;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -10,6 +9,7 @@ use foundry_cli::{
     utils::{self, parse_ether_value, LoadConfig},
 };
 use foundry_common::ens::NameOrAddress;
+use zksync_tx_types::ZkTransactionOpts;
 use std::str::FromStr;
 
 mod zksync;

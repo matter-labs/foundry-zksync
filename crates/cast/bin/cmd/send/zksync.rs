@@ -7,9 +7,10 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_zksync::{network::Zksync, provider::ZksyncProvider, wallet::ZksyncWallet};
-use cast::{NoopWallet, ZkTransactionOpts};
+use cast::NoopWallet;
 use eyre::Result;
 use foundry_cli::opts::EthereumOpts;
+use zksync_tx_types::ZkTransactionOpts;
 
 use crate::tx::{self, CastTxBuilder, InputState, SenderKind};
 

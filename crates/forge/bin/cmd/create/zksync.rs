@@ -51,16 +51,22 @@ pub struct ZkSyncData {
 
 impl CreateArgs {
     pub(super) async fn run_zksync(mut self, project: Project) -> Result<()> {
-        let paymaster_params = if let Some(paymaster_address) =
-            self.build.compiler.zk.paymaster_address
-        {
-            Some(PaymasterParams {
-                paymaster: paymaster_address,
-                paymaster_input: self.build.compiler.zk.paymaster_input.clone().unwrap_or_default(),
-            })
-        } else {
-            None
-        };
+        let paymaster_params =
+            if let Some(paymaster_address) = self.build.compiler.zk.transaction.paymaster_address {
+                Some(PaymasterParams {
+                    paymaster: paymaster_address,
+                    paymaster_input: self
+                        .build
+                        .compiler
+                        .zk
+                        .transaction
+                        .paymaster_input
+                        .clone()
+                        .unwrap_or_default(),
+                })
+            } else {
+                None
+            };
         let target_path = if let Some(ref mut path) = self.contract.path {
             canonicalize(project.root().join(path))?
         } else {

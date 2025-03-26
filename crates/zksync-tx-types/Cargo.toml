@@ -1,0 +1,33 @@
+[package]
+name = "zksync-tx-types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+alloy-primitives.workspace = true
+alloy-rpc-types = { workspace = true, features = ["eth", "trace"] }
+alloy-serde.workspace = true
+alloy-zksync.workspace = true
+eyre.workspace = true
+serde.workspace = true
+alloy-dyn-abi.workspace = true
+alloy-json-abi.workspace = true
+alloy-consensus = { workspace = true, features = ["serde", "kzg"] }
+alloy-network.workspace = true
+alloy-provider = { workspace = true, features = [
+  "reqwest",
+  "ws",
+  "ipc",
+  "trace-api",
+] }
+foundry-common.workspace = true
+
+[lints]
+workspace = true

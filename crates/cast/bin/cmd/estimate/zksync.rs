@@ -1,10 +1,10 @@
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use cast::ZkTransactionOpts;
 use eyre::Result;
 use foundry_cli::utils;
 use foundry_config::Config;
+use zksync_tx_types::ZkTransactionOpts;
 /// Estimates gas for a ZkSync transaction
 pub async fn estimate_gas(
     zk_tx: ZkTransactionOpts,

@@ -5,7 +5,7 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
-use cast::{Cast, ZkTransactionOpts};
+use cast::Cast;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -16,6 +16,7 @@ use foundry_cli::{
 use foundry_common::ens::NameOrAddress;
 use std::{path::PathBuf, str::FromStr};
 use zksync::send_zk_transaction;
+use zksync_tx_types::ZkTransactionOpts;
 
 mod zksync;
 /// CLI arguments for `cast send`.
