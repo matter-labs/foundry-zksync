@@ -84,6 +84,7 @@ forge::it:
     zk::fork::test_zk_consistent_storage_migration_after_fork
     zk::fork::test_zk_immutable_vars_persist_after_fork
     zk::fork::test_zk_setup_fork_failure
+    zk::fork::test_zk_signal_bytecode_by_hash_retrieval_failure
     zk::fuzz::test_zk_fuzz_avoid_system_addresses
     zk::gas::zk_script_execution_with_gas_multiplier
     zk::gas::zk_script_execution_with_gas_per_pubdata
