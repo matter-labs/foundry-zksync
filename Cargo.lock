@@ -4788,7 +4788,7 @@ name = "foundry-cheatcodes-spec"
 version = "0.0.12"
 dependencies = [
  "alloy-sol-types",
- "foundry-macros 0.0.11",
+ "foundry-macros 0.0.12",
  "schemars",
  "serde",
  "serde_json",
@@ -4870,7 +4870,7 @@ dependencies = [
  "dunce",
  "eyre",
  "foundry-block-explorers",
- "foundry-common-fmt 0.0.11",
+ "foundry-common-fmt 0.0.12",
  "foundry-compilers",
  "foundry-config",
  "foundry-zksync-compilers",
@@ -4904,7 +4904,7 @@ dependencies = [
  "alloy-serde 0.12.6",
  "chrono",
  "comfy-table",
- "foundry-macros 0.0.11",
+ "foundry-macros 0.0.12",
  "revm-primitives",
  "serde",
  "serde_json",
@@ -5134,8 +5134,8 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
  "derive_more 2.0.1",
- "foundry-common-fmt 0.0.11",
- "foundry-macros 0.0.11",
+ "foundry-common-fmt 0.0.12",
+ "foundry-macros 0.0.12",
  "foundry-test-utils",
  "itertools 0.14.0",
 ]
