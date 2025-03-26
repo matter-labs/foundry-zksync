@@ -1,6 +1,7 @@
 //! Contains in-memory implementation of anvil-zksync.
 use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
+use alloy_provider::Provider;
 use anvil_zksync_api_server::NodeServerBuilder;
 use anvil_zksync_common::cache::CacheConfig;
 use anvil_zksync_config::{
@@ -368,12 +369,144 @@ impl ZkSyncNode {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct RpcRequest {
     pub jsonrpc: String,
     pub id: u64,
     pub method: String,
     pub params: Option<serde_json::Value>,
+}
+
+pub struct MockServerBuilder {
+    expectations: Vec<Expectation>,
+    mitm_to_url: Option<String>,
+    chain_id: String,
+}
+
+impl Default for MockServerBuilder {
+    fn default() -> Self {
+        Self {
+            expectations: Default::default(),
+            mitm_to_url: Default::default(),
+            chain_id: Self::DEFAULT_CHAIN_ID.to_owned(),
+        }
+    }
+}
+
+impl MockServerBuilder {
+    pub const DEFAULT_CHAIN_ID: &str = "0x104";
+
+    /// Redirect all unmatched calls to the given target
+    pub fn as_mitm_with(self, target: String) -> Self {
+        Self { mitm_to_url: Some(target), ..self }
+    }
+
+    /// Return the given chain_id to a `eth_getChainId`
+    pub fn with_chain_id(self, chain_id: U256) -> Self {
+        Self { chain_id: format!("0x{chain_id:x}"), ..self }
+    }
+
+    /// Matches against a JSON-RPC `method` (which optional `params`)
+    /// and returns the given `result`
+    pub fn expect(
+        mut self,
+        method: &str,
+        params: Option<serde_json::Value>,
+        result: serde_json::Value,
+    ) -> Self {
+        let method = method.to_string();
+        let id_matcher = Arc::new(std::sync::RwLock::new(0));
+        let id_matcher_clone = id_matcher.clone();
+        self.expectations.push(
+            Expectation::matching(request::body(json_decoded(move |request: &RpcRequest| {
+                let result = request.method == method && request.params == params;
+                if result {
+                    let mut writer = id_matcher.write().unwrap();
+                    *writer = request.id;
+                }
+                result
+            })))
+            .respond_with(move || {
+                let id = *id_matcher_clone.read().unwrap();
+                json_encoded(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "result": result,
+                    "id": id
+                }))
+            }),
+        );
+        self
+    }
+
+    fn expect_chain_id(chain_id: &str) -> Expectation {
+        Expectation::matching(request::body(json_decoded(eq(serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "eth_chainId",
+        })))))
+        .times(..)
+        .respond_with(json_encoded(serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 0,
+            "result": chain_id,
+        })))
+    }
+
+    fn expect_proxy(proxy: &str) -> Expectation {
+        let stub_request =
+            RpcRequest { jsonrpc: String::new(), id: 0, method: String::new(), params: None };
+        let request = Arc::new(std::sync::Mutex::new(stub_request.clone()));
+        let request_clone = request.clone();
+
+        let provider = foundry_common::provider::ProviderBuilder::new(proxy)
+            .build_zksync()
+            .expect("unable to initialize zksync provider");
+
+        Expectation::matching(request::body(json_decoded(move |incoming: &RpcRequest| {
+            *request.lock().unwrap() = incoming.clone();
+            true
+        })))
+        .times(..)
+        .respond_with({
+            move || {
+                let request =
+                    std::mem::replace(&mut *request_clone.lock().unwrap(), stub_request.clone());
+                let response = match foundry_common::block_on(
+                    provider
+                        .raw_request::<_, serde_json::Value>(request.method.into(), request.params),
+                ) {
+                    Ok(response) => response,
+                    Err(err) => serde_json::json!({
+                        "error": format!("{err:?}"),
+                    }),
+                };
+
+                json_encoded(serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "id": request.id,
+                    "result": response
+                }))
+            }
+        })
+    }
+
+    /// Build & start an instance of [`MockServer`]
+    pub fn build(self) -> MockServer {
+        //NOTE: the expectations are matched in reverse order from insertion
+        let server = Server::run();
+
+        if let Some(proxy) = self.mitm_to_url {
+            server.expect(Self::expect_proxy(&proxy));
+        }
+
+        server.expect(Self::expect_chain_id(&self.chain_id));
+
+        for expectation in self.expectations {
+            server.expect(expectation);
+        }
+
+        MockServer { inner: server }
+    }
 }
 
 /// A HTTP server that can be used to mock a fork source.
@@ -385,25 +518,14 @@ pub struct MockServer {
 impl MockServer {
     pub const CHAIN_ID: &str = "0x104";
 
+    /// Returns a builder for a [`MockServer`]
+    pub fn builder() -> MockServerBuilder {
+        MockServerBuilder::default()
+    }
+
     /// Start the mock server.
     pub fn run() -> Self {
-        let inner = Server::run();
-
-        inner.expect(
-            Expectation::matching(request::body(json_decoded(eq(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 0,
-                "method": "eth_chainId",
-            })))))
-            .times(..)
-            .respond_with(json_encoded(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": 0,
-                "result": Self::CHAIN_ID,
-            }))),
-        );
-
-        Self { inner }
+        Self::builder().build()
     }
 
     /// Retrieve the mock server's url.
