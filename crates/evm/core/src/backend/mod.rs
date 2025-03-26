@@ -1630,8 +1630,11 @@ impl Database for Backend {
                 Ok(Bytecode::new_raw(bytes))
             });
 
-            if let Ok(bytes) = result {
-                return Ok(bytes);
+            match result {
+                Ok(bytes) => return Ok(bytes),
+                Err(e) => {
+                    tracing::error!(hash = ?code_hash, reason = ?e, "unable to obtain bytecode by hash from backend");
+                }
             }
         }
 
