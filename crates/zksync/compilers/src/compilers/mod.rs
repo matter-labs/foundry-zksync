@@ -84,8 +84,7 @@ fn rebase_path(base: &Path, path: &Path) -> PathBuf {
         if Some(path_component) != base_component {
             if base_component.is_some() {
                 new_path.extend(
-                    std::iter::repeat(std::path::Component::ParentDir)
-                        .take(base_components.count() + 1),
+                    std::iter::repeat_n(std::path::Component::ParentDir, base_components.count() + 1),
                 );
             }
 
