@@ -5,7 +5,7 @@ use alloy_signer::Signer;
 use alloy_zksync::wallet::ZksyncWallet;
 use cast::{NoopWallet, ZkTransactionOpts};
 use clap::Parser;
-use eyre::Result;
+use eyre::{OptionExt, Result};
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
     utils::{get_provider, LoadConfig},
@@ -55,6 +55,12 @@ pub struct MakeTxArgs {
     /// Force a zksync eip-712 transaction and apply CREATE overrides
     #[arg(long = "zksync")]
     zk_force: bool,
+
+    /// Generate a raw RLP-encoded unsigned transaction.
+    ///
+    /// Relaxes the wallet requirement.
+    #[arg(long, requires = "from")]
+    raw_unsigned: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -75,7 +81,8 @@ pub enum MakeTxSubcommands {
 
 impl MakeTxArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, command, tx, path, eth, zk_tx, zk_force } = self;
+        let Self { to, mut sig, mut args, command, tx, path, eth, zk_tx, zk_force, raw_unsigned } =
+            self;
 
         let blob_data = if let Some(path) = path { Some(std::fs::read(path)?) } else { None };
 
@@ -96,6 +103,26 @@ impl MakeTxArgs {
 
         let config = eth.load_config()?;
 
+        let provider = get_provider(&config)?;
+
+        // NOTE(zk): tx is built in two steps as signer might have a different type
+        let builder = CastTxBuilder::new(provider, tx, &config)
+            .await?
+            .with_to(to)
+            .await?
+            .with_code_sig_and_args(code, sig, args)
+            .await?
+            .with_blob_data(blob_data)?;
+
+        if raw_unsigned {
+            // Build unsigned raw tx
+            let from = eth.wallet.from.ok_or_eyre("missing `--from` address")?;
+            let raw_tx = builder.build_unsigned_raw(from).await?;
+
+            sh_println!("{raw_tx}")?;
+            return Ok(());
+        }
+
         // Retrieve the signer, and bail if it can't be constructed.
         // NOTE(zk): if custom signature is sent, signer is not used so
         // we do not bail in that case, the Result is kept instead
@@ -111,17 +138,6 @@ impl MakeTxArgs {
             tx::validate_from_address(eth.wallet.from, from)?;
             (from, Some(signer))
         };
-
-        let provider = get_provider(&config)?;
-
-        // NOTE(zk): tx is built in two steps as signer might have a different type
-        let builder = CastTxBuilder::new(provider, tx, &config)
-            .await?
-            .with_to(to)
-            .await?
-            .with_code_sig_and_args(code, sig, args)
-            .await?
-            .with_blob_data(blob_data)?;
 
         let (tx, _) = if zk_tx.custom_signature.is_some() {
             builder.build_raw(SenderKind::Address(from)).await?
