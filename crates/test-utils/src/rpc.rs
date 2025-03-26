@@ -24,6 +24,11 @@ static INFURA_KEYS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
         // "16a8be88795540b9b3903d8de0f7baa5",
         // "f4a0bdad42674adab5fc0ac077ffab2b",
         // "5c812e02193c4ba793f8c214317582bd",
+        "22d07e883da246438e63abad14d088f5",
+        "7031545d5b934be8bbdd12e77565178c",
+        "1156b9dbbfe249929d0cbcd3802683eb",
+        "85476c545f8f4e88915ad2260a225d0d",
+        "a254cdc5a4f14b7e8ae076d3b9fb5ea3",
     ];
 
     keys.shuffle(&mut rand::thread_rng());
@@ -32,22 +37,17 @@ static INFURA_KEYS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
 });
 
 // List of alchemy keys for mainnet
-// Note(zk): We try using the env variable if present to avoid rate limiting issues from Foundry
-// upstream
 static ALCHEMY_KEYS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
-    let mut keys = if let Ok(key) = env::var("ALCHEMY_API_KEY") {
-        vec![Box::leak(key.into_boxed_str()) as &'static str]
-    } else {
-        vec![
-            // "ib1f4u1ojm-9lJJypwkeZeG-75TJRB7O",
-            // "7mTtk6IW4DwroGnKmG_bOWri2hyaGYhX",
-            // "GL4M0hfzSYGU5e1_t804HoUDOObWP-FA",
+    let mut keys = vec![
+        // "ib1f4u1ojm-9lJJypwkeZeG-75TJRB7O",
+        // "7mTtk6IW4DwroGnKmG_bOWri2hyaGYhX",
+        // "GL4M0hfzSYGU5e1_t804HoUDOObWP-FA",
             // "WV407BEiBmjNJfKo9Uo_55u0z0ITyCOX",
             // "Ge56dH9siMF4T0whP99sQXOcr2mFs8wZ",
-            "QC55XC151AgkS3FNtWvz9VZGeu9Xd9lb",
-            "pwc5rmJhrdoaSEfimoKEmsvOjKSmPDrP",
-            "A5sZ85MIr4SzCMkT0zXh2eeamGIq3vGL",
-            "9VWGraLx0tMiSWx05WH-ywgSVmMxs66W",
+            // "QC55XC151AgkS3FNtWvz9VZGeu9Xd9lb",
+            // "pwc5rmJhrdoaSEfimoKEmsvOjKSmPDrP",
+            // "A5sZ85MIr4SzCMkT0zXh2eeamGIq3vGL",
+            // "9VWGraLx0tMiSWx05WH-ywgSVmMxs66W",
             // "U4hsGWgl9lBM1j3jhSgJ4gbjHg2jRwKy",
             // "K-uNlqYoYCO9cdBHcifwCDAcEjDy1UHL",
             // "GWdgwabOE2XfBdLp_gIq-q6QHa7DSoag",
@@ -63,11 +63,10 @@ static ALCHEMY_KEYS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
             // "sDNCLu_e99YZRkbWlVHiuM3BQ5uxYCZU",
             // "M6lfpxTBrywHOvKXOS4yb7cTTpa25ZQ9",
             // "UK8U_ogrbYB4lQFTGJHHDrbiS4UPnac6",
-            "Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf",
+            // "Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf",
             // "UVatYU2Ax0rX6bDiqddeTRDdcCxzdpoE",
-            "bVjX9v-FpmUhf5R_oHIgwJx2kXvYPRbx",
-        ]
-    };
+            // "bVjX9v-FpmUhf5R_oHIgwJx2kXvYPRbx",
+    ];
     keys.shuffle(&mut rand::thread_rng());
     keys
 });
@@ -145,6 +144,18 @@ pub fn next_ws_archive_rpc_url() -> String {
 ///
 /// Uses either environment variables (comma separated urls) or default keys.
 fn next_archive_url(is_ws: bool) -> String {
+    // First try to use ALCHEMY_API_KEY if it exists
+    if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
+        let url = if is_ws {
+            format!("wss://eth-mainnet.g.alchemy.com/v2/{alchemy_key}")
+        } else {
+            format!("https://eth-mainnet.g.alchemy.com/v2/{alchemy_key}")
+        };
+        eprintln!("--- next_archive_url(is_ws={is_ws}) = using ALCHEMY_API_KEY ---");
+        return url;
+    }
+
+    // Fall back to existing logic
     let urls = archive_urls(is_ws);
     let url = if env_archive_urls(is_ws).is_empty() {
         next(urls)
@@ -175,11 +186,11 @@ fn archive_urls(is_ws: bool) -> &'static [String] {
         }
 
         let mut urls = Vec::new();
-        for &key in ALCHEMY_KEYS.iter() {
+        for &key in INFURA_KEYS.iter() {
             if is_ws {
-                urls.push(format!("wss://eth-mainnet.g.alchemy.com/v2/{key}"));
+                urls.push(format!("wss://mainnet.infura.io/ws/v3/{key}"));
             } else {
-                urls.push(format!("https://eth-mainnet.g.alchemy.com/v2/{key}"));
+                urls.push(format!("https://mainnet.infura.io/v3/{key}"));
             }
         }
         urls
@@ -236,10 +247,23 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
         return "https://mainnet.base.org".to_string();
     }
 
-    let idx = next_idx() % (INFURA_KEYS.len() + ALCHEMY_KEYS.len());
-    let is_infura = idx < INFURA_KEYS.len();
+    // Note(zk): We try using the env variable if present to avoid rate limiting issues from Foundry
+    // upstream
+    let key = if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
+        println!("Using ALCHEMY_API_KEY");
+        (false, &*Box::leak(alchemy_key.into_boxed_str()))
+    } else {
+        eprintln!("Falling back to existing key rotation logic");
+        // Fall back to existing key rotation logic
+        let idx = next_idx() % (INFURA_KEYS.len() + ALCHEMY_KEYS.len());
+        let is_infura = idx < INFURA_KEYS.len();
+        (
+            is_infura,
+            if is_infura { INFURA_KEYS[idx] } else { ALCHEMY_KEYS[idx - INFURA_KEYS.len()] },
+        )
+    };
 
-    let key = if is_infura { INFURA_KEYS[idx] } else { ALCHEMY_KEYS[idx - INFURA_KEYS.len()] };
+    let (is_infura, key) = key;
 
     // Nowhere near complete.
     let prefix = if is_infura {
