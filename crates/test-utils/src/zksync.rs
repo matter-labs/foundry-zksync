@@ -397,7 +397,7 @@ impl MockServerBuilder {
     pub const DEFAULT_CHAIN_ID: &str = "0x104";
 
     /// Redirect all unmatched calls to the given target
-    pub fn as_mitm_with(self, target: String) -> Self {
+    pub fn wrapping(self, target: String) -> Self {
         Self { mitm_to_url: Some(target), ..self }
     }
 
