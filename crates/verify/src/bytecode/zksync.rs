@@ -71,7 +71,8 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
     let mut json_results: Vec<JsonResult> = vec![];
 
     let block_explorer_metadata =
-        block_explorer_contract_source_code(etherscan_api_url, etherscan_key, args.address).await?;
+        block_explorer_contract_source_code(etherscan_api_url.clone(), etherscan_key, args.address)
+            .await?;
 
     let onchain_hash_type = block_explorer_metadata
         .source_code
@@ -383,15 +384,21 @@ fn deserialize_source_code<'de, D: Deserializer<'de>>(
 }
 
 async fn block_explorer_contract_source_code(
-    verifier_url: &Url,
+    verifier_url: Url,
     api_key: Option<&str>,
     address: Address,
 ) -> Result<Metadata> {
-    let api_key_query_param = api_key.map(|ak| format!("&apikey={ak}")).unwrap_or_default();
-    let req_url = format!(
-        "{verifier_url}?module=contract&action=getsourcecode&address={address}{api_key_query_param}"
-    );
-    let response: String = reqwest::get(req_url).await?.text().await?;
+    let client = reqwest::Client::new();
+
+    let addr_str = &address.to_string();
+
+    let mut query_params =
+        vec![("module", "contract"), ("action", "getsourcecode"), ("address", addr_str)];
+    if let Some(key) = api_key {
+        query_params.push(("apikey", key));
+    }
+
+    let response = client.get(verifier_url).query(&query_params).send().await?.text().await?;
     if response.contains("Contract source code not verified") {
         return Err(EtherscanError::ContractCodeNotVerified(address).into());
     }
