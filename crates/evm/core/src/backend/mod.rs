@@ -1620,22 +1620,18 @@ impl Database for Backend {
             .and_then(|id| self.get_fork_info(id).ok())
             .map(|info| info.fork_type.is_zk())
             .and_then(|is_zk| if is_zk { self.active_fork_url() } else { None });
+
         if let (Some(fork_url), Some(db)) = (maybe_zk_fork, self.active_fork_db_mut()) {
             let provider = try_get_zksync_http_provider(fork_url)
                 .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)))?;
-            let result = db.db.do_any_request(async move {
-                let bytes = provider
-                    .raw_request::<_, Bytes>("zks_getBytecodeByHash".into(), vec![code_hash])
-                    .await?;
-                Ok(Bytecode::new_raw(bytes))
-            });
 
-            match result {
-                Ok(bytes) => return Ok(bytes),
-                Err(e) => {
-                    tracing::error!(hash = ?code_hash, reason = ?e, "unable to obtain bytecode by hash from backend");
-                }
-            }
+            return db.db.do_any_request(async move {
+                provider
+                    .raw_request::<_, Bytes>("zks_getBytecodeByHash".into(), vec![code_hash])
+                    .await
+                    .map(Bytecode::new_raw)
+                    .map_err(Into::into)
+            });
         }
 
         if let Some(db) = self.active_fork_db_mut() {
@@ -2114,13 +2110,19 @@ mod tests {
     async fn test_zk_code_by_hash_failure_is_propagated() {
         let mock = MockServer::run();
 
-        let mockblock = alloy_rpc_types::Block::<AnyRpcTransaction, AnyRpcHeader>::empty(AnyRpcHeader::default());
+        let mockblock = alloy_rpc_types::Block::<AnyRpcTransaction, AnyRpcHeader>::empty(
+            AnyRpcHeader::default(),
+        );
 
         // requests made during Backend::spawn as part of fork creation process
         mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
         mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
         mock.expect("eth_chainId", None, serde_json::json!("0x01"));
-        mock.expect("eth_getBlockByNumber", Some(serde_json::json!(["0x1", false])), serde_json::json!(mockblock));
+        mock.expect(
+            "eth_getBlockByNumber",
+            Some(serde_json::json!(["0x1", false])),
+            serde_json::json!(mockblock),
+        );
 
         // just to mark the RPC as a ZK rpc
         mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
