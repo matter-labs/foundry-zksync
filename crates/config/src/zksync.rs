@@ -135,7 +135,7 @@ impl ZkSyncConfig {
             libraries,
             optimizer,
             evm_version: Some(evm_version),
-            metadata: Some(SettingsMetadata::new(self.hash_type.or(self.bytecode_hash))),
+            metadata: Some(SettingsMetadata::new(self.hash_type())),
             via_ir: Some(via_ir),
             // Set in project paths.
             remappings: Vec::new(),
@@ -169,6 +169,10 @@ impl ZkSyncConfig {
 
         // `cli_settings` get set from `Project` values when building `ZkSolcVersionedInput`
         ZkSolcSettings::new_from_path(settings, CliSettings::default(), zksolc_path)
+    }
+
+    pub fn hash_type(&self) -> Option<BytecodeHash> {
+        self.hash_type.or(self.bytecode_hash)
     }
 }
 

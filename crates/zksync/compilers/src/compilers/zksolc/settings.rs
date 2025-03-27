@@ -49,12 +49,12 @@ pub struct ZkSettings {
     /// Solidity remappings
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub remappings: Vec<Remapping>,
+    /// EVM version
     #[serde(
         default,
         with = "serde_helpers::display_from_str_opt",
         skip_serializing_if = "Option::is_none"
     )]
-    /// EVM version
     pub evm_version: Option<EvmVersion>,
 
     // check if the same (and use `compilers version`)
@@ -437,14 +437,13 @@ impl SettingsMetadata {
 }
 
 /// Determines the hash method for the metadata hash that is appended to the bytecode.
-/// Zksolc only supports keccak256
 #[derive(Clone, Debug, Default, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BytecodeHash {
     /// Do not include bytecode hash.
-    #[default]
     #[serde(rename = "none")]
     None,
     /// The default keccak256 hash.
+    #[default]
     #[serde(rename = "keccak256")]
     Keccak256,
     /// The `ipfs` hash.

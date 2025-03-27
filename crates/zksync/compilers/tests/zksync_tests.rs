@@ -117,7 +117,8 @@ fn zksync_can_set_hash_type_with_supported_versions() {
         let contract_keccak = compiled.find_first("Contract").unwrap();
         let bytecode_keccak =
             contract_keccak.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
-        // NOTE: "none" value seems to pad 32 bytes of 0s at the end in this particular case
+
+        // NOTE: "none" value pads 32 bytes because len should be an odd multiple of 32
         assert_eq!(bytecode_none.len(), bytecode_keccak.len(), "zksolc {version}");
         assert_ne!(bytecode_none, bytecode_keccak, "zksolc {version}");
 
