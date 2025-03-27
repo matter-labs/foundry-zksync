@@ -2050,12 +2050,14 @@ mod tests {
         fork::CreateFork,
         opts::EvmOpts,
     };
-    use alloy_primitives::{Address, U256};
+    use alloy_network::{AnyRpcHeader, AnyRpcTransaction};
+    use alloy_primitives::{Address, B256, U256};
     use alloy_provider::Provider;
     use foundry_common::provider::get_http_provider;
     use foundry_config::{Config, NamedChain};
     use foundry_fork_db::cache::{BlockchainDb, BlockchainDbMeta};
-    use revm::DatabaseRef;
+    use foundry_test_utils::MockServer;
+    use revm::{Database, DatabaseRef};
 
     const ENDPOINT: Option<&str> = option_env!("ETH_RPC_URL");
 
@@ -2106,5 +2108,39 @@ mod tests {
         assert!(db.accounts().read().contains_key(&address));
         assert!(db.storage().read().contains_key(&address));
         assert_eq!(db.storage().read().get(&address).unwrap().len(), num_slots as usize);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_zk_code_by_hash_failure_is_propagated() {
+        let mock = MockServer::run();
+
+        let mockblock = alloy_rpc_types::Block::<AnyRpcTransaction, AnyRpcHeader>::empty(AnyRpcHeader::default());
+
+        // requests made during Backend::spawn as part of fork creation process
+        mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
+        mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
+        mock.expect("eth_chainId", None, serde_json::json!("0x01"));
+        mock.expect("eth_getBlockByNumber", Some(serde_json::json!(["0x1", false])), serde_json::json!(mockblock));
+
+        // just to mark the RPC as a ZK rpc
+        mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
+        mock.expect(
+            "zks_getBytecodeByHash",
+            Some(serde_json::json!([
+                "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
+            ])),
+            serde_json::json!("force failure"),
+        );
+
+        let evm_opts = EvmOpts::default();
+        let env = revm::primitives::Env::default();
+        let fork = CreateFork { enable_caching: true, url: mock.url(), env, evm_opts };
+
+        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm());
+        let req = backend.code_by_hash(B256::from(alloy_primitives::fixed_bytes!(
+            "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
+        )));
+
+        assert!(req.is_err())
     }
 }
