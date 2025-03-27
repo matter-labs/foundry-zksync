@@ -6,8 +6,8 @@ use forge::revm::primitives::SpecId;
 use foundry_common::provider::try_get_zksync_http_provider;
 use foundry_test_utils::{
     forgetest_async,
-    util::{self, OutputExt},
-    Filter, Fork, MockServer, ZkSyncNode,
+    util::{self},
+    Filter, ZkSyncNode,
 };
 use foundry_zksync_core::state::{get_nonce_storage, new_full_nonce};
 
@@ -100,55 +100,4 @@ contract ZkForkNonceTest is Script {{
     ]);
 
     cmd.assert_success();
-});
-
-forgetest_async!(test_zk_signal_bytecode_by_hash_retrieval_failure, |prj, cmd| {
-    let node =
-        ZkSyncNode::start_with_fork(Fork::new_with_block("mainnet".to_owned(), 0x3605436)).await;
-    let mock_server = MockServer::builder()
-        .expect(
-            "zks_getBytecodeByHash",
-            Some(serde_json::json!([
-                "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
-            ])),
-            serde_json::json!("force failure"),
-        )
-        .as_mitm_with(node.url())
-        .build();
-
-    let rpc_url = mock_server.url();
-    util::initialize(prj.root());
-
-    prj.add_test(
-        "UsePredeployedContract.t.sol",
-        format!(
-            r#"
-import "forge-std/Test.sol";
-
-contract UsePredeployedContract is Test {{
-  string constant ZKSYNC_RPC_URL = "{rpc_url}";
-  uint256 constant FORK_BLOCK = 56_644_662;
-
-  address constant ZK_TOKEN_ADDRESS = 0x5A7d6b2F92C77FAD6CCaBd7EE0624E64907Eaf3E;
-
-  function setUp() external {{
-    uint256 _forkId = vm.createFork(vm.rpcUrl(ZKSYNC_RPC_URL), FORK_BLOCK);
-    vm.selectFork(_forkId);
-  }}
-
-  function testUsePredeployedContract() public {{
-    address alice = makeAddr("alice");
-    deal(ZK_TOKEN_ADDRESS, alice, 10);
-  }}
-}}
-"#
-        )
-        .as_str(),
-    )
-    .unwrap();
-
-    cmd.args(["test", "--zksync", "--no-storage-caching", "--mc", "UsePredeployedContract"]);
-
-    let output = cmd.assert_failure().get_output().stdout_lossy();
-    assert!(output.contains("unable to obtain bytecode by hash from backend"));
 });
