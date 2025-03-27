@@ -61,6 +61,7 @@ pub struct ZkSyncConfig {
     /// Force evmla for zkSync
     pub force_evmla: bool,
 
+    #[serde(alias = "LLVMOptions")]
     pub llvm_options: Vec<String>,
 
     /// Enable optimizer for zkSync
@@ -143,6 +144,7 @@ impl ZkSyncConfig {
             enable_eravm_extensions: self.enable_eravm_extensions,
             force_evmla: self.force_evmla,
             llvm_options: self.llvm_options.clone(),
+            llvm_options_legacy: Default::default(),
             output_selection: OutputSelection {
                 all: FileOutputSelection {
                     per_file: [].into(),

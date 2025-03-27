@@ -80,8 +80,12 @@ pub struct ZkSettings {
     #[serde(default, rename = "enableEraVMExtensions")]
     pub enable_eravm_extensions: bool,
     /// The extra LLVM options.
-    #[serde(default, rename = "LLVMOptions", skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub llvm_options: Vec<String>,
+
+    /// This field was renamed in zksolc v1.5.12
+    #[serde(default, rename = "LLVMOptions", skip_serializing_if = "Vec::is_empty")]
+    pub llvm_options_legacy: Vec<String>,
     /// Whether to compile via EVM assembly.
     #[serde(default, rename = "forceEVMLA")]
     pub force_evmla: bool,
@@ -215,6 +219,7 @@ impl Default for ZkSettings {
             remappings: Default::default(),
             enable_eravm_extensions: false,
             llvm_options: Default::default(),
+            llvm_options_legacy: Default::default(),
             force_evmla: false,
             codegen: Default::default(),
             suppressed_errors: Default::default(),
@@ -254,6 +259,7 @@ impl CompilerSettings for ZkSolcSettings {
                     libraries,
                     enable_eravm_extensions,
                     llvm_options,
+                    llvm_options_legacy: _,
                     force_evmla,
                     codegen,
                     suppressed_warnings,

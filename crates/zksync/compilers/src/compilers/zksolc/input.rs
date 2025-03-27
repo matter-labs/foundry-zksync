@@ -133,6 +133,11 @@ impl ZkSolcInput {
             metadata.sanitize(zksolc_version);
         };
 
+        // zksolc v1.5.12 renamed LLVMOptions to llvm_options
+        if zksolc_version <= &Version::new(1, 5, 11) {
+            settings.llvm_options_legacy = std::mem::take(&mut settings.llvm_options);
+        }
+
         settings.optimizer.sanitize(zksolc_version);
 
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }
