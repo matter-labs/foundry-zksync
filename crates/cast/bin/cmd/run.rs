@@ -3,8 +3,9 @@ use alloy_network::{AnyNetwork, TransactionResponse};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockTransactions;
+use alloy_serde::OtherFields;
 use cast::{
-    revm::primitives::EnvWithHandlerCfg, utils::apply_chain_and_block_specific_env_changes,
+    revm::primitives::EnvWithHandlerCfg, utils::{apply_chain_and_block_specific_env_changes, configure_zksync_tx_env},
 };
 use clap::Parser;
 use eyre::{Result, WrapErr};
@@ -98,6 +99,10 @@ pub struct RunArgs {
     /// Disable block gas limit check.
     #[arg(long)]
     pub disable_block_gas_limit: bool,
+
+    /// Run a ZKsync transaction.
+    #[arg(long = "zksync")]
+    zk_force: bool,
 }
 
 impl RunArgs {
@@ -110,6 +115,7 @@ impl RunArgs {
         let figment = Into::<Figment>::into(&self.rpc).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
         let mut config = Config::from_provider(figment)?.sanitized();
+        config.zksync.compile = self.zk_force;
         let strategy = utils::get_executor_strategy(&config);
 
         let compute_units_per_second =
@@ -220,7 +226,22 @@ impl RunArgs {
                         break;
                     }
 
-                    configure_tx_env(&mut env, &tx.inner);
+                    if self.zk_force {
+                        let metadata = configure_zksync_tx_env(&mut env, &tx.inner);
+                        let mut other_fields = OtherFields::default();
+                        other_fields.insert(
+                            foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                            serde_json::to_value(metadata)
+                                .expect("Failed to serialize ZkTransactionMetadata"),
+                        );
+
+                        executor.strategy.runner.zksync_set_transaction_context(
+                            executor.strategy.context.as_mut(),
+                            other_fields,
+                        );
+                    } else {
+                        configure_tx_env(&mut env, &tx.inner);
+                    }
 
                     if let Some(to) = Transaction::to(tx) {
                         trace!(tx=?tx.tx_hash(),?to, "executing previous call transaction");
@@ -259,7 +280,22 @@ impl RunArgs {
         let result = {
             executor.set_trace_printer(self.trace_printer);
 
-            configure_tx_env(&mut env, &tx.inner);
+            if self.zk_force {
+                let metadata = configure_zksync_tx_env(&mut env, &tx.inner);
+                let mut other_fields = OtherFields::default();
+                other_fields.insert(
+                    foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                    serde_json::to_value(metadata)
+                        .expect("Failed to serialize ZkTransactionMetadata"),
+                );
+
+                executor.strategy.runner.zksync_set_transaction_context(
+                    executor.strategy.context.as_mut(),
+                    other_fields,
+                );
+            } else {
+                configure_tx_env(&mut env, &tx.inner);
+            }
 
             if let Some(to) = Transaction::to(&tx) {
                 trace!(tx=?tx.tx_hash(), to=?to, "executing call transaction");
