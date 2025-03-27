@@ -53,7 +53,7 @@ pub struct ZkSyncConfig {
     pub bytecode_hash: Option<BytecodeHash>,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
-    pub fallback_oz: bool,
+    pub size_fallback: bool,
 
     /// Whether to support compilation of zkSync-specific simulations
     pub enable_eravm_extensions: bool,
@@ -90,7 +90,7 @@ impl Default for ZkSyncConfig {
             solc_path: Default::default(),
             hash_type: Default::default(),
             bytecode_hash: Default::default(),
-            fallback_oz: Default::default(),
+            size_fallback: Default::default(),
             enable_eravm_extensions: Default::default(),
             force_evmla: Default::default(),
             llvm_options: Default::default(),
@@ -125,7 +125,8 @@ impl ZkSyncConfig {
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
-            fallback_to_optimizing_for_size: Some(self.fallback_oz),
+            size_fallback: Some(self.should_compile()),
+            fallback_to_optimizing_for_size: None,
             disable_system_request_memoization: Some(true),
             details: self.optimizer_details.clone(),
             jump_table_density_threshold: None,

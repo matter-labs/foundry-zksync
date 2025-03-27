@@ -322,6 +322,9 @@ pub struct Optimizer {
     pub mode: Option<char>,
     /// Whether to try to recompile with -Oz if the bytecode is too large.
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub size_fallback: Option<bool>,
+    /// Previous name of size_fallback
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fallback_to_optimizing_for_size: Option<bool>,
     /// Whether to disable the system request memoization.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -341,6 +344,13 @@ impl Optimizer {
     pub fn enable(&mut self) {
         self.enabled = Some(true)
     }
+
+    /// This will remove/adjust values in the settings that are not compatible with this version.
+    pub fn sanitize(&mut self, zksolc_version: &Version) {
+        if zksolc_version <= &Version::new(1, 5, 11) {
+            self.fallback_to_optimizing_for_size = self.size_fallback.take();
+        }
+    }
 }
 
 impl Default for Optimizer {
@@ -349,6 +359,7 @@ impl Default for Optimizer {
             enabled: Some(false),
             mode: None,
             fallback_to_optimizing_for_size: None,
+            size_fallback: None,
             disable_system_request_memoization: None,
             jump_table_density_threshold: None,
             details: None,

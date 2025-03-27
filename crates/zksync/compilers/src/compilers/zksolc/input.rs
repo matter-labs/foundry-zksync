@@ -133,6 +133,8 @@ impl ZkSolcInput {
             metadata.sanitize(zksolc_version);
         };
 
+        settings.optimizer.sanitize(zksolc_version);
+
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }
     }
 
@@ -192,5 +194,81 @@ impl StandardJsonCompilerInput {
     /// new StandardJsonCompilerInput
     pub fn new(sources: Vec<(PathBuf, Source)>, settings: ZkSettings) -> Self {
         Self { language: SolcLanguage::Solidity, sources, settings }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compilers::zksolc::settings::Optimizer;
+
+    #[test]
+    fn test_zk_optimizer_sanitization_pre_1_5_11() {
+        let language = SolcLanguage::Solidity;
+        let sources = Sources::default();
+        let settings = ZkSettings {
+            optimizer: Optimizer {
+                enabled: Some(true),
+                size_fallback: Some(true),
+                fallback_to_optimizing_for_size: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Test with zksolc version 1.5.6
+        let old_version = Version::new(1, 5, 6);
+        let input = ZkSolcInput::new(language, sources.clone(), settings.clone(), &old_version);
+
+        // For old versions, size_fallback should be moved to fallback_to_optimizing_for_size
+        assert!(input.settings.optimizer.size_fallback.is_none());
+        assert_eq!(input.settings.optimizer.fallback_to_optimizing_for_size, Some(true));
+    }
+
+    #[test]
+    fn test_zk_optimizer_sanitization_post_1_5_11() {
+        let language = SolcLanguage::Solidity;
+        let sources = Sources::default();
+        let settings = ZkSettings {
+            optimizer: Optimizer {
+                enabled: Some(true),
+                size_fallback: Some(true),
+                fallback_to_optimizing_for_size: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Test with zksolc version 1.5.12
+        let new_version = Version::new(1, 5, 12);
+        let input = ZkSolcInput::new(language, sources.clone(), settings.clone(), &new_version);
+
+        // For newer versions, size_fallback should be preserved and fallback_to_optimizing_for_size
+        // should be None
+        assert_eq!(input.settings.optimizer.size_fallback, Some(true));
+        assert!(input.settings.optimizer.fallback_to_optimizing_for_size.is_none());
+    }
+
+    #[test]
+    fn test_zk_optimizer_sanitization_at_1_5_11() {
+        let language = SolcLanguage::Solidity;
+        let sources = Sources::default();
+        let settings = ZkSettings {
+            optimizer: Optimizer {
+                enabled: Some(true),
+                size_fallback: Some(true),
+                fallback_to_optimizing_for_size: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Test with zksolc version 1.5.11
+        let version = Version::new(1, 5, 11);
+        let input = ZkSolcInput::new(language, sources.clone(), settings.clone(), &version);
+
+        // For version 1.5.11, size_fallback should be moved to fallback_to_optimizing_for_size
+        assert!(input.settings.optimizer.size_fallback.is_none());
+        assert_eq!(input.settings.optimizer.fallback_to_optimizing_for_size, Some(true));
     }
 }

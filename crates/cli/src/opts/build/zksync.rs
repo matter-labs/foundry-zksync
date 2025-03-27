@@ -73,14 +73,14 @@ pub struct ZkSyncArgs {
 
     /// Try to recompile with -Oz if the bytecode is too large.
     #[clap(
-        long = "zk-fallback-oz",
+        long = "zk-size-fallback",
         visible_alias = "fallback-oz",
         value_name = "FALLBACK_OZ",
         num_args = 0..=1,
         require_equals = true,
         default_missing_value = "true"
     )]
-    pub fallback_oz: Option<bool>,
+    pub size_fallback: Option<bool>,
 
     /// Set the LLVM optimization parameter `-O[0 | 1 | 2 | 3 | s | z]`.
     /// Use `3` for best performance and `z` for minimal size.
@@ -159,7 +159,7 @@ impl ZkSyncArgs {
         set_if_some!(self.enable_eravm_extensions, zksync.enable_eravm_extensions);
         set_if_some!(self.llvm_options.clone(), zksync.llvm_options);
         set_if_some!(self.force_evmla, zksync.force_evmla);
-        set_if_some!(self.fallback_oz, zksync.fallback_oz);
+        set_if_some!(self.size_fallback, zksync.size_fallback);
 
         set_if_some!(self.optimizer.then_some(true), zksync.optimizer);
         set_if_some!(
