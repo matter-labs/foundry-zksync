@@ -113,7 +113,7 @@ forgetest_async!(test_zk_signal_bytecode_by_hash_retrieval_failure, |prj, cmd| {
             ])),
             serde_json::json!("force failure"),
         )
-        .wrapping(node.url())
+        .as_mitm_with(node.url())
         .build();
 
     let rpc_url = mock_server.url();
