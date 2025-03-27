@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.13](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.12...foundry-zksync-v0.0.13) (2025-03-26)
+
+
+### Features
+
+* add verify-bytecode support ([#994](https://github.com/matter-labs/foundry-zksync/issues/994)) ([f872d3c](https://github.com/matter-labs/foundry-zksync/commit/f872d3c82e5f828ebc84dc506cbf2d2e412c722b))
+
+
+### Bug Fixes
+
+* Bump ubuntu on CI install ([#995](https://github.com/matter-labs/foundry-zksync/issues/995)) ([3f8025f](https://github.com/matter-labs/foundry-zksync/commit/3f8025f53f2c4cffe6ac4b43a3e20d4ebf993c6e))
+
 ## [0.0.12](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.11...foundry-zksync-v0.0.12) (2025-03-21)
 
 
