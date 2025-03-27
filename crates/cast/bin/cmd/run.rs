@@ -5,7 +5,8 @@ use alloy_provider::Provider;
 use alloy_rpc_types::BlockTransactions;
 use alloy_serde::OtherFields;
 use cast::{
-    revm::primitives::EnvWithHandlerCfg, utils::{apply_chain_and_block_specific_env_changes, configure_zksync_tx_env},
+    revm::primitives::EnvWithHandlerCfg,
+    utils::{apply_chain_and_block_specific_env_changes, configure_zksync_tx_env},
 };
 use clap::Parser;
 use eyre::{Result, WrapErr};
