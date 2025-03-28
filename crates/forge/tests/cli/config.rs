@@ -1311,7 +1311,7 @@ exclude = []
     "solc_path": null,
     "hash_type": null,
     "bytecode_hash": null,
-    "fallback_oz": false,
+    "size_fallback": false,
     "enable_eravm_extensions": false,
     "force_evmla": false,
     "llvm_options": [],
