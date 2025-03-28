@@ -282,7 +282,7 @@ contract ZkCheatcodesTest is DSTest {
 
     function testZkCheatcodesCanBeUsedAfterFork() public {
         assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
-                string memory ethUrl = string.concat(
+        string memory ethUrl = string.concat(
             "https://eth-mainnet.alchemyapi.io/v2/",
             vm.envOr("ALCHEMY_API_KEY", string("Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf"))
         );
