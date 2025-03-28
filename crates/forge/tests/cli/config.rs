@@ -1043,7 +1043,7 @@ endpoints = "all"
 [profile.default.zksync]
 compile = false
 startup = false
-fallback_oz = false
+size_fallback = false
 enable_eravm_extensions = false
 force_evmla = false
 llvm_options = []
