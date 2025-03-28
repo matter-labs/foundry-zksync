@@ -105,6 +105,8 @@ jobs:
 
   zk-cargo-test:
     runs-on: ubuntu-24.04-github-hosted-16core
+    env:
+      ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
