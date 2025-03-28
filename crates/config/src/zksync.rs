@@ -126,7 +126,7 @@ impl ZkSyncConfig {
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
-            size_fallback: Some(self.should_compile()),
+            size_fallback: Some(self.size_fallback),
             fallback_to_optimizing_for_size: None,
             disable_system_request_memoization: Some(true),
             details: self.optimizer_details.clone(),
