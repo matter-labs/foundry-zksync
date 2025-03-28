@@ -205,7 +205,7 @@ impl ForgeTestProfile {
         zk_config.zksync.startup = true;
         zk_config.zksync.size_fallback = true;
         zk_config.zksync.optimizer_mode = '3';
-        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 11)));
+        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 12)));
         zk_config.fuzz.no_zksync_reserved_addresses = true;
         zk_config.invariant.depth = 15;
 

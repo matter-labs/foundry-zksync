@@ -205,7 +205,7 @@ impl StandardJsonCompilerInput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::compilers::zksolc::settings::Optimizer;
+    use crate::compilers::zksolc::settings::Optimizer;=
 
     #[test]
     fn test_zk_optimizer_sanitization_pre_1_5_11() {

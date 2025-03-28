@@ -159,7 +159,7 @@ impl ZkSyncConfig {
         let zksolc_path = if let Some(path) = config_ensure_zksolc(self.zksolc.as_ref(), offline)? {
             path
         } else if !offline {
-            let default_version = semver::Version::new(1, 5, 11);
+            let default_version = semver::Version::new(1, 5, 12);
             let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
             if zksolc.is_none() {
                 ZkSolc::blocking_install(&default_version)?;
