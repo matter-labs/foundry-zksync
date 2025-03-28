@@ -75,6 +75,7 @@ pub struct ZkSyncArgs {
     #[clap(
         long = "zk-size-fallback",
         visible_alias = "fallback-oz",
+        visible_alias = "size-fallback",
         value_name = "FALLBACK_OZ",
         num_args = 0..=1,
         require_equals = true,
