@@ -22,6 +22,9 @@ use alloy_primitives::{
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, TxKind, B256, U256,
 };
+use alloy_rpc_types::{
+    AccessList,
+};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
@@ -482,6 +485,9 @@ pub struct Cheatcodes {
     /// Scripting based transactions
     pub broadcastable_transactions: BroadcastableTransactions,
 
+    /// Current EIP-2930 access lists.
+    pub access_list: Option<AccessList>,
+
     /// Additional, user configurable context this Inspector has access to when inspecting a call.
     pub config: Arc<CheatsConfig>,
 
@@ -573,6 +579,7 @@ impl Clone for Cheatcodes {
             deprecated: self.deprecated.clone(),
             wallets: self.wallets.clone(),
             strategy: self.strategy.clone(),
+            access_list: self.access_list.clone(),
         }
     }
 }
@@ -613,6 +620,7 @@ impl Cheatcodes {
             allowed_mem_writes: Default::default(),
             broadcast: Default::default(),
             broadcastable_transactions: Default::default(),
+            access_list: Default::default(),
             context: Default::default(),
             serialized_jsons: Default::default(),
             eth_deals: Default::default(),
@@ -749,6 +757,11 @@ impl Cheatcodes {
                     ecx_inner.env.tx.caller = new_origin;
                 }
             }
+        }
+
+        // Apply EIP-2930 access lists.
+        if let Some(access_list) = &self.access_list {
+            ecx_inner.env.tx.access_list = access_list.to_vec();
         }
 
         // Apply our broadcast
@@ -1148,6 +1161,11 @@ where {
                     }
                 }
             }
+        }
+
+        // Apply EIP-2930 access lists.
+        if let Some(access_list) = &self.access_list {
+            ecx_inner.env.tx.access_list = access_list.to_vec();
         }
 
         // Apply our broadcast
