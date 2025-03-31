@@ -80,8 +80,12 @@ pub struct ZkSettings {
     #[serde(default, rename = "enableEraVMExtensions")]
     pub enable_eravm_extensions: bool,
     /// The extra LLVM options.
-    #[serde(default, rename = "LLVMOptions", skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub llvm_options: Vec<String>,
+
+    /// This field was renamed in zksolc v1.5.12
+    #[serde(default, rename = "LLVMOptions", skip_serializing_if = "Vec::is_empty")]
+    pub llvm_options_legacy: Vec<String>,
     /// Whether to compile via EVM assembly.
     #[serde(default, rename = "forceEVMLA")]
     pub force_evmla: bool,
@@ -215,6 +219,7 @@ impl Default for ZkSettings {
             remappings: Default::default(),
             enable_eravm_extensions: false,
             llvm_options: Default::default(),
+            llvm_options_legacy: Default::default(),
             force_evmla: false,
             codegen: Default::default(),
             suppressed_errors: Default::default(),
@@ -254,6 +259,7 @@ impl CompilerSettings for ZkSolcSettings {
                     libraries,
                     enable_eravm_extensions,
                     llvm_options,
+                    llvm_options_legacy: _,
                     force_evmla,
                     codegen,
                     suppressed_warnings,
@@ -322,6 +328,9 @@ pub struct Optimizer {
     pub mode: Option<char>,
     /// Whether to try to recompile with -Oz if the bytecode is too large.
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub size_fallback: Option<bool>,
+    /// Previous name of size_fallback
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fallback_to_optimizing_for_size: Option<bool>,
     /// Whether to disable the system request memoization.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -341,6 +350,13 @@ impl Optimizer {
     pub fn enable(&mut self) {
         self.enabled = Some(true)
     }
+
+    /// This will remove/adjust values in the settings that are not compatible with this version.
+    pub fn sanitize(&mut self, zksolc_version: &Version) {
+        if zksolc_version <= &Version::new(1, 5, 11) {
+            self.fallback_to_optimizing_for_size = self.size_fallback.take();
+        }
+    }
 }
 
 impl Default for Optimizer {
@@ -349,6 +365,7 @@ impl Default for Optimizer {
             enabled: Some(false),
             mode: None,
             fallback_to_optimizing_for_size: None,
+            size_fallback: None,
             disable_system_request_memoization: None,
             jump_table_density_threshold: None,
             details: None,

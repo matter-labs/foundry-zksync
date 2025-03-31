@@ -340,7 +340,7 @@ struct BEZkSettings {
     pub codegen: Codegen,
     #[serde(default, with = "serde_helpers::display_from_str_opt")]
     pub evm_version: Option<EvmVersion>,
-    #[serde(default, rename = "LLVMOptions")]
+    #[serde(default, alias = "LLVMOptions")]
     pub llvm_options: Vec<String>,
     #[serde(default, rename = "enableEraVMExtensions")]
     pub enable_eravm_extensions: bool,
