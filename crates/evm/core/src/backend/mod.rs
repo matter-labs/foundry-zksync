@@ -2076,8 +2076,14 @@ mod tests {
     use foundry_common::provider::get_http_provider;
     use foundry_config::{Config, NamedChain};
     use foundry_fork_db::cache::{BlockchainDb, BlockchainDbMeta};
-    use foundry_test_utils::MockServer;
+    use foundry_test_utils::{
+        httptest::{self, matchers, responders},
+        MockServer, RpcRequest,
+    };
+    use foundry_zksync_core::EMPTY_CODE;
     use revm::{Database, DatabaseRef};
+
+    use super::CODE_BY_HASH_RETRIES;
 
     const ENDPOINT: Option<&str> = option_env!("ETH_RPC_URL");
 
@@ -2150,13 +2156,13 @@ mod tests {
 
         // just to mark the RPC as a ZK rpc
         mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
-        mock.expect(
-            "zks_getBytecodeByHash",
-            Some(serde_json::json!([
-                "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
-            ])),
-            serde_json::json!("force failure"),
-        );
+        let code_hash_fail =
+            httptest::Expectation::matching(matchers::request::body(matchers::json_decoded(
+                move |req: &RpcRequest| req.method.as_str() == "zks_getBytecodeByHash",
+            )))
+            .times(CODE_BY_HASH_RETRIES as usize + 1)
+            .respond_with(move || responders::status_code(500));
+        mock.inner.expect(code_hash_fail);
 
         let evm_opts = EvmOpts::default();
         let env = revm::primitives::Env::default();
@@ -2168,5 +2174,55 @@ mod tests {
         )));
 
         assert!(req.is_err())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_zk_code_by_hash_retries() {
+        let mock = MockServer::run();
+
+        let mockblock = alloy_rpc_types::Block::<AnyRpcTransaction, AnyRpcHeader>::empty(
+            AnyRpcHeader::default(),
+        );
+
+        // requests made during Backend::spawn as part of fork creation process
+        mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
+        mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
+        mock.expect("eth_chainId", None, serde_json::json!("0x01"));
+        mock.expect(
+            "eth_getBlockByNumber",
+            Some(serde_json::json!(["0x1", false])),
+            serde_json::json!(mockblock),
+        );
+
+        // just to mark the RPC as a ZK rpc
+        mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
+
+        let code_hash_fail_once =
+            httptest::Expectation::matching(matchers::request::body(matchers::json_decoded(
+                move |req: &RpcRequest| req.method.as_str() == "zks_getBytecodeByHash",
+            )))
+            .times(2)
+            .respond_with(responders::cycle(vec![
+                Box::new(move || responders::status_code(500)),
+                Box::new(move || {
+                    responders::json_encoded(serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": 0,
+                        "result": EMPTY_CODE,
+                    }))
+                }),
+            ]));
+        mock.inner.expect(code_hash_fail_once);
+
+        let evm_opts = EvmOpts::default();
+        let env = revm::primitives::Env::default();
+        let fork = CreateFork { enable_caching: true, url: mock.url(), env, evm_opts };
+
+        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm());
+        let req = backend.code_by_hash(B256::from(alloy_primitives::fixed_bytes!(
+            "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
+        )));
+
+        assert!(req.is_ok())
     }
 }

@@ -128,6 +128,7 @@ foundry-config:
     zksync::tests::zksync_project_has_zksync_solc_when_solc_req_is_a_version
 foundry-evm-core:
     backend::tests::test_zk_code_by_hash_failure_is_propagated
+    backend::tests::test_zk_code_by_hash_retries
 foundry-zksync-compilers:
     compilers::artifact_output::zk::bytecode::tests::serialized_bytecode_is_not_prefixed
     compilers::zksolc::tests::get_solc_type_and_version_works_for_vanilla_solc
