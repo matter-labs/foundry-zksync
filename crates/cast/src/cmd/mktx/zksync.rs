@@ -1,3 +1,4 @@
+use crate::zksync::ZkTransactionOpts;
 use alloy_network::TransactionBuilder;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -5,7 +6,6 @@ use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
     provider::ZksyncProvider,
 };
-use crate::zksync::ZkTransactionOpts;
 use eyre::Result;
 use foundry_cli::utils;
 use foundry_config::Config;

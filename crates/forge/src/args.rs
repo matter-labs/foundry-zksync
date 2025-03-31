@@ -107,7 +107,7 @@ pub fn run_command(args: Forge) -> Result<()> {
             let config = utils::load_config_with_root(root.as_deref())?;
             let project = config.project()?;
             let zk_project =
-            foundry_config::zksync::config_create_project(&config, config.cache, false)?;
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
             config.cleanup(&project)?;
             config.cleanup(&zk_project)?;
             Ok(())

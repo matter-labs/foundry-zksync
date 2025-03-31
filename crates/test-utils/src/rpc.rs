@@ -195,23 +195,25 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
                 _ => None, // Only use Alchemy for configured chains
             };
             if let Some(subdomain_prefix) = subdomain_prefix {
-                 eprintln!("--- Using ALCHEMY_API_KEY env var for chain: {} ---", chain);
-                 // Note: Key is leaked to get 'static str, matching previous pattern
-                 let key_ref: &'static str = Box::leak(alchemy_key.into_boxed_str());
-                 let host = format!("{subdomain_prefix}.g.alchemy.com");
-                 // Return the fully constructed Alchemy URL directly
-                 let url = if is_ws {
-                     format!("wss://{host}/v2/{key_ref}")
-                 } else {
-                     format!("https://{host}/v2/{key_ref}")
-                 };
-                 eprintln!("--- next_url(is_ws={is_ws}, chain={chain:?}) = {url} ---");
-                 return url;
+                eprintln!("--- Using ALCHEMY_API_KEY env var for chain: {chain} ---");
+                // Note: Key is leaked to get 'static str, matching previous pattern
+                let key_ref: &'static str = Box::leak(alchemy_key.into_boxed_str());
+                let host = format!("{subdomain_prefix}.g.alchemy.com");
+                // Return the fully constructed Alchemy URL directly
+                let url = if is_ws {
+                    format!("wss://{host}/v2/{key_ref}")
+                } else {
+                    format!("https://{host}/v2/{key_ref}")
+                };
+                eprintln!("--- next_url(is_ws={is_ws}, chain={chain:?}) = {url} ---");
+                return url;
             } else {
-                 eprintln!("--- ALCHEMY_API_KEY found, but chain {} not configured. Falling back. ---", chain);
+                eprintln!(
+                    "--- ALCHEMY_API_KEY found, but chain {chain} not configured. Falling back. ---"
+                );
             }
         } else {
-             eprintln!("--- ALCHEMY_API_KEY not found. Falling back. ---");
+            eprintln!("--- ALCHEMY_API_KEY not found. Falling back. ---");
         }
 
         // DRPC for other networks used in tests (Fallback if Alchemy key not used)

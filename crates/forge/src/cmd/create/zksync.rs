@@ -467,9 +467,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::utils::get_provider_zksync;
     use alloy_zksync::network::tx_type::TxType;
+    use foundry_cli::utils::get_provider_zksync;
 
     #[test]
     fn test_zk_deployer_builds_eip712_transactions() {

@@ -1,5 +1,7 @@
 use crate::{
-    traces::TraceKind, tx::{CastTxBuilder, SenderKind}, zksync, Cast, ZkCast, ZkTransactionOpts
+    traces::TraceKind,
+    tx::{CastTxBuilder, SenderKind},
+    zksync, Cast, ZkCast, ZkTransactionOpts,
 };
 use alloy_primitives::{TxKind, U256};
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
@@ -26,7 +28,6 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use std::str::FromStr;
-
 
 /// CLI arguments for `cast call`.
 #[derive(Debug, Parser)]

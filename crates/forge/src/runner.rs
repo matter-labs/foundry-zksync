@@ -133,7 +133,7 @@ impl<'a> ContractRunner<'a> {
         self.executor.set_balance(LIBRARY_DEPLOYER, U256::MAX)?;
 
         let mut result = TestSetup::default();
-        for code in self.mcr.libs_to_deploy.iter() {
+        for code in &self.mcr.libs_to_deploy {
             let deploy_result = self.executor.deploy_library(
                 LIBRARY_DEPLOYER,
                 DeployLibKind::Create(code.clone()),

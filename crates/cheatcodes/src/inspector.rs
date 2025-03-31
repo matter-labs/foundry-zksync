@@ -22,9 +22,7 @@ use alloy_primitives::{
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, TxKind, B256, U256,
 };
-use alloy_rpc_types::{
-    AccessList,
-};
+use alloy_rpc_types::AccessList;
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},

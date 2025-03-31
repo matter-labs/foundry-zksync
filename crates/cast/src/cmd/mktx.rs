@@ -1,6 +1,6 @@
 use crate::{
     tx::{self, CastTxBuilder, SenderKind},
-    zksync::{ZkTransactionOpts, NoopWallet},
+    zksync::{NoopWallet, ZkTransactionOpts},
 };
 use alloy_network::{eip2718::Encodable2718, EthereumWallet, TransactionBuilder};
 use alloy_primitives::hex;

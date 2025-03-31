@@ -10,8 +10,10 @@ use alloy_zksync::{network::Zksync, provider::ZksyncProvider, wallet::ZksyncWall
 use eyre::Result;
 use foundry_cli::opts::EthereumOpts;
 
-use crate::tx::{self, CastTxBuilder, InputState, SenderKind};
-use crate::zksync::{ZkTransactionOpts, NoopWallet};
+use crate::{
+    tx::{self, CastTxBuilder, InputState, SenderKind},
+    zksync::{NoopWallet, ZkTransactionOpts},
+};
 
 pub async fn send_zk_transaction(
     zk_provider: RootProvider<Zksync>,

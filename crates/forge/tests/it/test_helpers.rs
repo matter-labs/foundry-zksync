@@ -21,7 +21,10 @@ use foundry_config::{
 };
 use foundry_evm::{constants::CALLER, opts::EvmOpts};
 use foundry_test_utils::{
-    fd_lock, init_tracing, rpc::{next_http_archive_rpc_url, next_rpc_endpoint}, util::OutputExt, TestCommand, ZkSyncNode,
+    fd_lock, init_tracing,
+    rpc::{next_http_archive_rpc_url, next_rpc_endpoint},
+    util::OutputExt,
+    TestCommand, ZkSyncNode,
 };
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},

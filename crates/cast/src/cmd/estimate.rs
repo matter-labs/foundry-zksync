@@ -1,4 +1,7 @@
-use crate::{tx::{CastTxBuilder, SenderKind}, ZkTransactionOpts};
+use crate::{
+    tx::{CastTxBuilder, SenderKind},
+    ZkTransactionOpts,
+};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockId;
