@@ -53,7 +53,7 @@ pub struct ZkSyncConfig {
     pub bytecode_hash: Option<BytecodeHash>,
 
     /// Whether to try to recompile with -Oz if the bytecode is too large.
-    pub fallback_oz: bool,
+    pub size_fallback: bool,
 
     /// Whether to support compilation of zkSync-specific simulations
     pub enable_eravm_extensions: bool,
@@ -61,6 +61,7 @@ pub struct ZkSyncConfig {
     /// Force evmla for zkSync
     pub force_evmla: bool,
 
+    #[serde(alias = "LLVMOptions")]
     pub llvm_options: Vec<String>,
 
     /// Enable optimizer for zkSync
@@ -90,7 +91,7 @@ impl Default for ZkSyncConfig {
             solc_path: Default::default(),
             hash_type: Default::default(),
             bytecode_hash: Default::default(),
-            fallback_oz: Default::default(),
+            size_fallback: Default::default(),
             enable_eravm_extensions: Default::default(),
             force_evmla: Default::default(),
             llvm_options: Default::default(),
@@ -125,7 +126,8 @@ impl ZkSyncConfig {
         let optimizer = Optimizer {
             enabled: Some(self.optimizer),
             mode: Some(self.optimizer_mode),
-            fallback_to_optimizing_for_size: Some(self.fallback_oz),
+            size_fallback: Some(self.size_fallback),
+            fallback_to_optimizing_for_size: None,
             disable_system_request_memoization: Some(true),
             details: self.optimizer_details.clone(),
             jump_table_density_threshold: None,
@@ -142,6 +144,7 @@ impl ZkSyncConfig {
             enable_eravm_extensions: self.enable_eravm_extensions,
             force_evmla: self.force_evmla,
             llvm_options: self.llvm_options.clone(),
+            llvm_options_legacy: Default::default(),
             output_selection: OutputSelection {
                 all: FileOutputSelection {
                     per_file: [].into(),
@@ -156,7 +159,7 @@ impl ZkSyncConfig {
         let zksolc_path = if let Some(path) = config_ensure_zksolc(self.zksolc.as_ref(), offline)? {
             path
         } else if !offline {
-            let default_version = semver::Version::new(1, 5, 11);
+            let default_version = ZkSolc::zksolc_latest_supported_version();
             let mut zksolc = ZkSolc::find_installed_version(&default_version)?;
             if zksolc.is_none() {
                 ZkSolc::blocking_install(&default_version)?;
