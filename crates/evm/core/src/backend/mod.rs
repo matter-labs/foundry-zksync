@@ -80,6 +80,14 @@ const DEFAULT_PERSISTENT_ACCOUNTS: [Address; 3] =
 pub const GLOBAL_FAIL_SLOT: U256 =
     uint!(0x6661696c65640000000000000000000000000000000000000000000000000000_U256);
 
+/// The number of times the backend will attempt to
+/// retrieve code_by_hash from forked DB
+const CODE_BY_HASH_RETRIES: u32 = 3;
+
+/// The delay (in seconds) betwen each retry to
+/// retrieve code_by_hash from forked DB
+const CODE_BY_HASH_RETRY_DELAY_SECS: u64 = 3;
+
 /// Defines the info of a fork
 pub struct ForkInfo {
     /// The type of fork
@@ -1614,7 +1622,7 @@ impl Database for Backend {
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
-        // Try obtaining code by hash via zks_getBytecodeByHash for zksync forks.
+        // NOTE(zk): Try obtaining code by hash via zks_getBytecodeByHash for zksync forks.
         let maybe_zk_fork = self
             .active_fork_id()
             .and_then(|id| self.get_fork_info(id).ok())
@@ -1623,15 +1631,31 @@ impl Database for Backend {
 
         if let (Some(fork_url), Some(db)) = (maybe_zk_fork, self.active_fork_db_mut()) {
             let provider = try_get_zksync_http_provider(fork_url)
+                .map(Arc::new)
                 .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)))?;
 
-            return db.db.do_any_request(async move {
-                provider
-                    .raw_request::<_, Bytes>("zks_getBytecodeByHash".into(), vec![code_hash])
-                    .await
-                    .map(Bytecode::new_raw)
-                    .map_err(Into::into)
-            });
+            let retry = foundry_common::retry::Retry::new(
+                CODE_BY_HASH_RETRIES,
+                std::time::Duration::from_secs(CODE_BY_HASH_RETRY_DELAY_SECS),
+            );
+
+            return retry
+                .run(move || {
+                    let provider = provider.clone();
+                    db.db
+                        .do_any_request(async move {
+                            provider
+                                .raw_request::<_, Bytes>(
+                                    "zks_getBytecodeByHash".into(),
+                                    vec![code_hash],
+                                )
+                                .await
+                                .map(Bytecode::new_raw)
+                                .map_err(Into::into)
+                        })
+                        .map_err(Into::into)
+                })
+                .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)));
         }
 
         if let Some(db) = self.active_fork_db_mut() {
