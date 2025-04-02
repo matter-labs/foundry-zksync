@@ -63,7 +63,7 @@ fn run() -> Result<()> {
         ForgeSubcommand::Script(cmd) => {
             command_name = "script";
             utils::block_on(cmd.run_script())
-        },
+        }
         ForgeSubcommand::Coverage(cmd) => {
             command_name = "coverage";
             if cmd.is_watch() {
@@ -75,7 +75,7 @@ fn run() -> Result<()> {
         ForgeSubcommand::Bind(cmd) => {
             command_name = "bind";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Build(cmd) => {
             command_name = "build";
             if cmd.is_watch() {
@@ -87,56 +87,56 @@ fn run() -> Result<()> {
         ForgeSubcommand::VerifyContract(args) => {
             command_name = "verify-contract";
             utils::block_on(args.run())
-        },
+        }
         ForgeSubcommand::VerifyCheck(args) => {
             command_name = "verify-check";
             utils::block_on(args.run())
-        },
+        }
         ForgeSubcommand::VerifyBytecode(cmd) => {
             command_name = "verify-bytecode";
             utils::block_on(cmd.run())
-        },
+        }
         ForgeSubcommand::Clone(cmd) => {
             command_name = "clone";
             utils::block_on(cmd.run())
-        },
+        }
         ForgeSubcommand::Cache(cmd) => {
             command_name = "cache";
             match cmd.sub {
                 CacheSubcommands::Clean(cmd) => {
                     subcommand_name = Some("clean");
                     cmd.run()
-                },
+                }
                 CacheSubcommands::Ls(cmd) => {
                     subcommand_name = Some("ls");
                     cmd.run()
-                },
+                }
             }
-        },
+        }
         ForgeSubcommand::Create(cmd) => {
             command_name = "create";
             utils::block_on(cmd.run())
-        },
+        }
         ForgeSubcommand::Update(cmd) => {
             command_name = "update";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Install(cmd) => {
             command_name = "install";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Remove(cmd) => {
             command_name = "remove";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Remappings(cmd) => {
             command_name = "remappings";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Init(cmd) => {
             command_name = "init";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Completions { shell } => {
             command_name = "completions";
             generate(shell, &mut Forge::command(), "forge", &mut std::io::stdout());
@@ -181,19 +181,19 @@ fn run() -> Result<()> {
         ForgeSubcommand::Config(cmd) => {
             command_name = "config";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Flatten(cmd) => {
             command_name = "flatten";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Inspect(cmd) => {
             command_name = "inspect";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Tree(cmd) => {
             command_name = "tree";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Geiger(cmd) => {
             command_name = "geiger";
             let n = cmd.run()?;
@@ -214,32 +214,32 @@ fn run() -> Result<()> {
         ForgeSubcommand::Selectors { command } => {
             command_name = "selectors";
             utils::block_on(command.run())
-        },
+        }
         ForgeSubcommand::Generate(cmd) => {
             command_name = "generate";
             match cmd.sub {
                 GenerateSubcommands::Test(cmd) => {
                     subcommand_name = Some("test");
                     cmd.run()
-                },
+                }
             }
-        },
+        }
         ForgeSubcommand::Compiler(cmd) => {
             command_name = "compiler";
             cmd.run()
-        },
+        }
         ForgeSubcommand::Soldeer(cmd) => {
             command_name = "soldeer";
             utils::block_on(cmd.run())
-        },
+        }
         ForgeSubcommand::Eip712(cmd) => {
             command_name = "eip712";
             cmd.run()
-        },
+        }
         ForgeSubcommand::BindJson(cmd) => {
             command_name = "bind-json";
             cmd.run()
-        },
+        }
     };
 
     let telemetry = get_telemetry().expect("telemetry is not initialized");
@@ -247,15 +247,10 @@ fn run() -> Result<()> {
         .insert("command", Some(command_name))
         .insert("subcommand", subcommand_name)
         .take();
-    let _ = utils::block_on(
-        telemetry
-        .track_event(
-            "forge",
-            TelemetryProps::new()
-                .insert("params", Some(telemetry_cmd_params))
-                .take(),
-        )
-    );
+    let _ = utils::block_on(telemetry.track_event(
+        "forge",
+        TelemetryProps::new().insert("params", Some(telemetry_cmd_params)).take(),
+    ));
 
     result
 }
