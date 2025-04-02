@@ -47,7 +47,7 @@ fn run() -> Result<()> {
     args.global.init()?;
     init_execution_context(&args.cmd);
 
-    let mut command_name = "unknown";
+    let command_name: &str;
     let mut subcommand_name: Option<&str> = None;
     let result = match args.cmd {
         ForgeSubcommand::Test(cmd) => {
