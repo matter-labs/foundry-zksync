@@ -4538,6 +4538,7 @@ dependencies = [
  "watchexec-events",
  "watchexec-signals",
  "yansi",
+ "zksync_telemetry",
  "zksync_types",
 ]
 
