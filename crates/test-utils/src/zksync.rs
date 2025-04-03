@@ -370,7 +370,7 @@ impl ZkSyncNode {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct RpcRequest {
+pub struct RpcRequest {
     pub jsonrpc: String,
     pub id: u64,
     pub method: String,

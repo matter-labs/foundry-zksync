@@ -126,6 +126,9 @@ forge-verify:
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_keccak_not_equal
 foundry-config:
     zksync::tests::zksync_project_has_zksync_solc_when_solc_req_is_a_version
+foundry-evm-core:
+    backend::tests::test_zk_code_by_hash_failure_is_propagated
+    backend::tests::test_zk_code_by_hash_retries
 foundry-zksync-compilers:
     compilers::artifact_output::zk::bytecode::tests::serialized_bytecode_is_not_prefixed
     compilers::zksolc::input::tests::test_zk_llvm_options_sanitization
