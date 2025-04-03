@@ -40,8 +40,8 @@ struct DeployedSystemContract {
 }
 static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLock::new(|| {
     let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
-        &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
-        false,
+        anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
+        zksync_types::ProtocolVersionId::latest(),
     );
 
     contracts

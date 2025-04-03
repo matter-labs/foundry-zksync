@@ -29,7 +29,7 @@ use httptest::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::AllowOrigin;
-use zksync_types::{L2BlockNumber, DEFAULT_ERA_CHAIN_ID, H160, U256};
+use zksync_types::{L2BlockNumber, ProtocolVersionId, DEFAULT_ERA_CHAIN_ID, H160, U256};
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [
@@ -267,7 +267,8 @@ impl ZkSyncNode {
             TestNodeFeeInputProvider::from_fork(fork_client.as_ref().map(|f| &f.details));
         let filters = Arc::new(RwLock::new(EthFilters::default()));
         let system_contracts = SystemContracts::from_options(
-            &SystemContractsOptions::BuiltInWithoutSecurity,
+            SystemContractsOptions::BuiltInWithoutSecurity,
+            ProtocolVersionId::latest(),
             false,
             false,
         );

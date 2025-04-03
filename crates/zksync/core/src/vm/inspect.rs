@@ -489,9 +489,14 @@ struct InnerZkVmResult {
 }
 
 static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = LazyLock::new(|| {
-    SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false, false)
-        .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
-        .clone()
+    SystemContracts::from_options(
+        Options::BuiltInWithoutSecurity,
+        zksync_types::ProtocolVersionId::latest(),
+        false,
+        false,
+    )
+    .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
+    .clone()
 });
 
 fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
