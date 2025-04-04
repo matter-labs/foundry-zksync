@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.13](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.12...foundry-zksync-v0.0.13) (2025-04-04)
+
+
+### Features
+
+* Add support for zksolc 1.5.12 ([#1002](https://github.com/matter-labs/foundry-zksync/issues/1002)) ([274cc62](https://github.com/matter-labs/foundry-zksync/commit/274cc622bde9b0c8c17ff469260e10e2d3b7c36b))
+* add verify-bytecode support ([#994](https://github.com/matter-labs/foundry-zksync/issues/994)) ([f872d3c](https://github.com/matter-labs/foundry-zksync/commit/f872d3c82e5f828ebc84dc506cbf2d2e412c722b))
+
+
+### Bug Fixes
+
+* Bump ubuntu on CI install ([#995](https://github.com/matter-labs/foundry-zksync/issues/995)) ([3f8025f](https://github.com/matter-labs/foundry-zksync/commit/3f8025f53f2c4cffe6ac4b43a3e20d4ebf993c6e))
+* Use alchemy api key for ETH RPC URL ([#1003](https://github.com/matter-labs/foundry-zksync/issues/1003)) ([75e5fa9](https://github.com/matter-labs/foundry-zksync/commit/75e5fa91ba3822ec5cd51d5154b8b16dc1f8db41))
+
 ## [0.0.12](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.11...foundry-zksync-v0.0.12) (2025-03-21)
 
 
