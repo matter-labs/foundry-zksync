@@ -231,7 +231,7 @@ impl NodeArgs {
             .with_blocktime(self.block_time)
             .with_no_mining(self.no_mining)
             .with_mixed_mining(self.mixed_mining, self.block_time)
-            .with_account_generator(self.account_generator())
+            .with_account_generator(self.account_generator())?
             .with_genesis_balance(genesis_balance)
             .with_genesis_timestamp(self.timestamp)
             .with_port(self.port)
@@ -342,7 +342,7 @@ impl NodeArgs {
                 }
             });
 
-            // on windows, this will never fires
+            // On windows, this will never fire.
             #[cfg(not(unix))]
             let mut sigterm = Box::pin(futures::future::pending::<()>());
 
@@ -350,11 +350,9 @@ impl NodeArgs {
             tokio::select! {
                  _ = &mut sigterm => {
                     trace!("received sigterm signal, shutting down");
-                },
-                _ = &mut on_shutdown =>{
-
                 }
-                _ = &mut state_dumper =>{}
+                _ = &mut on_shutdown => {}
+                _ = &mut state_dumper => {}
             }
 
             // shutdown received

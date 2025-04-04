@@ -9,6 +9,8 @@ cast::cli:
     zk::test_zk_cast_mktx_contract_deploy
     zk::test_zk_cast_using_paymaster
     zk::test_zk_cast_without_paymaster
+forge:
+    cmd::create::zksync::tests::test_zk_deployer_builds_eip712_transactions
 forge::cli:
     cmd::zk_can_init_with_zksync
     zk::build::test_zk_build_sizes
@@ -117,8 +119,6 @@ forge::it:
     zk::sender::test_zk_correctly_updates_sender_nonce
     zk::traces::test_zk_traces_work_during_call
     zk::traces::test_zk_traces_work_during_create
-forge::bin/forge:
-    cmd::create::zksync::tests::test_zk_deployer_builds_eip712_transactions
 forge-verify:
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_both_none
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_ipfs

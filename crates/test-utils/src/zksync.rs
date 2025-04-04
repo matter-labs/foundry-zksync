@@ -310,7 +310,7 @@ impl ZkSyncNode {
             storage_key_layout,
         );
 
-        for wallet in LEGACY_RICH_WALLETS.iter() {
+        for wallet in &LEGACY_RICH_WALLETS {
             let address = wallet.0;
             node.set_rich_account(
                 H160::from_str(address).unwrap(),
@@ -318,7 +318,7 @@ impl ZkSyncNode {
             )
             .await;
         }
-        for wallet in RICH_WALLETS.iter() {
+        for wallet in &RICH_WALLETS {
             let address = wallet.0;
             node.set_rich_account(
                 H160::from_str(address).unwrap(),

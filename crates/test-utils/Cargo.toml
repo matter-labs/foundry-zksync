@@ -51,7 +51,3 @@ anvil_zksync_l1_sidecar.workspace = true
 [dev-dependencies]
 tokio.workspace = true
 foundry-block-explorers.workspace = true
-
-[features]
-# feature for integration tests that test external projects
-external-integration-tests = []

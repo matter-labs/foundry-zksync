@@ -78,6 +78,5 @@ vergen = { workspace = true, features = ["build", "git", "gitcl"] }
 cargo_metadata = "0.19.2"
 
 [dev-dependencies]
-similar-asserts.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 axum = { workspace = true }
