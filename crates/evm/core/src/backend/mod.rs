@@ -80,6 +80,14 @@ const DEFAULT_PERSISTENT_ACCOUNTS: [Address; 3] =
 pub const GLOBAL_FAIL_SLOT: U256 =
     uint!(0x6661696c65640000000000000000000000000000000000000000000000000000_U256);
 
+/// The number of times the backend will attempt to
+/// retrieve code_by_hash from forked DB
+const CODE_BY_HASH_RETRIES: u32 = 3;
+
+/// The delay (in seconds) betwen each retry to
+/// retrieve code_by_hash from forked DB
+const CODE_BY_HASH_RETRY_DELAY_SECS: u64 = 3;
+
 /// Defines the info of a fork
 pub struct ForkInfo {
     /// The type of fork
@@ -849,7 +857,7 @@ impl Backend {
                 // created account takes precedence: for example contract creation in setups
                 if init_account.is_created() {
                     trace!(?loaded_account, "skipping created account");
-                    continue
+                    continue;
                 }
 
                 // otherwise we need to replace the account's info with the one from the fork's
@@ -920,7 +928,7 @@ impl Backend {
 
             if tx.tx_hash() == tx_hash {
                 // found the target transaction
-                return Ok(Some(tx.inner.clone()))
+                return Ok(Some(tx.inner.clone()));
             }
             trace!(tx=?tx.tx_hash(), "committing transaction");
 
@@ -1614,25 +1622,40 @@ impl Database for Backend {
     }
 
     fn code_by_hash(&mut self, code_hash: B256) -> Result<Bytecode, Self::Error> {
-        // Try obtaining code by hash via zks_getBytecodeByHash for zksync forks.
+        // NOTE(zk): Try obtaining code by hash via zks_getBytecodeByHash for zksync forks.
         let maybe_zk_fork = self
             .active_fork_id()
             .and_then(|id| self.get_fork_info(id).ok())
             .map(|info| info.fork_type.is_zk())
             .and_then(|is_zk| if is_zk { self.active_fork_url() } else { None });
+
         if let (Some(fork_url), Some(db)) = (maybe_zk_fork, self.active_fork_db_mut()) {
             let provider = try_get_zksync_http_provider(fork_url)
+                .map(Arc::new)
                 .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)))?;
-            let result = db.db.do_any_request(async move {
-                let bytes = provider
-                    .raw_request::<_, Bytes>("zks_getBytecodeByHash".into(), vec![code_hash])
-                    .await?;
-                Ok(Bytecode::new_raw(bytes))
-            });
 
-            if let Ok(bytes) = result {
-                return Ok(bytes);
-            }
+            let retry = foundry_common::retry::Retry::new(
+                CODE_BY_HASH_RETRIES,
+                std::time::Duration::from_secs(CODE_BY_HASH_RETRY_DELAY_SECS),
+            );
+
+            return retry
+                .run(move || {
+                    let provider = provider.clone();
+                    db.db
+                        .do_any_request(async move {
+                            provider
+                                .raw_request::<_, Bytes>(
+                                    "zks_getBytecodeByHash".into(),
+                                    vec![code_hash],
+                                )
+                                .await
+                                .map(Bytecode::new_raw)
+                                .map_err(Into::into)
+                        })
+                        .map_err(Into::into)
+                })
+                .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)));
         }
 
         if let Some(db) = self.active_fork_db_mut() {
@@ -2047,12 +2070,20 @@ mod tests {
         fork::CreateFork,
         opts::EvmOpts,
     };
-    use alloy_primitives::{Address, U256};
+    use alloy_network::{AnyRpcHeader, AnyRpcTransaction};
+    use alloy_primitives::{Address, B256, U256};
     use alloy_provider::Provider;
     use foundry_common::provider::get_http_provider;
     use foundry_config::{Config, NamedChain};
     use foundry_fork_db::cache::{BlockchainDb, BlockchainDbMeta};
-    use revm::DatabaseRef;
+    use foundry_test_utils::{
+        httptest::{self, matchers, responders},
+        MockServer, RpcRequest,
+    };
+    use foundry_zksync_core::EMPTY_CODE;
+    use revm::{Database, DatabaseRef};
+
+    use super::CODE_BY_HASH_RETRIES;
 
     const ENDPOINT: Option<&str> = option_env!("ETH_RPC_URL");
 
@@ -2103,5 +2134,95 @@ mod tests {
         assert!(db.accounts().read().contains_key(&address));
         assert!(db.storage().read().contains_key(&address));
         assert_eq!(db.storage().read().get(&address).unwrap().len(), num_slots as usize);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_zk_code_by_hash_failure_is_propagated() {
+        let mock = MockServer::run();
+
+        let mockblock = alloy_rpc_types::Block::<AnyRpcTransaction, AnyRpcHeader>::empty(
+            AnyRpcHeader::default(),
+        );
+
+        // requests made during Backend::spawn as part of fork creation process
+        mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
+        mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
+        mock.expect("eth_chainId", None, serde_json::json!("0x01"));
+        mock.expect(
+            "eth_getBlockByNumber",
+            Some(serde_json::json!(["0x1", false])),
+            serde_json::json!(mockblock),
+        );
+
+        // just to mark the RPC as a ZK rpc
+        mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
+        let code_hash_fail =
+            httptest::Expectation::matching(matchers::request::body(matchers::json_decoded(
+                move |req: &RpcRequest| req.method.as_str() == "zks_getBytecodeByHash",
+            )))
+            .times(CODE_BY_HASH_RETRIES as usize + 1)
+            .respond_with(move || responders::status_code(500));
+        mock.inner.expect(code_hash_fail);
+
+        let evm_opts = EvmOpts::default();
+        let env = revm::primitives::Env::default();
+        let fork = CreateFork { enable_caching: true, url: mock.url(), env, evm_opts };
+
+        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm());
+        let req = backend.code_by_hash(B256::from(alloy_primitives::fixed_bytes!(
+            "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
+        )));
+
+        assert!(req.is_err())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_zk_code_by_hash_retries() {
+        let mock = MockServer::run();
+
+        let mockblock = alloy_rpc_types::Block::<AnyRpcTransaction, AnyRpcHeader>::empty(
+            AnyRpcHeader::default(),
+        );
+
+        // requests made during Backend::spawn as part of fork creation process
+        mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
+        mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
+        mock.expect("eth_chainId", None, serde_json::json!("0x01"));
+        mock.expect(
+            "eth_getBlockByNumber",
+            Some(serde_json::json!(["0x1", false])),
+            serde_json::json!(mockblock),
+        );
+
+        // just to mark the RPC as a ZK rpc
+        mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
+
+        let code_hash_fail_once =
+            httptest::Expectation::matching(matchers::request::body(matchers::json_decoded(
+                move |req: &RpcRequest| req.method.as_str() == "zks_getBytecodeByHash",
+            )))
+            .times(2)
+            .respond_with(responders::cycle(vec![
+                Box::new(move || responders::status_code(500)),
+                Box::new(move || {
+                    responders::json_encoded(serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": 0,
+                        "result": EMPTY_CODE,
+                    }))
+                }),
+            ]));
+        mock.inner.expect(code_hash_fail_once);
+
+        let evm_opts = EvmOpts::default();
+        let env = revm::primitives::Env::default();
+        let fork = CreateFork { enable_caching: true, url: mock.url(), env, evm_opts };
+
+        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm());
+        let req = backend.code_by_hash(B256::from(alloy_primitives::fixed_bytes!(
+            "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
+        )));
+
+        assert!(req.is_ok())
     }
 }

@@ -27,9 +27,10 @@ pub use util::{TestCommand, TestProject};
 mod script;
 pub use script::{ScriptOutcome, ScriptTester};
 
-// TODO: remove once anvil supports zksync node
+// TODO(zk): remove once anvil supports zksync node
 mod zksync;
-pub use zksync::{Fork, MockServer, ZkSyncNode};
+pub use httptest;
+pub use zksync::{Fork, MockServer, RpcRequest, ZkSyncNode};
 
 // re-exports for convenience
 pub use foundry_compilers;
