@@ -1,5 +1,7 @@
 # **Foundry with ZKsync Era - Alpha**
 
+TEST CI
+
 **[Install](https://foundry-book.zksync.io/getting-started/installation)**
 | [Limitations](https://foundry-book.zksync.io/zksync-specifics/limitations/)
 | [User Book](https://foundry-book.zksync.io/)
