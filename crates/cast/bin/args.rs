@@ -1086,9 +1086,7 @@ impl CastSubcommand {
             Self::ToRlp { value: _ } => "to-rlp",
             Self::ToHex(ToBaseArgs { value: _, base_in: _ }) => "to-hex",
             Self::ToDec(ToBaseArgs { value: _, base_in: _ }) => "to-dec",
-            Self::ToBase { base: ToBaseArgs { value: _, base_in: _ }, base_out: _ } => {
-                "to-base"
-            }
+            Self::ToBase { base: ToBaseArgs { value: _, base_in: _ }, base_out: _ } => "to-base",
             Self::ToBytes32 { bytes: _ } => "to-bytes32",
             Self::FormatBytes32String { string: _ } => "from-bytes32-string",
             Self::ParseBytes32String { bytes: _ } => "parse-bytes32-string",
@@ -1129,9 +1127,7 @@ impl CastSubcommand {
             Self::GasPrice { rpc: _ } => "gas-price",
             Self::Index { key_type: _, key: _, slot_number: _ } => "index",
             Self::IndexErc7201 { id: _, formula_id: _ } => "index-erc7201",
-            Self::Implementation { block: _, beacon: _, who: _, rpc: _ } => {
-                "implementation"
-            }
+            Self::Implementation { block: _, beacon: _, who: _, rpc: _ } => "implementation",
             Self::Admin { block: _, who: _, rpc: _ } => "admin",
             Self::Nonce { block: _, who: _, rpc: _ } => "nonce",
             Self::Codehash { block: _, who: _, slots: _, rpc: _ } => "codehash",
@@ -1145,13 +1141,9 @@ impl CastSubcommand {
             Self::Estimate(_) => "estimate",
             Self::MakeTx(_) => "make-tx",
             Self::PublishTx { raw_tx: _, cast_async: _, rpc: _ } => "publish-tx",
-            Self::Receipt {
-                tx_hash: _,
-                field: _,
-                cast_async: _,
-                confirmations: _,
-                rpc: _,
-            } => "receipt",
+            Self::Receipt { tx_hash: _, field: _, cast_async: _, confirmations: _, rpc: _ } => {
+                "receipt"
+            }
             Self::Run(_) => "run",
             Self::SendTx(_) => "send-tx",
             Self::Tx { tx_hash: _, field: _, raw: _, rpc: _ } => "tx",
@@ -1173,12 +1165,8 @@ impl CastSubcommand {
             Self::Keccak { data: _ } => "keccak",
             Self::HashMessage { message: _ } => "hash-message",
             Self::SigEvent { event_string: _ } => "sig-event",
-            Self::LeftShift { value: _, bits: _, base_in: _, base_out: _ } => {
-                "left-shift"
-            }
-            Self::RightShift { value: _, bits: _, base_in: _, base_out: _ } => {
-                "right-shift"
-            }
+            Self::LeftShift { value: _, bits: _, base_in: _, base_out: _ } => "left-shift",
+            Self::RightShift { value: _, bits: _, base_in: _, base_out: _ } => "right-shift",
             Self::Source {
                 address: _,
                 directory: _,
