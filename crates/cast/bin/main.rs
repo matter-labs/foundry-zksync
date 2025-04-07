@@ -734,12 +734,8 @@ async fn main_args(args: CastArgs) -> Result<()> {
     };
 
     let _ = telemetry
-        .track_event(
-            "cast",
-            TelemetryProps::new()
-                .insert("params", Some(telemetry_props))
-                .take(),
-        ).await;
+        .track_event("cast", TelemetryProps::new().insert("params", Some(telemetry_props)).take())
+        .await;
 
     /// Prints slice of tokens using [`format_tokens`] or [`format_tokens_raw`] depending whether
     /// the shell is in JSON mode.

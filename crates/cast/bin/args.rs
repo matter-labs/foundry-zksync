@@ -1086,7 +1086,9 @@ impl CastSubcommand {
             CastSubcommand::ToRlp { value: _ } => "to-rlp",
             CastSubcommand::ToHex(ToBaseArgs { value: _, base_in: _ }) => "to-hex",
             CastSubcommand::ToDec(ToBaseArgs { value: _, base_in: _ }) => "to-dec",
-            CastSubcommand::ToBase { base: ToBaseArgs { value: _, base_in: _ }, base_out: _ } => "to-base",
+            CastSubcommand::ToBase { base: ToBaseArgs { value: _, base_in: _ }, base_out: _ } => {
+                "to-base"
+            }
             CastSubcommand::ToBytes32 { bytes: _ } => "to-bytes32",
             CastSubcommand::FormatBytes32String { string: _ } => "from-bytes32-string",
             CastSubcommand::ParseBytes32String { bytes: _ } => "parse-bytes32-string",
@@ -1127,7 +1129,9 @@ impl CastSubcommand {
             CastSubcommand::GasPrice { rpc: _ } => "gas-price",
             CastSubcommand::Index { key_type: _, key: _, slot_number: _ } => "index",
             CastSubcommand::IndexErc7201 { id: _, formula_id: _ } => "index-erc7201",
-            CastSubcommand::Implementation { block: _, beacon: _, who: _, rpc: _ } => "implementation",
+            CastSubcommand::Implementation { block: _, beacon: _, who: _, rpc: _ } => {
+                "implementation"
+            }
             CastSubcommand::Admin { block: _, who: _, rpc: _ } => "admin",
             CastSubcommand::Nonce { block: _, who: _, rpc: _ } => "nonce",
             CastSubcommand::Codehash { block: _, who: _, slots: _, rpc: _ } => "codehash",
@@ -1141,7 +1145,13 @@ impl CastSubcommand {
             CastSubcommand::Estimate(_) => "estimate",
             CastSubcommand::MakeTx(_) => "make-tx",
             CastSubcommand::PublishTx { raw_tx: _, cast_async: _, rpc: _ } => "publish-tx",
-            CastSubcommand::Receipt { tx_hash: _, field: _, cast_async: _, confirmations: _, rpc: _ } => "receipt",
+            CastSubcommand::Receipt {
+                tx_hash: _,
+                field: _,
+                cast_async: _,
+                confirmations: _,
+                rpc: _,
+            } => "receipt",
             CastSubcommand::Run(_) => "run",
             CastSubcommand::SendTx(_) => "send-tx",
             CastSubcommand::Tx { tx_hash: _, field: _, raw: _, rpc: _ } => "tx",
@@ -1163,8 +1173,12 @@ impl CastSubcommand {
             CastSubcommand::Keccak { data: _ } => "keccak",
             CastSubcommand::HashMessage { message: _ } => "hash-message",
             CastSubcommand::SigEvent { event_string: _ } => "sig-event",
-            CastSubcommand::LeftShift { value: _, bits: _, base_in: _, base_out: _ } => "left-shift",
-            CastSubcommand::RightShift { value: _, bits: _, base_in: _, base_out: _ } => "right-shift",
+            CastSubcommand::LeftShift { value: _, bits: _, base_in: _, base_out: _ } => {
+                "left-shift"
+            }
+            CastSubcommand::RightShift { value: _, bits: _, base_in: _, base_out: _ } => {
+                "right-shift"
+            }
             CastSubcommand::Source {
                 address: _,
                 directory: _,
