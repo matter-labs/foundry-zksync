@@ -155,13 +155,15 @@ fn run() -> Result<()> {
         ForgeSubcommand::BindJson(cmd) => cmd.run(),
     };
 
-    let _ = utils::block_on(telemetry.track_event(
-        "forge",
-        TelemetryProps::new()
-            .insert("params", Some(telemetry_props))
-            .insert("result", Some(if result.is_ok() { "success" } else { "failure" }))
-            .take(),
-    ));
+    let _ = utils::block_on(
+        telemetry.track_event(
+            "forge",
+            TelemetryProps::new()
+                .insert("params", Some(telemetry_props))
+                .insert("result", Some(if result.is_ok() { "success" } else { "failure" }))
+                .take(),
+        ),
+    );
 
     result
 }

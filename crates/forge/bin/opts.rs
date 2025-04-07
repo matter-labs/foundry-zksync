@@ -1,9 +1,24 @@
 use crate::cmd::{
-    bind::BindArgs, bind_json, build::BuildArgs, cache::{CacheArgs, CacheSubcommands}, clone::CloneArgs,
-    compiler::CompilerArgs, config, coverage, create::CreateArgs, doc::DocArgs, eip712, flatten,
-    fmt::FmtArgs, geiger, generate, generate::GenerateSubcommands, init::InitArgs, inspect, install::InstallArgs,
-    remappings::RemappingArgs, remove::RemoveArgs, selectors::SelectorsSubcommands, snapshot,
-    soldeer, test, tree, update,
+    bind::BindArgs,
+    bind_json,
+    build::BuildArgs,
+    cache::{CacheArgs, CacheSubcommands},
+    clone::CloneArgs,
+    compiler::CompilerArgs,
+    config, coverage,
+    create::CreateArgs,
+    doc::DocArgs,
+    eip712, flatten,
+    fmt::FmtArgs,
+    geiger, generate,
+    generate::GenerateSubcommands,
+    init::InitArgs,
+    inspect,
+    install::InstallArgs,
+    remappings::RemappingArgs,
+    remove::RemoveArgs,
+    selectors::SelectorsSubcommands,
+    snapshot, soldeer, test, tree, update,
 };
 use clap::{Parser, Subcommand, ValueHint};
 use forge_script::ScriptArgs;
@@ -183,12 +198,10 @@ impl ForgeSubcommand {
             ForgeSubcommand::VerifyCheck(_) => ("verify-check", None),
             ForgeSubcommand::VerifyBytecode(_) => ("verify-bytecode", None),
             ForgeSubcommand::Clone(_) => ("clone", None),
-            ForgeSubcommand::Cache(cmd) => {
-                match cmd.sub {
-                    CacheSubcommands::Clean(_) => ("cache", Some("clean")),
-                    CacheSubcommands::Ls(_) => ("cache", Some("ls"))
-                }
-            }
+            ForgeSubcommand::Cache(cmd) => match cmd.sub {
+                CacheSubcommands::Clean(_) => ("cache", Some("clean")),
+                CacheSubcommands::Ls(_) => ("cache", Some("ls")),
+            },
             ForgeSubcommand::Create(_) => ("create", None),
             ForgeSubcommand::Update(_) => ("update", None),
             ForgeSubcommand::Install(_) => ("install", None),
@@ -196,26 +209,24 @@ impl ForgeSubcommand {
             ForgeSubcommand::Remappings(_) => ("remappings", None),
             ForgeSubcommand::Init(_) => ("init", None),
             ForgeSubcommand::Completions { shell: _ } => ("completions", None),
-            ForgeSubcommand::GenerateFigSpec =>  ("generate-fig-spec", None),
-            ForgeSubcommand::Clean { root: _ } =>  ("clean", None),
-            ForgeSubcommand::Snapshot(_) =>  ("snapshot", None),
+            ForgeSubcommand::GenerateFigSpec => ("generate-fig-spec", None),
+            ForgeSubcommand::Clean { root: _ } => ("clean", None),
+            ForgeSubcommand::Snapshot(_) => ("snapshot", None),
             ForgeSubcommand::Fmt(_) => ("fmt", None),
-            ForgeSubcommand::Config(_) =>  ("config", None),
-            ForgeSubcommand::Flatten(_) =>  ("flatten", None),
-            ForgeSubcommand::Inspect(_) =>  ("inspect", None),
-            ForgeSubcommand::Tree(_) =>  ("tree", None),
-            ForgeSubcommand::Geiger(_) =>  ("geiger", None),
+            ForgeSubcommand::Config(_) => ("config", None),
+            ForgeSubcommand::Flatten(_) => ("flatten", None),
+            ForgeSubcommand::Inspect(_) => ("inspect", None),
+            ForgeSubcommand::Tree(_) => ("tree", None),
+            ForgeSubcommand::Geiger(_) => ("geiger", None),
             ForgeSubcommand::Doc(_) => ("doc", None),
             ForgeSubcommand::Selectors { command: _ } => ("selectors", None),
-            ForgeSubcommand::Generate(cmd) => {
-                match cmd.sub {
-                    GenerateSubcommands::Test(_) => ("generate", Some("test"))
-                }
-            }
+            ForgeSubcommand::Generate(cmd) => match cmd.sub {
+                GenerateSubcommands::Test(_) => ("generate", Some("test")),
+            },
             ForgeSubcommand::Compiler(_) => ("compiler", None),
             ForgeSubcommand::Soldeer(_) => ("soldeer", None),
             ForgeSubcommand::Eip712(_) => ("eip712", None),
-            ForgeSubcommand::BindJson(_) => ("bind-json", None)
+            ForgeSubcommand::BindJson(_) => ("bind-json", None),
         };
         TelemetryProps::new()
             .insert("command", Some(command_name))
