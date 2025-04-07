@@ -13,7 +13,7 @@ import {SystemContractsCaller} from
     "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from
     "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/SystemContractHelper.sol";
-import {EfficientCall} from "zksync-contracts/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+import {EfficientCall} from "era-contracts/system-contracts/contracts/libraries/EfficientCall.sol";
 import {
     BOOTLOADER_FORMAL_ADDRESS,
     NONCE_HOLDER_SYSTEM_CONTRACT,
