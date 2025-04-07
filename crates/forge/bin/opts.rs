@@ -1,7 +1,7 @@
 use crate::cmd::{
-    bind::BindArgs, bind_json, build::BuildArgs, cache::CacheArgs, clone::CloneArgs,
+    bind::BindArgs, bind_json, build::BuildArgs, cache::{CacheArgs, CacheSubcommands}, clone::CloneArgs,
     compiler::CompilerArgs, config, coverage, create::CreateArgs, doc::DocArgs, eip712, flatten,
-    fmt::FmtArgs, geiger, generate, init::InitArgs, inspect, install::InstallArgs,
+    fmt::FmtArgs, geiger, generate, generate::GenerateSubcommands, init::InitArgs, inspect, install::InstallArgs,
     remappings::RemappingArgs, remove::RemoveArgs, selectors::SelectorsSubcommands, snapshot,
     soldeer, test, tree, update,
 };
@@ -11,6 +11,7 @@ use forge_verify::{VerifyArgs, VerifyBytecodeArgs, VerifyCheckArgs};
 use foundry_cli::opts::GlobalArgs;
 use foundry_common::version::{LONG_VERSION, SHORT_VERSION};
 use std::path::PathBuf;
+use zksync_telemetry::TelemetryProps;
 
 /// Build, test, fuzz, debug and deploy Solidity contracts.
 #[derive(Parser)]
@@ -168,6 +169,59 @@ pub enum ForgeSubcommand {
 
     /// Generate bindings for serialization/deserialization of project structs via JSON cheatcodes.
     BindJson(bind_json::BindJsonArgs),
+}
+
+impl ForgeSubcommand {
+    pub fn into_telemetry_props(&self) -> TelemetryProps {
+        let (command_name, subcommand_name) = match self {
+            ForgeSubcommand::Test(_) => ("test", None),
+            ForgeSubcommand::Script(_) => ("script", None),
+            ForgeSubcommand::Coverage(_) => ("coverage", None),
+            ForgeSubcommand::Bind(_) => ("bind", None),
+            ForgeSubcommand::Build(_) => ("build", None),
+            ForgeSubcommand::VerifyContract(_) => ("verify-contract", None),
+            ForgeSubcommand::VerifyCheck(_) => ("verify-check", None),
+            ForgeSubcommand::VerifyBytecode(_) => ("verify-bytecode", None),
+            ForgeSubcommand::Clone(_) => ("clone", None),
+            ForgeSubcommand::Cache(cmd) => {
+                match cmd.sub {
+                    CacheSubcommands::Clean(_) => ("cache", Some("clean")),
+                    CacheSubcommands::Ls(_) => ("cache", Some("ls"))
+                }
+            }
+            ForgeSubcommand::Create(_) => ("create", None),
+            ForgeSubcommand::Update(_) => ("update", None),
+            ForgeSubcommand::Install(_) => ("install", None),
+            ForgeSubcommand::Remove(_) => ("remove", None),
+            ForgeSubcommand::Remappings(_) => ("remappings", None),
+            ForgeSubcommand::Init(_) => ("init", None),
+            ForgeSubcommand::Completions { shell: _ } => ("completions", None),
+            ForgeSubcommand::GenerateFigSpec =>  ("generate-fig-spec", None),
+            ForgeSubcommand::Clean { root: _ } =>  ("clean", None),
+            ForgeSubcommand::Snapshot(_) =>  ("snapshot", None),
+            ForgeSubcommand::Fmt(_) => ("fmt", None),
+            ForgeSubcommand::Config(_) =>  ("config", None),
+            ForgeSubcommand::Flatten(_) =>  ("flatten", None),
+            ForgeSubcommand::Inspect(_) =>  ("inspect", None),
+            ForgeSubcommand::Tree(_) =>  ("tree", None),
+            ForgeSubcommand::Geiger(_) =>  ("geiger", None),
+            ForgeSubcommand::Doc(_) => ("doc", None),
+            ForgeSubcommand::Selectors { command: _ } => ("selectors", None),
+            ForgeSubcommand::Generate(cmd) => {
+                match cmd.sub {
+                    GenerateSubcommands::Test(_) => ("generate", Some("test"))
+                }
+            }
+            ForgeSubcommand::Compiler(_) => ("compiler", None),
+            ForgeSubcommand::Soldeer(_) => ("soldeer", None),
+            ForgeSubcommand::Eip712(_) => ("eip712", None),
+            ForgeSubcommand::BindJson(_) => ("bind-json", None)
+        };
+        TelemetryProps::new()
+            .insert("command", Some(command_name))
+            .insert("subcommand", subcommand_name)
+            .take()
+    }
 }
 
 #[cfg(test)]
