@@ -20,10 +20,11 @@ use foundry_common::{
         import_selectors, parse_signatures, pretty_calldata, ParsedSignatures, SelectorImportData,
         SelectorType,
     },
-    shell, stdin,
+    shell, stdin, POSTHOG_API_KEY, TELEMETRY_CONFIG_NAME,
 };
 use foundry_config::Config;
 use std::time::Instant;
+use zksync_telemetry::{get_telemetry, init_telemetry, TelemetryProps};
 
 pub mod args;
 pub mod cmd;
@@ -40,6 +41,14 @@ extern crate foundry_common;
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn main() {
+    let _ = utils::block_on(init_telemetry(
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        TELEMETRY_CONFIG_NAME,
+        Some(POSTHOG_API_KEY.into()),
+        None,
+        None,
+    ));
     if let Err(err) = run() {
         let _ = foundry_common::sh_err!("{err:?}");
         std::process::exit(1);
@@ -64,6 +73,9 @@ fn run() -> Result<()> {
 
 #[tokio::main]
 async fn main_args(args: CastArgs) -> Result<()> {
+    let telemetry = get_telemetry().expect("telemetry is not initialized");
+    let telemetry_props = args.cmd.into_telemetry_props();
+
     match args.cmd {
         // Constants
         CastSubcommand::MaxInt { r#type } => {
@@ -720,6 +732,14 @@ async fn main_args(args: CastArgs) -> Result<()> {
             sh_println!("{}", SimpleCast::decode_eof(&eof)?)?
         }
     };
+
+    let _ = telemetry
+        .track_event(
+            "cast",
+            TelemetryProps::new()
+                .insert("params", Some(telemetry_props))
+                .take(),
+        ).await;
 
     /// Prints slice of tokens using [`format_tokens`] or [`format_tokens_raw`] depending whether
     /// the shell is in JSON mode.
