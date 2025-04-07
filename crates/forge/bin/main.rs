@@ -48,7 +48,7 @@ fn run() -> Result<()> {
     init_execution_context(&args.cmd);
 
     let telemetry = get_telemetry().expect("telemetry is not initialized");
-    let telemetry_props = args.cmd.into_telemetry_props();
+    let telemetry_props = args.cmd.get_telemetry_props();
 
     let result = match args.cmd {
         ForgeSubcommand::Test(cmd) => {

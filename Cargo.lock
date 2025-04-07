@@ -2731,6 +2731,7 @@ dependencies = [
  "tokio",
  "tracing",
  "yansi",
+ "zksync_telemetry",
  "zksync_types",
 ]
 

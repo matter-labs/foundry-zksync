@@ -1057,7 +1057,7 @@ pub enum CastSubcommand {
 }
 
 impl CastSubcommand {
-    pub fn into_telemetry_props(&self) -> TelemetryProps {
+    pub fn get_telemetry_props(&self) -> TelemetryProps {
         let command_name = match self {
             CastSubcommand::MaxInt { r#type: _ } => "max-int",
             CastSubcommand::MinInt { r#type: _ } => "min-int",

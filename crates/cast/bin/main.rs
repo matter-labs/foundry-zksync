@@ -74,7 +74,7 @@ fn run() -> Result<()> {
 #[tokio::main]
 async fn main_args(args: CastArgs) -> Result<()> {
     let telemetry = get_telemetry().expect("telemetry is not initialized");
-    let telemetry_props = args.cmd.into_telemetry_props();
+    let telemetry_props = args.cmd.get_telemetry_props();
 
     match args.cmd {
         // Constants

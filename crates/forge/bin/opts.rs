@@ -187,7 +187,7 @@ pub enum ForgeSubcommand {
 }
 
 impl ForgeSubcommand {
-    pub fn into_telemetry_props(&self) -> TelemetryProps {
+    pub fn get_telemetry_props(&self) -> TelemetryProps {
         let (command_name, subcommand_name) = match self {
             ForgeSubcommand::Test(_) => ("test", None),
             ForgeSubcommand::Script(_) => ("script", None),
