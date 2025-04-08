@@ -30,6 +30,7 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
     utils::configure_tx_env,
 };
+use foundry_zksync_core::convert::ConvertRU256;
 
 /// CLI arguments for `cast run`.
 #[derive(Clone, Debug, Parser)]
@@ -104,6 +105,12 @@ pub struct RunArgs {
     /// Run a ZKsync transaction.
     #[arg(long = "zksync")]
     zk_force: bool,
+
+    /// Disables storage caching entirely.
+    /// NOTE(zk) This is needed so tests don't cache anvil-zksync responses, could also be useful
+    /// upstream.
+    #[arg(long)]
+    no_storage_caching: bool,
 }
 
 impl RunArgs {
@@ -117,6 +124,7 @@ impl RunArgs {
         let evm_opts = figment.extract::<EvmOpts>()?;
         let mut config = Config::from_provider(figment)?.sanitized();
         config.zksync.compile = self.zk_force;
+        config.no_storage_caching = self.no_storage_caching;
         let strategy = utils::get_executor_strategy(&config);
 
         let compute_units_per_second =
@@ -196,6 +204,7 @@ impl RunArgs {
             create2_deployer,
             strategy,
         );
+
         let mut env =
             EnvWithHandlerCfg::new_with_spec_id(Box::new(env.clone()), executor.spec_id());
 

@@ -5,7 +5,7 @@ use crate::{
 };
 use alloy_consensus::BlockHeader;
 use alloy_json_abi::{Function, JsonAbi};
-use alloy_network::{AnyTxEnvelope, TransactionResponse, UnknownTxEnvelope};
+use alloy_network::{AnyTxEnvelope, TransactionResponse};
 use alloy_primitives::{Address, Selector, TxKind, B256, U256};
 use alloy_provider::{network::BlockResponse, Network};
 use alloy_rpc_types::{Transaction, TransactionRequest};
@@ -26,7 +26,7 @@ use revm::{
     primitives::{CreateScheme, EVMError, HandlerCfg, SpecId, KECCAK_EMPTY},
     FrameOrResult, FrameResult,
 };
-use std::{cell::RefCell, rc::Rc, str::FromStr, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 pub use revm::primitives::EvmState as StateChangeset;
 
@@ -128,7 +128,7 @@ pub fn configure_zksync_tx_env(
             .and_then(|value| alloy_primitives::hex::decode(value).ok())
             .unwrap_or_default();
         let (eip712_tx, _) =
-            zksync_types::transaction_request::TransactionRequest::from_bytes(&input, 0x104.into())
+            zksync_types::transaction_request::TransactionRequest::from_bytes_unverified(&input)
                 .expect("invalid zksync transaction");
 
         env.tx.transact_to = TxKind::Call(eip712_tx.to.expect("to must exist").to_address());
