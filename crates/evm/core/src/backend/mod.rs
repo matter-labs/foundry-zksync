@@ -32,7 +32,7 @@ use std::{
     any::Any,
     collections::{BTreeMap, HashSet},
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 use strategy::{BackendStrategy, BackendStrategyForkInfo};
 
@@ -84,9 +84,9 @@ pub const GLOBAL_FAIL_SLOT: U256 =
 /// retrieve code_by_hash from forked DB
 const CODE_BY_HASH_RETRIES: u32 = 3;
 
-/// The delay (in seconds) betwen each retry to
+/// The delay between each retry to
 /// retrieve code_by_hash from forked DB
-const CODE_BY_HASH_RETRY_DELAY_SECS: u64 = 3;
+const CODE_BY_HASH_RETRY_DELAY_SECS: Duration = Duration::from_secs(3);
 
 /// Defines the info of a fork
 pub struct ForkInfo {
