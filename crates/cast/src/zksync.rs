@@ -8,6 +8,7 @@ use alloy_primitives::{hex, Address, Bytes, PrimitiveSignature, TxKind, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
+use alloy_sol_types::SolCall;
 use alloy_zksync::network::{
     transaction_request::TransactionRequest as ZkTransactionRequest,
     tx_envelope::TxEnvelope,
@@ -16,10 +17,12 @@ use alloy_zksync::network::{
 };
 use clap::{command, Parser};
 use eyre::{Context, Result};
+use foundry_cli::utils;
 use foundry_common::{
     fmt::{format_token, format_token_raw},
     shell,
 };
+use foundry_config::Config;
 
 use crate::Cast;
 
@@ -241,4 +244,43 @@ impl NetworkWallet<Zksync> for NoopWallet {
             }
         }
     }
+}
+
+/// Converts the given tx request to be a full ZkSync transaction request with fee estimation
+pub async fn convert_tx(
+    evm_tx: WithOtherFields<TransactionRequest>,
+    zk_tx: ZkTransactionOpts,
+    zk_code: Option<String>,
+) -> Result<ZkTransactionRequest> {
+    let mut tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
+
+    // NOTE(zk): here we are doing a `call` so the fee doesn't matter
+    // but we need a valid value for `gas_per_pubdata`
+    tx.set_gas_per_pubdata(U256::from(50_000));
+
+    Ok(tx)
+}
+
+/// Retrieve the appropriate function given the transaction options
+pub fn convert_func(tx: &WithOtherFields<TransactionRequest>, func: Function) -> Result<Function> {
+    // if we are deploying we should return the "create" function
+    // instead of the original which may be the constructor
+    if tx.to == Some(TxKind::Create) {
+        Function::parse(alloy_zksync::contracts::l2::contract_deployer::createCall::SIGNATURE)
+            .map_err(Into::into)
+    } else {
+        Ok(func)
+    }
+}
+
+/// Estimates gas for a ZkSync transaction
+pub async fn estimate_gas(
+    zk_tx: ZkTransactionOpts,
+    evm_tx: WithOtherFields<TransactionRequest>,
+    zk_code: Option<String>,
+    config: &Config,
+) -> Result<u64> {
+    let zk_provider = utils::get_provider_zksync(config)?;
+    let tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
+    Ok(zk_provider.estimate_gas(tx).await?)
 }
