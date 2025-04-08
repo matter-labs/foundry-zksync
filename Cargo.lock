@@ -2696,6 +2696,7 @@ dependencies = [
  "tokio",
  "tracing",
  "yansi",
+ "zksync_telemetry",
  "zksync_types",
 ]
 
@@ -4464,6 +4465,7 @@ dependencies = [
  "watchexec-events",
  "watchexec-signals",
  "yansi",
+ "zksync_telemetry",
  "zksync_types",
 ]
 

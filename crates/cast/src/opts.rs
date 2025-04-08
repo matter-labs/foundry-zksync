@@ -15,6 +15,7 @@ use foundry_common::{
     version::{LONG_VERSION, SHORT_VERSION},
 };
 use std::{path::PathBuf, str::FromStr};
+use zksync_telemetry::TelemetryProps;
 
 /// A Swiss Army knife for interacting with Ethereum applications from the command line.
 #[derive(Parser)]
@@ -1060,6 +1061,134 @@ pub enum CastSubcommand {
         #[command(subcommand)]
         command: TxPoolSubcommands,
     },
+}
+
+impl CastSubcommand {
+    pub fn get_telemetry_props(&self) -> TelemetryProps {
+        let command_name = match self {
+            CastSubcommand::MaxInt { r#type: _ } => "max-int",
+            CastSubcommand::MinInt { r#type: _ } => "min-int",
+            CastSubcommand::MaxUint { r#type: _ } => "max-uint",
+            CastSubcommand::AddressZero => "address-zero",
+            CastSubcommand::HashZero => "hash-zero",
+            CastSubcommand::FromUtf8 { text: _ } => "from-utf8",
+            CastSubcommand::ToAscii { hexdata: _ } => "to-ascii",
+            CastSubcommand::ToUtf8 { hexdata: _ } => "to-utf8",
+            CastSubcommand::FromFixedPoint { value: _, decimals: _ } => "from-fixed-point",
+            CastSubcommand::ToFixedPoint { value: _, decimals: _ } => "to-fixed-point",
+            CastSubcommand::ConcatHex { data: _ } => "concat-hex",
+            CastSubcommand::FromBin => "from-bin",
+            CastSubcommand::ToHexdata { input: _ } => "to-hexdata",
+            CastSubcommand::ToCheckSumAddress { address: _ } => "to-check-sum-address",
+            CastSubcommand::ToUint256 { value: _ } => "to-uint256",
+            CastSubcommand::ToInt256 { value: _ } => "to-int256",
+            CastSubcommand::ToUnit { value: _, unit: _ } => "to-unit",
+            CastSubcommand::ParseUnits { value: _, unit: _ } => "parse-units",
+            CastSubcommand::FormatUnits { value: _, unit: _ } => "format-units",
+            CastSubcommand::FromWei { value: _, unit: _ } => "from-wei",
+            CastSubcommand::ToWei { value: _, unit: _ } => "to-wei",
+            CastSubcommand::FromRlp { value: _, as_int: _ } => "from-rlp",
+            CastSubcommand::ToRlp { value: _ } => "to-rlp",
+            CastSubcommand::ToHex(ToBaseArgs { value: _, base_in: _ }) => "to-hex",
+            CastSubcommand::ToDec(ToBaseArgs { value: _, base_in: _ }) => "to-dec",
+            CastSubcommand::ToBase { base: ToBaseArgs { value: _, base_in: _ }, base_out: _ } => {
+                "to-base"
+            }
+            CastSubcommand::ToBytes32 { bytes: _ } => "to-bytes32",
+            CastSubcommand::FormatBytes32String { string: _ } => "from-bytes32-string",
+            CastSubcommand::ParseBytes32String { bytes: _ } => "parse-bytes32-string",
+            CastSubcommand::ParseBytes32Address { bytes: _ } => "parse-bytes32-address",
+            CastSubcommand::DecodeAbi { sig: _, calldata: _, input: _ } => "decode-abi",
+            CastSubcommand::AbiEncode { sig: _, packed: _, args: _ } => "abi-encode",
+            CastSubcommand::DecodeCalldata { sig: _, calldata: _ } => "decode-calldata",
+            CastSubcommand::CalldataEncode { sig: _, args: _ } => "calldata-encode",
+            CastSubcommand::DecodeString { data: _ } => "decode-string",
+            CastSubcommand::DecodeEvent { sig: _, data: _ } => "decode-event",
+            CastSubcommand::DecodeError { sig: _, data: _ } => "decode-error",
+            CastSubcommand::Interface(_) => "interface",
+            CastSubcommand::CreationCode(_) => "creation-code",
+            CastSubcommand::ConstructorArgs(_) => "constructor-args",
+            CastSubcommand::Artifact(_) => "artifact",
+            CastSubcommand::Bind(_) => "bind",
+            CastSubcommand::PrettyCalldata { calldata: _, offline: _ } => "pretty-calldata",
+            CastSubcommand::Sig { sig: _, optimize: _ } => "sig",
+            CastSubcommand::AccessList(_) => "access-list",
+            CastSubcommand::Age { block: _, rpc: _ } => "age",
+            CastSubcommand::Balance { block: _, who: _, ether: _, rpc: _, erc20: _ } => "balance",
+            CastSubcommand::BaseFee { block: _, rpc: _ } => "base-fee",
+            CastSubcommand::Block { block: _, full: _, field: _, rpc: _ } => "block",
+            CastSubcommand::BlockNumber { rpc: _, block: _ } => "block-number",
+            CastSubcommand::Chain { rpc: _ } => "chain",
+            CastSubcommand::ChainId { rpc: _ } => "chain-id",
+            CastSubcommand::Client { rpc: _ } => "client",
+            CastSubcommand::Code { block: _, who: _, disassemble: _, rpc: _ } => "code",
+            CastSubcommand::Codesize { block: _, who: _, rpc: _ } => "codesize",
+            CastSubcommand::ComputeAddress { address: _, nonce: _, rpc: _ } => "compute-address",
+            CastSubcommand::Disassemble { bytecode: _ } => "disassemble",
+            CastSubcommand::Selectors { bytecode: _, resolve: _ } => "selectors",
+            CastSubcommand::FindBlock(_) => "find-block",
+            CastSubcommand::GasPrice { rpc: _ } => "gas-price",
+            CastSubcommand::Index { key_type: _, key: _, slot_number: _ } => "index",
+            CastSubcommand::IndexErc7201 { id: _, formula_id: _ } => "index-erc7201",
+            CastSubcommand::Implementation { block: _, beacon: _, who: _, rpc: _ } => {
+                "implementation"
+            }
+            CastSubcommand::Admin { block: _, who: _, rpc: _ } => "admin",
+            CastSubcommand::Nonce { block: _, who: _, rpc: _ } => "nonce",
+            CastSubcommand::Codehash { block: _, who: _, slots: _, rpc: _ } => "codehash",
+            CastSubcommand::StorageRoot { block: _, who: _, slots: _, rpc: _ } => "storage-root",
+            CastSubcommand::Proof { address: _, slots: _, rpc: _, block: _ } => "proof",
+            CastSubcommand::Rpc(_) => "rpc",
+            CastSubcommand::Storage(_) => "storage",
+            CastSubcommand::Call(_) => "call",
+            CastSubcommand::Estimate(_) => "estimate",
+            CastSubcommand::MakeTx(_) => "make-tx",
+            CastSubcommand::PublishTx { raw_tx: _, cast_async: _, rpc: _ } => "publish-tx",
+            CastSubcommand::Receipt {
+                tx_hash: _,
+                field: _,
+                cast_async: _,
+                confirmations: _,
+                rpc: _,
+            } => "receipt",
+            CastSubcommand::Run(_) => "run",
+            CastSubcommand::SendTx(_) => "send-tx",
+            CastSubcommand::Tx { tx_hash: _, field: _, raw: _, rpc: _ } => "tx",
+            CastSubcommand::FourByte { selector: _ } => "four-byte",
+            CastSubcommand::FourByteCalldata { calldata: _ } => "four-byte-calldata",
+            CastSubcommand::FourByteEvent { topic: _ } => "four-byte-event",
+            CastSubcommand::UploadSignature { signatures: _ } => "upload-signature",
+            CastSubcommand::Namehash { name: _ } => "namehash",
+            CastSubcommand::LookupAddress { who: _, rpc: _, verify: _ } => "lookup-address",
+            CastSubcommand::ResolveName { who: _, rpc: _, verify: _ } => "resolve-name",
+            CastSubcommand::Keccak { data: _ } => "keccak",
+            CastSubcommand::HashMessage { message: _ } => "hash-message",
+            CastSubcommand::SigEvent { event_string: _ } => "sig-event",
+            CastSubcommand::LeftShift { value: _, bits: _, base_in: _, base_out: _ } => {
+                "left-shift"
+            }
+            CastSubcommand::RightShift { value: _, bits: _, base_in: _, base_out: _ } => {
+                "right-shift"
+            }
+            CastSubcommand::Source {
+                address: _,
+                directory: _,
+                explorer_api_url: _,
+                explorer_url: _,
+                etherscan: _,
+                flatten: _,
+            } => "source",
+            CastSubcommand::Create2(_) => "create2",
+            CastSubcommand::Wallet { command: _ } => "wallet",
+            CastSubcommand::Completions { shell: _ } => "completions",
+            CastSubcommand::GenerateFigSpec => "generate-fig-spec",
+            CastSubcommand::Logs(_) => "logs",
+            CastSubcommand::DecodeTransaction { tx: _ } => "decode-transaction",
+            CastSubcommand::DecodeEof { eof: _ } => "decode-eof",
+            CastSubcommand::TxPool { command: _ } => "tx-pool",
+        };
+        TelemetryProps::new().insert("command", Some(command_name)).take()
+    }
 }
 
 /// CLI arguments for `cast --to-base`.

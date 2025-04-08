@@ -25,6 +25,7 @@ use foundry_common::{
 };
 use foundry_config::Config;
 use std::time::Instant;
+use zksync_telemetry::{get_telemetry, TelemetryProps};
 
 /// Run the `cast` command-line interface.
 pub fn run() -> Result<()> {
@@ -54,6 +55,8 @@ pub fn setup() -> Result<()> {
 /// Run the subcommand.
 #[tokio::main]
 pub async fn run_command(args: CastArgs) -> Result<()> {
+    let telemetry = get_telemetry().expect("telemetry is not initialized");
+    let telemetry_props = args.cmd.get_telemetry_props();
     match args.cmd {
         // Constants
         CastSubcommand::MaxInt { r#type } => {
@@ -711,6 +714,10 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
         }
         CastSubcommand::TxPool { command } => command.run().await?,
     };
+
+    let _ = telemetry
+        .track_event("cast", TelemetryProps::new().insert("params", Some(telemetry_props)).take())
+        .await;
 
     /// Prints slice of tokens using [`format_tokens`] or [`format_tokens_raw`] depending whether
     /// the shell is in JSON mode.
