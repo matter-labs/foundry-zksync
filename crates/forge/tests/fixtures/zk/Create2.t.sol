@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
-import {L2ContractHelper} from "era-contracts/l2-contracts/contracts/L2ContractHelper.sol"; // =0.8.20
+import {L2ContractHelper} from "zksync-contracts/zksync-contracts/l2/contracts/L2ContractHelper.sol"; // =0.8.20
 
 import {Greeter} from "../src/Greeter.sol";
 import {CustomNumber} from "../src/CustomNumber.sol";
