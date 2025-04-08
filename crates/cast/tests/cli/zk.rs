@@ -719,7 +719,7 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
 ",
             deployed_addr
         )),
-        "trace mistmatch, got output:\n{output}"
+        "trace mismatch, got output:\n{output}"
     );
 });
 
@@ -796,6 +796,6 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
 ",
             deployed_addr
         )),
-        "trace mistmatch, got output:\n{output}"
+        "trace mismatch, got output:\n{output}"
     );
 });
