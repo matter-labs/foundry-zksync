@@ -30,7 +30,6 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
     utils::configure_tx_env,
 };
-use foundry_zksync_core::convert::ConvertRU256;
 
 /// CLI arguments for `cast run`.
 #[derive(Clone, Debug, Parser)]
