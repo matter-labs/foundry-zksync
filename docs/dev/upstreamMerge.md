@@ -102,7 +102,7 @@ Once the compilation errors are solved (the previous PR `upstream-<SHORT_COMMIT_
 With everything solved and the final PR approved, **squash merge it into `main`**.
 
 #### **Why squash merge?**
-This will include all the upstream commits that we will need to include later, but **for now, it's a better alternative than making tricky rebases to remove "bad commits" that are in an intermediate state due to all the merges that were done during the process** (bringing upstream and also updating the branches with ongoing changes on `main`).
+This will include all the changes from upstream but squashed under a single commit. The distinct upstream commits will be included in a later step. We prefer the squash-merge strategy instead of rebase as rebasing would usually involve fixing the merge conflict multiple times with each included upstream commit, often becoming tedious.
 
 ### 7. Individual Commit Incorporation
 
