@@ -131,7 +131,11 @@ contract ZkCheatcodesTest is DSTest {
 
     function setUp() public {
         forkEra = vm.createFork(Globals.ZKSYNC_MAINNET_URL, ERA_FORK_BLOCK);
-        forkEth = vm.createFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
+        string memory ethUrl = string.concat(
+            "https://eth-mainnet.alchemyapi.io/v2/",
+            vm.envOr("ALCHEMY_API_KEY", string("Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf"))
+        );
+        forkEth = vm.createFork(ethUrl, ETH_FORK_BLOCK);
     }
 
     function testZkCheatcodesRoll() public {
@@ -278,8 +282,11 @@ contract ZkCheatcodesTest is DSTest {
 
     function testZkCheatcodesCanBeUsedAfterFork() public {
         assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
-
-        vm.createSelectFork(Globals.ETHEREUM_MAINNET_URL, ETH_FORK_BLOCK);
+        string memory ethUrl = string.concat(
+            "https://eth-mainnet.alchemyapi.io/v2/",
+            vm.envOr("ALCHEMY_API_KEY", string("Lc7oIGYeL_QvInzI0Wiu_pOZZDEKBrdf"))
+        );
+        vm.createSelectFork(ethUrl, ETH_FORK_BLOCK);
         assertEq(0, address(0x4e59b44847b379578588920cA78FbF26c0B4956C).balance);
 
         vm.deal(0x4e59b44847b379578588920cA78FbF26c0B4956C, 1 ether);

@@ -201,7 +201,7 @@ foundry-strategy-zksync = { path = "crates/strategy/zksync" }
 
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.11.0", default-features = false }
-foundry-compilers = { version = "0.13.3", default-features = false }
+foundry-compilers = { version = "0.13.5", default-features = false }
 foundry-fork-db = "0.12"
 solang-parser = "=0.3.3"
 solar-parse = { version = "=0.1.1", default-features = false }
@@ -253,7 +253,7 @@ syn-solidity = "0.8.22"
 
 alloy-chains = "0.1"
 alloy-rlp = "0.3"
-alloy-zksync = "0.12.1"
+alloy-zksync = "=0.12.1"
 
 alloy-trie = "0.7.0"
 
@@ -282,15 +282,13 @@ zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = 
 zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
 zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "7a3fea5ebb8e90cedff749a45f3b78538443b3d6" }
 
-era-solc = { git = "https://github.com/matter-labs/era-compiler-solidity.git", tag = "1.5.11", package = "era-solc" }
-
 # macros
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = "2.0"
 async-trait = "0.1"
-derive_more = { version = "1.0", features = ["full"] }
-thiserror = "2.0.10"
+derive_more = { version = "2.0", features = ["full"] }
+thiserror = "2"
 
 # bench
 divan = "0.1"
@@ -311,7 +309,7 @@ comfy-table = "7"
 dirs = "6"
 dunce = "1"
 evm-disassembler = "0.5"
-evmole = "0.6"
+evmole = "0.7"
 eyre = "0.6"
 figment = "0.10"
 futures = "0.3"
@@ -335,7 +333,7 @@ semver = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "=1.0.128", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
-soldeer-commands = "=0.5.2"
+soldeer-commands = "=0.5.3"
 strum = "0.27"
 tempfile = "3.13"
 tikv-jemallocator = "0.6"

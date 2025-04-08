@@ -28,6 +28,10 @@ forge::cli:
     zk::script::test_zk_can_execute_script_with_arguments
     zk::verify::zk_can_create_verify_random_contract_sepolia
     zk::verify::zk_can_verify_random_contract_sepolia
+    zk::verify_bytecode::zk_verify_bytecode
+    zk::verify_bytecode::zk_verify_bytecode_error_diff
+    zk::verify_bytecode::zk_verify_bytecode_ipfs
+    zk::verify_bytecode::zk_verify_bytecode_none
 forge::it:
     zk::basic::test_zk_address_balance_is_consistent
     zk::basic::test_zk_block_information_is_consistent
@@ -117,10 +121,18 @@ forge::it:
     zk::traces::test_zk_traces_work_during_create
 forge::bin/forge:
     cmd::create::zksync::tests::test_zk_deployer_builds_eip712_transactions
+forge-verify:
+    bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_both_none
+    bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_ipfs
+    bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_keccak
+    bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_keccak_not_equal
 foundry-config:
     zksync::tests::zksync_project_has_zksync_solc_when_solc_req_is_a_version
 foundry-zksync-compilers:
     compilers::artifact_output::zk::bytecode::tests::serialized_bytecode_is_not_prefixed
+    compilers::zksolc::input::tests::test_zk_llvm_options_sanitization
+    compilers::zksolc::input::tests::test_zk_optimizer_sanitization_post_1_5_11
+    compilers::zksolc::input::tests::test_zk_optimizer_sanitization_pre_1_5_11
     compilers::zksolc::tests::get_solc_type_and_version_works_for_vanilla_solc
     compilers::zksolc::tests::get_solc_type_and_version_works_for_zksync_solc
     compilers::zksolc::tests::zksolc_can_compile_with_remapped_links
