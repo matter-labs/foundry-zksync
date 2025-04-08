@@ -55,6 +55,7 @@ alloy-transport.workspace = true
 alloy-zksync.workspace = true
 
 zksync_types.workspace = true
+zksync_telemetry.workspace = true
 
 chrono.workspace = true
 eyre.workspace = true

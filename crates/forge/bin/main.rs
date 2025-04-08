@@ -2,8 +2,9 @@ use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 use eyre::Result;
 use foundry_cli::{handler, utils};
-use foundry_common::shell;
+use foundry_common::{shell, POSTHOG_API_KEY, TELEMETRY_CONFIG_NAME};
 use foundry_evm::inspectors::cheatcodes::{set_execution_context, ForgeContext};
+use zksync_telemetry::{get_telemetry, init_telemetry, TelemetryProps};
 
 mod cmd;
 use cmd::{cache::CacheSubcommands, generate::GenerateSubcommands, watch};
@@ -22,6 +23,14 @@ extern crate tracing;
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn main() {
+    let _ = utils::block_on(init_telemetry(
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+        TELEMETRY_CONFIG_NAME,
+        Some(POSTHOG_API_KEY.into()),
+        None,
+        None,
+    ));
     if let Err(err) = run() {
         let _ = foundry_common::sh_err!("{err:?}");
         std::process::exit(1);
@@ -38,7 +47,10 @@ fn run() -> Result<()> {
     args.global.init()?;
     init_execution_context(&args.cmd);
 
-    match args.cmd {
+    let telemetry = get_telemetry().expect("telemetry is not initialized");
+    let telemetry_props = args.cmd.get_telemetry_props();
+
+    let result = match args.cmd {
         ForgeSubcommand::Test(cmd) => {
             if cmd.is_watch() {
                 utils::block_on(watch::watch_test(cmd))
@@ -141,7 +153,19 @@ fn run() -> Result<()> {
         ForgeSubcommand::Soldeer(cmd) => utils::block_on(cmd.run()),
         ForgeSubcommand::Eip712(cmd) => cmd.run(),
         ForgeSubcommand::BindJson(cmd) => cmd.run(),
-    }
+    };
+
+    let _ = utils::block_on(
+        telemetry.track_event(
+            "forge",
+            TelemetryProps::new()
+                .insert("params", Some(telemetry_props))
+                .insert("result", Some(if result.is_ok() { "success" } else { "failure" }))
+                .take(),
+        ),
+    );
+
+    result
 }
 
 /// Set the program execution context based on `forge` subcommand used.
