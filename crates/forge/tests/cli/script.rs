@@ -5,7 +5,7 @@ use alloy_primitives::{address, hex, Address, Bytes};
 use anvil::{spawn, NodeConfig};
 use forge_script_sequence::ScriptSequence;
 use foundry_test_utils::{
-    rpc::{self, next_http_rpc_endpoint},
+    rpc::{self, next_http_archive_rpc_url},
     snapbox::IntoData,
     util::{OTHER_SOLC_VERSION, SOLC_VERSION},
     ScriptOutcome, ScriptTester,
@@ -2245,7 +2245,7 @@ ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
 "#]]);
 
     assert!(!api
-        .get_code(address!("4e59b44847b379578588920cA78FbF26c0B4956C"), Default::default())
+        .get_code(address!("0x4e59b44847b379578588920cA78FbF26c0B4956C"), Default::default())
         .await
         .unwrap()
         .is_empty());
@@ -2457,7 +2457,7 @@ forgetest_async!(should_set_correct_sender_nonce_via_cli, |prj, cmd| {
     )
     .unwrap();
 
-    let rpc_url = next_http_rpc_endpoint();
+    let rpc_url = next_http_archive_rpc_url();
 
     let fork_bn = 21614115;
 
