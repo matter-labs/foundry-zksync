@@ -38,15 +38,15 @@ Throughout this process, we use a **specific branch naming convention** to keep 
 | `upstream-<SHORT_COMMIT_HASH>-build` | Branch for fixing compilation errors after conflict resolution. |
 | `upstream-<SHORT_COMMIT_HASH>-commits` | Branch for incorporating individual upstream commits into main. |
 
+This is a diagram of the process:
+
+![Upstream Merge Process](upstreamMerge.svg)
+
+
 ### 1. Target Commit Selection
 
 Visit the [Foundry repository](https://github.com/foundry-rs/foundry) and select a **target upstream commit** for the update. Generally, choose the latest `master` commit to get the latest features.
   
-  #### **Complex commit recommended approach**
-
-   If any **commit in the tree is deemed to be complex** (subjective discussion based on the degree of changes introduced that creates a more difficult merge conflict resolution), the recommended approach is to **pick the commit before it** until the aforementioned constraint is satisfied. 
-   
-   Once you **finish the merging process to that commit merging to `main`**, then **start the process for only for the complex commit**. For that scenario, the multiple PR approach may be ignored.
 
 ### 2. Tracking Branch Creation
 
