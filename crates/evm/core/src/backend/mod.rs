@@ -86,7 +86,7 @@ const CODE_BY_HASH_RETRIES: u32 = 3;
 
 /// The delay between each retry to
 /// retrieve code_by_hash from forked DB
-const CODE_BY_HASH_RETRY_DELAY_SECS: Duration = Duration::from_secs(3);
+const CODE_BY_HASH_RETRY_DELAY: Duration = Duration::from_secs(3);
 
 /// Defines the info of a fork
 pub struct ForkInfo {
@@ -1634,10 +1634,8 @@ impl Database for Backend {
                 .map(Arc::new)
                 .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)))?;
 
-            let retry = foundry_common::retry::Retry::new(
-                CODE_BY_HASH_RETRIES,
-                std::time::Duration::from_secs(CODE_BY_HASH_RETRY_DELAY_SECS),
-            );
+            let retry =
+                foundry_common::retry::Retry::new(CODE_BY_HASH_RETRIES, CODE_BY_HASH_RETRY_DELAY);
 
             return retry
                 .run(move || {
