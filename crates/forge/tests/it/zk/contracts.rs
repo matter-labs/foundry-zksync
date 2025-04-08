@@ -79,7 +79,6 @@ async fn test_zk_contract_create2() {
 
     prj.add_test("Create2.t.sol", include_str!("../../fixtures/zk/Create2.t.sol")).unwrap();
 
-    println!("{:?}", prj.root());tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
     cmd.args([
         "test",
         "--zk-startup",
