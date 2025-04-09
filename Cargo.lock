@@ -1324,7 +1324,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_api_decl"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "anvil_zksync_types",
  "jsonrpsee",
@@ -1336,7 +1336,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_api_server"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "anvil_zksync_api_decl",
  "anvil_zksync_common",
@@ -1363,7 +1363,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_common"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "alloy",
  "anstream",
@@ -1386,7 +1386,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_config"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1404,7 +1404,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_console"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1420,7 +1420,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_core"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1461,7 +1461,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_l1_sidecar"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1485,7 +1485,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_traces"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "alloy",
  "anstyle",
@@ -1507,7 +1507,7 @@ dependencies = [
 [[package]]
 name = "anvil_zksync_types"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "clap",
  "lazy_static",
@@ -5095,6 +5095,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zksync_types",
 ]
 
 [[package]]
@@ -13564,7 +13565,7 @@ dependencies = [
 [[package]]
 name = "zksync_error"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=ff18d025d7f278a2389b6f9f0266917570d727a3#ff18d025d7f278a2389b6f9f0266917570d727a3"
+source = "git+https://github.com/nbaztec/anvil-zksync.git?branch=ff18d025d7f278a2389b6f9f0266917570d727a3-fixed#be839bcba898fac838320473248b489a236d4a28"
 dependencies = [
  "anyhow",
  "lazy_static",

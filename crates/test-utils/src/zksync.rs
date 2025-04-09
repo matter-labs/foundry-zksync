@@ -247,7 +247,11 @@ impl ZkSyncNode {
         fork_client: Option<ForkClient>,
     ) {
         // We need to init telemetry else anvil-zksync will panic.
+        // We use the hack to set env `CI=true` to disable interactive mode in integration tests,
+        // else the tests hang at the telemetry prompt
+        std::env::set_var("CI", "true");
         zksync_telemetry::init_telemetry("", "", "", None, None, None).await.ok();
+        std::env::remove_var("CI");
 
         const MAX_TRANSACTIONS: usize = 100; // Not that important for testing purposes.
 

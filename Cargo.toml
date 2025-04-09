@@ -381,3 +381,12 @@ httptest = "0.16.3"
 
 [patch."https://github.com/matter-labs/zksync-telemetry"]
 zksync_telemetry = { git = "https://github.com/nbaztec/zksync-telemetry", branch = "nish-unpin-serde-patch" }
+
+[patch."https://github.com/matter-labs/anvil-zksync.git"]
+anvil_zksync_core = { git = "https://github.com/nbaztec/anvil-zksync.git", branch = "ff18d025d7f278a2389b6f9f0266917570d727a3-fixed" }
+anvil_zksync_types = { git = "https://github.com/nbaztec/anvil-zksync.git", branch = "ff18d025d7f278a2389b6f9f0266917570d727a3-fixed" }
+anvil_zksync_config = { git = "https://github.com/nbaztec/anvil-zksync.git", branch = "ff18d025d7f278a2389b6f9f0266917570d727a3-fixed" }
+anvil_zksync_api_server = { git = "https://github.com/nbaztec/anvil-zksync.git", branch = "ff18d025d7f278a2389b6f9f0266917570d727a3-fixed" }
+anvil_zksync_common = { git = "https://github.com/nbaztec/anvil-zksync.git", branch = "ff18d025d7f278a2389b6f9f0266917570d727a3-fixed" }
+anvil_zksync_traces = { git = "https://github.com/nbaztec/anvil-zksync.git", branch = "ff18d025d7f278a2389b6f9f0266917570d727a3-fixed" }
+anvil_zksync_l1_sidecar = { git = "https://github.com/nbaztec/anvil-zksync.git", branch = "ff18d025d7f278a2389b6f9f0266917570d727a3-fixed" }
