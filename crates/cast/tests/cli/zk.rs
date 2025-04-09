@@ -714,10 +714,9 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
     assert!(
         output.contains(&format!(
             "Traces:
-  [91] → new <unknown>@{}
+  [91] → new <unknown>@{deployed_addr}
     └─ ← [Return] 224 bytes of code
-",
-            deployed_addr
+"
         )),
         "trace mismatch, got output:\n{output}"
     );
@@ -791,10 +790,9 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
     assert!(
         output.contains(&format!(
             "Traces:
-  [5627] {}::increment()
+  [5627] {deployed_addr}::increment()
     └─ ← [Return]
-",
-            deployed_addr
+"
         )),
         "trace mismatch, got output:\n{output}"
     );
