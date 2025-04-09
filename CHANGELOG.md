@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.13](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.12...foundry-zksync-v0.0.13) (2025-04-09)
+
+
+### Features
+
+* Add support for zksolc 1.5.12 ([#1002](https://github.com/matter-labs/foundry-zksync/issues/1002)) ([274cc62](https://github.com/matter-labs/foundry-zksync/commit/274cc622bde9b0c8c17ff469260e10e2d3b7c36b))
+* add telemetry ([#1008](https://github.com/matter-labs/foundry-zksync/issues/1008)) ([e9e5df3](https://github.com/matter-labs/foundry-zksync/commit/e9e5df314b4a3fb111626967011270afb92ee3f5))
+* add verify-bytecode support ([#994](https://github.com/matter-labs/foundry-zksync/issues/994)) ([f872d3c](https://github.com/matter-labs/foundry-zksync/commit/f872d3c82e5f828ebc84dc506cbf2d2e412c722b))
+* cast run ([#1013](https://github.com/matter-labs/foundry-zksync/issues/1013)) ([6bd3238](https://github.com/matter-labs/foundry-zksync/commit/6bd32385610dffea90a22c69f1b6041661b82361))
+* retry `zks_getBytecodeByHash` failures ([#1000](https://github.com/matter-labs/foundry-zksync/issues/1000)) ([49aa003](https://github.com/matter-labs/foundry-zksync/commit/49aa003f113961ccbe9e471829bd0615e9e1a5c3))
+
+
+### Bug Fixes
+
+* bump tokio version to fix RUSTSEC advisory ([#1014](https://github.com/matter-labs/foundry-zksync/issues/1014)) ([5c03679](https://github.com/matter-labs/foundry-zksync/commit/5c036796b5f3b3838216f477b3391fde18084fdd))
+* Bump ubuntu on CI install ([#995](https://github.com/matter-labs/foundry-zksync/issues/995)) ([3f8025f](https://github.com/matter-labs/foundry-zksync/commit/3f8025f53f2c4cffe6ac4b43a3e20d4ebf993c6e))
+* **forge:** err if forge create contract with empty bytecode ([87cbe16](https://github.com/matter-labs/foundry-zksync/commit/87cbe1659dfc2e27f87e505709a0a2fcb90c79b0))
+* Use alchemy api key for ETH RPC URL ([#1003](https://github.com/matter-labs/foundry-zksync/issues/1003)) ([75e5fa9](https://github.com/matter-labs/foundry-zksync/commit/75e5fa91ba3822ec5cd51d5154b8b16dc1f8db41))
+
 ## [0.0.12](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.11...foundry-zksync-v0.0.12) (2025-03-21)
 
 

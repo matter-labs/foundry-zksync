@@ -32,7 +32,7 @@ resolver = "2"
 metadata.upstream_version = "1.0.0"
 
 [workspace.package]
-version = "0.0.12" # x-release-please-version
+version = "0.0.13" # x-release-please-version
 edition = "2021"
 # Remember to update clippy.toml as well
 rust-version = "1.83"
