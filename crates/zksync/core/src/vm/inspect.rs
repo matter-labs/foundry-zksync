@@ -440,7 +440,7 @@ where
     let balance = ZKVMData::new(ecx).get_balance(address);
 
     if balance.is_zero() {
-        error!("balance is 0 for {}, transaction will fail", address.to_h160());
+        error!("balance is 0 for {:?}, transaction will fail", address.to_h160());
     }
 
     let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
