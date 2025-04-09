@@ -67,9 +67,6 @@ pub use zksync::*;
 extern crate tracing;
 
 #[macro_use]
-extern crate tracing;
-
-#[macro_use]
 extern crate foundry_common;
 
 // TODO: CastContract with common contract initializers? Same for CastProviders?
