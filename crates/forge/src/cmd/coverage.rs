@@ -12,7 +12,7 @@ use crate::{
 use alloy_primitives::{map::HashMap, Address, Bytes, U256};
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::{Context, Result};
-use foundry_cli::utils::{self, LoadConfig, STATIC_FUZZ_SEED};
+use foundry_cli::utils::{self, LoadConfig, STATIC_FUZZ_SEED}; // Dustin kept self
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
     artifacts::{

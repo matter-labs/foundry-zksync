@@ -134,7 +134,7 @@ impl<'a> ContractRunner<'a> {
 
         let mut result = TestSetup::default();
         for code in &self.mcr.libs_to_deploy {
-            let deploy_result = self.executor.deploy_library(
+            let deploy_result = self.executor.deploy( // Dustin took incoming deploy_library removed
                 LIBRARY_DEPLOYER,
                 DeployLibKind::Create(code.clone()),
                 U256::ZERO,
