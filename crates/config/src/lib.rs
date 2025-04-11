@@ -197,6 +197,8 @@ pub struct Config {
     pub libraries: Vec<String>,
     /// whether to enable cache
     pub cache: bool,
+    /// whether to dynamically link tests
+    pub dynamic_test_linking: bool,
     /// where the cache is stored if enabled
     pub cache_path: PathBuf,
     /// where the gas snapshots are stored
@@ -1198,7 +1200,7 @@ impl Config {
     /// Returns configured [Vyper] compiler.
     pub fn vyper_compiler(&self) -> Result<Option<Vyper>, SolcError> {
         // Only instantiate Vyper if there are any Vyper files in the project.
-        if self.project_paths::<VyperLanguage>().input_files_iter().next().is_none() {
+        if !self.project_paths::<VyperLanguage>().has_input_files() {
             return Ok(None);
         }
         let vyper = if let Some(path) = &self.vyper.path {
@@ -1206,7 +1208,6 @@ impl Config {
         } else {
             Vyper::new("vyper").ok()
         };
-
         Ok(vyper)
     }
 
@@ -2303,6 +2304,7 @@ impl Default for Config {
             out: "out".into(),
             libs: vec!["lib".into()],
             cache: true,
+            dynamic_test_linking: false,
             cache_path: "cache".into(),
             broadcast: "broadcast".into(),
             snapshots: "snapshots".into(),
@@ -2588,10 +2590,7 @@ mod tests {
 
     #[test]
     fn default_sender() {
-        assert_eq!(
-            Config::DEFAULT_SENDER,
-            Address::from_str("0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38").unwrap()
-        );
+        assert_eq!(Config::DEFAULT_SENDER, address!("0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"));
     }
 
     #[test]
@@ -4819,11 +4818,11 @@ mod tests {
                 config.labels,
                 AddressHashMap::from_iter(vec![
                     (
-                        Address::from_str("0x1F98431c8aD98523631AE4a59f267346ea31F984").unwrap(),
+                        address!("0x1F98431c8aD98523631AE4a59f267346ea31F984"),
                         "Uniswap V3: Factory".to_string()
                     ),
                     (
-                        Address::from_str("0xC36442b4a4522E871399CD717aBDD847Ab11FE88").unwrap(),
+                        address!("0xC36442b4a4522E871399CD717aBDD847Ab11FE88"),
                         "Uniswap V3: Positions NFT".to_string()
                     ),
                 ])

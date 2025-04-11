@@ -37,7 +37,7 @@ pub fn project_standard_json_input(
         graph
             .all_imported_nodes(*target_index)
             .map(|index| graph.node(index).unpack())
-            .filter(|(p, _)| unique_paths.insert(p.to_path_buf())),
+            .filter(|(p, _)| unique_paths.insert(p)),
     );
 
     let root = project.root();

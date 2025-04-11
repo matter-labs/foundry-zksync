@@ -13,7 +13,7 @@ exclude.workspace = true
 
 [dependencies]
 foundry-compilers = { workspace = true, features = ["svm-solc"] }
-foundry-compilers-artifacts-solc = "0.13.0"
+foundry-compilers-artifacts-solc = "0.14.0"
 alloy-primitives.workspace = true
 alloy-json-abi.workspace = true
 tracing.workspace = true
