@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.14](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.13...foundry-zksync-v0.0.14) (2025-04-11)
+
+
+### Bug Fixes
+
+* crossbeam-channel dep from rust advisory ([#1017](https://github.com/matter-labs/foundry-zksync/issues/1017)) ([44a1ce9](https://github.com/matter-labs/foundry-zksync/commit/44a1ce96227519d13d7380d40edf19abffc656ad))
+
 ## [0.0.13](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.12...foundry-zksync-v0.0.13) (2025-04-09)
 
 
