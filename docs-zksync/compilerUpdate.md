@@ -4,6 +4,8 @@ This guide outlines the steps and considerations for updating the `zksolc` compi
 
 For more information about the defined compiler policy, you can check the [Foundry-ZKsync compiler section](https://foundry-book.zksync.io/zksync-specifics/compilation-overview?highlight=policy#compiler-support-policy). 
 
+Additionally, when performing a compiler update, it's crucial to understand how Foundry settings impact the input the compiler ultimately receives. For more details about the flow, you can check the [compiler flow](compilerFlow.md)
+
 ### Process Overview
 The process requires careful attention to backward compatibility, version support, and configuration changes. Below are the detailed steps to ensure a smooth compiler update:
 1. **Add New Versions**:
@@ -16,13 +18,6 @@ The process requires careful attention to backward compatibility, version suppor
 4. **Incorporate New Compiler Options**:
     - In the [`settings.rs`](https://github.com/matter-labs/foundry-zksync/blob/main/crates/zksync/compilers/src/compilers/zksolc/settings.rs) file, add any new compiler options. Ensure the settings accommodate all supported compilers and include optional ad-hoc sanitizing when building `ZkSolcInput` from the settings ([`input.rs`](https://github.com/matter-labs/foundry-zksync/blob/3f8025f53f2c4cffe6ac4b43a3e20d4ebf993c6e/crates/zksync/compilers/src/compilers/zksolc/input.rs#L126)).
 
-### Handling Specific Changes: Examples
-
-- **New Error Types**:
-    - If a new error type is added (e.g., `Ripemd160` Error as seen in [era-compiler-solidity/pull/276/files](https://github.com/matter-labs/era-compiler-solidity/pull/276/files)), incorporate the new error type into the `ErrorType` settings enum.
-- **Option Renaming**:
-    - When options are renamed (e.g., `fallbackToOptimizingForSize` to `sizeFallback` and `LLVMOptions` to `llvmOptions` as seen in [era-compiler-solidity/commit/62f0ce7dc6c5050e3a464a6b453d493e07384f53](https://github.com/matter-labs/era-compiler-solidity/commit/62f0ce7dc6c5050e3a464a6b453d493e07384f53)), rename the option in the config and CLI, while keeping an alias for the old one. In `ZkSettings/ZkSolcInput`, maintain both values as `Option`. Use `sizeFallback` internally and populate `fallbackToOptimizingForSize` during input sanitization for `zksolc` versions that require it. The same applies to `llvmOptions`.
-
 ### Testing and Submission
 
 1. **Run Foundry Test Suite**:
@@ -30,28 +25,16 @@ The process requires careful attention to backward compatibility, version suppor
 2. **Submit a PR**:
     - Create a pull request with all the changes.
 
-### Examples
+### Handling Specific Changes: Examples
+Some scenarios arise in the past where particular attention was needed and that might be relevant to future updates.
 
+- **New Error Types**:
+    - If a new error type is added (e.g., `Ripemd160` Error as seen in [era-compiler-solidity/pull/276/files](https://github.com/matter-labs/era-compiler-solidity/pull/276/files)), incorporate the new error type into the `ErrorType` settings enum.
+- **Option Renaming**:
+    - When options are renamed (e.g., `fallbackToOptimizingForSize` to `sizeFallback` and `LLVMOptions` to `llvmOptions` as seen in [era-compiler-solidity/commit/62f0ce7dc6c5050e3a464a6b453d493e07384f53](https://github.com/matter-labs/era-compiler-solidity/commit/62f0ce7dc6c5050e3a464a6b453d493e07384f53)), rename the option in the config and CLI, while keeping an alias for the old one. In `ZkSettings/ZkSolcInput`, maintain both values as `Option`. Use `sizeFallback` internally and populate `fallbackToOptimizingForSize` during input sanitization for `zksolc` versions that require it. The same applies to `llvmOptions`.
+
+### Examples
 For further clarification, you can review these compiler update examples:
 
 1. [feat: add assemblycreate for warning suppression for zksolc 1.5.10](https://github.com/matter-labs/foundry-zksync/pull/840)
 2. [feat: Add support for zksolc 1.5.12](https://github.com/matter-labs/foundry-zksync/pull/1002)
-
-### Appendix: `zksolc` Configuration to Compiler Input Flow
-
-Understanding the flow from Foundry settings to the final compiler input is crucial for reviewing changes and ensuring backward compatibility:
-
-![image.png](compilerInput.png)
-
-1. **Configuration**:
-    - Configuration settings originate from sources like `foundry.toml` and command-line arguments, with dedicated ZKSync settings.
-2. **ZkSolcSettings**:
-    - The configuration is used to build `ZkSolcSettings`, which are used in the compilation flow.
-3. **ZkSolcVersionedInput**:
-    - During compilation, the `solc` version and sources are resolved. These, along with `ZkSolcSettings`, define the `ZkSolcVersionedInput`, which contains the sanitized `ZkSolcInput`.
-4. **Sanitization**:
-    - Sanitization occurs in two phases: first with the `zksolc` version during input creation, and then with the `solc` version immediately after. This ensures compliance with the Foundry compilers API, which pairs sources with compiler versions during version resolution. The `solc` version is used for pairing because different `solc` versions can be used for the same project, but only one `zksolc` version (stored in `ZkSolcSettings`) is defined. The call to sanitize uses the resolved `solc` version, necessitating the introduction of `zksolc` sanitization elsewhere.
-
-### Summary
-
-Updating `zksolc` in Foundry-ZKSync requires careful attention to backward compatibility. The process involves adding new versions, reviewing release notes, incorporating compiler options, and thorough testing. Understanding the configuration flow and sanitization process is essential for ensuring a smooth transition and maintaining the integrity of the compiler integration.
