@@ -5,7 +5,7 @@ This guide outlines the steps and considerations for updating the `zksolc` compi
 For more information about the defined compiler policy, you can check the [Foundry-ZKsync compiler section](https://foundry-book.zksync.io/zksync-specifics/compilation-overview?highlight=policy#compiler-support-policy). 
 
 ### Process Overview
-
+The process requires careful attention to backward compatibility, version support, and configuration changes. Below are the detailed steps to ensure a smooth compiler update:
 1. **Add New Versions**:
     - In [`crates/zksync/compilers/src/compilers/zksolc/mod.rs`](https://github.com/matter-labs/foundry-zksync/blob/3f8025f53f2c4cffe6ac4b43a3e20d4ebf993c6e/crates/zksync/compilers/src/compilers/zksolc/mod.rs#L415), add the new `zksolc` version to the list of supported versions. This will make it the default (latest) version.
 2. **Review Release Notes and Version Commits**:
