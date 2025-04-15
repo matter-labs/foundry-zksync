@@ -1,4 +1,4 @@
-# Updating zksolc in Foundry-ZKSync: A Guideline
+# Updating zksolc in Foundry-ZKsync: Step-by-step guide
 
 When a new `zksolc` version is released, making it available in Foundry involves more than simply bumping the version number. Backward compatibility must be carefully considered. For more information about the defined compiler policy you can check the [Foundry-ZKSync compiler section](https://foundry-book.zksync.io/zksync-specifics/compilation-overview?highlight=policy#compiler-support-policy). 
 
