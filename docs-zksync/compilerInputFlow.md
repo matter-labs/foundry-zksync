@@ -1,5 +1,7 @@
 # `zksolc` Configuration to Compiler Input Flow
 
+Foundry-ZKsync serves as a powerful tool for developing and interacting with Solidity smart contracts. A core function of this tool is compiling your Solidity code using the `zksolc` compiler. To provide flexibility and control over this process, Foundry-ZKsync allows users to specify various configuration settings through `foundry.toml` or command-line flags. These settings are then processed and ultimately translated into a structured input that the `zksolc` compiler understands and uses to perform the compilation.
+
 Understanding the flow from Foundry settings to the final compiler input is crucial for reviewing changes and ensuring backward compatibility:
 
 ![image.png](compilerInput.png)
