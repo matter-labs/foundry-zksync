@@ -30,7 +30,7 @@ When a new `zksolc` version is released, making it available in Foundry involves
 
 ### Examples
 
-For further clarification, you can review these compiler update examples
+For further clarification, you can review these compiler update examples:
 
 1. [feat: add assemblycreate for warning suppression for zksolc 1.5.10](https://github.com/matter-labs/foundry-zksync/pull/840)
 2. [feat: Add support for zksolc 1.5.12](https://github.com/matter-labs/foundry-zksync/pull/1002)
