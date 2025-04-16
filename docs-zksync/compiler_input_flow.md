@@ -4,7 +4,7 @@ Foundry-ZKsync serves as a powerful tool for developing and interacting with Sol
 
 Understanding the flow from Foundry settings to the final compiler input is crucial for reviewing changes and ensuring backward compatibility:
 
-![image.png](compilerInput.png)
+![image.png](compiler_input.png)
 
 1. **Configuration**:
     - Configuration settings originate from sources like `foundry.toml` and command-line arguments, with dedicated ZKSync settings.
