@@ -29,10 +29,7 @@ use foundry_evm_core::{
 };
 use itertools::Itertools;
 use revm_inspectors::tracing::types::{DecodedCallLog, DecodedCallTrace};
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::OnceLock,
-};
+use std::{collections::BTreeMap, sync::OnceLock};
 
 mod precompiles;
 
@@ -277,7 +274,7 @@ impl CallTraceDecoder {
         }
 
         trace!(target: "evm::traces", len=addrs.len(), "collecting address identities"); // Dustin accepted incoming here
-        for IdentifiedAddress { address, label, contract, abi, artifact_id: _ } in addrs {
+        for IdentifiedAddress { address, label, contract, abi, artifact_id } in addrs {
             let _span = trace_span!(target: "evm::traces", "identity", ?contract, ?label).entered();
 
             if let Some(contract) = contract {

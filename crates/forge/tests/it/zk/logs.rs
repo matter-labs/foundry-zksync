@@ -11,7 +11,7 @@ async fn test_zk_logs_work_in_call() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkConsoleOutputDuringCall", "ZkConsoleTest", ".*");
 
-    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test();
+    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test().unwrap();
     assert_multiple(
         &results,
         BTreeMap::from([(
@@ -39,7 +39,7 @@ async fn test_zk_logs_work_in_create() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("testZkConsoleOutputDuringCreate", "ZkConsoleTest", ".*");
 
-    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test();
+    let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test().unwrap();
     assert_multiple(
         &results,
         BTreeMap::from([(

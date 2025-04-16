@@ -118,7 +118,7 @@ impl ZkVerificationContext {
         sources.insert(self.target_path.clone(), Source::read(&self.target_path)?);
         let graph = Graph::<SolData>::resolve_sources(&self.project.paths, sources)?;
 
-        Ok(graph.imports(&self.target_path).into_iter().cloned().collect())
+        Ok(graph.imports(&self.target_path).into_iter().map(|p| p.to_path_buf()).collect())
     }
 }
 

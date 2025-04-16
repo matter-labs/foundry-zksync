@@ -31,5 +31,5 @@ mod version;
 
 mod ext_integration;
 
-mod zk;
 mod test_optimizer;
+mod zk;
