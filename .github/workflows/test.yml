@@ -101,7 +101,7 @@ jobs:
         with:
           cache-on-failure: true
       - name: cargo hack
-        run: cargo hack check
+        run: cargo hack check --each-feature --exclude-features isolate-by-default
 
   zk-cargo-test:
     runs-on: ubuntu-24.04-github-hosted-16core
