@@ -1,4 +1,4 @@
-# RPC Endpoint - Foundry-ZKSync
+# RPC Endpoint - Foundry-ZKsync
 
 This document details the CI changes made to both the **Rust endpoint selection logic and GitHub workflows** made in Foundry-ZKsync compared to upstream Foundry. Since upstream merges can affect this process, maintaining this documentation helps prevent time-consuming debugging of known issues in the CI. 
 
