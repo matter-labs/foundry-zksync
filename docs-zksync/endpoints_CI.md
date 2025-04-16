@@ -3,7 +3,7 @@
 This document details the CI changes made to both the **Rust endpoint selection logic and GitHub workflows** made in Foundry-ZKsync compared to upstream Foundry. Since upstream merges can affect this process, maintaining this documentation helps prevent time-consuming debugging of known issues in the CI. 
 
 ## Context
-Foundry-zksync combines ZKsync tests with the upstream Foundry testing flow in CI. The system rotates between public RPC endpoints from different providers. Because these open endpoints handle regular CI runs and we depend on them, we hit rate-limiting errors. To solve this, **we implemented a dedicated RPC Alchemy endpoint, provided by MatterLabs through GitHub secrets**. 
+Foundry-zksync combines ZKsync tests with the upstream Foundry testing flow in CI. The system rotates between public RPC endpoints from different providers. Because these open endpoints handle regular CI runs and we depend on them, we hit rate-limiting errors. To solve this, **we are currently using a dedicated RPC Alchemy endpoint, provided by MatterLabs through GitHub secrets**. 
 
 
 
