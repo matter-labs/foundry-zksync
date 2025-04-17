@@ -358,8 +358,7 @@ fn create_default_chains() -> HashMap<String, ChainData> {
         ChainData {
             name: "Sepolia".to_string(),
             chain_id: 11155111,
-            default_rpc_url: "https://1rpc.io/sepolia"
-                .to_string(),
+            default_rpc_url: "https://1rpc.io/sepolia".to_string(),
         },
     );
 

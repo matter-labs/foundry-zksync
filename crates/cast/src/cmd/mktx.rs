@@ -164,7 +164,8 @@ impl MakeTxArgs {
             Ok(())
         } else {
             let signer = maybe_signer.expect("No signer found");
-            // Dustin took icnoming changes excludes: `let (tx, _) = tx_builder.build(&signer).await?;`
+            // Dustin took icnoming changes excludes: `let (tx, _) =
+            // tx_builder.build(&signer).await?;`
             let tx = tx.build(&EthereumWallet::new(signer)).await?;
 
             let signed_tx = hex::encode(tx.encoded_2718());
