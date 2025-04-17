@@ -22,7 +22,9 @@ use alloy_primitives::{
     map::{AddressHashMap, HashMap, HashSet},
     Address, Bytes, Log, TxKind, B256, U256,
 };
-use alloy_rpc_types::AccessList;
+use alloy_rpc_types::{
+    AccessList,
+};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
@@ -581,7 +583,7 @@ impl Clone for Cheatcodes {
             mapping_slots: self.mapping_slots.clone(),
             pc: self.pc,
             breakpoints: self.breakpoints.clone(),
-            intercept_next_create_call: self.intercept_next_create_call.clone(),
+            intercept_next_create_call: self.intercept_next_create_call,
             test_runner: self.test_runner.clone(),
             ignored_traces: self.ignored_traces.clone(),
             arbitrary_storage: self.arbitrary_storage.clone(),

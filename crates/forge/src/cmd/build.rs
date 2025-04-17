@@ -93,6 +93,7 @@ impl BuildArgs {
                 }
             }
 
+            
             let format_json = shell::is_json();
             let compiler = ProjectCompiler::new()
                 .files(files)
