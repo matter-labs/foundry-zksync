@@ -358,7 +358,7 @@ fn create_default_chains() -> HashMap<String, ChainData> {
         ChainData {
             name: "Sepolia".to_string(),
             chain_id: 11155111,
-            default_rpc_url: "https://sepolia.infura.io/v3/b9794ad1ddf84dfb8c34d6bb5dca2001"
+            default_rpc_url: "https://1rpc.io/sepolia"
                 .to_string(),
         },
     );
