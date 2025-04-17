@@ -347,7 +347,7 @@ pub async fn get_tracing_executor(
         is_odyssey,
         create2_deployer,
         strategy,
-    );
+    )?; // DUSTIN - ? kept
 
     Ok((env, executor))
 }

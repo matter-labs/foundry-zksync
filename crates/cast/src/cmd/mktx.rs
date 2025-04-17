@@ -109,7 +109,7 @@ impl MakeTxArgs {
         let provider = get_provider(&config)?;
 
         // NOTE(zk): tx is built in two steps as signer might have a different type
-        let builder = CastTxBuilder::new(provider, tx, &config)
+        let tx_builder = CastTxBuilder::new(provider, tx, &config)
             .await?
             .with_to(to)
             .await?
@@ -120,7 +120,7 @@ impl MakeTxArgs {
         if raw_unsigned {
             // Build unsigned raw tx
             let from = eth.wallet.from.ok_or_eyre("missing `--from` address")?;
-            let raw_tx = builder.build_unsigned_raw(from).await?;
+            let raw_tx = tx_builder.build_unsigned_raw(from).await?;
 
             sh_println!("{raw_tx}")?;
             return Ok(());
@@ -143,9 +143,9 @@ impl MakeTxArgs {
         };
 
         let (tx, _) = if zk_tx.custom_signature.is_some() {
-            builder.build_raw(SenderKind::Address(from)).await?
+            tx_builder.build_raw(SenderKind::Address(from)).await?
         } else {
-            builder.build_raw(maybe_signer.as_ref().expect("No signer found")).await?
+            tx_builder.build_raw(maybe_signer.as_ref().expect("No signer found")).await?
         };
 
         if zk_tx.has_zksync_args() || zk_force {
@@ -164,7 +164,7 @@ impl MakeTxArgs {
             Ok(())
         } else {
             let signer = maybe_signer.expect("No signer found");
-
+            // Dustin took icnoming changes excludes: `let (tx, _) = tx_builder.build(&signer).await?;`
             let tx = tx.build(&EthereumWallet::new(signer)).await?;
 
             let signed_tx = hex::encode(tx.encoded_2718());
