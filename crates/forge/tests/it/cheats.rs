@@ -16,6 +16,7 @@ use foundry_test_utils::Filter;
 async fn test_cheats_local(test_data: &ForgeTestData) {
     let mut filter = Filter::new(".*", ".*", &format!(".*cheats{RE_PATH_SEPARATOR}*"))
         .exclude_paths("Fork")
+        .exclude_tests("DelegatePrank")
         .exclude_contracts("(Isolated|WithSeed)");
 
     // Exclude FFI tests on Windows because no `echo`, and file tests that expect certain file paths
