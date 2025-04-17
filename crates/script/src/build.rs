@@ -295,7 +295,7 @@ impl PreprocessedState {
                 output,
                 zk_output,
                 target,
-                project_root: project.root().clone(),
+                project_root: project.root().to_path_buf(),
                 dual_compiled_contracts,
             },
         })

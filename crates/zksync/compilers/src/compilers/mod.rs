@@ -31,7 +31,7 @@ pub fn project_standard_json_input(
     let mut sources = Vec::new();
     let mut unique_paths = HashSet::new();
     let (path, source) = graph.node(*target_index).unpack();
-    unique_paths.insert(path.clone());
+    unique_paths.insert(path);
     sources.push((path, source));
     sources.extend(
         graph

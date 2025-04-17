@@ -22,10 +22,7 @@ use alloy_primitives::{
     map::{AddressHashMap, HashMap, HashSet},
     Address, Bytes, Log, TxKind, B256, U256,
 };
-use alloy_rpc_types::{
-    request::{TransactionInput, TransactionRequest},
-    AccessList,
-};
+use alloy_rpc_types::AccessList;
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
@@ -49,7 +46,7 @@ use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
 use revm::{
     interpreter::{
-        opcode as op, CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome,
+        opcode as op, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome,
         EOFCreateInputs, EOFCreateKind, Gas, InstructionResult, Interpreter, InterpreterAction,
         InterpreterResult,
     },
@@ -584,6 +581,7 @@ impl Clone for Cheatcodes {
             mapping_slots: self.mapping_slots.clone(),
             pc: self.pc,
             breakpoints: self.breakpoints.clone(),
+            intercept_next_create_call: self.intercept_next_create_call,
             test_runner: self.test_runner.clone(),
             ignored_traces: self.ignored_traces.clone(),
             arbitrary_storage: self.arbitrary_storage.clone(),
@@ -771,8 +769,6 @@ impl Cheatcodes {
             });
         }
 
-        let ecx = &mut ecx.inner;
-        let gas = Gas::new(input.gas_limit());
         let curr_depth = ecx.journaled_state.depth();
         let ecx_inner = &mut ecx.inner;
         let gas = Gas::new(input.gas_limit());
@@ -794,7 +790,7 @@ impl Cheatcodes {
 
         // Apply EIP-2930 access lists.
         if let Some(access_list) = &self.access_list {
-            ecx.env.tx.access_list = access_list.to_vec();
+            ecx_inner.env.tx.access_list = access_list.to_vec();
         }
 
         // Apply our broadcast
@@ -1160,7 +1156,8 @@ where {
             // Apply delegate call, `call.caller`` will not equal `prank.prank_caller`
             // TODO(zk): support delegatecall prank
             if let CallScheme::DelegateCall | CallScheme::ExtDelegateCall = call.scheme {
-                if prank.delegate_call { // Dustin used current change 
+                if prank.delegate_call {
+                    // Dustin used current change
                     call.target_address = prank.new_caller;
                     call.caller = prank.new_caller;
                     // NOTE(zk): ecx_inner vs upstream's ecx used here
@@ -1198,7 +1195,7 @@ where {
 
         // Apply EIP-2930 access lists.
         if let Some(access_list) = &self.access_list {
-            ecx.env.tx.access_list = access_list.to_vec();
+            ecx_inner.env.tx.access_list = access_list.to_vec();
         }
 
         // Apply our broadcast

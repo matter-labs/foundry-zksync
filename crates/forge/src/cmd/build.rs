@@ -96,6 +96,7 @@ impl BuildArgs {
             let format_json = shell::is_json();
             let compiler = ProjectCompiler::new()
                 .files(files)
+                .dynamic_test_linking(config.dynamic_test_linking)
                 .print_names(self.names)
                 .print_sizes(self.sizes)
                 .ignore_eip_3860(self.ignore_eip_3860)
@@ -147,23 +148,6 @@ impl BuildArgs {
             // solc output. This is safe currently as the output is simply dropped.
             Ok(())
         }
-
-        let format_json = shell::is_json();
-        let compiler = ProjectCompiler::new()
-            .files(files)
-            .dynamic_test_linking(config.dynamic_test_linking)
-            .print_names(self.names)
-            .print_sizes(self.sizes)
-            .ignore_eip_3860(self.ignore_eip_3860)
-            .bail(!format_json);
-
-        let output = compiler.compile(&project)?;
-
-        if format_json && !self.names && !self.sizes {
-            sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
-        }
-
-        Ok(output)
     }
 
     /// Returns the `Project` for the current workspace

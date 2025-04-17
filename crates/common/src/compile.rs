@@ -67,7 +67,7 @@ pub struct ProjectCompiler {
 
     /// Set zksync specific settings based on context
     zksync: bool,
-    
+
     /// Whether to compile with dynamic linking tests and scripts.
     dynamic_test_linking: bool,
 }
