@@ -101,7 +101,7 @@ Forge scripts are generally executed in three stages:
 2. Simulation
 3. Broadcast
 
-During initial execution we execute the script just like a test, while we record individual transactions as they occur using the `vm.startBroadcast() / vm.stopBroadcast()` cheatcodes. These transactions are recorded in the normal foundry way, however we make use of alloy's `OtherFields` struct to encode additional `EIP-712` fields like `factory_deps` and `poaymaster_params` under the key specified by `ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY` constant.
+During initial execution we execute the script just like a test, while we record individual transactions as they occur using the `vm.startBroadcast() / vm.stopBroadcast()` cheatcodes. These transactions are recorded in the normal foundry way, however we make use of alloy's `OtherFields` struct to encode additional `EIP-712` fields like `factory_deps` and `paymaster_params` under the key specified by `ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY` constant.
 
 These fields are then decoded out when the transaction is built for `alloy-zksync`. 
 
