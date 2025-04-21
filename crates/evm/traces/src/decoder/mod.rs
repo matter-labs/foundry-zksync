@@ -273,7 +273,7 @@ impl CallTraceDecoder {
             return;
         }
 
-        trace!(target: "evm::traces", len=addrs.len(), "collecting address identities"); // Dustin accepted incoming here
+        trace!(target: "evm::traces", len=addrs.len(), "collecting address identities");
         for IdentifiedAddress { address, label, contract, abi, artifact_id } in addrs {
             let _span = trace_span!(target: "evm::traces", "identity", ?contract, ?label).entered();
 

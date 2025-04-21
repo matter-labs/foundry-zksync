@@ -1157,7 +1157,6 @@ where {
             // TODO(zk): support delegatecall prank
             if let CallScheme::DelegateCall | CallScheme::ExtDelegateCall = call.scheme {
                 if prank.delegate_call {
-                    // Dustin used current change
                     call.target_address = prank.new_caller;
                     call.caller = prank.new_caller;
                     // NOTE(zk): ecx_inner vs upstream's ecx used here
