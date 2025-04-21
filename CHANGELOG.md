@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.0.13](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.12...foundry-zksync-v0.0.13) (2025-04-09)
+
+
+### Features
+
+* Add support for zksolc 1.5.12 ([#1002](https://github.com/matter-labs/foundry-zksync/issues/1002)) ([274cc62](https://github.com/matter-labs/foundry-zksync/commit/274cc622bde9b0c8c17ff469260e10e2d3b7c36b))
+* add telemetry ([#1008](https://github.com/matter-labs/foundry-zksync/issues/1008)) ([e9e5df3](https://github.com/matter-labs/foundry-zksync/commit/e9e5df314b4a3fb111626967011270afb92ee3f5))
+* add verify-bytecode support ([#994](https://github.com/matter-labs/foundry-zksync/issues/994)) ([f872d3c](https://github.com/matter-labs/foundry-zksync/commit/f872d3c82e5f828ebc84dc506cbf2d2e412c722b))
+* cast run ([#1013](https://github.com/matter-labs/foundry-zksync/issues/1013)) ([6bd3238](https://github.com/matter-labs/foundry-zksync/commit/6bd32385610dffea90a22c69f1b6041661b82361))
+* retry `zks_getBytecodeByHash` failures ([#1000](https://github.com/matter-labs/foundry-zksync/issues/1000)) ([49aa003](https://github.com/matter-labs/foundry-zksync/commit/49aa003f113961ccbe9e471829bd0615e9e1a5c3))
+
+
+### Bug Fixes
+
+* bump tokio version to fix RUSTSEC advisory ([#1014](https://github.com/matter-labs/foundry-zksync/issues/1014)) ([5c03679](https://github.com/matter-labs/foundry-zksync/commit/5c036796b5f3b3838216f477b3391fde18084fdd))
+* Bump ubuntu on CI install ([#995](https://github.com/matter-labs/foundry-zksync/issues/995)) ([3f8025f](https://github.com/matter-labs/foundry-zksync/commit/3f8025f53f2c4cffe6ac4b43a3e20d4ebf993c6e))
+* **forge:** err if forge create contract with empty bytecode ([87cbe16](https://github.com/matter-labs/foundry-zksync/commit/87cbe1659dfc2e27f87e505709a0a2fcb90c79b0))
+* Use alchemy api key for ETH RPC URL ([#1003](https://github.com/matter-labs/foundry-zksync/issues/1003)) ([75e5fa9](https://github.com/matter-labs/foundry-zksync/commit/75e5fa91ba3822ec5cd51d5154b8b16dc1f8db41))
+
+## [0.0.12](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.11...foundry-zksync-v0.0.12) (2025-03-21)
+
+
+### Features
+
+* **backend:transact_from_tx:** take `inspect_ctx` ([013b96d](https://github.com/matter-labs/foundry-zksync/commit/013b96d7caf224ead5bcb407ec937d34f42da866))
+* broadcast raw transaction cheatcode ([#958](https://github.com/matter-labs/foundry-zksync/issues/958)) ([013b96d](https://github.com/matter-labs/foundry-zksync/commit/013b96d7caf224ead5bcb407ec937d34f42da866))
+* **inspect:** set `target_depth` thru inspect_ctx ([013b96d](https://github.com/matter-labs/foundry-zksync/commit/013b96d7caf224ead5bcb407ec937d34f42da866))
+* remove openssl dependency ([#967](https://github.com/matter-labs/foundry-zksync/issues/967)) ([61e3baa](https://github.com/matter-labs/foundry-zksync/commit/61e3baa773a4fed65eb47924beff408e8b5681b0))
+
+
+### Bug Fixes
+
+* Add depth adjustment on create for expectRevert ([#986](https://github.com/matter-labs/foundry-zksync/issues/986)) ([7f93bae](https://github.com/matter-labs/foundry-zksync/commit/7f93bae41eb932f4b756dfa04240b08a89179879))
+* **ci:** open issue after last retry fails ([#972](https://github.com/matter-labs/foundry-zksync/issues/972)) ([c75cca0](https://github.com/matter-labs/foundry-zksync/commit/c75cca066b48661c4ccb7febe1c3161adc771d67))
+* **docker:** use cross main instead 0.2.5 ([02f8c9a](https://github.com/matter-labs/foundry-zksync/commit/02f8c9a234755f0cc8cf1860399093d499c0d238))
+* **forge:** base url for custom verification providers type ([02f8c9a](https://github.com/matter-labs/foundry-zksync/commit/02f8c9a234755f0cc8cf1860399093d499c0d238))
+* Increase max depth for EraVM calls ([#979](https://github.com/matter-labs/foundry-zksync/issues/979)) ([f28f94f](https://github.com/matter-labs/foundry-zksync/commit/f28f94f5880902ef96866a75b589f73652524142))
+* un-ignore test ([#978](https://github.com/matter-labs/foundry-zksync/issues/978)) ([8daf45f](https://github.com/matter-labs/foundry-zksync/commit/8daf45fa0a55c823a3642b188795a64e5a966ec3))
+* **zk:warp:** only affect timestamp ([#963](https://github.com/matter-labs/foundry-zksync/issues/963)) ([9c40e44](https://github.com/matter-labs/foundry-zksync/commit/9c40e44cffab00a6035279d7de7e9395d33f3209))
+
+
+### Performance Improvements
+
+* improve zksync runtime ([#962](https://github.com/matter-labs/foundry-zksync/issues/962)) ([f14925c](https://github.com/matter-labs/foundry-zksync/commit/f14925cdfd4c618f4c642203995cf945f42cb415))
+
 ## [0.0.11](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.10...foundry-zksync-v0.0.11) (2025-03-10)
 
 

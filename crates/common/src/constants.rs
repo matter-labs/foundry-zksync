@@ -31,19 +31,22 @@ supported. Please try to change your RPC url to an archive node if the issue per
 
 /// Arbitrum L1 sender address of the first transaction in every block.
 /// `0x00000000000000000000000000000000000a4b05`
-pub const ARBITRUM_SENDER: Address = address!("00000000000000000000000000000000000a4b05");
+pub const ARBITRUM_SENDER: Address = address!("0x00000000000000000000000000000000000a4b05");
 
 /// The system address, the sender of the first transaction in every block:
 /// `0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001`
 ///
 /// See also <https://github.com/ethereum-optimism/optimism/blob/65ec61dde94ffa93342728d324fecf474d228e1f/specs/deposits.md#l1-attributes-deposited-transaction>
-pub const OPTIMISM_SYSTEM_ADDRESS: Address = address!("deaddeaddeaddeaddeaddeaddeaddeaddead0001");
+pub const OPTIMISM_SYSTEM_ADDRESS: Address = address!("0xdeaddeaddeaddeaddeaddeaddeaddeaddead0001");
 
 /// Transaction identifier of System transaction types
 pub const SYSTEM_TRANSACTION_TYPE: u8 = 126;
 
 /// Default user agent set as the header for requests that don't specify one.
 pub const DEFAULT_USER_AGENT: &str = concat!("foundry/", env!("CARGO_PKG_VERSION"));
+
+pub const POSTHOG_API_KEY: &str = "phc_eTvYMxu4UCkuFkAdY4DK6XzlUwoPppXuAcP1x9FhisG";
+pub const TELEMETRY_CONFIG_NAME: &str = "zksync-tooling";
 
 /// Returns whether the sender is a known L2 system sender that is the first tx in every block.
 ///

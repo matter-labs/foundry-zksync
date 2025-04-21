@@ -21,7 +21,10 @@ use foundry_config::{
 };
 use foundry_evm::{constants::CALLER, opts::EvmOpts};
 use foundry_test_utils::{
-    fd_lock, init_tracing, rpc::next_rpc_endpoint, util::OutputExt, TestCommand, ZkSyncNode,
+    fd_lock, init_tracing,
+    rpc::{next_http_archive_rpc_url, next_rpc_endpoint},
+    util::OutputExt,
+    TestCommand, ZkSyncNode,
 };
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
@@ -203,9 +206,9 @@ impl ForgeTestProfile {
 
         zk_config.zksync.compile = true;
         zk_config.zksync.startup = true;
-        zk_config.zksync.fallback_oz = true;
+        zk_config.zksync.size_fallback = true;
         zk_config.zksync.optimizer_mode = '3';
-        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 11)));
+        zk_config.zksync.zksolc = Some(foundry_config::SolcReq::Version(Version::new(1, 5, 12)));
         zk_config.fuzz.no_zksync_reserved_addresses = true;
         zk_config.invariant.depth = 15;
 
@@ -522,12 +525,13 @@ pub fn manifest_root() -> &'static Path {
 /// the RPC endpoints used during tests
 pub fn rpc_endpoints() -> RpcEndpoints {
     RpcEndpoints::new([
-        ("mainnet", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Mainnet))),
-        ("mainnet2", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Mainnet))),
+        ("mainnet", RpcEndpointUrl::Url(next_http_archive_rpc_url())),
+        ("mainnet2", RpcEndpointUrl::Url(next_http_archive_rpc_url())),
         ("sepolia", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Sepolia))),
         ("optimism", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Optimism))),
         ("arbitrum", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Arbitrum))),
         ("polygon", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::Polygon))),
+        ("bsc", RpcEndpointUrl::Url(next_rpc_endpoint(NamedChain::BinanceSmartChain))),
         ("avaxTestnet", RpcEndpointUrl::Url("https://api.avax-test.network/ext/bc/C/rpc".into())),
         ("moonbeam", RpcEndpointUrl::Url("https://moonbeam-rpc.publicnode.com".into())),
         ("rpcEnvAlias", RpcEndpointUrl::Env("${RPC_ENV_ALIAS}".into())),

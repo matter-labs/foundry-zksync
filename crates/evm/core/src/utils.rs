@@ -12,7 +12,10 @@ use alloy_rpc_types::{Transaction, TransactionRequest};
 use foundry_common::is_impersonated_tx;
 use foundry_config::NamedChain;
 use foundry_fork_db::DatabaseError;
-use foundry_zksync_core::DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
+use foundry_zksync_core::{
+    convert::{ConvertH160, ConvertU256},
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+};
 use revm::{
     handler::register::EvmHandler,
     interpreter::{
@@ -107,6 +110,46 @@ pub fn configure_tx_env(env: &mut revm::primitives::Env, tx: &Transaction<AnyTxE
     if let AnyTxEnvelope::Ethereum(tx) = &tx.inner.inner() {
         configure_tx_req_env(env, &tx.clone().into(), impersonated_from).expect("cannot fail");
     }
+}
+
+/// Configures the env for the given RPC transaction.
+/// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
+pub fn configure_zksync_tx_env(
+    env: &mut revm::primitives::Env,
+    tx: &Transaction<AnyTxEnvelope>,
+) -> foundry_zksync_core::ZkTransactionMetadata {
+    let mut metadata = foundry_zksync_core::ZkTransactionMetadata::default();
+    if let AnyTxEnvelope::Unknown(tx) = &tx.inner.inner() {
+        let input = tx
+            .inner
+            .fields
+            .get("input")
+            .and_then(|value| value.as_str())
+            .and_then(|value| alloy_primitives::hex::decode(value).ok())
+            .unwrap_or_default();
+        let (eip712_tx, _) =
+            zksync_types::transaction_request::TransactionRequest::from_bytes_unverified(&input)
+                .expect("invalid zksync transaction");
+
+        env.tx.transact_to = TxKind::Call(eip712_tx.to.expect("to must exist").to_address());
+        env.tx.caller = eip712_tx.from.expect("from must exist").to_address();
+        env.tx.gas_limit = eip712_tx.gas.as_u64();
+        env.tx.nonce = Some(eip712_tx.nonce.as_u64());
+        env.tx.value = eip712_tx.value.to_ru256();
+        env.tx.data = eip712_tx.input.0.into();
+        env.tx.chain_id = eip712_tx.chain_id;
+        env.tx.gas_price = eip712_tx.gas_price.to_ru256();
+        env.tx.gas_priority_fee = eip712_tx.max_priority_fee_per_gas.map(|value| value.to_ru256());
+
+        if let Some(eip712_meta) = eip712_tx.eip712_meta {
+            metadata = foundry_zksync_core::ZkTransactionMetadata {
+                factory_deps: eip712_meta.factory_deps,
+                paymaster_data: eip712_meta.paymaster_params,
+            };
+        }
+    }
+
+    metadata
 }
 
 /// Configures the env for the given RPC transaction request.

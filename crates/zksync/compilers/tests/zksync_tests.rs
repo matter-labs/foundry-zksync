@@ -95,7 +95,7 @@ fn zksync_can_set_hash_type_with_supported_versions() {
                 "Contract",
                 r#"
             // SPDX-License-Identifier: MIT OR Apache-2.0
-            pragma solidity ^0.8.10;
+            pragma solidity 0.8.10;
             contract Contract {
                 function call() public {}
             }
@@ -117,7 +117,8 @@ fn zksync_can_set_hash_type_with_supported_versions() {
         let contract_keccak = compiled.find_first("Contract").unwrap();
         let bytecode_keccak =
             contract_keccak.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
-        // NOTE: "none" value seems to pad 32 bytes of 0s at the end in this particular case
+
+        // NOTE: "none" value pads 32 bytes because len should be an odd multiple of 32
         assert_eq!(bytecode_none.len(), bytecode_keccak.len(), "zksolc {version}");
         assert_ne!(bytecode_none, bytecode_keccak, "zksolc {version}");
 
@@ -140,7 +141,7 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(zksolc_version: Versi
             "Erroneous",
             r#"
         // SPDX-License-Identifier: MIT OR Apache-2.0
-        pragma solidity ^0.8.10;
+        pragma solidity 0.8.10;
         contract Erroneous {
             function distribute(address payable recipient) public {
                 recipient.send(1);
@@ -189,7 +190,7 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(zksolc_version: Ver
             "Warning",
             r#"
         // SPDX-License-Identifier: MIT OR Apache-2.0
-        pragma solidity ^0.8.10;
+        pragma solidity 0.8.10;
         contract Warning {
             function test() public view {
                 require(tx.origin != address(0), "what");
@@ -251,7 +252,7 @@ fn test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(
             "Warning",
             r#"
         // SPDX-License-Identifier: MIT OR Apache-2.0
-        pragma solidity ^0.8.10;
+        pragma solidity 0.8.10;
         contract Warning {
             function deployWithCreate(bytes memory bytecode) public returns (address addr) {
                 assembly {
@@ -475,7 +476,7 @@ fn zksync_can_emit_build_info() {
         .add_source(
             "A",
             r#"
-pragma solidity ^0.8.10;
+pragma solidity 0.8.10;
 import "./B.sol";
 contract A { }
 "#,
@@ -486,7 +487,7 @@ contract A { }
         .add_source(
             "B",
             r"
-pragma solidity ^0.8.10;
+pragma solidity 0.8.10;
 contract B { }
 ",
         )
@@ -737,7 +738,7 @@ fn zksync_detects_change_on_cache_if_zksolc_version_changes() {
         .add_source(
             "A",
             r#"
-pragma solidity ^0.8.10;
+pragma solidity 0.8.10;
 import "./B.sol";
 contract A { }
 "#,
@@ -748,7 +749,7 @@ contract A { }
         .add_source(
             "B",
             r"
-pragma solidity ^0.8.10;
+pragma solidity 0.8.10;
 contract B { }
 ",
         )
