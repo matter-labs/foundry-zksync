@@ -140,7 +140,7 @@ impl MakeTxArgs {
             let from = signer.address();
 
             tx::validate_from_address(eth.wallet.from, from)?;
-            
+
             (from, Some(signer))
         };
 
