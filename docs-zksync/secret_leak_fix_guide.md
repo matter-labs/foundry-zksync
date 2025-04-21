@@ -88,7 +88,7 @@ git push --force
 
 - Prefer editing over dropping when unsure.
 - Always force-push after rebase to update the remote.
-- Ping your team if you're unsure about rewriting shared history.
+- Ping the members of the team that might be affected by the changes.
 
 ---
 
