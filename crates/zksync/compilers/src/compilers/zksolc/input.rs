@@ -133,6 +133,13 @@ impl ZkSolcInput {
             metadata.sanitize(zksolc_version);
         };
 
+        // zksolc v1.5.12 renamed LLVMOptions to llvmOptions in the std json input
+        if zksolc_version <= &Version::new(1, 5, 11) {
+            settings.llvm_options_legacy = std::mem::take(&mut settings.llvm_options);
+        }
+
+        settings.optimizer.sanitize(zksolc_version);
+
         Self { language, sources, settings, suppressed_warnings, suppressed_errors }
     }
 
@@ -192,5 +199,113 @@ impl StandardJsonCompilerInput {
     /// new StandardJsonCompilerInput
     pub fn new(sources: Vec<(PathBuf, Source)>, settings: ZkSettings) -> Self {
         Self { language: SolcLanguage::Solidity, sources, settings }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::compilers::zksolc::settings::Optimizer;
+    use serde_json::Value;
+
+    #[test]
+    fn test_zk_optimizer_sanitization_pre_1_5_11() {
+        let language = SolcLanguage::Solidity;
+        let sources = Sources::default();
+        let settings = ZkSettings {
+            optimizer: Optimizer {
+                enabled: Some(true),
+                size_fallback: Some(true),
+                fallback_to_optimizing_for_size: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Test with zksolc version 1.5.6
+        let old_version = Version::new(1, 5, 6);
+        let input = ZkSolcInput::new(language, sources.clone(), settings.clone(), &old_version);
+
+        // For old versions, size_fallback should be moved to fallback_to_optimizing_for_size
+        assert!(input.settings.optimizer.size_fallback.is_none());
+        assert_eq!(input.settings.optimizer.fallback_to_optimizing_for_size, Some(true));
+    }
+
+    #[test]
+    fn test_zk_optimizer_sanitization_post_1_5_11() {
+        let language = SolcLanguage::Solidity;
+        let sources = Sources::default();
+        let settings = ZkSettings {
+            optimizer: Optimizer {
+                enabled: Some(true),
+                size_fallback: Some(true),
+                fallback_to_optimizing_for_size: None,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Test with zksolc version 1.5.12
+        let new_version = Version::new(1, 5, 12);
+        let input = ZkSolcInput::new(language, sources.clone(), settings.clone(), &new_version);
+
+        // For newer versions, size_fallback should be preserved and fallback_to_optimizing_for_size
+        // should be None
+        assert_eq!(input.settings.optimizer.size_fallback, Some(true));
+        assert!(input.settings.optimizer.fallback_to_optimizing_for_size.is_none());
+    }
+
+    #[test]
+    fn test_zk_llvm_options_sanitization() {
+        let language = SolcLanguage::Solidity;
+        let sources = Sources::default();
+        let llvm_options = vec!["--some-llvm-option".to_string(), "-O3".to_string()];
+        let settings = ZkSettings { llvm_options: llvm_options.clone(), ..Default::default() };
+
+        // Test with zksolc version <= 1.5.11 (e.g., 1.5.11)
+        let old_version = Version::new(1, 5, 11);
+        let input_old = ZkSolcInput::new(language, sources.clone(), settings.clone(), &old_version);
+        let json_old: Value =
+            serde_json::to_value(&input_old).expect("Failed to serialize old input");
+
+        assert!(
+            json_old["settings"]["llvmOptions"].is_null(),
+            "llvmOptions should be null for old version JSON: {}",
+            json_old
+        );
+        assert!(
+            json_old["settings"]["LLVMOptions"].is_array(),
+            "LLVMOptions should be an array for old version JSON: {}",
+            json_old
+        );
+        assert_eq!(
+            json_old["settings"]["LLVMOptions"].as_array().unwrap(),
+            &llvm_options.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>(),
+            "LLVMOptions value mismatch for old version JSON: {}",
+            json_old
+        );
+
+        // Test with zksolc version > 1.5.11 (e.g., 1.5.12)
+        let new_version = Version::new(1, 5, 12);
+        let input_new = ZkSolcInput::new(language, sources, settings, &new_version);
+        let json_new: Value =
+            serde_json::to_value(&input_new).expect("Failed to serialize new input");
+
+        assert!(
+            json_new["settings"]["LLVMOptions"].is_null(),
+            "LLVMOptions should be null for new version JSON: {}",
+            json_new
+        );
+        assert!(
+            json_new["settings"]["llvmOptions"].is_array(),
+            "llvmOptions should be an array for new version JSON: {}",
+            json_new
+        );
+        assert_eq!(
+            json_new["settings"]["llvmOptions"].as_array().unwrap(),
+            &llvm_options.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>(),
+            "llvmOptions value mismatch for new version JSON: {}",
+            json_new
+        );
     }
 }

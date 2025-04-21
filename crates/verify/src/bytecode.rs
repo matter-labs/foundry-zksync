@@ -26,6 +26,8 @@ use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, utils::configure_tx_req_e
 use revm_primitives::{AccountInfo, TxKind};
 use std::path::PathBuf;
 
+mod zksync;
+
 impl_figment_convert!(VerifyBytecodeArgs);
 
 /// CLI arguments for `forge verify-bytecode`.
@@ -89,6 +91,10 @@ pub struct VerifyBytecodeArgs {
     /// Ignore verification for creation or runtime bytecode.
     #[arg(long, value_name = "BYTECODE_TYPE")]
     pub ignore: Option<BytecodeType>,
+
+    /// Verify for zksync
+    #[clap(long)]
+    pub zksync: bool,
 }
 
 impl figment::Provider for VerifyBytecodeArgs {
@@ -120,6 +126,9 @@ impl VerifyBytecodeArgs {
     /// Run the `verify-bytecode` command to verify the bytecode onchain against the locally built
     /// bytecode.
     pub async fn run(mut self) -> Result<()> {
+        if self.zksync {
+            return zksync::run(self).await;
+        }
         // Setup
         let config = self.load_config()?;
         let provider = utils::get_provider(&config)?;

@@ -488,6 +488,18 @@ forgetest!(can_set_optimizer_runs, |prj, cmd| {
     assert_eq!(config.optimizer_runs, Some(300));
 });
 
+// test that use_literal_content works
+forgetest!(can_set_use_literal_content, |prj, cmd| {
+    // explicitly set use_literal_content
+    prj.update_config(|config| config.use_literal_content = false);
+
+    let config = cmd.config();
+    assert_eq!(config.use_literal_content, false);
+
+    let config = prj.config_from_output(["--use-literal-content"]);
+    assert_eq!(config.use_literal_content, true);
+});
+
 // <https://github.com/foundry-rs/foundry/issues/9665>
 forgetest!(enable_optimizer_when_runs_set, |prj, cmd| {
     // explicitly set optimizer runs
@@ -1043,7 +1055,7 @@ endpoints = "all"
 [profile.default.zksync]
 compile = false
 startup = false
-fallback_oz = false
+size_fallback = false
 enable_eravm_extensions = false
 force_evmla = false
 llvm_options = []
@@ -1311,7 +1323,7 @@ exclude = []
     "solc_path": null,
     "hash_type": null,
     "bytecode_hash": null,
-    "fallback_oz": false,
+    "size_fallback": false,
     "enable_eravm_extensions": false,
     "force_evmla": false,
     "llvm_options": [],

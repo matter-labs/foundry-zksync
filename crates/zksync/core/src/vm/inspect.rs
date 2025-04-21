@@ -1,7 +1,11 @@
 use alloy_primitives::{hex, FixedBytes, Log};
 use anvil_zksync_config::types::SystemContractsOptions as Options;
 use anvil_zksync_core::{formatter::Formatter, system_contracts::SystemContracts};
-use anvil_zksync_types::ShowCalls;
+use anvil_zksync_traces::{
+    build_call_trace_arena, decode::CallTraceDecoderBuilder, decode_trace_arena,
+    filter_call_trace_arena, identifier::SignaturesIdentifier, render_trace_arena_inner,
+};
+use foundry_common::sh_println;
 use itertools::Itertools;
 use revm::{
     db::states::StorageSlot,
@@ -33,7 +37,7 @@ use core::convert::Into;
 use std::{
     collections::HashMap,
     fmt::Debug,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, RwLock},
 };
 
 use crate::{
@@ -436,7 +440,7 @@ where
     let balance = ZKVMData::new(ecx).get_balance(address);
 
     if balance.is_zero() {
-        error!("balance is 0 for {}, transaction will fail", address.to_h160());
+        error!("balance is 0 for {:?}, transaction will fail", address.to_h160());
     }
 
     let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
@@ -504,7 +508,6 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env, system_env, storage.clone());
 
     let tx: Transaction = l2_tx.into();
-    let initiator = tx.initiator_account();
 
     let call_tracer_result = Arc::default();
     let cheatcode_tracer_result = Arc::default();
@@ -516,7 +519,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     }
     let is_static = call_ctx.is_static;
     let is_create = call_ctx.is_create;
-    let bootloader_debug_tracer_result = Arc::default();
+    let bootloader_debug_tracer_result = Arc::new(RwLock::new(Err("result uninitialized".into())));
     let tracers = vec![
         ErrorTracer.into_tracer_pointer(),
         CallTracer::new(Arc::clone(&call_tracer_result)).into_tracer_pointer(),
@@ -559,8 +562,8 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     // populate gas usage info
     let bootloader_debug = Arc::try_unwrap(bootloader_debug_tracer_result)
         .unwrap()
-        .take()
-        .and_then(|result| result.ok())
+        .into_inner()
+        .unwrap()
         .expect("failed obtaining bootloader debug info");
     trace!("{bootloader_debug:?}");
 
@@ -612,27 +615,38 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     if tracing::enabled!(target: "anvil_zksync_core::formatter", tracing::Level::INFO) {
         let mut formatter = Formatter::new();
         let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
-        let show_outputs = get_env_var::<bool>("ZK_DEBUG_SHOW_OUTPUTS");
 
         formatter.print_vm_details(&tx_result);
 
-        for (i, call) in call_traces.iter().enumerate() {
-            let is_last = i == call_traces.len() - 1;
-            formatter.print_call(
-                initiator,
-                None,
-                call,
-                is_last,
-                ShowCalls::All,
-                show_outputs,
-                resolve_hashes,
+        if !call_traces.is_empty() {
+            let call_traces = call_traces.clone();
+            let tx_result_for_arena = tx_result.clone();
+            let mut builder = CallTraceDecoderBuilder::new();
+            builder = builder.with_signature_identifier(
+                SignaturesIdentifier::new(None, !resolve_hashes)
+                    .expect("failed building signature identifier"),
             );
-        }
 
-        for (i, event) in tx_result.logs.events.iter().enumerate() {
-            let is_last = i == tx_result.logs.events.len() - 1;
+            let decoder = builder.build();
+            let arena = futures::executor::block_on(async {
+                let blocking_result = tokio::task::spawn_blocking(move || {
+                    let mut arena = build_call_trace_arena(&call_traces, &tx_result_for_arena);
+                    let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                    rt.block_on(async {
+                        decode_trace_arena(&mut arena, &decoder)
+                            .await
+                            .expect("Failed to decode trace arena")
+                    });
+                    arena
+                })
+                .await;
 
-            formatter.print_event(event, resolve_hashes, is_last);
+                blocking_result.expect("spawn_blocking failed")
+            });
+
+            let filtered_arena = filter_call_trace_arena(&arena, 2);
+            let trace_output = render_trace_arena_inner(&filtered_arena, false);
+            sh_println!("\nTraces:\n{}", trace_output).expect("failed printing zkEVM traces");
         }
     }
 

@@ -118,7 +118,6 @@ pub fn fuzz_contract_with_calldata(
     // We need to compose all the strategies generated for each parameter in all possible
     // combinations.
     // `prop_oneof!` / `TupleUnion` `Arc`s for cheap cloning.
-    #[allow(clippy::arc_with_non_send_sync)]
     prop_oneof![
         60 => fuzz_calldata(func.clone(), fuzz_fixtures, no_zksync_reserved_addresses),
         40 => fuzz_calldata_from_state(func, fuzz_state),
