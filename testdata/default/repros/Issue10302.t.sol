@@ -10,7 +10,8 @@ contract A {
     }
 }
 // TODO: add back deep prank support, add `true` to startPrank @dustin
-// See: https://github.com/matter-labs/foundry-zksync/issues/1027 
+// See: https://github.com/matter-labs/foundry-zksync/issues/1027
+
 contract Issue10302Test is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
 
