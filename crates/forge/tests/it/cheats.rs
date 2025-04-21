@@ -13,9 +13,11 @@ use foundry_test_utils::Filter;
 
 /// Executes all cheat code tests but not fork cheat codes or tests that require isolation mode or
 /// specific seed.
+/// NOTE(zk): We filter DelegatePrank tests due to the use of deep pranks not yet supported. 
 async fn test_cheats_local(test_data: &ForgeTestData) {
     let mut filter = Filter::new(".*", ".*", &format!(".*cheats{RE_PATH_SEPARATOR}*"))
         .exclude_paths("Fork")
+        .exclude_tests("DelegatePrank")
         .exclude_contracts("(Isolated|WithSeed)");
 
     // Exclude FFI tests on Windows because no `echo`, and file tests that expect certain file paths
