@@ -96,7 +96,7 @@ In order for the revm storage to be correctly utilized in ZKsync VM, we perform 
 
 ## `forge script`
 
-Script scripts are generally executed in two stages:
+Forge scripts are generally executed in three stages:
 1. Initial Execution
 2. Broadcast
 
