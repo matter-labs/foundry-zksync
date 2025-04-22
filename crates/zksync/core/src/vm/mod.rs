@@ -1,4 +1,5 @@
 mod db;
+mod decoder;
 mod env;
 mod farcall;
 mod inspect;

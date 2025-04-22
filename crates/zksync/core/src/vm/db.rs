@@ -20,7 +20,7 @@ use zksync_vm_interface::storage::ReadStorage;
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     hash_bytecode,
-    state::FullNonce,
+    state::FullNonce, DEFAULT_PROTOCOL_VERSION,
 };
 
 use super::storage_recorder::{AccountAccess, AccountAccesses, CallType, StorageAccessRecorder};
@@ -40,8 +40,9 @@ struct DeployedSystemContract {
 }
 static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLock::new(|| {
     let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
-        &anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
-        false,
+        anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
+        DEFAULT_PROTOCOL_VERSION,
+        None,
     );
 
     contracts

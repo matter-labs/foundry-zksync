@@ -28,6 +28,7 @@ use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU25
 use eyre::eyre;
 use revm::{Database, InnerEvmContext};
 use serde::{Deserialize, Serialize};
+use zksync_types::ProtocolVersionId;
 use std::fmt::Debug;
 use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
 use zksync_types::{bytecode::BytecodeHash, Nonce};
@@ -48,6 +49,9 @@ use zksync_types::{
 };
 
 type Result<T> = std::result::Result<T, eyre::Report>;
+
+/// Defauly ZKsync protocol version.
+pub const DEFAULT_PROTOCOL_VERSION: ProtocolVersionId = ProtocolVersionId::Version27;
 
 /// Represents an empty code
 pub const EMPTY_CODE: [u8; 32] = [0; 32];
