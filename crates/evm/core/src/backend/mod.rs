@@ -526,7 +526,7 @@ impl Backend {
     ///
     /// If `fork` is `Some` this will use a `fork` database, otherwise with an in-memory
     /// database.
-    pub fn spawn(fork: Option<CreateFork>, strategy: BackendStrategy) -> Self {
+    pub fn spawn(fork: Option<CreateFork>, strategy: BackendStrategy) -> eyre::Result<Self> {
         Self::new(MultiFork::spawn(), fork, strategy)
     }
 
@@ -536,7 +536,11 @@ impl Backend {
     /// database.
     ///
     /// Prefer using [`spawn`](Self::spawn) instead.
-    pub fn new(forks: MultiFork, fork: Option<CreateFork>, strategy: BackendStrategy) -> Self {
+    pub fn new(
+        forks: MultiFork,
+        fork: Option<CreateFork>,
+        strategy: BackendStrategy,
+    ) -> eyre::Result<Self> {
         trace!(target: "backend", forking_mode=?fork.is_some(), "creating executor backend");
         // Note: this will take of registering the `fork`
         let inner = BackendInner {
@@ -555,8 +559,7 @@ impl Backend {
         };
 
         if let Some(fork) = fork {
-            let (fork_id, fork, _) =
-                backend.forks.create_fork(fork).expect("Unable to create fork");
+            let (fork_id, fork, _) = backend.forks.create_fork(fork)?;
             let fork_db = ForkDB::new(fork);
             let fork_ids = backend.inner.insert_new_fork(
                 fork_id.clone(),
@@ -569,7 +572,7 @@ impl Backend {
 
         trace!(target: "backend", forking_mode=? backend.active_fork_ids.is_some(), "created executor backend");
 
-        backend
+        Ok(backend)
     }
 
     /// Creates a new instance of `Backend` with fork added to the fork database and sets the fork
@@ -579,12 +582,12 @@ impl Backend {
         id: &ForkId,
         fork: Fork,
         journaled_state: JournaledState,
-    ) -> Self {
-        let mut backend = Self::spawn(None, strategy);
+    ) -> eyre::Result<Self> {
+        let mut backend = Self::spawn(None, strategy)?;
         let fork_ids = backend.inner.insert_new_fork(id.clone(), fork.db, journaled_state);
         backend.inner.launched_with_fork = Some((id.clone(), fork_ids.0, fork_ids.1));
         backend.active_fork_ids = Some(fork_ids);
-        backend
+        Ok(backend)
     }
 
     /// Creates a new instance with a `BackendDatabase::InMemory` cache layer for the `CacheDB`
@@ -1170,6 +1173,14 @@ impl DatabaseExt for Backend {
         {
             // update the shared state and track
             let mut fork = self.inner.take_fork(idx);
+
+            // Make sure all persistent accounts on the newly selected fork starts from the init
+            // state (from setup).
+            for addr in &self.inner.persistent_accounts {
+                if let Some(account) = self.fork_init_journaled_state.state.get(addr) {
+                    fork.journaled_state.state.insert(*addr, account.clone());
+                }
+            }
 
             // since all forks handle their state separately, the depth can drift
             // this is a handover where the target fork starts at the same depth where it was
@@ -2012,7 +2023,7 @@ fn commit_transaction(
         let fork = fork.clone();
         let journaled_state = journaled_state.clone();
         let depth = journaled_state.depth;
-        let mut db = Backend::new_with_fork(strategy.clone(), fork_id, fork, journaled_state);
+        let mut db = Backend::new_with_fork(strategy.clone(), fork_id, fork, journaled_state)?;
 
         let mut evm = crate::utils::new_evm_with_inspector(&mut db as _, env, inspector);
         // Adjust inner EVM depth to ensure that inspectors receive accurate data.
@@ -2106,7 +2117,7 @@ mod tests {
             evm_opts,
         };
 
-        let backend = Backend::spawn(Some(fork), BackendStrategy::new_evm());
+        let backend = Backend::spawn(Some(fork), BackendStrategy::new_evm()).unwrap();
 
         // some rng contract from etherscan
         let address: Address = "63091244180ae240c87d1f528f5f269134cb07b3".parse().unwrap();
@@ -2166,7 +2177,7 @@ mod tests {
         let env = revm::primitives::Env::default();
         let fork = CreateFork { enable_caching: true, url: mock.url(), env, evm_opts };
 
-        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm());
+        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm()).unwrap();
         let req = backend.code_by_hash(B256::from(alloy_primitives::fixed_bytes!(
             "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
         )));
@@ -2216,7 +2227,7 @@ mod tests {
         let env = revm::primitives::Env::default();
         let fork = CreateFork { enable_caching: true, url: mock.url(), env, evm_opts };
 
-        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm());
+        let mut backend = Backend::spawn(Some(fork), BackendStrategy::new_evm()).unwrap();
         let req = backend.code_by_hash(B256::from(alloy_primitives::fixed_bytes!(
             "0x0100015d3d7d4b367021d7c7519afb343ee967aa37d9a89df298bf9fbfcaca0e"
         )));
