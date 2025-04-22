@@ -1,8 +1,10 @@
+//! Decoder module copied from anvil-zksync as it's not exported publicly.
+
 use std::sync::OnceLock;
 
 use alloy_json_abi::Event;
-use anvil_zksync_traces::decode::{CallTraceDecoder, CallTraceDecoderBuilderBase};
 use anvil_zksync_console::{ds, hh};
+use anvil_zksync_traces::decode::{CallTraceDecoder, CallTraceDecoderBuilderBase};
 
 pub struct CallTraceDecoderBuilder;
 

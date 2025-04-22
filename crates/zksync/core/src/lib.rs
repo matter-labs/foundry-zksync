@@ -28,10 +28,9 @@ use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU25
 use eyre::eyre;
 use revm::{Database, InnerEvmContext};
 use serde::{Deserialize, Serialize};
-use zksync_types::ProtocolVersionId;
 use std::fmt::Debug;
 use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
-use zksync_types::{bytecode::BytecodeHash, Nonce};
+use zksync_types::{bytecode::BytecodeHash, Nonce, ProtocolVersionId};
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, deploy_nonce, encode_create_params, tx_nonce};
@@ -50,7 +49,7 @@ use zksync_types::{
 
 type Result<T> = std::result::Result<T, eyre::Report>;
 
-/// Defauly ZKsync protocol version.
+/// Default ZKsync protocol version.
 pub const DEFAULT_PROTOCOL_VERSION: ProtocolVersionId = ProtocolVersionId::Version27;
 
 /// Represents an empty code

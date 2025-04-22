@@ -2,8 +2,8 @@ use alloy_primitives::{hex, FixedBytes, Log};
 use anvil_zksync_config::types::SystemContractsOptions as Options;
 use anvil_zksync_core::{formatter::Formatter, system_contracts::SystemContracts};
 use anvil_zksync_traces::{
-    build_call_trace_arena, decode_trace_arena,
-    filter_call_trace_arena, identifier::SignaturesIdentifier, render_trace_arena_inner,
+    build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
+    identifier::SignaturesIdentifier, render_trace_arena_inner,
 };
 use foundry_common::sh_println;
 use itertools::Itertools;
@@ -45,12 +45,18 @@ use crate::{
     fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address,
     state::{new_full_nonce, parse_full_nonce, FullNonce},
     vm::{
-        db::{ZKVMData, DEFAULT_CHAIN_ID}, decoder::CallTraceDecoderBuilder, env::{create_l1_batch_env, create_system_env}, storage_recorder::{AccountAccess, StorageAccessRecorder}, storage_view::StorageView, tracers::{
+        db::{ZKVMData, DEFAULT_CHAIN_ID},
+        decoder::CallTraceDecoderBuilder,
+        env::{create_l1_batch_env, create_system_env},
+        storage_recorder::{AccountAccess, StorageAccessRecorder},
+        storage_view::StorageView,
+        tracers::{
             bootloader::{BootloaderDebug, BootloaderDebugTracer},
             cheatcode::{CallContext, CheatcodeTracer, CheatcodeTracerContext},
             error::ErrorTracer,
-        }
-    }, DEFAULT_PROTOCOL_VERSION,
+        },
+    },
+    DEFAULT_PROTOCOL_VERSION,
 };
 
 use foundry_evm_abi::console::{self, ds::Console};
@@ -485,9 +491,15 @@ struct InnerZkVmResult {
 }
 
 static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = LazyLock::new(|| {
-    SystemContracts::from_options(Options::BuiltInWithoutSecurity, None, DEFAULT_PROTOCOL_VERSION, false, false)
-        .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
-        .clone()
+    SystemContracts::from_options(
+        Options::BuiltInWithoutSecurity,
+        None,
+        DEFAULT_PROTOCOL_VERSION,
+        false,
+        false,
+    )
+    .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
+    .clone()
 });
 
 fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(

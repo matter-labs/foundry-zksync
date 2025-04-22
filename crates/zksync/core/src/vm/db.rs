@@ -20,7 +20,8 @@ use zksync_vm_interface::storage::ReadStorage;
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     hash_bytecode,
-    state::FullNonce, DEFAULT_PROTOCOL_VERSION,
+    state::FullNonce,
+    DEFAULT_PROTOCOL_VERSION,
 };
 
 use super::storage_recorder::{AccountAccess, AccountAccesses, CallType, StorageAccessRecorder};
