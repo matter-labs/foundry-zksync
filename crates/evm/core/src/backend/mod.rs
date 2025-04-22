@@ -2164,7 +2164,7 @@ mod tests {
         );
 
         // just to mark the RPC as a ZK rpc
-        mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
+        mock.expect("zks_getBaseTokenL1Address", None, serde_json::json!("0x01"));
         let code_hash_fail =
             httptest::Expectation::matching(matchers::request::body(matchers::json_decoded(
                 move |req: &RpcRequest| req.method.as_str() == "zks_getBytecodeByHash",
@@ -2204,7 +2204,7 @@ mod tests {
         );
 
         // just to mark the RPC as a ZK rpc
-        mock.expect("zks_L1ChainId", None, serde_json::json!("0x01"));
+        mock.expect("zks_getBaseTokenL1Address", None, serde_json::json!("0x01"));
 
         let code_hash_fail_once =
             httptest::Expectation::matching(matchers::request::body(matchers::json_decoded(
