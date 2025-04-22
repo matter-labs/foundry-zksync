@@ -27,8 +27,8 @@ pub struct CachedForkType(HashMap<String, ForkType>);
 
 impl CachedForkType {
     /// Retrieve the [ForkType] of a url.
-    /// We attempt to query the rpc provider for "zks_getBaseTokenL1Address" method. If it returns successfully,
-    /// then the chain is [ForkType::Zk], else it's [ForkType::Evm].
+    /// We attempt to query the rpc provider for "zks_getBaseTokenL1Address" method. If it returns
+    /// successfully, then the chain is [ForkType::Zk], else it's [ForkType::Evm].
     /// The result is then cached
     pub fn get(&mut self, fork_url: &str) -> ForkType {
         if let Some(fork_url_type) = self.0.get(fork_url) {
@@ -39,7 +39,10 @@ impl CachedForkType {
             .map(|provider| {
                 tokio::task::block_in_place(move || {
                     tokio::runtime::Handle::current()
-                        .block_on(provider.raw_request::<_, String>("zks_getBaseTokenL1Address".into(), ()))
+                        .block_on(
+                            provider
+                                .raw_request::<_, String>("zks_getBaseTokenL1Address".into(), ()),
+                        )
                         .map(|_| true)
                 })
                 .unwrap_or_default()
