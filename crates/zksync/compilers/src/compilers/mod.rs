@@ -31,13 +31,13 @@ pub fn project_standard_json_input(
     let mut sources = Vec::new();
     let mut unique_paths = HashSet::new();
     let (path, source) = graph.node(*target_index).unpack();
-    unique_paths.insert(path.clone());
+    unique_paths.insert(path);
     sources.push((path, source));
     sources.extend(
         graph
             .all_imported_nodes(*target_index)
             .map(|index| graph.node(index).unpack())
-            .filter(|(p, _)| unique_paths.insert(p.to_path_buf())),
+            .filter(|(p, _)| unique_paths.insert(p)),
     );
 
     let root = project.root();
