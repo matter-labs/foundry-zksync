@@ -42,12 +42,10 @@ This is a diagram of the process:
 
 ![Upstream Merge Process](upstreamMerge.svg)
 
-
 ### 1. Target Commit Selection
 
 Visit the [Foundry repository](https://github.com/foundry-rs/foundry) and select a **target upstream commit** for the update. Generally, choose the latest `master` commit to get the latest features.
   
-
 ### 2. Tracking Branch Creation
 
 Create a branch called `upstream-<SHORT_COMMIT_HASH>` and open a draft PR.
@@ -57,6 +55,7 @@ This PR is used to **track that the upstream update is in process** and to avoid
 ### 3. Merge Conflict Resolution
 
 In this step, we will resolve the merge conflicts with the target upstream commit. For that:
+
 1. **Create a branch** called `upstream-<SHORT_COMMIT_HASH>-merge`.
 2. Pull the target upstream commit.
 3. **Solve merge conflicts.**
@@ -78,13 +77,19 @@ In this step, we will resolve the merge conflicts with the target upstream commi
 
 3. **Dependency Updates**: `alloy-zksync` (https://github.com/popzxc/alloy-zksync) might need to be updated to use the alloy version used by foundry (Sample: https://github.com/popzxc/alloy-zksync/pull/39).
 
+4. **ZKsync Telemetry**: The zksync-telemetry crate is used to capture internal metrics related to user behavior and performance. These changes are **intentionally maintained** in our fork and **must not be removed** during conflict resolution. Be especially mindful when resolving conflicts involving telemetry logic. For reference, see the relevant changes introduced in [PR #1008](https://github.com/matter-labs/foundry-zksync/pull/1008/files).
+
+5. **Release Workflow**: We maintain a custom release workflow and do not adopt upstream changes to `.github/workflows/release.yml`. During conflict resolution, preserve our version of this file and discard any modifications introduced upstream.
+
+6. **Remove Publish Dockerfile**: The upstream `docker-publish.yml` workflow is not used in this repository. If it appears during a merge, it can be safely removed as part of the resolution process.
+
 ### 4. Compilation Error Fixes
 
 With conflict resolutions merged into `upstream-<SHORT_COMMIT_HASH>` branch, the next step is to solve compilation errors. For that:
+
 1. **Create a new branch `upstream-<SHORT_COMMIT_HASH>-build**`**.
 2. Make `cargo build` work. 
 3. Open a PR solving all compilation errors.
-
 
 ### 5. CI and Test Fixes
 
@@ -102,20 +107,26 @@ Once the compilation errors are solved (the previous PR `upstream-<SHORT_COMMIT_
 With everything solved and the final PR approved, **squash merge it into `main`**.
 
 #### **Why squash merge?**
+
 This will include all the changes from upstream but squashed under a single commit. The distinct upstream commits will be included in a later step. We prefer the squash-merge strategy instead of rebase as rebasing would usually involve fixing the merge conflict multiple times with each included upstream commit, often becoming tedious.
 
 ### 7. Individual Commit Incorporation
 
 1. From `main` with the upstream update incorporated, **create a new branch `upstream-<SHORT_COMMIT_HASH>-commits`.**
 2. **Pull all upstream commits again,** this time **picking changes from `HEAD` when resolving conflicts.** This should **result in a branch that incorporates the commits but has no changes** (Example: https://github.com/matter-labs/foundry-zksync/pull/686). One way to do this is to have upstream as a remote (called, say, `upstream`) and do:
+
    ```bash
    git pull upstream <COMMIT>
    ```
+
    For resolving conflicts, use:
+
    ```bash
    git checkout --ours .
    ```
+
 3. You might need to run:
+
    ```bash
    git commit --allow-empty -m "Merge upstream commit"
    ```
@@ -127,16 +138,20 @@ This will include all the changes from upstream but squashed under a single comm
 ### Documentation Update
 
 Update [foundry-zksync-book](https://github.com/matter-labs/foundry-zksync-book) with changes relevant up to that commit. Notes:
+
    - If needed, configure the upstream:
+
      ```bash
      git remote add upstream git@github.com:foundry-rs/book.git
      ```
+
    - For conflicts involving command runs, it's OK to accept our changes as there's a [job](https://github.com/matter-labs/foundry-zksync-book/blob/main/.github/workflows/update.yml) that will periodically run the command and update the output.
    - We don't have the `src/anvil` nor `src/reference/anvil` directories (we have `anvil-zksync` that's different). Any changes we get that create those directories can simply be deleted.
 
 ### Incorporated Changes Review
 
 **Review all incorporated changes looking for issues** to open on our end. In particular:
+
    - **PRs that add cheatcodes** to support them on zksync and/or add tests that may prove we cover them.
    - **PRs that add commands** (Idem)
 
