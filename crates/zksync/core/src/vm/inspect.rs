@@ -2,8 +2,8 @@ use alloy_primitives::{hex, FixedBytes, Log};
 use anvil_zksync_config::types::SystemContractsOptions as Options;
 use anvil_zksync_core::{formatter::Formatter, system_contracts::SystemContracts};
 use anvil_zksync_traces::{
-    build_call_trace_arena, decode::CallTraceDecoderBuilder, decode_trace_arena,
-    filter_call_trace_arena, identifier::SignaturesIdentifier, render_trace_arena_inner,
+    build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
+    identifier::SignaturesIdentifier, render_trace_arena_inner,
 };
 use foundry_common::sh_println;
 use itertools::Itertools;
@@ -46,6 +46,7 @@ use crate::{
     state::{new_full_nonce, parse_full_nonce, FullNonce},
     vm::{
         db::{ZKVMData, DEFAULT_CHAIN_ID},
+        decoder::CallTraceDecoderBuilder,
         env::{create_l1_batch_env, create_system_env},
         storage_recorder::{AccountAccess, StorageAccessRecorder},
         storage_view::StorageView,
@@ -55,6 +56,7 @@ use crate::{
             error::ErrorTracer,
         },
     },
+    DEFAULT_PROTOCOL_VERSION,
 };
 
 use foundry_evm_abi::console::{self, ds::Console};
@@ -489,9 +491,15 @@ struct InnerZkVmResult {
 }
 
 static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = LazyLock::new(|| {
-    SystemContracts::from_options(&Options::BuiltInWithoutSecurity, false, false)
-        .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
-        .clone()
+    SystemContracts::from_options(
+        Options::BuiltInWithoutSecurity,
+        None,
+        DEFAULT_PROTOCOL_VERSION,
+        false,
+        false,
+    )
+    .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
+    .clone()
 });
 
 fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
@@ -621,7 +629,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         if !call_traces.is_empty() {
             let call_traces = call_traces.clone();
             let tx_result_for_arena = tx_result.clone();
-            let mut builder = CallTraceDecoderBuilder::new();
+            let mut builder = CallTraceDecoderBuilder::default();
             builder = builder.with_signature_identifier(
                 SignaturesIdentifier::new(None, !resolve_hashes)
                     .expect("failed building signature identifier"),

@@ -30,7 +30,7 @@ use revm::{Database, InnerEvmContext};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
-use zksync_types::{bytecode::BytecodeHash, Nonce};
+use zksync_types::{bytecode::BytecodeHash, Nonce, ProtocolVersionId};
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, deploy_nonce, encode_create_params, tx_nonce};
@@ -48,6 +48,9 @@ use zksync_types::{
 };
 
 type Result<T> = std::result::Result<T, eyre::Report>;
+
+/// Default ZKsync protocol version.
+pub const DEFAULT_PROTOCOL_VERSION: ProtocolVersionId = ProtocolVersionId::Version27;
 
 /// Represents an empty code
 pub const EMPTY_CODE: [u8; 32] = [0; 32];
