@@ -47,7 +47,9 @@ use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
 use revm::{
     interpreter::{
-        opcode as op, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome, EOFCreateInputs, EOFCreateKind, Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult
+        opcode as op, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome,
+        EOFCreateInputs, EOFCreateKind, Gas, InstructionResult, Interpreter, InterpreterAction,
+        InterpreterResult,
     },
     primitives::{
         BlockEnv, CreateScheme, EVMError, EvmStorageSlot, SignedAuthorization, SpecId,
@@ -1243,6 +1245,18 @@ where {
 
                     let account =
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
+
+                    if self.active_delegation.is_some() && self.active_blob_sidecar.is_some() {
+                        let msg = "both delegation and blob are active; `attachBlob` and `attachDelegation` are not compatible";
+                        return Some(CallOutcome {
+                            result: InterpreterResult {
+                                result: InstructionResult::Revert,
+                                output: Error::encode(msg),
+                                gas,
+                            },
+                            memory_offset: call.return_memory_offset.clone(),
+                        });
+                    }
 
                     // Explicitly increment nonce if calls are not isolated.
                     if !self.config.evm_opts.isolate {
