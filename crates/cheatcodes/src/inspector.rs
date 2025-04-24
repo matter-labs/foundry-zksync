@@ -17,6 +17,7 @@ use crate::{
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
     Vm::{self, AccountAccess},
 };
+use alloy_consensus::BlobTransactionSidecar;
 use alloy_primitives::{
     hex,
     map::{AddressHashMap, HashMap, HashSet},
@@ -46,9 +47,7 @@ use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
 use revm::{
     interpreter::{
-        opcode as op, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome,
-        EOFCreateInputs, EOFCreateKind, Gas, InstructionResult, Interpreter, InterpreterAction,
-        InterpreterResult,
+        opcode as op, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome, EOFCreateInputs, EOFCreateKind, Gas, InstructionResult, Interpreter, InterpreterAction, InterpreterResult
     },
     primitives::{
         BlockEnv, CreateScheme, EVMError, EvmStorageSlot, SignedAuthorization, SpecId,
@@ -430,6 +429,9 @@ pub struct Cheatcodes {
     /// transaction construction.
     pub active_delegation: Option<SignedAuthorization>,
 
+    /// The active EIP-4844 blob that will be attached to the next call.
+    pub active_blob_sidecar: Option<BlobTransactionSidecar>,
+
     /// The gas price.
     ///
     /// Used in the cheatcode handler to overwrite the gas price separately from the gas price
@@ -553,6 +555,7 @@ impl Clone for Cheatcodes {
         Self {
             block: self.block.clone(),
             active_delegation: self.active_delegation.clone(),
+            active_blob_sidecar: self.active_blob_sidecar.clone(),
             gas_price: self.gas_price,
             labels: self.labels.clone(),
             pranks: self.pranks.clone(),
@@ -612,6 +615,7 @@ impl Cheatcodes {
             config,
             block: Default::default(),
             active_delegation: Default::default(),
+            active_blob_sidecar: Default::default(),
             gas_price: Default::default(),
             pranks: Default::default(),
             expected_revert: Default::default(),
@@ -1233,7 +1237,8 @@ where {
                         ecx_inner,
                         broadcast,
                         &mut self.broadcastable_transactions,
-                        &mut self.active_delegation,
+                        self.active_delegation.clone(),
+                        self.active_blob_sidecar.clone(),
                     );
 
                     let account =

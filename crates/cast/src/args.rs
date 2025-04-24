@@ -38,11 +38,7 @@ pub fn run() -> Result<()> {
 
 /// Setup the global logger and other utilities.
 pub fn setup() -> Result<()> {
-    // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs`
-    // provider, while foundry uses the `ring` provider. As a result, rustls cannot disambiguate
-    // between the two while selecting a default provider.
-    let _ = rustls::crypto::ring::default_provider().install_default();
-
+    utils::install_crypto_provider();
     handler::install();
     utils::load_dotenv();
     utils::subscriber();
@@ -489,14 +485,17 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
         }
         CastSubcommand::Run(cmd) => cmd.run().await?,
         CastSubcommand::SendTx(cmd) => cmd.run().await?,
-        CastSubcommand::Tx { tx_hash, field, raw, rpc } => {
+        CastSubcommand::Tx { tx_hash, from, nonce, field, raw, rpc } => {
             let config = rpc.load_config()?;
             let provider = utils::get_provider(&config)?;
 
             // Can use either --raw or specify raw as a field
             let raw = raw || field.as_ref().is_some_and(|f| f == "raw");
 
-            sh_println!("{}", Cast::new(&provider).transaction(tx_hash, field, raw).await?)?
+            sh_println!(
+                "{}",
+                Cast::new(&provider).transaction(tx_hash, from, nonce, field, raw).await?
+            )?
         }
 
         // 4Byte

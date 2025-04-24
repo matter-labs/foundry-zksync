@@ -3,7 +3,7 @@ use std::sync::Arc;
 use alloy_primitives::{map::HashMap, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::{
     request::{TransactionInput, TransactionRequest},
-    serde_helpers::WithOtherFields,
+    serde_helpers::WithOtherFields, BlobTransactionSidecar,
 };
 use foundry_cheatcodes::{
     journaled_account,
@@ -46,6 +46,7 @@ use zksync_types::{
     utils::{decompose_full_nonce, nonces_to_full_nonce},
     CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
 };
+use alloy_network::TransactionBuilder4844;
 
 use crate::cheatcode::context::ZksyncCheatcodeInspectorStrategyContext;
 
@@ -283,7 +284,8 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         ecx_inner: InnerEcx<'_, '_, '_>,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: &mut Option<SignedAuthorization>,
+        active_delegation: Option<SignedAuthorization>,
+        active_blob_sidecar: Option<BlobTransactionSidecar>,
     ) {
         let ctx_zk = get_context(ctx);
 
@@ -296,6 +298,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 broadcast,
                 broadcastable_transactions,
                 active_delegation,
+                active_blob_sidecar,
             );
         }
 
@@ -353,10 +356,23 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             ..Default::default()
         };
 
-        if let Some(auth_list) = active_delegation.take() {
-            tx_req.authorization_list = Some(vec![auth_list]);
-        } else {
-            tx_req.authorization_list = None;
+        match (active_delegation, active_blob_sidecar) {
+            (Some(_), Some(_)) => {
+                // Note(zk): We can't return a call outcome from here
+                return;
+            }
+            (Some(auth_list), None) => {
+                tx_req.authorization_list = Some(vec![auth_list]);
+                tx_req.sidecar = None;
+            }
+            (None, Some(blob_sidecar)) => {
+                tx_req.set_blob_sidecar(blob_sidecar);
+                tx_req.authorization_list = None;
+            }
+            (None, None) => {
+                tx_req.sidecar = None;
+                tx_req.authorization_list = None;
+            }
         }
         let mut tx = WithOtherFields::new(tx_req);
 
