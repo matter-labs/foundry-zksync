@@ -4,7 +4,10 @@ use crate::{
     zksync, Cast, ZkCast, ZkTransactionOpts,
 };
 use alloy_primitives::{Address, Bytes, TxKind, U256};
-use alloy_rpc_types::{BlockId, BlockNumberOrTag};
+use alloy_rpc_types::{
+    state::{StateOverride, StateOverridesBuilder},
+    BlockId, BlockNumberOrTag,
+};
 use alloy_serde::OtherFields;
 use clap::Parser;
 use eyre::Result;
@@ -29,7 +32,6 @@ use foundry_evm::{
 };
 use regex::Regex;
 use std::{str::FromStr, sync::LazyLock};
-use alloy_rpc_types::state::{StateOverride, StateOverridesBuilder};
 
 // matches override pattern <address>:<slot>:<value>
 // e.g. 0x123:0x1:0x1234
@@ -348,7 +350,10 @@ impl CallArgs {
 
             sh_println!("{}", zk_cast.call_zk(&zk_tx, func.as_ref(), block).await?)?;
         } else {
-            sh_println!("{}", Cast::new(provider).call(&tx, func.as_ref(), block, state_overrides).await?)?;
+            sh_println!(
+                "{}",
+                Cast::new(provider).call(&tx, func.as_ref(), block, state_overrides).await?
+            )?;
         }
 
         Ok(())

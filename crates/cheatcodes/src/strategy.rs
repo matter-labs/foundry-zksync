@@ -1,14 +1,13 @@
 use std::{any::Any, fmt::Debug, sync::Arc};
 
 use alloy_consensus::BlobTransactionSidecar;
+use alloy_network::TransactionBuilder4844;
 use alloy_primitives::{Address, TxKind};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
 use revm::{
     interpreter::{CallInputs, CallOutcome, CreateOutcome, Interpreter},
     primitives::SignedAuthorization,
-    
 };
-use alloy_network::TransactionBuilder4844;
 
 use crate::{
     inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx, InnerEcx},

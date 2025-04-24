@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
+use alloy_network::TransactionBuilder4844;
 use alloy_primitives::{map::HashMap, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::{
     request::{TransactionInput, TransactionRequest},
-    serde_helpers::WithOtherFields, BlobTransactionSidecar,
+    serde_helpers::WithOtherFields,
+    BlobTransactionSidecar,
 };
 use foundry_cheatcodes::{
     journaled_account,
@@ -46,7 +48,6 @@ use zksync_types::{
     utils::{decompose_full_nonce, nonces_to_full_nonce},
     CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
 };
-use alloy_network::TransactionBuilder4844;
 
 use crate::cheatcode::context::ZksyncCheatcodeInspectorStrategyContext;
 
