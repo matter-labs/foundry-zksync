@@ -1,5 +1,7 @@
 use std::{any::Any, fmt::Debug, sync::Arc};
 
+use alloy_consensus::BlobTransactionSidecar;
+use alloy_network::TransactionBuilder4844;
 use alloy_primitives::{Address, TxKind};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
 use revm::{
@@ -95,7 +97,8 @@ pub trait CheatcodeInspectorStrategyRunner:
         ecx_inner: InnerEcx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: &mut Option<SignedAuthorization>,
+        active_delegation: Option<SignedAuthorization>,
+        active_blob_sidecar: Option<BlobTransactionSidecar>,
     );
 
     fn post_initialize_interp(
@@ -217,7 +220,8 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         ecx_inner: InnerEcx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: &mut Option<SignedAuthorization>,
+        active_delegation: Option<SignedAuthorization>,
+        active_blob_sidecar: Option<BlobTransactionSidecar>,
     ) {
         let is_fixed_gas_limit = check_if_fixed_gas_limit(ecx_inner, call.gas_limit);
 
@@ -235,10 +239,23 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
             ..Default::default()
         };
 
-        if let Some(auth_list) = active_delegation.take() {
-            tx_req.authorization_list = Some(vec![auth_list]);
-        } else {
-            tx_req.authorization_list = None;
+        match (active_delegation, active_blob_sidecar) {
+            (Some(_), Some(_)) => {
+                // Note(zk): We can't return a call outcome from here
+                return;
+            }
+            (Some(auth_list), None) => {
+                tx_req.authorization_list = Some(vec![auth_list]);
+                tx_req.sidecar = None;
+            }
+            (None, Some(blob_sidecar)) => {
+                tx_req.set_blob_sidecar(blob_sidecar);
+                tx_req.authorization_list = None;
+            }
+            (None, None) => {
+                tx_req.sidecar = None;
+                tx_req.authorization_list = None;
+            }
         }
 
         broadcastable_transactions.push_back(BroadcastableTransaction {

@@ -448,7 +448,15 @@ pub enum CastSubcommand {
     #[command(visible_alias = "t")]
     Tx {
         /// The transaction hash.
-        tx_hash: String,
+        tx_hash: Option<String>,
+
+        /// The sender of the transaction.
+        #[arg(long, value_parser = NameOrAddress::from_str)]
+        from: Option<NameOrAddress>,
+
+        /// Nonce of the transaction.
+        #[arg(long)]
+        nonce: Option<u64>,
 
         /// If specified, only get the given field of the transaction. If "raw", the RLP encoded
         /// transaction will be printed.
@@ -1145,7 +1153,7 @@ impl CastSubcommand {
             }
             Self::Run(_) => "run",
             Self::SendTx(_) => "send-tx",
-            Self::Tx { tx_hash: _, field: _, raw: _, rpc: _ } => "tx",
+            Self::Tx { tx_hash: _, field: _, raw: _, rpc: _, from: _, nonce: _ } => "tx",
             Self::FourByte { selector: _ } => "four-byte",
             Self::FourByteCalldata { calldata: _ } => "four-byte-calldata",
             Self::FourByteEvent { topic: _ } => "four-byte-event",

@@ -165,6 +165,9 @@ impl ScriptRunner {
             self.executor.set_nonce(self.evm_opts.sender, prev_sender_nonce)?;
         }
 
+        // set script address to be used by execution inspector
+        self.executor.set_script(address);
+
         traces.extend(constructor_traces.map(|traces| (TraceKind::Deployment, traces)));
 
         // Script has already been deployed so we can migrate the database to zkEVM storage
