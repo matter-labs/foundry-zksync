@@ -6,10 +6,10 @@ import "cheats/Vm.sol";
 
 contract Issue1036 is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
-    
+
     function test_failingForkViaWebsocket() public {
         // The issue presented itself when using websocket endpoints and
         // not initializing properly the crypto provider.
-        vm.createSelectFork('wss://mainnet.era.zksync.io/ws');
+        vm.createSelectFork("wss://mainnet.era.zksync.io/ws");
     }
 }
