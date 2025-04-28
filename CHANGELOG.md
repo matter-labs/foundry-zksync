@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.0.14](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.13...foundry-zksync-v0.0.14) (2025-04-28)
+
+
+### Features
+
+* **`cast`:** getTransactionBySenderAndNonce ([#10323](https://github.com/matter-labs/foundry-zksync/issues/10323)) ([23b1cbd](https://github.com/matter-labs/foundry-zksync/commit/23b1cbd6ef131838629be51ad8f5f9391239eb4d))
+* add serde derive to forge bind ([#10332](https://github.com/matter-labs/foundry-zksync/issues/10332)) ([41506ca](https://github.com/matter-labs/foundry-zksync/commit/41506cadeb4b1c609dfa5ab77348c285346b0464))
+* add vm.getChain(chainAlias)  ([#10226](https://github.com/matter-labs/foundry-zksync/issues/10226)) ([1da4d32](https://github.com/matter-labs/foundry-zksync/commit/1da4d324652b3a61f7c7128a6d28f9d6239e8218))
+* **cast:** Include recover_authority when logging SignedAuthorization ([#10349](https://github.com/matter-labs/foundry-zksync/issues/10349)) ([77aec59](https://github.com/matter-labs/foundry-zksync/commit/77aec5998edc1ba4d72bd66c09a8df7d206e09d4))
+* **forge:** add new cheatcode `attachBlob` to send EIP-4844 transaction ([#10336](https://github.com/matter-labs/foundry-zksync/issues/10336)) ([e988893](https://github.com/matter-labs/foundry-zksync/commit/e9888937e032b3b4729b2e902c1eaf51f84a9948))
+* **script:** revert if address(this) used ([#10295](https://github.com/matter-labs/foundry-zksync/issues/10295)) ([055b0ea](https://github.com/matter-labs/foundry-zksync/commit/055b0ea4311254f89d1b3274eddb07bfac288f6c))
+* update anvil zksync ([#1030](https://github.com/matter-labs/foundry-zksync/issues/1030)) ([b62aa65](https://github.com/matter-labs/foundry-zksync/commit/b62aa652c5f65b24cb194ef355729a33edf0df4d))
+
+
+### Bug Fixes
+
+* add workaround for unlinked artifacts ([#10291](https://github.com/matter-labs/foundry-zksync/issues/10291)) ([bfb1cb6](https://github.com/matter-labs/foundry-zksync/commit/bfb1cb6b118b7e07a1de0fdea64a6cf44eb3a174))
+* crossbeam-channel dep from rust advisory ([#1017](https://github.com/matter-labs/foundry-zksync/issues/1017)) ([44a1ce9](https://github.com/matter-labs/foundry-zksync/commit/44a1ce96227519d13d7380d40edf19abffc656ad))
+* **docker:** build docker aarch64 without jemalloc ([#10286](https://github.com/matter-labs/foundry-zksync/issues/10286)) ([8d5c36f](https://github.com/matter-labs/foundry-zksync/commit/8d5c36fb2e951aebac2027d40a1120f6f1769efe))
+* force install default crypto provider ([#10327](https://github.com/matter-labs/foundry-zksync/issues/10327)) ([709f266](https://github.com/matter-labs/foundry-zksync/commit/709f266ff6a26264ac4fc8c06cc40964861c7ebb))
+* force prevrandao on rootstock network ([4add5dc](https://github.com/matter-labs/foundry-zksync/commit/4add5dcfa63d2631753ec7e84c5f20f1561ea8f3))
+* **forge:** avoid panic on internal decoding of linked tests ([#10333](https://github.com/matter-labs/foundry-zksync/issues/10333)) ([f76309d](https://github.com/matter-labs/foundry-zksync/commit/f76309dad7dddc0917755d3f3d17e1ad9d02c6b8))
+* **forge:** avoid preprocessor constructor args struct name conflict ([#10313](https://github.com/matter-labs/foundry-zksync/issues/10313)) ([ac724c2](https://github.com/matter-labs/foundry-zksync/commit/ac724c20f1f938676ed876310a51fe954135a9e1))
+* **forge:** do not set balance as apparent value in delegate prank ([#10304](https://github.com/matter-labs/foundry-zksync/issues/10304)) ([314eded](https://github.com/matter-labs/foundry-zksync/commit/314eded9b6e801d0870b4c7c2b1d1a57f58d5203))
+* **forge:** ensure selected fork contains init state for persisted accounts ([#10301](https://github.com/matter-labs/foundry-zksync/issues/10301)) ([b75625a](https://github.com/matter-labs/foundry-zksync/commit/b75625abc36152b3fd205a820cd4066ea7316df5))
+* **forge:** err if forge create contract with empty bytecode ([5b5bd7b](https://github.com/matter-labs/foundry-zksync/commit/5b5bd7b95f5f765abc84673c651e482f2fadc69b))
+* **forge:** run git submodule sync when installing ([#10347](https://github.com/matter-labs/foundry-zksync/issues/10347)) ([8690fef](https://github.com/matter-labs/foundry-zksync/commit/8690fefcce1e77e01cd03c3d91c5e5a9f0723abc))
+* propagate error on backend spawn fork ([5b5bd7b](https://github.com/matter-labs/foundry-zksync/commit/5b5bd7b95f5f765abc84673c651e482f2fadc69b))
+
 ## [0.0.13](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.12...foundry-zksync-v0.0.13) (2025-04-09)
 
 
