@@ -10,12 +10,12 @@ ignore = [
     # Used by boojum
     # derivative is unmaintained
     "RUSTSEC-2024-0388",
-    # deprecated paste used by alloy-primitives
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436 paste! is unmaintained
     "RUSTSEC-2024-0436",
     # protobuf in trezor_client
     "RUSTSEC-2024-0437",
     # https://rustsec.org/advisories/RUSTSEC-2025-0021 gitoxide uses SHA-1 hash implementations without any collision detection, leaving it vulnerable to hash collision attacks.
-    "RUSTSEC-2025-0021"
+    "RUSTSEC-2025-0021",
 ]
 
 # This section is considered when running `cargo deny check bans`.
