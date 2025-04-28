@@ -15,8 +15,10 @@ interface VmExt {
 
 contract ScriptSetupNonce is Script {
     VmExt internal constant vmExt = VmExt(VM_ADDRESS);
+    address internal constant DUMMY_ADDRESS = address(0x123456789);
 
     function setUp() public {
+        vm.deal(DUMMY_ADDRESS, 1 ether);
         uint256 initialNonceTx = checkTxNonce(address(tx.origin));
         uint256 initialNonceDeploy = checkDeployNonce(address(tx.origin));
         // Perform transactions and deploy contracts in setup to increment nonce and verify broadcast nonce matches onchain
@@ -65,14 +67,14 @@ contract ScriptSetupNonce is Script {
     function checkTxNonce(address addr) public returns (uint256) {
         // We prank here to avoid accidentally "polluting" the nonce of `addr` during the call
         // for example when `addr` is `tx.origin`
-        vm.prank(address(this), address(this));
+        vm.prank(DUMMY_ADDRESS, DUMMY_ADDRESS);
         return NonceLib.getTxNonce(addr);
     }
 
     function checkDeployNonce(address addr) public returns (uint256) {
         // We prank here to avoid accidentally "polluting" the nonce of `addr` during the call
         // for example when `addr` is `tx.origin`
-        vm.prank(address(this), address(this));
+        vm.prank(DUMMY_ADDRESS, DUMMY_ADDRESS);
         return NonceLib.getDeployNonce(addr);
     }
 }

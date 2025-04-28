@@ -6,7 +6,7 @@ use forge::{
     executors::strategy::ExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
     MultiContractRunnerBuilder,
 };
-use foundry_cli::utils;
+use foundry_cli::utils::{self, install_crypto_provider};
 use foundry_compilers::{
     artifacts::{EvmVersion, Libraries, Settings},
     compilers::multi::MultiCompiler,
@@ -239,6 +239,7 @@ impl ForgeTestData {
     ///
     /// Uses [get_compiled] to lazily compile the project.
     pub fn new(profile: ForgeTestProfile) -> Self {
+        install_crypto_provider();
         init_tracing();
 
         // NOTE(zk): We need to manually install the crypto provider as zksync-era uses `aws-lc-rs`
