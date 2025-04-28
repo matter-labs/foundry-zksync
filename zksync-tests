@@ -113,6 +113,7 @@ forge::it:
     zk::paymaster::test_zk_contract_paymaster
     zk::paymaster::test_zk_deploy_with_paymaster
     zk::proxy::script_zk_can_deploy_proxy
+    zk::repros::issue_1036
     zk::repros::issue_497
     zk::repros::issue_565
     zk::repros::issue_687
