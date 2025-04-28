@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.14](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.13...foundry-zksync-v0.0.14) (2025-04-28)
+
+
+### Features
+
+* add serde derive ([f697e54](https://github.com/matter-labs/foundry-zksync/commit/f697e548f8d75d07b868ffe6975cc1bb3168d82d))
+* update anvil zksync ([#1030](https://github.com/matter-labs/foundry-zksync/issues/1030)) ([b62aa65](https://github.com/matter-labs/foundry-zksync/commit/b62aa652c5f65b24cb194ef355729a33edf0df4d))
+
+
+### Bug Fixes
+
+* crossbeam-channel dep from rust advisory ([#1017](https://github.com/matter-labs/foundry-zksync/issues/1017)) ([44a1ce9](https://github.com/matter-labs/foundry-zksync/commit/44a1ce96227519d13d7380d40edf19abffc656ad))
+* force prevrandao on rootstock network ([f697e54](https://github.com/matter-labs/foundry-zksync/commit/f697e548f8d75d07b868ffe6975cc1bb3168d82d))
+* force prevrandao on rootstock network ([5b5bd7b](https://github.com/matter-labs/foundry-zksync/commit/5b5bd7b95f5f765abc84673c651e482f2fadc69b))
+* **forge:** err if forge create contract with empty bytecode ([f697e54](https://github.com/matter-labs/foundry-zksync/commit/f697e548f8d75d07b868ffe6975cc1bb3168d82d))
+* **forge:** err if forge create contract with empty bytecode ([f697e54](https://github.com/matter-labs/foundry-zksync/commit/f697e548f8d75d07b868ffe6975cc1bb3168d82d))
+* **forge:** err if forge create contract with empty bytecode ([5b5bd7b](https://github.com/matter-labs/foundry-zksync/commit/5b5bd7b95f5f765abc84673c651e482f2fadc69b))
+* **forge:** err if forge create contract with empty bytecode ([5b5bd7b](https://github.com/matter-labs/foundry-zksync/commit/5b5bd7b95f5f765abc84673c651e482f2fadc69b))
+* propagate error on backend spawn fork ([f697e54](https://github.com/matter-labs/foundry-zksync/commit/f697e548f8d75d07b868ffe6975cc1bb3168d82d))
+* propagate error on backend spawn fork ([5b5bd7b](https://github.com/matter-labs/foundry-zksync/commit/5b5bd7b95f5f765abc84673c651e482f2fadc69b))
+
 ## [0.0.13](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.12...foundry-zksync-v0.0.13) (2025-04-09)
 
 
