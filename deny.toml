@@ -10,12 +10,12 @@ ignore = [
     # Used by boojum
     # derivative is unmaintained
     "RUSTSEC-2024-0388",
-    # deprecated paste used by alloy-primitives
+    # https://rustsec.org/advisories/RUSTSEC-2024-0436 paste! is unmaintained
     "RUSTSEC-2024-0436",
     # protobuf in trezor_client
     "RUSTSEC-2024-0437",
     # https://rustsec.org/advisories/RUSTSEC-2025-0021 gitoxide uses SHA-1 hash implementations without any collision detection, leaving it vulnerable to hash collision attacks.
-    "RUSTSEC-2025-0021"
+    "RUSTSEC-2025-0021",
 ]
 
 # This section is considered when running `cargo deny check bans`.
@@ -71,6 +71,7 @@ allow = [
     "CDDL-1.0",
     "Zlib",
     "OpenSSL",
+    "CDLA-Permissive-2.0",
 ]
 
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
@@ -84,6 +85,9 @@ exceptions = [
     { allow = ["CC0-1.0"], name = "notify" },
     { allow = ["CC0-1.0"], name = "dunce" },
     { allow = ["CC0-1.0"], name = "aurora-engine-modexp" },
+    # Allow CDLA-Permissive-2.0 for webpki crates
+    { allow = ["CDLA-Permissive-2.0"], name = "webpki-root-certs" },
+    { allow = ["CDLA-Permissive-2.0"], name = "webpki-roots" },
 ]
 #copyleft = "deny"
 

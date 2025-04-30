@@ -48,6 +48,9 @@ anvil_zksync_api_server.workspace = true
 anvil_zksync_config.workspace = true
 anvil_zksync_l1_sidecar.workspace = true
 
+# See /Cargo.toml.
+idna_adapter.workspace = true
+
 [dev-dependencies]
 tokio.workspace = true
 foundry-block-explorers.workspace = true
