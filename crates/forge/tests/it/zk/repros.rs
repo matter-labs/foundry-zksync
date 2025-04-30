@@ -43,3 +43,6 @@ test_repro!(565; |cfg| {
 
 // https://github.com/matter-labs/foundry-zksync/issues/687
 test_repro!(687);
+
+// https://github.com/matter-labs/foundry-zksync/issues/1036
+test_repro!(1036);
