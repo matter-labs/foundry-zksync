@@ -1,0 +1,7 @@
+Installing foundryup-zksync...
+
+warning: libusb not found. You may need to install it manually on MacOS via Homebrew (brew install libusb).
+
+Detected your preferred shell is zsh and added foundryup-zksync to PATH.
+Run 'source /Users/mohitkapadiya/.zshenv' or start a new terminal session to use foundryup-zksync.
+Then, simply run 'foundryup-zksync' to install foundry-zksync.
