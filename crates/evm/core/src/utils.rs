@@ -23,7 +23,7 @@ use revm::{
     primitives::{CreateScheme, EVMError, HandlerCfg, SpecId, KECCAK_EMPTY},
     FrameOrResult, FrameResult,
 };
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, rc::Rc, str::FromStr, sync::Arc};
 
 pub use revm::primitives::EvmState as StateChangeset;
 
@@ -109,43 +109,89 @@ pub fn configure_tx_env(env: &mut revm::primitives::Env, tx: &Transaction<AnyTxE
     }
 }
 
+fn field_to_val<T: FromStr + Default>(
+    fields_map: &BTreeMap<String, serde_json::Value>,
+    field_name: &str,
+) -> T {
+    fields_map
+        .get(field_name)
+        .and_then(|v| v.as_str())
+        .and_then(|s| T::from_str(s).ok())
+        .unwrap_or_default()
+}
+
+fn field_to_bytes(
+    fields_map: &BTreeMap<String, serde_json::Value>,
+    field_name: &str,
+) -> alloy_primitives::Bytes {
+    fields_map
+        .get(field_name)
+        .and_then(|v| v.as_str())
+        .and_then(|s| alloy_primitives::hex::decode(s).ok())
+        .map(Into::into) // Convert Vec<u8> to Bytes
+        .unwrap_or_default()
+}
+
 /// Configures the env for the given RPC transaction.
 /// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
 pub fn configure_zksync_tx_env(
     env: &mut revm::primitives::Env,
-    tx: &Transaction<AnyTxEnvelope>,
+    outer_tx: &Transaction<AnyTxEnvelope>,
 ) -> foundry_zksync_core::ZkTransactionMetadata {
     let mut metadata = foundry_zksync_core::ZkTransactionMetadata::default();
-    if let AnyTxEnvelope::Unknown(tx) = &tx.inner.inner() {
-        let input = tx
+
+    if let AnyTxEnvelope::Unknown(unknown_tx_data) = &outer_tx.inner.inner() {
+        let input_bytes_from_fields = unknown_tx_data
             .inner
             .fields
             .get("input")
             .and_then(|value| value.as_str())
             .and_then(|value| alloy_primitives::hex::decode(value).ok())
             .unwrap_or_default();
-        let (eip712_tx, _) =
-            zksync_types::transaction_request::TransactionRequest::from_bytes_unverified(&input)
-                .expect("invalid zksync transaction");
 
-        env.tx.transact_to = TxKind::Call(eip712_tx.to.expect("to must exist").to_address());
-        env.tx.caller = eip712_tx.from.expect("from must exist").to_address();
-        env.tx.gas_limit = eip712_tx.gas.as_u64();
-        env.tx.nonce = Some(eip712_tx.nonce.as_u64());
-        env.tx.value = eip712_tx.value.to_ru256();
-        env.tx.data = eip712_tx.input.0.into();
-        env.tx.chain_id = eip712_tx.chain_id;
-        env.tx.gas_price = eip712_tx.gas_price.to_ru256();
-        env.tx.gas_priority_fee = eip712_tx.max_priority_fee_per_gas.map(|value| value.to_ru256());
+        // Note(ZK): Sometimes the input retrieved does not contain the encoded transaction. This
+        // happens mainly in sepolia and mainnet but not in anvil-zksync. That is why we
+        // need to check if the input is a valid transaction request and if not, we use the fields
+        // from the tx.
+        match zksync_types::transaction_request::TransactionRequest::from_bytes_unverified(
+            &input_bytes_from_fields,
+        ) {
+            Ok((eip712_tx, _)) => {
+                env.tx.transact_to =
+                    TxKind::Call(eip712_tx.to.expect("to must exist").to_address());
+                env.tx.caller = eip712_tx.from.expect("from must exist").to_address();
+                env.tx.gas_limit = eip712_tx.gas.as_u64();
+                env.tx.nonce = Some(eip712_tx.nonce.as_u64());
+                env.tx.value = eip712_tx.value.to_ru256();
+                env.tx.data = eip712_tx.input.0.into();
+                env.tx.chain_id = eip712_tx.chain_id;
+                env.tx.gas_price = eip712_tx.gas_price.to_ru256();
+                env.tx.gas_priority_fee =
+                    eip712_tx.max_priority_fee_per_gas.map(|value| value.to_ru256());
 
-        if let Some(eip712_meta) = eip712_tx.eip712_meta {
-            metadata = foundry_zksync_core::ZkTransactionMetadata {
-                factory_deps: eip712_meta.factory_deps,
-                paymaster_data: eip712_meta.paymaster_params,
-            };
+                if let Some(eip712_meta) = eip712_tx.eip712_meta {
+                    metadata = foundry_zksync_core::ZkTransactionMetadata {
+                        factory_deps: eip712_meta.factory_deps,
+                        paymaster_data: eip712_meta.paymaster_params,
+                    };
+                }
+            }
+            Err(_e) => {
+                let fields_map_ref = &*unknown_tx_data.inner.fields;
+
+                env.tx.transact_to = TxKind::Call(field_to_val::<Address>(fields_map_ref, "to"));
+                env.tx.caller = outer_tx.inner.signer();
+                env.tx.gas_limit = field_to_val::<U256>(fields_map_ref, "gas").to::<u64>();
+                env.tx.nonce = Some(field_to_val::<U256>(fields_map_ref, "nonce").to::<u64>());
+                env.tx.value = field_to_val::<U256>(fields_map_ref, "value");
+                env.tx.data = field_to_bytes(fields_map_ref, "input");
+                env.tx.chain_id = Some(field_to_val::<U256>(fields_map_ref, "chainId").to::<u64>());
+                env.tx.gas_price = field_to_val::<U256>(fields_map_ref, "gasPrice");
+                env.tx.gas_priority_fee =
+                    Some(field_to_val::<U256>(fields_map_ref, "maxPriorityFeePerGas"));
+            }
         }
     }
-
     metadata
 }
 
