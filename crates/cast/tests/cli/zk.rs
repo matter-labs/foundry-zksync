@@ -815,8 +815,8 @@ casttest!(test_zk_cast_run_with_transaction_on_sepolia, async |_prj, cmd| {
     assert!(
         output.contains(
             "Traces:
-  [5645] 0x9760bfd2698A7289e0dB1039D98Ce99A66250790::decrement()
-    └─ ← [Return]
+  [91] → new <unknown>@0x6CC144d3c53c0e816Afbb6ffe2A1f67884477607
+    └─ ← [Return] 864 bytes of code
 "
         ),
         "trace mismatch, got output:\n{output}"
