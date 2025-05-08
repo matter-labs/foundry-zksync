@@ -138,18 +138,14 @@ pub fn configure_zksync_tx_env(
 
     match &outer_tx.common_data {
         // Set zkSync specific metadata
-        ExecuteTransactionCommon::L2(common_data) => {
-            foundry_zksync_core::ZkTransactionMetadata {
-                factory_deps: outer_tx.execute.factory_deps.clone(),
-                paymaster_data: Some(common_data.paymaster_params.clone()),
-            }
-        }
-        _ => {
-            foundry_zksync_core::ZkTransactionMetadata {
-                factory_deps: outer_tx.execute.factory_deps.clone(),
-                paymaster_data: None,
-            }
-        }
+        ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: Some(common_data.paymaster_params.clone()),
+        },
+        _ => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: None,
+        },
     }
 }
 
