@@ -155,6 +155,13 @@ impl RunArgs {
         // fetch the block the transaction was mined in
         let block = provider.get_block(tx_block_number.into()).full().await?;
 
+        let raw_block = provider
+            .raw_request::<_, serde_json::Value>(
+                "zks_getRawBlockTransactions".into(),
+                vec![serde_json::json!(tx_block_number)],
+            )
+            .await?;
+
         // we need to fork off the parent block
         config.fork_block_number = Some(tx_block_number - 1);
 
@@ -235,7 +242,10 @@ impl RunArgs {
                     }
 
                     if self.zk_force {
-                        let metadata = configure_zksync_tx_env(&mut env, &tx.inner);
+                        let raw_tx = &raw_block
+                            .as_array()
+                            .ok_or_else(|| eyre::eyre!("Expected array of transactions"))?[index];
+                        let metadata = configure_zksync_tx_env(&mut env, raw_tx);
                         let mut other_fields = OtherFields::default();
                         other_fields.insert(
                             foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
@@ -289,7 +299,22 @@ impl RunArgs {
             executor.set_trace_printer(self.trace_printer);
 
             if self.zk_force {
-                let metadata = configure_zksync_tx_env(&mut env, &tx.inner);
+                let raw_txs = raw_block
+                    .as_array()
+                    .ok_or_else(|| eyre::eyre!("Expected array of transactions"))?;
+
+                // Find the raw transaction that matches our target transaction hash
+                let raw_tx = raw_txs
+                    .iter()
+                    .find(|raw_tx| {
+                        let tx_hash = raw_tx["common_data"]["L2"]["input"]["hash"]
+                            .as_str()
+                            .unwrap_or_default();
+                        tx_hash == tx.tx_hash().to_string()
+                    })
+                    .ok_or_else(|| eyre::eyre!("Could not find target transaction in raw block"))?;
+
+                let metadata = configure_zksync_tx_env(&mut env, raw_tx);
                 let mut other_fields = OtherFields::default();
                 other_fields.insert(
                     foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),

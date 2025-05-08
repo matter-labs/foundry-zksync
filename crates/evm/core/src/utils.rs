@@ -9,10 +9,7 @@ use alloy_rpc_types::{Transaction, TransactionRequest};
 use foundry_common::is_impersonated_tx;
 use foundry_config::NamedChain;
 use foundry_fork_db::DatabaseError;
-use foundry_zksync_core::{
-    convert::{ConvertH160, ConvertU256},
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-};
+use foundry_zksync_core::DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
 use revm::{
     handler::register::EvmHandler,
     interpreter::{
@@ -136,62 +133,85 @@ fn field_to_bytes(
 /// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
 pub fn configure_zksync_tx_env(
     env: &mut revm::primitives::Env,
-    outer_tx: &Transaction<AnyTxEnvelope>,
+    outer_tx: &serde_json::Value,
 ) -> foundry_zksync_core::ZkTransactionMetadata {
     let mut metadata = foundry_zksync_core::ZkTransactionMetadata::default();
 
-    if let AnyTxEnvelope::Unknown(unknown_tx_data) = &outer_tx.inner.inner() {
-        let input_bytes_from_fields = unknown_tx_data
-            .inner
-            .fields
-            .get("input")
-            .and_then(|value| value.as_str())
-            .and_then(|value| alloy_primitives::hex::decode(value).ok())
-            .unwrap_or_default();
+    // Extract fields from the raw zkSync transaction format
+    let common_data = &outer_tx["common_data"]["L2"];
+    let execute = &outer_tx["execute"];
 
-        // Note(ZK): Sometimes the input retrieved does not contain the encoded transaction. This
-        // happens mainly in sepolia and mainnet but not in anvil-zksync. That is why we
-        // need to check if the input is a valid transaction request and if not, we use the fields
-        // from the tx.
-        match zksync_types::transaction_request::TransactionRequest::from_bytes_unverified(
-            &input_bytes_from_fields,
-        ) {
-            Ok((eip712_tx, _)) => {
-                env.tx.transact_to =
-                    TxKind::Call(eip712_tx.to.expect("to must exist").to_address());
-                env.tx.caller = eip712_tx.from.expect("from must exist").to_address();
-                env.tx.gas_limit = eip712_tx.gas.as_u64();
-                env.tx.nonce = Some(eip712_tx.nonce.as_u64());
-                env.tx.value = eip712_tx.value.to_ru256();
-                env.tx.data = eip712_tx.input.0.into();
-                env.tx.chain_id = eip712_tx.chain_id;
-                env.tx.gas_price = eip712_tx.gas_price.to_ru256();
-                env.tx.gas_priority_fee =
-                    eip712_tx.max_priority_fee_per_gas.map(|value| value.to_ru256());
+    // Set basic transaction fields
+    env.tx.caller = common_data["initiatorAddress"].as_str().unwrap().parse().unwrap();
+    env.tx.transact_to =
+        TxKind::Call(execute["contractAddress"].as_str().unwrap().parse().unwrap());
+    env.tx.gas_limit = U256::from_str_radix(
+        common_data["fee"]["gas_limit"].as_str().unwrap().trim_start_matches("0x"),
+        16,
+    )
+    .unwrap()
+    .try_into()
+    .unwrap();
+    env.tx.nonce = Some(common_data["nonce"].as_u64().unwrap());
+    env.tx.value =
+        U256::from_str_radix(execute["value"].as_str().unwrap().trim_start_matches("0x"), 16)
+            .unwrap();
+    env.tx.data = alloy_primitives::hex::decode(
+        execute["calldata"].as_str().unwrap().trim_start_matches("0x"),
+    )
+    .unwrap()
+    .into();
+    env.tx.gas_price = U256::from_str_radix(
+        common_data["fee"]["max_fee_per_gas"].as_str().unwrap().trim_start_matches("0x"),
+        16,
+    )
+    .unwrap();
+    env.tx.gas_priority_fee = Some(
+        U256::from_str_radix(
+            common_data["fee"]["max_priority_fee_per_gas"]
+                .as_str()
+                .unwrap()
+                .trim_start_matches("0x"),
+            16,
+        )
+        .unwrap(),
+    );
 
-                if let Some(eip712_meta) = eip712_tx.eip712_meta {
-                    metadata = foundry_zksync_core::ZkTransactionMetadata {
-                        factory_deps: eip712_meta.factory_deps,
-                        paymaster_data: eip712_meta.paymaster_params,
-                    };
-                }
-            }
-            Err(_e) => {
-                let fields_map_ref = &*unknown_tx_data.inner.fields;
-
-                env.tx.transact_to = TxKind::Call(field_to_val::<Address>(fields_map_ref, "to"));
-                env.tx.caller = outer_tx.inner.signer();
-                env.tx.gas_limit = field_to_val::<U256>(fields_map_ref, "gas").to::<u64>();
-                env.tx.nonce = Some(field_to_val::<U256>(fields_map_ref, "nonce").to::<u64>());
-                env.tx.value = field_to_val::<U256>(fields_map_ref, "value");
-                env.tx.data = field_to_bytes(fields_map_ref, "input");
-                env.tx.chain_id = Some(field_to_val::<U256>(fields_map_ref, "chainId").to::<u64>());
-                env.tx.gas_price = field_to_val::<U256>(fields_map_ref, "gasPrice");
-                env.tx.gas_priority_fee =
-                    Some(field_to_val::<U256>(fields_map_ref, "maxPriorityFeePerGas"));
-            }
-        }
+    // Set zkSync specific metadata
+    if let Some(paymaster_params) = outer_tx.get("paymasterParams") {
+        metadata = foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: execute["factoryDeps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|dep| {
+                    dep.as_array().unwrap().iter().map(|b| b.as_u64().unwrap() as u8).collect()
+                })
+                .collect(),
+            paymaster_data: Some(foundry_zksync_core::PaymasterParams {
+                paymaster: paymaster_params["paymaster"].as_str().unwrap().parse().unwrap(),
+                paymaster_input: paymaster_params["paymasterInput"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|b| b.as_u64().unwrap() as u8)
+                    .collect(),
+            }),
+        };
+    } else {
+        metadata = foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: execute["factoryDeps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|dep| {
+                    dep.as_array().unwrap().iter().map(|b| b.as_u64().unwrap() as u8).collect()
+                })
+                .collect(),
+            paymaster_data: None,
+        };
     }
+
     metadata
 }
 

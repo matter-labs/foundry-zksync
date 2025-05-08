@@ -98,7 +98,7 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
     assert!(output > 0);
 
     // Interact with the counter using the paymaster
-    cmd.cast_fuse().args([
+    let output2 = cmd.cast_fuse().args([
         "send",
         "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
         "increment()",
@@ -111,7 +111,13 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
         "--rpc-url",
         &url
     ])
-    .assert_success();
+    .assert_success()
+    .get_output()
+    .stdout_lossy();
+
+    let re = Regex::new(r"transactionHash\s+(\w+)").expect("invalid regex");
+    let caps = re.captures(&output2).expect("failed getting capture");
+    let tx_hash = caps.get(1).expect("failed getting tx hash").as_str();
 
     let balance_after = cmd
         .cast_fuse()
@@ -121,6 +127,12 @@ casttest!(test_zk_cast_using_paymaster, async |_prj, cmd| {
         .stdout_lossy();
 
     assert_eq!(balance_after, balance_before);
+
+    // re ran the same tx
+    cmd
+        .cast_fuse()
+        .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
+        .assert_success();
 });
 
 casttest!(test_zk_cast_without_paymaster, async |_prj, cmd| {
@@ -803,7 +815,7 @@ casttest!(test_zk_cast_run_with_transaction_on_sepolia, async |_prj, cmd| {
         ZkSyncNode::start_with_fork(Fork::new("https://sepolia.era.zksync.dev".to_string())).await;
     let url = node.url();
 
-    let tx_hash = "0xfca642a79e719404521da4ebe0789b3a2577e43c4d0e5cde22617b81a4779dfc";
+    let tx_hash = "0x39c0deddcccf67d3991b7cfd7dcd8dec971f31dde2108b2fe75214972071c253";
 
     let output = cmd
         .cast_fuse()
