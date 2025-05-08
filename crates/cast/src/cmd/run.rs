@@ -155,12 +155,18 @@ impl RunArgs {
         // fetch the block the transaction was mined in
         let block = provider.get_block(tx_block_number.into()).full().await?;
 
-        let raw_block = provider
-            .raw_request::<_, serde_json::Value>(
-                "zks_getRawBlockTransactions".into(),
-                vec![serde_json::json!(tx_block_number)],
-            )
-            .await?;
+        // Only fetch raw block data if zk_force is enabled
+        let mut raw_block = None;
+        if self.zk_force {
+            raw_block = Some(
+                provider
+                    .raw_request::<_, serde_json::Value>(
+                        "zks_getRawBlockTransactions".into(),
+                        vec![serde_json::json!(tx_block_number)],
+                    )
+                    .await?,
+            );
+        }
 
         // we need to fork off the parent block
         config.fork_block_number = Some(tx_block_number - 1);
@@ -224,7 +230,7 @@ impl RunArgs {
                 pb.set_position(0);
 
                 let BlockTransactions::Full(ref txs) = block.transactions else {
-                    return Err(eyre::eyre!("Could not get block txs"))
+                    return Err(eyre::eyre!("Could not get block txs"));
                 };
 
                 for (index, tx) in txs.iter().enumerate() {
@@ -243,6 +249,8 @@ impl RunArgs {
 
                     if self.zk_force {
                         let raw_tx = &raw_block
+                            .as_ref()
+                            .unwrap()
                             .as_array()
                             .ok_or_else(|| eyre::eyre!("Expected array of transactions"))?[index];
                         let metadata = configure_zksync_tx_env(&mut env, raw_tx);
@@ -300,6 +308,8 @@ impl RunArgs {
 
             if self.zk_force {
                 let raw_txs = raw_block
+                    .as_ref()
+                    .ok_or_else(|| eyre::eyre!("Raw block data not available"))?
                     .as_array()
                     .ok_or_else(|| eyre::eyre!("Expected array of transactions"))?;
 
