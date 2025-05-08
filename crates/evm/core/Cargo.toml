@@ -61,6 +61,6 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["time", "macros"] }
 tracing.workspace = true
 url.workspace = true
-
+zksync_types.workspace = true
 [dev-dependencies]
 foundry-test-utils.workspace = true

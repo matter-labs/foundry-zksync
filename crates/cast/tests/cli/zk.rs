@@ -803,7 +803,7 @@ casttest!(test_zk_cast_run_with_create_transaction_on_sepolia, async |_prj, cmd|
         ZkSyncNode::start_with_fork(Fork::new("https://sepolia.era.zksync.dev".to_string())).await;
     let url = node.url();
 
-    let tx_hash = "0x39c0deddcccf67d3991b7cfd7dcd8dec971f31dde2108b2fe75214972071c253";
+    let tx_hash = "0x77280b7ed82da2f7f4dc1c91930fb65e3e0fa956a0f465f0631039d22b8f5f83";
 
     let output = cmd
         .cast_fuse()
@@ -815,8 +815,8 @@ casttest!(test_zk_cast_run_with_create_transaction_on_sepolia, async |_prj, cmd|
     assert!(
         output.contains(
             "Traces:
-  [91] → new <unknown>@0x6CC144d3c53c0e816Afbb6ffe2A1f67884477607
-    └─ ← [Return] 864 bytes of code
+  [91] → new <unknown>@0x9760bfd2698A7289e0dB1039D98Ce99A66250790
+    └─ ← [Return] 800 bytes of code
 "
         ),
         "trace mismatch, got output:\n{output}"

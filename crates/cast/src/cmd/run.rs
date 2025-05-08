@@ -29,6 +29,7 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
     utils::{configure_tx_env, configure_zksync_tx_env},
 };
+use zksync_types::Transaction as ZkTransaction;
 
 /// CLI arguments for `cast run`.
 #[derive(Clone, Debug, Parser)]
@@ -160,7 +161,7 @@ impl RunArgs {
         if self.zk_force {
             raw_block = Some(
                 provider
-                    .raw_request::<_, serde_json::Value>(
+                    .raw_request::<_, Vec<ZkTransaction>>(
                         "zks_getRawBlockTransactions".into(),
                         vec![serde_json::json!(tx_block_number)],
                     )
@@ -251,8 +252,8 @@ impl RunArgs {
                         let raw_tx = &raw_block
                             .as_ref()
                             .unwrap()
-                            .as_array()
-                            .ok_or_else(|| eyre::eyre!("Expected array of transactions"))?[index];
+                            .get(index)
+                            .expect("Failed to get transaction");
                         let metadata = configure_zksync_tx_env(&mut env, raw_tx);
                         let mut other_fields = OtherFields::default();
                         other_fields.insert(
@@ -309,19 +310,12 @@ impl RunArgs {
             if self.zk_force {
                 let raw_txs = raw_block
                     .as_ref()
-                    .ok_or_else(|| eyre::eyre!("Raw block data not available"))?
-                    .as_array()
-                    .ok_or_else(|| eyre::eyre!("Expected array of transactions"))?;
+                    .ok_or_else(|| eyre::eyre!("Raw block data not available"))?;
 
                 // Find the raw transaction that matches our target transaction hash
                 let raw_tx = raw_txs
                     .iter()
-                    .find(|raw_tx| {
-                        let tx_hash = raw_tx["common_data"]["L2"]["input"]["hash"]
-                            .as_str()
-                            .unwrap_or_default();
-                        tx_hash == tx.tx_hash().to_string()
-                    })
+                    .find(|raw_tx| raw_tx.hash() == zksync_types::H256::from(tx.tx_hash().0))
                     .ok_or_else(|| eyre::eyre!("Could not find target transaction in raw block"))?;
 
                 let metadata = configure_zksync_tx_env(&mut env, raw_tx);

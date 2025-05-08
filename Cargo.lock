@@ -5146,6 +5146,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zksync_types",
 ]
 
 [[package]]
