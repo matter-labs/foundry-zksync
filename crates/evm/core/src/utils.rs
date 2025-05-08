@@ -20,7 +20,7 @@ use revm::{
     primitives::{CreateScheme, EVMError, HandlerCfg, SpecId, KECCAK_EMPTY},
     FrameOrResult, FrameResult,
 };
-use std::{cell::RefCell, rc::Rc, sync::Arc};
+use std::{cell::RefCell, rc::Rc, str::FromStr, sync::Arc};
 
 pub use revm::primitives::EvmState as StateChangeset;
 
@@ -112,84 +112,103 @@ pub fn configure_zksync_tx_env(
     env: &mut revm::primitives::Env,
     outer_tx: &serde_json::Value,
 ) -> foundry_zksync_core::ZkTransactionMetadata {
-    let mut metadata = foundry_zksync_core::ZkTransactionMetadata::default();
-
     // Extract fields from the raw zkSync transaction format
     let common_data = &outer_tx["common_data"]["L2"];
     let execute = &outer_tx["execute"];
 
     // Set basic transaction fields
-    env.tx.caller = common_data["initiatorAddress"].as_str().unwrap().parse().unwrap();
-    env.tx.transact_to =
-        TxKind::Call(execute["contractAddress"].as_str().unwrap().parse().unwrap());
-    env.tx.gas_limit = U256::from_str_radix(
-        common_data["fee"]["gas_limit"].as_str().unwrap().trim_start_matches("0x"),
-        16,
+    env.tx.caller = common_data["initiatorAddress"]
+        .as_str()
+        .expect("initiatorAddress not found in common_data")
+        .parse()
+        .expect("invalid initiatorAddress format");
+
+    env.tx.transact_to = TxKind::Call(
+        execute["contractAddress"]
+            .as_str()
+            .expect("contractAddress not found in execute")
+            .parse()
+            .expect("invalid contractAddress format"),
+    );
+
+    env.tx.gas_limit = U256::from_str(
+        common_data["fee"]["gas_limit"].as_str().expect("gas_limit not found in fee"),
     )
-    .unwrap()
+    .expect("invalid gas_limit format")
     .try_into()
-    .unwrap();
-    env.tx.nonce = Some(common_data["nonce"].as_u64().unwrap());
-    env.tx.value =
-        U256::from_str_radix(execute["value"].as_str().unwrap().trim_start_matches("0x"), 16)
-            .unwrap();
+    .expect("gas_limit too large");
+
+    env.tx.nonce = Some(common_data["nonce"].as_u64().expect("nonce not found in common_data"));
+
+    env.tx.value = U256::from_str(execute["value"].as_str().expect("value not found in execute"))
+        .expect("invalid value format");
+
     env.tx.data = alloy_primitives::hex::decode(
-        execute["calldata"].as_str().unwrap().trim_start_matches("0x"),
+        execute["calldata"].as_str().expect("calldata not found in execute"),
     )
-    .unwrap()
+    .expect("invalid calldata format")
     .into();
-    env.tx.gas_price = U256::from_str_radix(
-        common_data["fee"]["max_fee_per_gas"].as_str().unwrap().trim_start_matches("0x"),
-        16,
+
+    env.tx.gas_price = U256::from_str(
+        common_data["fee"]["max_fee_per_gas"].as_str().expect("max_fee_per_gas not found in fee"),
     )
-    .unwrap();
+    .expect("invalid max_fee_per_gas format");
+
     env.tx.gas_priority_fee = Some(
-        U256::from_str_radix(
+        U256::from_str(
             common_data["fee"]["max_priority_fee_per_gas"]
                 .as_str()
-                .unwrap()
-                .trim_start_matches("0x"),
-            16,
+                .expect("max_priority_fee_per_gas not found in fee"),
         )
-        .unwrap(),
+        .expect("invalid max_priority_fee_per_gas format"),
     );
 
     // Set zkSync specific metadata
     if let Some(paymaster_params) = outer_tx.get("paymasterParams") {
-        metadata = foundry_zksync_core::ZkTransactionMetadata {
+        foundry_zksync_core::ZkTransactionMetadata {
             factory_deps: execute["factoryDeps"]
                 .as_array()
-                .unwrap()
+                .expect("factoryDeps not found in execute")
                 .iter()
                 .map(|dep| {
-                    dep.as_array().unwrap().iter().map(|b| b.as_u64().unwrap() as u8).collect()
+                    dep.as_array()
+                        .expect("invalid factoryDeps format")
+                        .iter()
+                        .map(|b| b.as_u64().expect("invalid factoryDeps byte format") as u8)
+                        .collect()
                 })
                 .collect(),
             paymaster_data: Some(foundry_zksync_core::PaymasterParams {
-                paymaster: paymaster_params["paymaster"].as_str().unwrap().parse().unwrap(),
+                paymaster: paymaster_params["paymaster"]
+                    .as_str()
+                    .expect("paymaster not found in paymasterParams")
+                    .parse()
+                    .expect("invalid paymaster format"),
                 paymaster_input: paymaster_params["paymasterInput"]
                     .as_array()
-                    .unwrap()
+                    .expect("paymasterInput not found in paymasterParams")
                     .iter()
-                    .map(|b| b.as_u64().unwrap() as u8)
+                    .map(|b| b.as_u64().expect("invalid paymasterInput byte format") as u8)
                     .collect(),
             }),
-        };
+        }
     } else {
-        metadata = foundry_zksync_core::ZkTransactionMetadata {
+        foundry_zksync_core::ZkTransactionMetadata {
             factory_deps: execute["factoryDeps"]
                 .as_array()
-                .unwrap()
+                .expect("factoryDeps not found in execute")
                 .iter()
                 .map(|dep| {
-                    dep.as_array().unwrap().iter().map(|b| b.as_u64().unwrap() as u8).collect()
+                    dep.as_array()
+                        .expect("invalid factoryDeps format")
+                        .iter()
+                        .map(|b| b.as_u64().expect("invalid factoryDeps byte format") as u8)
+                        .collect()
                 })
                 .collect(),
             paymaster_data: None,
-        };
+        }
     }
-
-    metadata
 }
 
 /// Configures the env for the given RPC transaction request.
