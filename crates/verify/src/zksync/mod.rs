@@ -40,66 +40,96 @@ impl VerificationProvider for ZkVerificationProvider {
         context: CompilerVerificationContext,
     ) -> Result<()> {
         trace!("ZkVerificationProvider::verify");
+
         let request = self.prepare_request(&args, &context).await?;
 
-        let client = reqwest::Client::new();
+        // builds fully-qualified name (path:contractName or just contractName)
+        let fq_name = args
+            .contract
+            .as_ref()
+            .map(|ci| {
+                ci.path
+                    .as_ref()
+                    .map(|p| format!("{}:{}", p, ci.name))
+                    .unwrap_or_else(|| ci.name.clone())
+            })
+            .unwrap_or_else(|| request.contract_name.clone());
 
+        let client = reqwest::Client::new();
         let retry: Retry = args.retry.into_retry();
-        let verification_id: u64 = retry
+
+        let maybe_id: Option<u64> = retry
             .run_async(|| {
                 async {
                     sh_println!(
                         "\nSubmitting verification for [{}] at address {}.",
-                        request.contract_name, request.contract_address
+                        fq_name,
+                        request.contract_address
                     )?;
 
                     let verifier_url = args
-                    .verifier
-                    .verifier_url
-                    .as_deref()
-                    .ok_or_else(|| eyre::eyre!("verifier_url must be specified either in the config or through the CLI"))?;
+                        .verifier
+                        .verifier_url
+                        .as_deref()
+                        .ok_or_else(|| eyre::eyre!("verifier_url must be specified"))?;
 
-                    let response = client
+                    let resp = client
                         .post(verifier_url)
                         .header("Content-Type", "application/json")
                         .json(&request)
                         .send()
                         .await?;
 
-                    let status = response.status();
-                    let text = response.text().await?;
+                    let status = resp.status();
+                    let body = resp.text().await?;
+                    let lower = body.to_lowercase();
+
+                    if lower.contains("already verified") {
+                        sh_println!(
+                            "Contract [{}] \"{}\" is already verified. Skipping verification.",
+                            fq_name,
+                            request.contract_address
+                        )?;
+                        return Ok(None);
+                    }
 
                     if !status.is_success() {
                         eyre::bail!(
-                            "Verification request for address ({}) failed with status code {}\nDetails: {}",
+                            "Verification request for address ({}) failed with status {}.\nDetails: {}",
                             args.address,
                             status,
-                            text,
+                            body,
                         );
                     }
 
-                    let parsed_id = text.trim().parse().map_err(|e| {
-                        eyre::eyre!("Failed to parse verification ID: {} - error: {}", text, e)
-                    })?;
+                    let id = body
+                        .trim()
+                        .parse()
+                        .map_err(|e| eyre::eyre!("Failed to parse verification ID `{}`: {}", body, e))?;
 
-                    Ok(parsed_id)
+                    Ok(Some(id))
                 }
                 .boxed()
             })
             .await?;
 
-        let _ = sh_println!(
-            "Verification submitted successfully. Verification ID: {}",
-            verification_id
-        );
+        if let Some(verification_id) = maybe_id {
+            sh_println!(
+                "Verification submitted successfully. Verification ID: {}",
+                verification_id
+            )?;
 
-        self.check(VerifyCheckArgs {
-            id: verification_id.to_string(),
-            verifier: args.verifier.clone(),
-            retry: args.retry,
-            etherscan: EtherscanOpts::default(),
-        })
-        .await?;
+            self.check(VerifyCheckArgs {
+                id: verification_id.to_string(),
+                verifier: args.verifier.clone(),
+                retry: args.retry,
+                etherscan: EtherscanOpts::default(),
+            })
+            .await?;
+        } else {
+            // Already verified → skip entirely
+            return Ok(());
+        }
 
         Ok(())
     }
