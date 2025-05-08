@@ -20,7 +20,7 @@ use revm::{
     primitives::{CreateScheme, EVMError, HandlerCfg, SpecId, KECCAK_EMPTY},
     FrameOrResult, FrameResult,
 };
-use std::{cell::RefCell, collections::BTreeMap, rc::Rc, str::FromStr, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 pub use revm::primitives::EvmState as StateChangeset;
 
@@ -104,29 +104,6 @@ pub fn configure_tx_env(env: &mut revm::primitives::Env, tx: &Transaction<AnyTxE
     if let AnyTxEnvelope::Ethereum(tx) = &tx.inner.inner() {
         configure_tx_req_env(env, &tx.clone().into(), impersonated_from).expect("cannot fail");
     }
-}
-
-fn field_to_val<T: FromStr + Default>(
-    fields_map: &BTreeMap<String, serde_json::Value>,
-    field_name: &str,
-) -> T {
-    fields_map
-        .get(field_name)
-        .and_then(|v| v.as_str())
-        .and_then(|s| T::from_str(s).ok())
-        .unwrap_or_default()
-}
-
-fn field_to_bytes(
-    fields_map: &BTreeMap<String, serde_json::Value>,
-    field_name: &str,
-) -> alloy_primitives::Bytes {
-    fields_map
-        .get(field_name)
-        .and_then(|v| v.as_str())
-        .and_then(|s| alloy_primitives::hex::decode(s).ok())
-        .map(Into::into) // Convert Vec<u8> to Bytes
-        .unwrap_or_default()
 }
 
 /// Configures the env for the given RPC transaction.
