@@ -29,6 +29,7 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
     utils::{configure_tx_env, configure_zksync_tx_env},
 };
+use zksync_types::Transaction as ZkTransaction;
 
 /// CLI arguments for `cast run`.
 #[derive(Clone, Debug, Parser)]
@@ -155,6 +156,19 @@ impl RunArgs {
         // fetch the block the transaction was mined in
         let block = provider.get_block(tx_block_number.into()).full().await?;
 
+        // Only fetch raw block data if zk_force is enabled
+        let mut raw_block = None;
+        if self.zk_force {
+            raw_block = Some(
+                provider
+                    .raw_request::<_, Vec<ZkTransaction>>(
+                        "zks_getRawBlockTransactions".into(),
+                        vec![serde_json::json!(tx_block_number)],
+                    )
+                    .await?,
+            );
+        }
+
         // we need to fork off the parent block
         config.fork_block_number = Some(tx_block_number - 1);
 
@@ -217,7 +231,7 @@ impl RunArgs {
                 pb.set_position(0);
 
                 let BlockTransactions::Full(ref txs) = block.transactions else {
-                    return Err(eyre::eyre!("Could not get block txs"))
+                    return Err(eyre::eyre!("Could not get block txs"));
                 };
 
                 for (index, tx) in txs.iter().enumerate() {
@@ -235,7 +249,12 @@ impl RunArgs {
                     }
 
                     if self.zk_force {
-                        let metadata = configure_zksync_tx_env(&mut env, &tx.inner);
+                        let raw_tx = &raw_block
+                            .as_ref()
+                            .unwrap()
+                            .get(index)
+                            .expect("Failed to get transaction");
+                        let metadata = configure_zksync_tx_env(&mut env, raw_tx);
                         let mut other_fields = OtherFields::default();
                         other_fields.insert(
                             foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
@@ -289,7 +308,17 @@ impl RunArgs {
             executor.set_trace_printer(self.trace_printer);
 
             if self.zk_force {
-                let metadata = configure_zksync_tx_env(&mut env, &tx.inner);
+                let raw_txs = raw_block
+                    .as_ref()
+                    .ok_or_else(|| eyre::eyre!("Raw block data not available"))?;
+
+                // Find the raw transaction that matches our target transaction hash
+                let raw_tx = raw_txs
+                    .iter()
+                    .find(|raw_tx| raw_tx.hash() == zksync_types::H256::from(tx.tx_hash().0))
+                    .ok_or_else(|| eyre::eyre!("Could not find target transaction in raw block"))?;
+
+                let metadata = configure_zksync_tx_env(&mut env, raw_tx);
                 let mut other_fields = OtherFields::default();
                 other_fields.insert(
                     foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
