@@ -130,11 +130,9 @@ pub fn configure_zksync_tx_env(
     env.tx.value =
         U256::from_str(outer_tx.execute.value.to_string().as_str()).expect("invalid value format");
 
-    let calldata = outer_tx.execute.calldata.clone();
-    let max_fee = outer_tx.max_fee_per_gas();
-
-    env.tx.data = calldata.into();
-    env.tx.gas_price = U256::from(max_fee.0[0]);
+    env.tx.data = outer_tx.execute.calldata.clone().into();
+    env.tx.gas_price = U256::from_str(&outer_tx.max_fee_per_gas().to_string())
+        .expect("invalid max fee per gas format");
 
     match &outer_tx.common_data {
         // Set zkSync specific metadata
