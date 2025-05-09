@@ -23,7 +23,7 @@ use revm::{
     primitives::{CreateScheme, EVMError, HandlerCfg, SpecId, KECCAK_EMPTY},
     FrameOrResult, FrameResult,
 };
-use std::{cell::RefCell, rc::Rc, str::FromStr, sync::Arc};
+use std::{cell::RefCell, rc::Rc, sync::Arc};
 use zksync_types::{ExecuteTransactionCommon, Transaction as ZkTransaction};
 
 pub use revm::primitives::EvmState as StateChangeset;
@@ -119,16 +119,15 @@ pub fn configure_zksync_tx_env(
     // Extract fields from the raw zkSync transaction format
 
     // Set basic transaction fields
-    env.tx.caller = ConvertH160::to_address(outer_tx.initiator_account());
+    env.tx.caller = outer_tx.initiator_account().to_address();
 
-    env.tx.transact_to = TxKind::Call(ConvertH160::to_address(
-        outer_tx.recipient_account().expect("recipient_account not found in execute"),
-    ));
+    env.tx.transact_to = TxKind::Call(
+        outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
+    );
 
     env.tx.gas_limit = outer_tx.gas_limit().as_u64();
 
-    let nonce = outer_tx.nonce().expect("nonce not found in common_data").0.into();
-    env.tx.nonce = Some(nonce);
+    env.tx.nonce = Some(outer_tx.nonce().expect("nonce not found in common_data").0.into());
 
     env.tx.value = outer_tx.execute.value.to_ru256();
 
