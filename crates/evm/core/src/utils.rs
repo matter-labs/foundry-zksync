@@ -9,7 +9,10 @@ use alloy_rpc_types::{Transaction, TransactionRequest};
 use foundry_common::is_impersonated_tx;
 use foundry_config::NamedChain;
 use foundry_fork_db::DatabaseError;
-use foundry_zksync_core::{convert::ConvertH160, DEFAULT_CREATE2_DEPLOYER_ZKSYNC};
+use foundry_zksync_core::{
+    convert::{ConvertH160, ConvertU256},
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+};
 use revm::{
     handler::register::EvmHandler,
     interpreter::{
@@ -127,12 +130,10 @@ pub fn configure_zksync_tx_env(
     let nonce = outer_tx.nonce().expect("nonce not found in common_data").0.into();
     env.tx.nonce = Some(nonce);
 
-    env.tx.value =
-        U256::from_str(outer_tx.execute.value.to_string().as_str()).expect("invalid value format");
+    env.tx.value = outer_tx.execute.value.to_ru256();
 
     env.tx.data = outer_tx.execute.calldata.clone().into();
-    env.tx.gas_price = U256::from_str(&outer_tx.max_fee_per_gas().to_string())
-        .expect("invalid max fee per gas format");
+    env.tx.gas_price = outer_tx.max_fee_per_gas().to_ru256();
 
     match &outer_tx.common_data {
         // Set zkSync specific metadata
