@@ -2186,7 +2186,7 @@ impl FigmentProviders {
     }
 }
 
-/// Wrapper type for `regex::Regex` that implements `PartialEq`
+/// Wrapper type for [`regex::Regex`] that implements [`PartialEq`] and [`serde`] traits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct RegexWrapper {
@@ -2208,6 +2208,8 @@ impl std::cmp::PartialEq for RegexWrapper {
     }
 }
 
+impl Eq for RegexWrapper {}
+
 impl From<RegexWrapper> for regex::Regex {
     fn from(wrapper: RegexWrapper) -> Self {
         wrapper.inner
@@ -2217,6 +2219,26 @@ impl From<RegexWrapper> for regex::Regex {
 impl From<regex::Regex> for RegexWrapper {
     fn from(re: Regex) -> Self {
         Self { inner: re }
+    }
+}
+
+mod serde_regex {
+    use regex::Regex;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub(crate) fn serialize<S>(value: &Regex, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(value.as_str())
+    }
+
+    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Regex, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Regex::new(&s).map_err(serde::de::Error::custom)
     }
 }
 
