@@ -1046,13 +1046,13 @@ eof = false
 additional_compiler_profiles = []
 compilation_restrictions = []
 
-[[profile.default.fs_permissions]]
-access = "read"
-path = "out"
-
 [profile.default.rpc_storage_caching]
 chains = "all"
 endpoints = "all"
+
+[[profile.default.fs_permissions]]
+access = "read"
+path = "out"
 
 [profile.default.zksync]
 compile = false
