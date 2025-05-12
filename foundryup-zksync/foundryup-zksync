@@ -11,8 +11,8 @@ FOUNDRY_DIR=${FOUNDRY_DIR:-"$BASE_DIR/.foundry"}
 FOUNDRY_VERSIONS_DIR="$FOUNDRY_DIR/versions"
 FOUNDRY_BIN_DIR="$FOUNDRY_DIR/bin"
 FOUNDRY_MAN_DIR="$FOUNDRY_DIR/share/man/man1"
-FOUNDRY_BIN_URL="https://raw.githubusercontent.com/foundry-rs/foundry/master/foundryup/foundryup"
-FOUNDRY_BIN_PATH="$FOUNDRY_BIN_DIR/foundryup"
+FOUNDRY_BIN_URL="https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/foundryup-zksync/foundryup-zksync"
+FOUNDRY_BIN_PATH="$FOUNDRY_BIN_DIR/foundryup-zksync"
 
 FOUNDRYUP_JOBS=""
 
