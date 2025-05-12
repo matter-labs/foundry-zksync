@@ -40,8 +40,6 @@ regex = { workspace = true, default-features = false }
 yansi.workspace = true
 itertools.workspace = true
 
-ciborium = "0.2"
-
 # zk
 foundry-zksync-compilers.workspace = true
 

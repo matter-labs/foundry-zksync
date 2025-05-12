@@ -4606,7 +4606,6 @@ dependencies = [
  "alloy-provider",
  "alloy-rpc-types 0.12.6",
  "async-trait",
- "ciborium",
  "clap",
  "eyre",
  "foundry-block-explorers",

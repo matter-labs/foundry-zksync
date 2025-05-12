@@ -239,7 +239,6 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
             ..Default::default()
         };
 
-
         match (active_delegation, active_blob_sidecar) {
             (Some(_), Some(_)) => {
                 // Note(zk): We can't return a call outcome from here
