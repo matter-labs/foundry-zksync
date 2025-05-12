@@ -239,6 +239,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
             ..Default::default()
         };
 
+
         match (active_delegation, active_blob_sidecar) {
             (Some(_), Some(_)) => {
                 // Note(zk): We can't return a call outcome from here
@@ -247,6 +248,9 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
             (Some(auth_list), None) => {
                 tx_req.authorization_list = Some(vec![auth_list]);
                 tx_req.sidecar = None;
+
+                // Increment nonce to reflect the signed authorization.
+                account.info.nonce += 1;
             }
             (None, Some(blob_sidecar)) => {
                 tx_req.set_blob_sidecar(blob_sidecar);

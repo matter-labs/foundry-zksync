@@ -7,7 +7,7 @@ use foundry_config::{
 };
 use foundry_test_utils::{
     foundry_compilers::PathStyle,
-    rpc::next_mainnet_etherscan_api_key,
+    rpc::next_etherscan_api_key,
     snapbox::IntoData,
     util::{pretty_err, read_string, OutputExt, TestCommand},
 };
@@ -37,7 +37,7 @@ Options:
   -j, --threads <THREADS>
           Number of threads to use. Specifying 0 defaults to the number of logical cores
           
-          [aliases: jobs]
+          [aliases: --jobs]
 
   -V, --version
           Print version
@@ -620,7 +620,7 @@ forgetest!(can_clone, |prj, cmd| {
     cmd.args([
         "clone",
         "--etherscan-api-key",
-        next_mainnet_etherscan_api_key().as_str(),
+        next_etherscan_api_key().as_str(),
         "0x044b75f554b886A065b9567891e45c79542d7357",
     ])
     .arg(prj.root())
@@ -649,7 +649,7 @@ forgetest!(can_clone_quiet, |prj, cmd| {
     cmd.args([
         "clone",
         "--etherscan-api-key",
-        next_mainnet_etherscan_api_key().as_str(),
+        next_etherscan_api_key().as_str(),
         "--quiet",
         "0xDb53f47aC61FE54F456A4eb3E09832D08Dd7BEec",
     ])
@@ -667,7 +667,7 @@ forgetest!(can_clone_no_remappings_txt, |prj, cmd| {
     cmd.args([
         "clone",
         "--etherscan-api-key",
-        next_mainnet_etherscan_api_key().as_str(),
+        next_etherscan_api_key().as_str(),
         "--no-remappings-txt",
         "0x33e690aEa97E4Ef25F0d140F1bf044d663091DAf",
     ])
@@ -702,7 +702,7 @@ forgetest!(can_clone_keep_directory_structure, |prj, cmd| {
         .args([
             "clone",
             "--etherscan-api-key",
-            next_mainnet_etherscan_api_key().as_str(),
+            next_etherscan_api_key().as_str(),
             "--keep-directory-structure",
             "0x33e690aEa97E4Ef25F0d140F1bf044d663091DAf",
         ])
@@ -740,7 +740,7 @@ forgetest!(can_clone_with_node_modules, |prj, cmd| {
     cmd.args([
         "clone",
         "--etherscan-api-key",
-        next_mainnet_etherscan_api_key().as_str(),
+        next_etherscan_api_key().as_str(),
         "0xA3E217869460bEf59A1CfD0637e2875F9331e823",
     ])
     .arg(prj.root())
