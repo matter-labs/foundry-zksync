@@ -39,13 +39,8 @@ pub async fn run(args: VerifyBytecodeArgs) -> Result<()> {
     // TODO: we just create etherscan client to get the api url which has some
     // resolution logic baked in. We cannot reuse the client for now as most primitive methods
     // are private and we need zksync specific deserialization.
-    let etherscan = EtherscanVerificationProvider.client(
-        chain,
-        &args.verifier.verifier,
-        args.verifier.verifier_url.as_deref(),
-        etherscan_key,
-        &config,
-    )?;
+    let etherscan =
+        EtherscanVerificationProvider.client(&args.etherscan, &args.verifier, &config)?;
     let etherscan_api_url = etherscan.etherscan_api_url();
 
     let onchain_runtime_code = match args.block {

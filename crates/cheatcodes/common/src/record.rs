@@ -24,4 +24,10 @@ impl RecordAccess {
         self.record_read(target, slot);
         self.writes.entry(target).or_default().push(slot);
     }
+
+    /// Clears the recorded reads and writes.
+    pub fn clear(&mut self) {
+        // Also frees memory.
+        *self = Default::default();
+    }
 }

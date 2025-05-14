@@ -456,7 +456,10 @@ pub struct Cheatcodes {
     pub fork_revert_diagnostic: Option<RevertDiagnostic>,
 
     /// Recorded storage reads and writes
-    pub accesses: Option<RecordAccess>,
+    pub accesses: RecordAccess,
+
+    /// Whether storage access recording is currently active
+    pub recording_accesses: bool,
 
     /// Recorded account accesses (calls, creates) organized by relative call depth, where the
     /// topmost vector corresponds to accesses at the depth at which account access recording
@@ -568,6 +571,7 @@ impl Clone for Cheatcodes {
             recorded_account_diffs_stack: self.recorded_account_diffs_stack.clone(),
             record_debug_steps_info: self.record_debug_steps_info,
             recorded_logs: self.recorded_logs.clone(),
+            recording_accesses: self.recording_accesses,
             mocked_calls: self.mocked_calls.clone(),
             mocked_functions: self.mocked_functions.clone(),
             expected_calls: self.expected_calls.clone(),
@@ -624,6 +628,7 @@ impl Cheatcodes {
             assume_no_revert: Default::default(),
             fork_revert_diagnostic: Default::default(),
             accesses: Default::default(),
+            recording_accesses: Default::default(),
             recorded_account_diffs_stack: Default::default(),
             recorded_logs: Default::default(),
             record_debug_steps_info: Default::default(),
@@ -1232,6 +1237,9 @@ where {
                         });
                     }
 
+                    let active_delegation = self.active_delegation.clone();
+                    let active_blob_sidecar = self.active_blob_sidecar.clone();
+
                     self.strategy.runner.record_broadcastable_call_transactions(
                         self.strategy.context.as_mut(),
                         self.config.clone(),
@@ -1239,14 +1247,16 @@ where {
                         ecx_inner,
                         broadcast,
                         &mut self.broadcastable_transactions,
-                        self.active_delegation.clone(),
-                        self.active_blob_sidecar.clone(),
+                        self.active_delegation.take(),
+                        self.active_blob_sidecar.take(),
                     );
 
                     let account =
                         ecx_inner.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
 
-                    if self.active_delegation.is_some() && self.active_blob_sidecar.is_some() {
+                    // Note(zk): The active delegation and blob sidecar check is in the strategy in
+                    // our codebase.
+                    if active_delegation.is_some() && active_blob_sidecar.is_some() {
                         let msg = "both delegation and blob are active; `attachBlob` and `attachDelegation` are not compatible";
                         return Some(CallOutcome {
                             result: InterpreterResult {
@@ -1436,7 +1446,7 @@ impl Inspector<&mut dyn DatabaseExt> for Cheatcodes {
         }
 
         // `record`: record storage reads and writes.
-        if self.accesses.is_some() {
+        if self.recording_accesses {
             self.record_accesses(interpreter);
         }
 
@@ -2055,7 +2065,7 @@ impl Cheatcodes {
     /// Records storage slots reads and writes.
     #[cold]
     fn record_accesses(&mut self, interpreter: &mut Interpreter) {
-        let Some(access) = &mut self.accesses else { return };
+        let access = &mut self.accesses;
         match interpreter.current_opcode() {
             op::SLOAD => {
                 let key = try_or_return!(interpreter.stack().peek(0));

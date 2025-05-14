@@ -605,7 +605,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
             expected_calls: Some(&mut state.expected_calls),
-            accesses: state.accesses.as_mut(),
+            accesses: Some(&mut state.accesses),
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
@@ -801,7 +801,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
             expected_calls: Some(&mut state.expected_calls),
-            accesses: state.accesses.as_mut(),
+            accesses: Some(&mut state.accesses),
             persisted_factory_deps: Some(&mut ctx.persisted_factory_deps),
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
