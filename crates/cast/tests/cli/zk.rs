@@ -4,7 +4,7 @@ use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::{
     casttest, str,
     util::{self, OutputExt},
-    MockServer, ZkSyncNode,
+    Fork, MockServer, ZkSyncNode,
 };
 use foundry_zksync_core::convert::ConvertH160;
 use regex::Regex;
@@ -794,6 +794,56 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
     └─ ← [Return]
 "
         )),
+        "trace mismatch, got output:\n{output}"
+    );
+});
+
+casttest!(test_zk_cast_run_with_create_transaction_on_sepolia, async |_prj, cmd| {
+    let node =
+        ZkSyncNode::start_with_fork(Fork::new("https://sepolia.era.zksync.dev".to_string())).await;
+    let url = node.url();
+
+    let tx_hash = "0x77280b7ed82da2f7f4dc1c91930fb65e3e0fa956a0f465f0631039d22b8f5f83";
+
+    let output = cmd
+        .cast_fuse()
+        .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    assert!(
+        output.contains(
+            "Traces:
+  [91] → new <unknown>@0x9760bfd2698A7289e0dB1039D98Ce99A66250790
+    └─ ← [Return] 800 bytes of code
+"
+        ),
+        "trace mismatch, got output:\n{output}"
+    );
+});
+
+casttest!(test_zk_cast_run_with_call_transaction_on_sepolia, async |_prj, cmd| {
+    let node =
+        ZkSyncNode::start_with_fork(Fork::new("https://sepolia.era.zksync.dev".to_string())).await;
+    let url = node.url();
+
+    let tx_hash = "0xfca642a79e719404521da4ebe0789b3a2577e43c4d0e5cde22617b81a4779dfc";
+
+    let output = cmd
+        .cast_fuse()
+        .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    assert!(
+        output.contains(
+            "Traces:
+  [5645] 0x9760bfd2698A7289e0dB1039D98Ce99A66250790::decrement()
+    └─ ← [Return]
+"
+        ),
         "trace mismatch, got output:\n{output}"
     );
 });

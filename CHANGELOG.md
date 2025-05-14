@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.0.15](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.14...foundry-zksync-v0.0.15) (2025-05-09)
+
+
+### Bug Fixes
+
+* Added test for issue 1036 regarding crypto provider initialization ([#1038](https://github.com/matter-labs/foundry-zksync/issues/1038)) ([7461390](https://github.com/matter-labs/foundry-zksync/commit/7461390b11493e89d8d09974f0303aefcc5c9cf5))
+* avoid retrying verification for already verified contracts ([#1046](https://github.com/matter-labs/foundry-zksync/issues/1046)) ([9f59ff8](https://github.com/matter-labs/foundry-zksync/commit/9f59ff85664988a16d8e27c53dcba4d61ca2fe18))
+* Fix decode and field population in cast run ([#1047](https://github.com/matter-labs/foundry-zksync/issues/1047)) ([5401d27](https://github.com/matter-labs/foundry-zksync/commit/5401d27600a7d5d8179dcf38829da0b5964a3c17))
+
 ## [0.0.14](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.13...foundry-zksync-v0.0.14) (2025-04-28)
 
 

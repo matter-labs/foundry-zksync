@@ -24,6 +24,7 @@ use revm::{
     FrameOrResult, FrameResult,
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
+use zksync_types::{ExecuteTransactionCommon, Transaction as ZkTransaction};
 
 pub use revm::primitives::EvmState as StateChangeset;
 
@@ -113,40 +114,37 @@ pub fn configure_tx_env(env: &mut revm::primitives::Env, tx: &Transaction<AnyTxE
 /// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
 pub fn configure_zksync_tx_env(
     env: &mut revm::primitives::Env,
-    tx: &Transaction<AnyTxEnvelope>,
+    outer_tx: &ZkTransaction,
 ) -> foundry_zksync_core::ZkTransactionMetadata {
-    let mut metadata = foundry_zksync_core::ZkTransactionMetadata::default();
-    if let AnyTxEnvelope::Unknown(tx) = &tx.inner.inner() {
-        let input = tx
-            .inner
-            .fields
-            .get("input")
-            .and_then(|value| value.as_str())
-            .and_then(|value| alloy_primitives::hex::decode(value).ok())
-            .unwrap_or_default();
-        let (eip712_tx, _) =
-            zksync_types::transaction_request::TransactionRequest::from_bytes_unverified(&input)
-                .expect("invalid zksync transaction");
+    // Extract fields from the raw zkSync transaction format
 
-        env.tx.transact_to = TxKind::Call(eip712_tx.to.expect("to must exist").to_address());
-        env.tx.caller = eip712_tx.from.expect("from must exist").to_address();
-        env.tx.gas_limit = eip712_tx.gas.as_u64();
-        env.tx.nonce = Some(eip712_tx.nonce.as_u64());
-        env.tx.value = eip712_tx.value.to_ru256();
-        env.tx.data = eip712_tx.input.0.into();
-        env.tx.chain_id = eip712_tx.chain_id;
-        env.tx.gas_price = eip712_tx.gas_price.to_ru256();
-        env.tx.gas_priority_fee = eip712_tx.max_priority_fee_per_gas.map(|value| value.to_ru256());
+    // Set basic transaction fields
+    env.tx.caller = outer_tx.initiator_account().to_address();
 
-        if let Some(eip712_meta) = eip712_tx.eip712_meta {
-            metadata = foundry_zksync_core::ZkTransactionMetadata {
-                factory_deps: eip712_meta.factory_deps,
-                paymaster_data: eip712_meta.paymaster_params,
-            };
-        }
+    env.tx.transact_to = TxKind::Call(
+        outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
+    );
+
+    env.tx.gas_limit = outer_tx.gas_limit().as_u64();
+
+    env.tx.nonce = Some(outer_tx.nonce().expect("nonce not found in common_data").0.into());
+
+    env.tx.value = outer_tx.execute.value.to_ru256();
+
+    env.tx.data = outer_tx.execute.calldata.clone().into();
+    env.tx.gas_price = outer_tx.max_fee_per_gas().to_ru256();
+
+    match &outer_tx.common_data {
+        // Set zkSync specific metadata
+        ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: Some(common_data.paymaster_params.clone()),
+        },
+        _ => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: None,
+        },
     }
-
-    metadata
 }
 
 /// Configures the env for the given RPC transaction request.
