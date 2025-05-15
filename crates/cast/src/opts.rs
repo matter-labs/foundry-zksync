@@ -1063,10 +1063,6 @@ pub enum CastSubcommand {
         resolve: bool,
     },
 
-    /// Decodes EOF container bytes
-    #[command()]
-    DecodeEof { eof: Option<String> },
-
     /// Inspect the TxPool of a node.
     #[command(visible_alias = "tp")]
     TxPool {
@@ -1184,7 +1180,6 @@ impl CastSubcommand {
             Self::GenerateFigSpec => "generate-fig-spec",
             Self::Logs(_) => "logs",
             Self::DecodeTransaction { tx: _ } => "decode-transaction",
-            Self::DecodeEof { eof: _ } => "decode-eof",
             Self::TxPool { command: _ } => "tx-pool",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()

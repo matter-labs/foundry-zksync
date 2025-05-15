@@ -16,8 +16,6 @@ pub fn check_command_for_field(field: &ContractArtifactField) -> Result<bool> {
         ContractArtifactField::GasEstimates,
         ContractArtifactField::StorageLayout,
         ContractArtifactField::Metadata,
-        ContractArtifactField::Eof,
-        ContractArtifactField::EofInit,
     ];
 
     let fields_zksolc_should_error = [
