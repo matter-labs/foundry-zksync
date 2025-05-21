@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.16](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.15...foundry-zksync-v0.0.16) (2025-05-19)
+
+
+### Bug Fixes
+
+* fix formating crash caused by non-breaking space in comment ([4bcedfb](https://github.com/matter-labs/foundry-zksync/commit/4bcedfbc0b02ca53f34a91db75872bf773fd6e94))
+
 ## [0.0.15](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.14...foundry-zksync-v0.0.15) (2025-05-09)
 
 
