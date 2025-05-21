@@ -13,7 +13,9 @@ use foundry_compilers::{
 use foundry_config::Config;
 use foundry_zksync_compilers::compilers::{
     artifact_output::zk::ZkArtifactOutput,
-    zksolc::{self, ZkSolc, ZkSolcCompiler},
+    zksolc::{
+        self, ZkSolc, ZkSolcCompiler, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
+    },
 };
 use revm_primitives::Bytes;
 use semver::Version;
@@ -47,19 +49,29 @@ impl ZkVerificationContext {
             foundry_config::zksync::config_create_project(&config, config.cache, false)?;
         project.no_artifacts = true;
         let zksolc_version = project.settings.zksolc_version_ref();
+        let solc_revision = if zksolc_version >= &ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR {
+            &ZKSYNC_SOLC_REVISIONS[1]
+        } else {
+            &ZKSYNC_SOLC_REVISIONS[0]
+        };
 
         let (solc_version, is_zksync_solc) = if let Some(solc) = &config.zksync.solc_path {
             let solc_type_and_version = zksolc::get_solc_version_info(solc)?;
             (solc_type_and_version.version, solc_type_and_version.zksync_version.is_some())
         } else {
-            //if there's no `solc_path` specified then we use the same
+            // if there's no `solc_path` specified then we use the same
             // as the project version
-            let maybe_solc_path =
-                ZkSolc::find_solc_installed_version(&context_solc_version.to_string())?;
+            let maybe_solc_path = ZkSolc::find_solc_installed_version(
+                &context_solc_version.to_string(),
+                &solc_revision.to_string(),
+            )?;
             let solc_path = if let Some(p) = maybe_solc_path {
                 p
             } else {
-                ZkSolc::solc_blocking_install(&context_solc_version.to_string())?
+                ZkSolc::solc_blocking_install(
+                    &context_solc_version.to_string(),
+                    &solc_revision.to_string(),
+                )?
             };
 
             let solc = Solc::new_with_version(solc_path, context_solc_version.clone());
