@@ -99,6 +99,7 @@ impl EtherscanFlattenedSource {
             },
             solc_version: solc_version.clone(),
             cli_settings: CliSettings::default(),
+            zksolc_version,
             zksolc_path,
         };
 
