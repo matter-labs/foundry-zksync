@@ -97,7 +97,7 @@ fn zksync_can_set_hash_type_with_supported_versions() {
             // SPDX-License-Identifier: MIT OR Apache-2.0
             pragma solidity 0.8.10;
             contract Contract {
-                function call() public {}test_zk_build_sizes
+                function call() public {}
             }
             "#,
             )
