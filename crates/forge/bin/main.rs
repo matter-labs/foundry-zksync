@@ -5,9 +5,8 @@ use foundry_cli::utils;
 use foundry_common::{POSTHOG_API_KEY, TELEMETRY_CONFIG_NAME};
 use zksync_telemetry::init_telemetry;
 
-#[cfg(all(feature = "jemalloc", unix))]
 #[global_allocator]
-static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+static ALLOC: foundry_cli::utils::Allocator = foundry_cli::utils::new_allocator();
 
 fn main() {
     let _ = utils::block_on(init_telemetry(

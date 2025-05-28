@@ -33,6 +33,7 @@ alloy-rlp.workspace = true
 alloy-chains.workspace = true
 alloy-zksync.workspace = true
 
+cfg-if = "1.0"
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
 color-eyre.workspace = true
 dotenvy = "0.15"
@@ -60,5 +61,9 @@ foundry-zksync-compilers.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 
+[target.'cfg(unix)'.dependencies]
+tikv-jemallocator = { workspace = true, optional = true }
+
 [features]
 tracy = ["dep:tracing-tracy"]
+jemalloc = ["dep:tikv-jemallocator"]
