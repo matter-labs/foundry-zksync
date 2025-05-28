@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.0.16](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.15...foundry-zksync-v0.0.16) (2025-05-28)
+
+
+### Features
+
+* add 7702 support to eth-sendtransaction ([#10504](https://github.com/matter-labs/foundry-zksync/issues/10504)) ([eef4acd](https://github.com/matter-labs/foundry-zksync/commit/eef4acdbcb4dd8bfe0894052750b051fe5a31754))
+* **cast:** Verbose signing output ([#10529](https://github.com/matter-labs/foundry-zksync/issues/10529)) ([477876a](https://github.com/matter-labs/foundry-zksync/commit/477876a87fea0cd8e2c398f23f836189f2aad58c))
+* dynamic ZKsync/LLVM solc revision selection ([#1055](https://github.com/matter-labs/foundry-zksync/issues/1055)) ([9120621](https://github.com/matter-labs/foundry-zksync/commit/9120621eddb9372392da2cf574270f5136c5fd06))
+* **forge:** cheatcodes to crosschain sign and attach delegation ([#10518](https://github.com/matter-labs/foundry-zksync/issues/10518)) ([297d4e2](https://github.com/matter-labs/foundry-zksync/commit/297d4e25e1da36a0f1a8e3d0f2e6850375bad3a9))
+
+
+### Bug Fixes
+
+* **`cast`:** respect `full` arg in `cast block` ([#10536](https://github.com/matter-labs/foundry-zksync/issues/10536)) ([9e53778](https://github.com/matter-labs/foundry-zksync/commit/9e53778208a2cdb335d5ef794cb13122b8288364))
+* **`common`:** find target by path if present ([#10538](https://github.com/matter-labs/foundry-zksync/issues/10538)) ([71f9b8e](https://github.com/matter-labs/foundry-zksync/commit/71f9b8e645abc24da099912ce4d4ce481d26ffad))
+* **`Makefile`:** update `lint-foundry` target to explicitly use nightly ([#10526](https://github.com/matter-labs/foundry-zksync/issues/10526)) ([b47cf78](https://github.com/matter-labs/foundry-zksync/commit/b47cf78425f6d28bae5c90870eacbeea93c1a0e0))
+* adds zksync, abstract to diff gas calc ([#10539](https://github.com/matter-labs/foundry-zksync/issues/10539)) ([0f8a1ff](https://github.com/matter-labs/foundry-zksync/commit/0f8a1ff67a0a417acccc0869290b28a5c3cef3ce))
+* **anvil:** recomputing next-base-fee after reloading state ([#10488](https://github.com/matter-labs/foundry-zksync/issues/10488)) ([e0ad278](https://github.com/matter-labs/foundry-zksync/commit/e0ad278c4433bc48f1c6ec902f72bf4d980957e0))
+* **anvil:** use saturating_to when check for req funds ([#10503](https://github.com/matter-labs/foundry-zksync/issues/10503)) ([f240a34](https://github.com/matter-labs/foundry-zksync/commit/f240a34ac6824d7a5b3d7b25cb9dfe78aee2f4d4))
+* **cast:** disassembler PC & end of code push padding ([#10520](https://github.com/matter-labs/foundry-zksync/issues/10520)) ([73fec68](https://github.com/matter-labs/foundry-zksync/commit/73fec683a281be0d2215ab735fac43222e1fd358))
+* fix formating crash caused by non-breaking space in comment ([1eb5988](https://github.com/matter-labs/foundry-zksync/commit/1eb598870e7e26a57d813e7584a0a5517566bdd9))
+* fix formating crash caused by non-breaking space in comment ([4bcedfb](https://github.com/matter-labs/foundry-zksync/commit/4bcedfbc0b02ca53f34a91db75872bf773fd6e94))
+* fix formating crash caused by non-breaking space in comment ([38536c9](https://github.com/matter-labs/foundry-zksync/commit/38536c965bde2d155666fdc2d54302b750edee02))
+* fix formating crash caused by non-breaking space in comment. ([#10522](https://github.com/matter-labs/foundry-zksync/issues/10522)) ([38536c9](https://github.com/matter-labs/foundry-zksync/commit/38536c965bde2d155666fdc2d54302b750edee02))
+* **forge:** do not revert if event with count 0 not emitted ([#10534](https://github.com/matter-labs/foundry-zksync/issues/10534)) ([447ef28](https://github.com/matter-labs/foundry-zksync/commit/447ef284e6fc1210028ce6bcffad1c87c9fb7df4))
+* **forge:** mark prank applied on contract creation too ([#10532](https://github.com/matter-labs/foundry-zksync/issues/10532)) ([fb9904b](https://github.com/matter-labs/foundry-zksync/commit/fb9904b17c070ea74f4fc4525c00bc6c403c0acb))
+* **forge:** support preproc with try contract creation ([#10498](https://github.com/matter-labs/foundry-zksync/issues/10498)) ([12b2ed4](https://github.com/matter-labs/foundry-zksync/commit/12b2ed44f8d0667b3c10ce58493466484a66c245))
+* **forge:** vm.cool mark cold instead storage cleaning ([#10546](https://github.com/matter-labs/foundry-zksync/issues/10546)) ([d381a8a](https://github.com/matter-labs/foundry-zksync/commit/d381a8aab3196ca53366e2584bcdb4210febfc5c))
+* patch solang-parser ([#10509](https://github.com/matter-labs/foundry-zksync/issues/10509)) ([dc6a216](https://github.com/matter-labs/foundry-zksync/commit/dc6a2160ef1cecf21531eaf6722af9f7f64ca3c7))
+* respect full arg ([9e53778](https://github.com/matter-labs/foundry-zksync/commit/9e53778208a2cdb335d5ef794cb13122b8288364))
+* sort blocks by number ([#10505](https://github.com/matter-labs/foundry-zksync/issues/10505)) ([0a7b3f0](https://github.com/matter-labs/foundry-zksync/commit/0a7b3f02b559fcb884f9886274f04a89dec15f9c))
+
+
+### Performance Improvements
+
+* find latest block for next-base-fee. replaces [#10505](https://github.com/matter-labs/foundry-zksync/issues/10505) ([#10511](https://github.com/matter-labs/foundry-zksync/issues/10511)) ([58297d3](https://github.com/matter-labs/foundry-zksync/commit/58297d3457569989bc5cfbcf88ac43766fa8f4b3))
+
 ## [0.0.15](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.14...foundry-zksync-v0.0.15) (2025-05-09)
 
 
