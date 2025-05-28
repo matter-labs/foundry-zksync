@@ -277,7 +277,7 @@ pub fn get_solc_version_info(path: &Path) -> Result<SolcVersionInfo, SolcError> 
 
     // Get solc version from second line
     let version = lines.get(1).ok_or_else(|| SolcError::msg("Version not found in Solc output"))?;
-    let version =   
+    let version =
         Version::from_str(&version.trim_start_matches("Version: ").replace(".g++", ".gcc"))?;
 
     // Check for ZKsync version in the last line
@@ -817,7 +817,7 @@ mod tests {
         let solc = zksolc.solc.unwrap();
         let solc_v = get_solc_version_info(&solc).unwrap();
         let zksync_v = solc_v.zksync_version.unwrap();
-        
+
         let prerelease = Version::parse(zksync_v.pre.as_str()).unwrap();
         assert_eq!(solc_v.version.minor, 8);
         assert!(ZKSYNC_SOLC_REVISIONS.contains(&prerelease));
