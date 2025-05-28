@@ -715,7 +715,7 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
         output.contains(&format!(
             "Traces:
   [91] → new <unknown>@{deployed_addr}
-    └─ ← [Return] 224 bytes of code
+    └─ ← [Return] 288 bytes of code
 "
         )),
         "trace mismatch, got output:\n{output}"

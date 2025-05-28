@@ -285,6 +285,9 @@ pub fn get_solc_version_info(path: &Path) -> Result<SolcVersionInfo, SolcError> 
         if line.starts_with("ZKsync") {
             let version_str = line.trim_start_matches("ZKsync:").trim();
             Version::parse(version_str).ok()
+        } else if line.starts_with("LLVM") {
+            let version_str = line.trim_start_matches("LLVM:").trim();
+            Version::parse(version_str).ok()
         } else {
             None
         }
@@ -814,6 +817,7 @@ mod tests {
         let solc = zksolc.solc.unwrap();
         let solc_v = get_solc_version_info(&solc).unwrap();
         let zksync_v = solc_v.zksync_version.unwrap();
+
         let prerelease = Version::parse(zksync_v.pre.as_str()).unwrap();
         assert_eq!(solc_v.version.minor, 8);
         assert!(ZKSYNC_SOLC_REVISIONS.contains(&prerelease));

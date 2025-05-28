@@ -125,7 +125,7 @@ alloy-signer-local.workspace = true
 [features]
 default = ["jemalloc"]
 asm-keccak = ["alloy-primitives/asm-keccak"]
-jemalloc = ["dep:tikv-jemallocator"]
+jemalloc = ["foundry-cli/jemalloc"]
 aws-kms = ["foundry-wallets/aws-kms"]
 gcp-kms = ["foundry-wallets/gcp-kms"]
 isolate-by-default = ["foundry-config/isolate-by-default"]

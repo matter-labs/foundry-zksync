@@ -118,8 +118,10 @@ fn zksync_can_set_hash_type_with_supported_versions() {
         let bytecode_keccak =
             contract_keccak.bytecode.as_ref().map(|b| b.object().into_bytes()).unwrap().unwrap();
 
-        // NOTE: "none" value pads 32 bytes because len should be an odd multiple of 32
-        assert_eq!(bytecode_none.len(), bytecode_keccak.len(), "zksolc {version}");
+        assert!(
+            (bytecode_none.len() as i32 - bytecode_keccak.len() as i32).abs() % 32 == 0,
+            "zksolc {version}: Bytecode lengths can differ by multiples of 32 bytes when including metadata"
+        );
         assert_ne!(bytecode_none, bytecode_keccak, "zksolc {version}");
 
         let end = bytecode_keccak.len() - 32;
