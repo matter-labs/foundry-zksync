@@ -15,6 +15,7 @@ use foundry_zksync_compilers::{
                 ZkSolcSettings,
             },
             ErrorType, WarningType, ZkSettings, ZkSolc, ZkSolcCompiler,
+            ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
         },
     },
 };
@@ -254,12 +255,30 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
             SolcReq::Version(version) => {
                 let solc_version_without_metadata =
                     format!("{}.{}.{}", version.major, version.minor, version.patch);
-                let maybe_solc =
-                    ZkSolc::find_solc_installed_version(&solc_version_without_metadata)?;
+                let solc_revision = match config
+                    .zksync
+                    .zksolc
+                    .as_ref()
+                    .and_then(|zksolc| zksolc.try_version().ok())
+                {
+                    Some(ref zksolc_version)
+                        if zksolc_version >= &ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR =>
+                    {
+                        &ZKSYNC_SOLC_REVISIONS[1]
+                    }
+                    _ => &ZKSYNC_SOLC_REVISIONS[0],
+                };
+                let maybe_solc = ZkSolc::find_solc_installed_version(
+                    &solc_version_without_metadata,
+                    &solc_revision.to_string(),
+                )?;
                 let path = if let Some(solc) = maybe_solc {
                     solc
                 } else {
-                    ZkSolc::solc_blocking_install(&solc_version_without_metadata)?
+                    ZkSolc::solc_blocking_install(
+                        &solc_version_without_metadata,
+                        &solc_revision.to_string(),
+                    )?
                 };
                 Solc::new_with_version(
                     path,

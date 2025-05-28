@@ -5,7 +5,9 @@ use alloy_primitives::hex;
 use eyre::{eyre, Result};
 use foundry_cli::opts::EtherscanOpts;
 use foundry_common::{abi::encode_function_args, retry::Retry};
-use foundry_zksync_compilers::compilers::zksolc::input::StandardJsonCompilerInput;
+use foundry_zksync_compilers::compilers::zksolc::{
+    input::StandardJsonCompilerInput, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
+};
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, thread::sleep, time::Duration};
@@ -175,8 +177,15 @@ impl ZkVerificationProvider {
 
         let (solc_version, zk_compiler_version) = match context {
             CompilerVerificationContext::ZkSolc(zk_context) => {
-                // Format solc_version as "zkVM-{compiler_version}-1.0.1"
-                let solc_version = format!("zkVM-{}-1.0.1", zk_context.compiler_version.solc);
+                // Format solc_version as "zkVM-{compiler_version}-1.0.2"
+                let solc_revision =
+                    if zk_context.compiler_version.zksolc >= ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR {
+                        &ZKSYNC_SOLC_REVISIONS[1]
+                    } else {
+                        &ZKSYNC_SOLC_REVISIONS[0]
+                    };
+                let solc_version =
+                    format!("zkVM-{}-{solc_revision}", zk_context.compiler_version.solc);
                 let zk_compiler_version = format!("v{}", zk_context.compiler_version.zksolc);
                 (solc_version, zk_compiler_version)
             }
