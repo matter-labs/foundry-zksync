@@ -8,8 +8,9 @@ use anvil_zksync_config::{
         DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
         DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
     },
-    types::SystemContractsOptions,
+    types::{SystemContractsOptions, BoojumConfig},
     TestNodeConfig,
+    BaseTokenConfig
 };
 use anvil_zksync_core::{
     filters::EthFilters,
@@ -268,14 +269,14 @@ impl ZkSyncNode {
         let impersonation = ImpersonationManager::default();
         let pool = TxPool::new(impersonation.clone(), config.transaction_order);
         let fee_input_provider =
-            TestNodeFeeInputProvider::from_fork(fork_client.as_ref().map(|f| &f.details));
+            TestNodeFeeInputProvider::from_fork(fork_client.as_ref().map(|f| &f.details), &BaseTokenConfig::default());
         let filters = Arc::new(RwLock::new(EthFilters::default()));
         let system_contracts = SystemContracts::from_options(
             SystemContractsOptions::BuiltInWithoutSecurity,
             None,
             ProtocolVersionId::Version26,
             false,
-            false,
+            BoojumConfig::default(),
         );
         let storage_key_layout = StorageKeyLayout::ZkEra;
 

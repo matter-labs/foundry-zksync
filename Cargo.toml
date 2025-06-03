@@ -265,21 +265,21 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
-anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
-anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
-anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
-anvil_zksync_common = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
-anvil_zksync_console = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
-anvil_zksync_traces = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
-anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "8bfe7312180c86953318439f5dc9719870a53769" }
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
+anvil_zksync_common = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
+anvil_zksync_console = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
+anvil_zksync_traces = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
+anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "6517081f8307ba92dd2636d0985371dc97d8d59e" }
 zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "f6d8618d870a09467ff24ea32ef57e01af8f311e" }
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v27.2.0" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v27.2.0" }
-zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v27.2.0" }
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v27.2.0" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v27.2.0" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v27.2.0" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "301c65ef0b86893cc7a4dd6f204da89ce58d553f" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "301c65ef0b86893cc7a4dd6f204da89ce58d553f" }
+zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", rev = "301c65ef0b86893cc7a4dd6f204da89ce58d553f" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "301c65ef0b86893cc7a4dd6f204da89ce58d553f" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "301c65ef0b86893cc7a4dd6f204da89ce58d553f" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "301c65ef0b86893cc7a4dd6f204da89ce58d553f" }
 
 # macros
 proc-macro2 = "1.0"
@@ -358,3 +358,13 @@ idna_adapter = "=1.1.0"
 
 [patch.crates-io]
 vise = { git = "https://github.com/matter-labs/vise.git", rev = "51669f42f60c50b3a521662a4ecd71212a303299" }
+
+# [patch."https://github.com/matter-labs/anvil-zksync.git"]
+# anvil_zksync_core        = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/core" }
+# anvil_zksync_types       = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/types" }
+# anvil_zksync_config      = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/config" }
+# anvil_zksync_api_server  = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/api_server" }
+# anvil_zksync_common      = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/common" }
+# anvil_zksync_console     = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/console" }
+# anvil_zksync_traces      = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/traces" }
+# anvil_zksync_l1_sidecar  = { path = "/Users/dustinbrickwood/Documents/dev/zk/devx/anvil-zksync/crates/l1_sidecar" }
