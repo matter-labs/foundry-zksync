@@ -23,6 +23,7 @@ use crate::{
     state::FullNonce,
     DEFAULT_PROTOCOL_VERSION,
 };
+use anvil_zksync_core::deps::system_contracts::NON_KERNEL_CONTRACT_LOCATIONS;
 
 use super::storage_recorder::{AccountAccess, AccountAccesses, CallType, StorageAccessRecorder};
 
@@ -46,8 +47,15 @@ static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLo
         None,
     );
 
-    contracts
-        .into_iter()
+    let filtered = contracts.into_iter().filter(|contract| {
+        let addr = contract.account_id.address();
+        // If `addr` matches any entry in NON_KERNEL_CONTRACT_LOCATIONS, drop it:
+        !NON_KERNEL_CONTRACT_LOCATIONS
+            .iter()
+            .any(|(_name, a, _ver)| *a == *addr)
+    });
+
+    filtered
         .map(|contract| DeployedSystemContract {
             deployed_contract_hash: hash_bytecode(&contract.bytecode),
             deployed_contract: contract,

@@ -13,7 +13,7 @@ use foundry_cheatcodes_common::{
 use tracing::debug;
 use zksync_multivm::{
     interface::tracer::TracerExecutionStatus,
-    tracers::dynamic::vm_1_5_0::DynTracer,
+    tracers::dynamic::vm_1_5_2::DynTracer,
     vm_latest::{BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState},
     zk_evm_latest::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},

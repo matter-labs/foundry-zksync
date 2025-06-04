@@ -1,5 +1,5 @@
 use alloy_primitives::{hex, FixedBytes, Log};
-use anvil_zksync_config::types::SystemContractsOptions as Options;
+use anvil_zksync_config::types::{BoojumConfig, SystemContractsOptions as Options};
 use anvil_zksync_core::{formatter::Formatter, system_contracts::SystemContracts};
 use anvil_zksync_traces::{
     build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
@@ -496,7 +496,7 @@ static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = Laz
         None,
         DEFAULT_PROTOCOL_VERSION,
         false,
-        false,
+        BoojumConfig::default(),
     )
     .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
     .clone()
@@ -643,7 +643,6 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
                     rt.block_on(async {
                         decode_trace_arena(&mut arena, &decoder)
                             .await
-                            .expect("Failed to decode trace arena")
                     });
                     arena
                 })
