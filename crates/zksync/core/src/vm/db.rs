@@ -50,9 +50,7 @@ static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLo
     let filtered = contracts.into_iter().filter(|contract| {
         let addr = contract.account_id.address();
         // If `addr` matches any entry in NON_KERNEL_CONTRACT_LOCATIONS, drop it:
-        !NON_KERNEL_CONTRACT_LOCATIONS
-            .iter()
-            .any(|(_name, a, _ver)| *a == *addr)
+        !NON_KERNEL_CONTRACT_LOCATIONS.iter().any(|(_name, a, _ver)| *a == *addr)
     });
 
     filtered
