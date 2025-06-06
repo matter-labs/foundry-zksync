@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.17](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.16...foundry-zksync-v0.0.17) (2025-06-06)
+
+
+### Bug Fixes
+
+* Resolve codespell error in changelog ([#1058](https://github.com/matter-labs/foundry-zksync/issues/1058)) ([f92cc90](https://github.com/matter-labs/foundry-zksync/commit/f92cc907b9e28c55ba1199d7fc032145901bbb0c))
+* updates anvil-zksync and filter non-kernel contracts ([#1062](https://github.com/matter-labs/foundry-zksync/issues/1062)) ([747cec5](https://github.com/matter-labs/foundry-zksync/commit/747cec5cb6080bb0dccdd35880d0c8e5abe270b9))
+
 ## [0.0.16](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.15...foundry-zksync-v0.0.16) (2025-05-28)
 
 
