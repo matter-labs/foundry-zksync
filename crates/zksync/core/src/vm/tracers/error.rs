@@ -1,5 +1,5 @@
 use zksync_multivm::{
-    tracers::dynamic::vm_1_5_0::DynTracer,
+    tracers::dynamic::vm_1_5_2::DynTracer,
     vm_latest::{HistoryMode, SimpleMemory, VmTracer},
     zk_evm_latest::{
         tracing::{AfterDecodingData, VmLocalStateData},
