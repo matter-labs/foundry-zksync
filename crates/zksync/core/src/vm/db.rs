@@ -13,7 +13,7 @@ use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_types::{
     get_code_key, get_nonce_key, get_system_context_init_logs, h256_to_u256,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
-    StorageKey, StorageLog, StorageValue, CREATE2_FACTORY_ADDRESS
+    StorageKey, StorageLog, StorageValue, CREATE2_FACTORY_ADDRESS,
 };
 use zksync_vm_interface::storage::ReadStorage;
 
@@ -56,9 +56,7 @@ static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLo
         }
 
         // Drop anything that matches a non-kernel contract location.
-        !NON_KERNEL_CONTRACT_LOCATIONS
-            .iter()
-            .any(|(_name, a, _ver)| *a == *addr)
+        !NON_KERNEL_CONTRACT_LOCATIONS.iter().any(|(_name, a, _ver)| *a == *addr)
     });
 
     filtered
