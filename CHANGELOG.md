@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.18](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.17...foundry-zksync-v0.0.18) (2025-06-06)
+
+
+### Bug Fixes
+
+* address issue with filtering create2 address factory  ([#1065](https://github.com/matter-labs/foundry-zksync/issues/1065)) ([f2aa902](https://github.com/matter-labs/foundry-zksync/commit/f2aa902841f3e820be32ccab56beb19f203341ab))
+
 ## [0.0.17](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.16...foundry-zksync-v0.0.17) (2025-06-06)
 
 
