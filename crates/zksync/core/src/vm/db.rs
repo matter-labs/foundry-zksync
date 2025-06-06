@@ -13,7 +13,7 @@ use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_types::{
     get_code_key, get_nonce_key, get_system_context_init_logs, h256_to_u256,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
-    StorageKey, StorageLog, StorageValue,
+    StorageKey, StorageLog, StorageValue, CREATE2_FACTORY_ADDRESS
 };
 use zksync_vm_interface::storage::ReadStorage;
 
@@ -40,6 +40,7 @@ struct DeployedSystemContract {
     deployed_contract: zksync_types::block::DeployedContract,
     deployed_contract_hash: H256,
 }
+
 static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLock::new(|| {
     let contracts = anvil_zksync_core::deps::system_contracts::get_deployed_contracts(
         anvil_zksync_config::types::SystemContractsOptions::BuiltInWithoutSecurity,
@@ -49,8 +50,15 @@ static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLo
 
     let filtered = contracts.into_iter().filter(|contract| {
         let addr = contract.account_id.address();
-        // If `addr` matches any entry in NON_KERNEL_CONTRACT_LOCATIONS, drop it:
-        !NON_KERNEL_CONTRACT_LOCATIONS.iter().any(|(_name, a, _ver)| *a == *addr)
+
+        if *addr == CREATE2_FACTORY_ADDRESS {
+            return true;
+        }
+
+        // Drop anything that matches a non-kernel contract location.
+        !NON_KERNEL_CONTRACT_LOCATIONS
+            .iter()
+            .any(|(_name, a, _ver)| *a == *addr)
     });
 
     filtered
@@ -60,7 +68,6 @@ static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLo
         })
         .collect()
 });
-
 pub struct ZKVMData<'a, DB: Database> {
     ecx: &'a mut InnerEvmContext<DB>,
     pub factory_deps: HashMap<H256, Vec<u8>>,
