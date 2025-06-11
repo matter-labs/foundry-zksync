@@ -220,6 +220,7 @@ where
     let storage_ptr =
         StorageView::new(&mut era_db, modified_storage_keys, tx.common_data.initiator_address)
             .into_rc_ptr();
+    
     let InnerZkVmResult {
         tx_result,
         bytecodes,
@@ -229,7 +230,6 @@ where
         create_outcome,
         gas_usage,
     } = inspect_inner(tx, storage_ptr, chain_id, ccx, call_ctx.clone());
-
     info!(
         reserved=?gas_usage.bootloader_debug.reserved_gas, limit=?gas_usage.limit, execution=?gas_usage.execution, pubdata=?gas_usage.pubdata, refunded=?gas_usage.refunded,
         "gas usage",
@@ -430,24 +430,23 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let value = ecx.env.tx.value.to_u256();
-    let use_paymaster = !paymaster_params.paymaster.is_zero();
+    let value   = ecx.env.tx.value.to_u256();
+    let basefee = ecx.env.block.basefee.to_u256();
+    let gas0    = ecx.env.tx.gas_price.to_u256();
+    let limit0  = ecx.env.tx.gas_limit.into();
 
-    // Get balance of either paymaster or caller depending on who's paying
-    let address = if use_paymaster {
+    let use_paymaster = !paymaster_params.paymaster.is_zero();
+    let payer = if use_paymaster {
         Address::from_slice(paymaster_params.paymaster.as_bytes())
     } else {
         caller
     };
-    let balance = ZKVMData::new(ecx).get_balance(address);
+    let balance = ZKVMData::new(ecx).get_balance(payer);
 
-    if balance.is_zero() {
-        error!("balance is 0 for {:?}, transaction will fail", address.to_h160());
-    }
+    // apply heuristics only for dev-nets (baseFee == 0)
+    let max_fee_per_gas = fix_l2_gas_price(gas0, basefee);
+    let gas_limit       = fix_l2_gas_limit(limit0, max_fee_per_gas, value, balance, basefee);
 
-    let max_fee_per_gas = fix_l2_gas_price(ecx.env.tx.gas_price.to_u256());
-
-    let gas_limit = fix_l2_gas_limit(ecx.env.tx.gas_limit.into(), max_fee_per_gas, value, balance);
     (gas_limit, max_fee_per_gas)
 }
 
@@ -495,7 +494,7 @@ static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = Laz
         Options::BuiltInWithoutSecurity,
         None,
         DEFAULT_PROTOCOL_VERSION,
-        false,
+        true,
         BoojumConfig::default(),
     )
     .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
@@ -512,11 +511,11 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
 
     let system_env = create_system_env(BASELINE_CONTRACTS.clone(), chain_id);
-
+    
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env, system_env, storage.clone());
-
-    let tx: Transaction = l2_tx.into();
-
+    
+    let tx: Transaction = l2_tx.clone().into();
+    
     let call_tracer_result = Arc::default();
     let cheatcode_tracer_result = Arc::default();
     let mut expected_calls = HashMap::<_, _>::new();
@@ -541,9 +540,9 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         )
         .into_tracer_pointer(),
     ];
+    
     let compressed_bytecodes = vm.push_transaction(tx).compressed_bytecodes.into_owned();
     let mut tx_result = vm.inspect(&mut tracers.into(), InspectExecutionMode::OneTx);
-
     let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
     trace!(?tx_result.result, "zk vm result");
 
@@ -575,8 +574,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         .expect("failed obtaining bootloader debug info");
     trace!("{bootloader_debug:?}");
 
-    let total_gas_limit =
-        bootloader_debug.total_gas_limit_from_user.saturating_sub(bootloader_debug.reserved_gas);
+    let total_gas_limit = bootloader_debug.total_gas_limit_from_user;
     let intrinsic_gas = total_gas_limit - bootloader_debug.gas_limit_after_intrinsic;
     let gas_for_validation =
         bootloader_debug.gas_limit_after_intrinsic - bootloader_debug.gas_after_validation;

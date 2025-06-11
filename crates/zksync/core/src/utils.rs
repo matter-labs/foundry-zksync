@@ -111,8 +111,12 @@ pub fn get_private_key(private_key: &Option<String>) -> Result<H256> {
 /// happen:
 ///   * The scripts can fail if the balance is not enough for gas * MAGIC_VALUE
 ///   * The tests/deploy can fail if MAGIC_VALUE is too low
-pub fn fix_l2_gas_price(gas_price: U256) -> U256 {
-    U256::max(gas_price, U256::from(260_000_000))
+pub fn fix_l2_gas_price(gas_price: U256, base_fee: U256) -> U256 {
+    if base_fee.is_zero() && gas_price < U256::from(260_000_000) {
+        U256::from(260_000_000)
+    } else {
+        gas_price
+    }
 }
 
 /// Limits the gas_limit proportional to a user's available balance given the gas_price.
@@ -122,13 +126,12 @@ pub fn fix_l2_gas_limit(
     gas_price: U256,
     value: U256,
     balance: U256,
+    base_fee: U256,
 ) -> U256 {
-    let gas_limit = if gas_price.is_zero() || balance <= value {
-        proposed_gas_limit
+    if base_fee.is_zero() && !gas_price.is_zero() && balance > value {
+        let max_by_balance = balance.saturating_sub(value) / gas_price;
+        U256::min(U256::min(proposed_gas_limit, max_by_balance), U256::from(MAX_L2_GAS_LIMIT))
     } else {
-        let max_gas_limit = balance.saturating_sub(value).div_mod(gas_price).0;
-        U256::min(proposed_gas_limit, max_gas_limit)
-    };
-
-    U256::min(gas_limit, U256::from(MAX_L2_GAS_LIMIT))
+        proposed_gas_limit
+    }
 }
