@@ -1,3 +1,4 @@
+use crate::convert::ConvertU256;
 use alloy_primitives::{hex, FixedBytes, Log};
 use anvil_zksync_config::types::{BoojumConfig, SystemContractsOptions as Options};
 use anvil_zksync_core::{formatter::Formatter, system_contracts::SystemContracts};
@@ -5,6 +6,7 @@ use anvil_zksync_traces::{
     build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
     identifier::SignaturesIdentifier, render_trace_arena_inner,
 };
+use core::convert::Into;
 use foundry_common::sh_println;
 use itertools::Itertools;
 use revm::{
@@ -15,6 +17,11 @@ use revm::{
         U256 as rU256,
     },
     Database, EvmContext,
+};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::{Arc, LazyLock, RwLock},
 };
 use tracing::{debug, error, info, trace, warn};
 use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
@@ -32,13 +39,6 @@ use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
-
-use core::convert::Into;
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    sync::{Arc, LazyLock, RwLock},
-};
 
 use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256},
@@ -431,24 +431,27 @@ where
     <DB as Database>::Error: Debug,
 {
     let value = ecx.env.tx.value.to_u256();
-    let basefee = ecx.env.block.basefee.to_u256();
     let gas_price = ecx.env.tx.gas_price.to_u256();
     let gas_limit = ecx.env.tx.gas_limit.into();
 
+    let dev_mode = gas_price.is_zero();
+    if !dev_mode {
+        // return the original gas limit and gas price
+        return (gas_limit, gas_price);
+    }
+
     let use_paymaster = !paymaster_params.paymaster.is_zero();
-    // Get balance of either paymaster or caller depending on who's paying
-    let address = if use_paymaster {
+    let payer = if use_paymaster {
         Address::from_slice(paymaster_params.paymaster.as_bytes())
     } else {
         caller
     };
-    let balance = ZKVMData::new(ecx).get_balance(address);
-    if balance.is_zero() {
-        error!("balance is 0 for {:?}, transaction will fail", address.to_h160());
-    }
+    let balance = ZKVMData::new(ecx).get_balance(payer);
 
-    let max_fee_per_gas = fix_l2_gas_price(gas_price, basefee);
-    let gas_limit = fix_l2_gas_limit(gas_limit, max_fee_per_gas, value, balance, basefee);
+    let max_fee_per_gas = fix_l2_gas_price(gas_price);
+    let gas_limit = fix_l2_gas_limit(gas_limit, max_fee_per_gas, value, balance);
+
+    ecx.env.block.basefee = max_fee_per_gas.to_ru256();
 
     (gas_limit, max_fee_per_gas)
 }
