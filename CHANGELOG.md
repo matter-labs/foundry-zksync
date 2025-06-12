@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.19](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.18...foundry-zksync-v0.0.19) (2025-06-12)
+
+
+### Bug Fixes
+
+* address issue with replaying tx via cast run  ([#1071](https://github.com/matter-labs/foundry-zksync/issues/1071)) ([adb50e9](https://github.com/matter-labs/foundry-zksync/commit/adb50e9eb6331b2e81907a6ff117a5537d671938))
+
 ## [0.0.18](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.17...foundry-zksync-v0.0.18) (2025-06-06)
 
 
