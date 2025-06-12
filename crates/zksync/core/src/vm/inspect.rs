@@ -1,4 +1,3 @@
-use crate::convert::ConvertU256;
 use alloy_primitives::{hex, FixedBytes, Log};
 use anvil_zksync_config::types::{BoojumConfig, SystemContractsOptions as Options};
 use anvil_zksync_core::{formatter::Formatter, system_contracts::SystemContracts};
@@ -450,8 +449,6 @@ where
 
     let max_fee_per_gas = fix_l2_gas_price(gas_price);
     let gas_limit = fix_l2_gas_limit(gas_limit, max_fee_per_gas, value, balance);
-
-    ecx.env.block.basefee = max_fee_per_gas.to_ru256();
 
     (gas_limit, max_fee_per_gas)
 }
