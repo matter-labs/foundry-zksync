@@ -78,7 +78,9 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             // If we have a pending stack, it will be appended to the end of primary stack, else at
             // the beginning, once the record is finalized.
             let stack_insert_index = if recorded_account_diffs_stack.len() > 1 {
-                recorded_account_diffs_stack.first().map_or(0, Vec::len)
+                recorded_account_diffs_stack
+                    .get(recorded_account_diffs_stack.len() - 2)
+                    .map_or(0, Vec::len)
             } else {
                 0
             };
@@ -932,10 +934,14 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         if let Some(index) = ctx.remove_recorded_access_at.take() {
             if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut()
             {
-                if let Some(last) = recorded_account_diffs_stack.first_mut() {
+                if let Some(last) = recorded_account_diffs_stack.last_mut() {
                     // This entry has been inserted during CREATE/CALL operations in revm's
                     // cheatcode inspector and must be removed.
-                    let _ = last.remove(index);
+                    if index < last.len() {
+                        let _ = last.remove(index);
+                    } else {
+                        warn!(target: "zksync", index, len = last.len(), "skipping duplicate access removal: out of bounds");
+                    }
                 }
             }
         }
