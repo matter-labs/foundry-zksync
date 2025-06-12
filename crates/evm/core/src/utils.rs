@@ -124,9 +124,10 @@ pub fn configure_zksync_tx_env(
     env.tx.transact_to = TxKind::Call(
         outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
     );
-
-    env.tx.gas_limit = outer_tx.gas_limit().as_u64();
-
+    env.tx.gas_limit = match &outer_tx.common_data {
+        ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
+        _ => outer_tx.gas_limit().as_u64(),
+    };
     env.tx.nonce = Some(outer_tx.nonce().expect("nonce not found in common_data").0.into());
 
     env.tx.value = outer_tx.execute.value.to_ru256();

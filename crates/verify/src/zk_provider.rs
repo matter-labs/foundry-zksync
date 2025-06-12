@@ -135,6 +135,7 @@ impl ZkVerificationContext {
 }
 
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum CompilerVerificationContext {
     Solc(VerificationContext),
     ZkSolc(ZkVerificationContext),
