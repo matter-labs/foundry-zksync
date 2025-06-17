@@ -67,16 +67,17 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
     ) {
         if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut() {
             // A duplicate entry is inserted on call/create start by the revm, and updated on
-            // call/create end. We have no easy way to skip that logic as of now, so
-            // we record the index the duplicate entry will be at and remove it
-            // via call to`zksync_fix_recorded_acceses`.
+            // call/create end.
+            //
+            // The duplicate entry therefore lands in the parent frame (second-to-last element), not
+            // the root frame. We use len() - 2 records the length of that parent frame
+            // so zksync_fix_recorded_accesses() can trim the single duplicate once it
+            // appears. When the stack depth is 1 we fall back to 0, so the outer-most
+            // call still behaves correctly.
             //
             // TODO(zk): This is currently a hack, as account access recording is
             // done in 4 parts - create/create_end and call/call_end. And these must all be
             // moved to strategy.
-            //
-            // If we have a pending stack, it will be appended to the end of primary stack, else at
-            // the beginning, once the record is finalized.
             let stack_insert_index = if recorded_account_diffs_stack.len() > 1 {
                 recorded_account_diffs_stack
                     .get(recorded_account_diffs_stack.len() - 2)
