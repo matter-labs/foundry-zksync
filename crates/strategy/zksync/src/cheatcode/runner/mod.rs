@@ -69,11 +69,15 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             // A duplicate entry is inserted on call/create start by the revm, and updated on
             // call/create end.
             //
-            // The duplicate entry therefore lands in the parent frame (second-to-last element), not
-            // the root frame. We use len() - 2 records the length of that parent frame
-            // so zksync_fix_recorded_accesses() can trim the single duplicate once it
-            // appears. When the stack depth is 1 we fall back to 0, so the outer-most
-            // call still behaves correctly.
+            // If we are inside a nested call (stack depth > 1), the placeholder
+            // lives in the *parent* frame.  Its index will be exactly the current
+            // length of that parent vector (`len()`), so we record that length.
+            //
+            // If we are at the root (depth == 1), the placeholder is already the
+            // last element of the root vector.  We therefore record `len() - 1`.
+            //
+            // `zksync_fix_recorded_accesses()` uses this index later to drop the
+            // single duplicate.
             //
             // TODO(zk): This is currently a hack, as account access recording is
             // done in 4 parts - create/create_end and call/call_end. And these must all be
@@ -83,7 +87,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     .get(recorded_account_diffs_stack.len() - 2)
                     .map_or(0, Vec::len)
             } else {
-                0
+                recorded_account_diffs_stack.first().map_or(0, |v| v.len().saturating_sub(1)) // `len() - 1`
             };
 
             if let Some(last) = recorded_account_diffs_stack.last_mut() {

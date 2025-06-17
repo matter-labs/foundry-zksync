@@ -30,6 +30,12 @@ contract StorageAccessorDelegator {
     }
 }
 
+contract DeepDelegator {
+    function deepAccess(StorageAccessor a, StorageAccessor b) external {
+        new StorageAccessorDelegator().accessDelegation(a, b);
+    }
+}
+
 contract Payment {
     constructor() payable {}
 
@@ -821,6 +827,18 @@ contract ZkStateDiffTest is DSTest {
         });
 
         assertEq(expected, diff);
+    }
+
+    function testNoDuplicateAccountAccess() external {
+        DeepDelegator deep = new DeepDelegator();
+    
+        vm.startStateDiffRecording();
+        deep.deepAccess(store1, store2);
+    
+        Vm.AccountAccess[] memory diff =
+            filterCallOrCreate(vm.stopAndReturnStateDiff());
+    
+        assertEq(diff.length, 7, "unexpected extra account-access entry");
     }
 
     function concat(Vm.StorageAccess memory a) internal pure returns (Vm.StorageAccess[] memory out) {
