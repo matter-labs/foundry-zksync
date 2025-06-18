@@ -831,13 +831,12 @@ contract ZkStateDiffTest is DSTest {
 
     function testNoDuplicateAccountAccess() external {
         DeepDelegator deep = new DeepDelegator();
-    
+
         vm.startStateDiffRecording();
         deep.deepAccess(store1, store2);
-    
-        Vm.AccountAccess[] memory diff =
-            filterCallOrCreate(vm.stopAndReturnStateDiff());
-    
+
+        Vm.AccountAccess[] memory diff = filterCallOrCreate(vm.stopAndReturnStateDiff());
+
         assertEq(diff.length, 7, "unexpected extra account-access entry");
     }
 
