@@ -67,20 +67,27 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
     ) {
         if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut() {
             // A duplicate entry is inserted on call/create start by the revm, and updated on
-            // call/create end. We have no easy way to skip that logic as of now, so
-            // we record the index the duplicate entry will be at and remove it
-            // via call to`zksync_fix_recorded_acceses`.
+            // call/create end.
+            //
+            // If we are inside a nested call (stack depth > 1), the placeholder
+            // lives in the *parent* frame.  Its index will be exactly the current
+            // length of that parent vector (`len()`), so we record that length.
+            //
+            // If we are at the root (depth == 1), the placeholder is already the
+            // last element of the root vector.  We therefore record `len() - 1`.
+            //
+            // `zksync_fix_recorded_accesses()` uses this index later to drop the
+            // single duplicate.
             //
             // TODO(zk): This is currently a hack, as account access recording is
             // done in 4 parts - create/create_end and call/call_end. And these must all be
             // moved to strategy.
-            //
-            // If we have a pending stack, it will be appended to the end of primary stack, else at
-            // the beginning, once the record is finalized.
             let stack_insert_index = if recorded_account_diffs_stack.len() > 1 {
-                recorded_account_diffs_stack.first().map_or(0, Vec::len)
+                recorded_account_diffs_stack
+                    .get(recorded_account_diffs_stack.len() - 2)
+                    .map_or(0, Vec::len)
             } else {
-                0
+                recorded_account_diffs_stack.first().map_or(0, |v| v.len().saturating_sub(1)) // `len() - 1`
             };
 
             if let Some(last) = recorded_account_diffs_stack.last_mut() {
@@ -932,10 +939,14 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         if let Some(index) = ctx.remove_recorded_access_at.take() {
             if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut()
             {
-                if let Some(last) = recorded_account_diffs_stack.first_mut() {
+                if let Some(last) = recorded_account_diffs_stack.last_mut() {
                     // This entry has been inserted during CREATE/CALL operations in revm's
                     // cheatcode inspector and must be removed.
-                    let _ = last.remove(index);
+                    if index < last.len() {
+                        let _ = last.remove(index);
+                    } else {
+                        warn!(target: "zksync", index, len = last.len(), "skipping duplicate access removal: out of bounds");
+                    }
                 }
             }
         }
