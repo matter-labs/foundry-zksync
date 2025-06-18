@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.20](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.19...foundry-zksync-v0.0.20) (2025-06-18)
+
+
+### Bug Fixes
+
+* addresses issue with state diff recording idx ([#1074](https://github.com/matter-labs/foundry-zksync/issues/1074)) ([41f3d53](https://github.com/matter-labs/foundry-zksync/commit/41f3d53a9bcea13a9bf9ea50d2eff6abecc32d23))
+
 ## [0.0.19](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.18...foundry-zksync-v0.0.19) (2025-06-12)
 
 
