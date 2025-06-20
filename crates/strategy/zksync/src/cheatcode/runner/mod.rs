@@ -87,7 +87,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     .get(recorded_account_diffs_stack.len() - 2)
                     .map_or(0, Vec::len)
             } else {
-                recorded_account_diffs_stack.first().map_or(0, |v| v.len().saturating_sub(1)) // `len() - 1`
+                // `len() - 1`
+                recorded_account_diffs_stack.first().map_or(0, |v| v.len().saturating_sub(1))
             };
 
             if let Some(last) = recorded_account_diffs_stack.last_mut() {
@@ -1109,6 +1110,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
         let mut deployed_codes: HashMap<Address, AccountInfo> = Default::default();
 
         let test_contract = data.db.get_test_contract_address();
+
         for address in data.db.persistent_accounts().into_iter().chain([data.env.tx.caller]) {
             info!(?address, "importing to zk state");
 
@@ -1142,36 +1144,82 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             let nonce_key = get_nonce_key(address);
             nonce_storage.insert(nonce_key, EvmStorageSlot::new(full_nonce.to_ru256()));
 
-            if test_contract.map(|test_address| address == test_address).unwrap_or_default() {
-                // avoid migrating test contract code
-                trace!(?address, "ignoring code translation for test contract");
-                continue;
-            }
+            if let Some(bytecode) = &info.code {
+                // TODO(zk): This has O(N*M) complexity, since for each contract we need to
+                // reset immutables in the deployed bytecode and compare it against dual compiled
+                // contract. Given that we're already in the loop, it can get pretty
+                // slow for big projects.
+                if let Some((_, contract)) = ctx
+                    .dual_compiled_contracts
+                    .find_by_evm_deployed_bytecode_with_immutables(bytecode.original_byte_slice())
+                {
+                    account_code_storage.insert(
+                        get_account_code_key(address),
+                        EvmStorageSlot::new(contract.zk_bytecode_hash.to_ru256()),
+                    );
+                    known_codes_storage.insert(
+                        contract.zk_bytecode_hash.to_ru256(),
+                        EvmStorageSlot::new(U256::ZERO),
+                    );
 
-            if let Some((_, contract)) = ctx.dual_compiled_contracts.iter().find(|(_, contract)| {
-                info.code_hash != KECCAK_EMPTY && info.code_hash == contract.evm_bytecode_hash
-            }) {
-                account_code_storage.insert(
-                    get_account_code_key(address),
-                    EvmStorageSlot::new(contract.zk_bytecode_hash.to_ru256()),
-                );
-                known_codes_storage
-                    .insert(contract.zk_bytecode_hash.to_ru256(), EvmStorageSlot::new(U256::ZERO));
-
-                let code_hash = B256::from_slice(contract.zk_bytecode_hash.as_bytes());
-                deployed_codes.insert(
-                    address,
-                    AccountInfo {
-                        balance: info.balance,
-                        nonce: info.nonce,
-                        code_hash,
-                        code: Some(Bytecode::new_raw(Bytes::from(
+                    let code_hash = B256::from_slice(contract.zk_bytecode_hash.as_bytes());
+                    if Some(address) != test_contract {
+                        deployed_codes.insert(
+                            address,
+                            AccountInfo {
+                                balance: info.balance,
+                                nonce: info.nonce,
+                                code_hash,
+                                code: Some(Bytecode::new_raw(Bytes::from(
+                                    contract.zk_deployed_bytecode.clone(),
+                                ))),
+                            },
+                        );
+                    } else {
+                        // We cannot override test contract info in the account, since calls to the
+                        // test contract on a high level are processed in
+                        // the EVM, so if we'll override the bytecode, we won't be able to
+                        // execute it.
+                        // However, we can set the account code hash in the `AccountCodeStorage` and
+                        // persist the factory dep so that the code can be
+                        // decommitted; this way the test contract can be invoked
+                        // by other contracts from within EraVM.
+                        // TODO(zk): Do we actually need to override code in accounts in general? It
+                        // feels like relying _just_ on the
+                        // `AccountCodeStorage` and factory deps would be enough.
+                        ctx.persisted_factory_deps.insert(
+                            contract.zk_bytecode_hash,
                             contract.zk_deployed_bytecode.clone(),
-                        ))),
-                    },
-                );
-            } else {
-                tracing::debug!(code_hash = ?info.code_hash, ?address, "no zk contract found")
+                        );
+
+                        if contract
+                            .evm_immutable_references
+                            .as_ref()
+                            .map(|refs| !refs.is_empty())
+                            .unwrap_or(false)
+                        {
+                            // TODO(zk): Test contract is deployed in a special way, so we do not
+                            // catch the immutables that were set
+                            // for it. Based on the deployed bytecode itself we cannot calculate the
+                            // right slots for `ImmutableSimulator`,
+                            // as `zksolc` assigns slots in the order of immutable construction in
+                            // Yul. It means that while we can migrate
+                            // the test contract to the EraVM, it will have all the
+                            // immutables set to `0x0`.
+                            tracing::warn!(
+                                ?address,
+                                "test contract has immutables, but they are not set in the EraVM",
+                            );
+                        }
+                    }
+                    tracing::info!(
+                        ?address,
+                        code_hash = ?info.code_hash,
+                        "found zk contract",
+                    );
+                } else {
+                    tracing::info!(code_hash = ?info.code_hash, ?address, "no zk contract found")
+                }
             }
         }
 

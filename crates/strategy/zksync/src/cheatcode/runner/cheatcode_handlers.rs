@@ -233,6 +233,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     zk_factory_deps,
                     evm_bytecode_hash: *evmBytecodeHash,
                     evm_deployed_bytecode: evmDeployedBytecode.to_vec(),
+                    evm_immutable_references: None, // TODO(zk): Is it possible to get this info?
                     evm_bytecode: evmBytecode.to_vec(),
                 };
 
