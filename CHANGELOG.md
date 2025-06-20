@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.21](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.20...foundry-zksync-v0.0.21) (2025-06-20)
+
+
+### Bug Fixes
+
+* Migrate test contract to EraVM state ([#1078](https://github.com/matter-labs/foundry-zksync/issues/1078)) ([4c58f0a](https://github.com/matter-labs/foundry-zksync/commit/4c58f0a5074f0f9cc71f2b950fad6360a7dda6d7))
+
 ## [0.0.20](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.19...foundry-zksync-v0.0.20) (2025-06-18)
 
 
