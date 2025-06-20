@@ -165,6 +165,7 @@ impl BuildData {
                     // TODO(zk): determine if this is ok, as it's
                     // not really used in dual compiled contracts
                     evm_deployed_bytecode: evm_deployed.to_vec(),
+                    evm_immutable_references: None, // TODO(zk): can we get this info?
                     evm_bytecode: evm_bytecode.to_vec(),
                 };
 

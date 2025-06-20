@@ -143,6 +143,8 @@ impl ZksyncExecutorStrategyRunner {
                     // TODO(zk): determine if this is ok, as it's
                     // not really used in dual compiled contracts
                     evm_deployed_bytecode: evm_deployed.to_vec(),
+                    evm_immutable_references: None, /* TODO(zk): is it possible/needed to get
+                                                     * this info here? */
                     evm_bytecode: evm_bytecode.to_vec(),
                 };
 

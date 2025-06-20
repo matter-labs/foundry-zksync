@@ -78,6 +78,7 @@ impl ZksyncCheatcodeInspectorStrategyContext {
                 zk_factory_deps: Default::default(),
                 evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
                 evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
+                evm_immutable_references: Some(Default::default()),
                 evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
             },
         );
@@ -99,6 +100,7 @@ impl ZksyncCheatcodeInspectorStrategyContext {
                 zk_factory_deps: Default::default(),
                 evm_bytecode_hash: CHEATCODE_CONTRACT_HASH,
                 evm_deployed_bytecode: cheatcodes_bytecode.to_vec(),
+                evm_immutable_references: Some(Default::default()),
                 evm_bytecode: cheatcodes_bytecode.to_vec(),
             },
         );

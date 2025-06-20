@@ -1,6 +1,6 @@
 //! ZKSolc module.
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::PathBuf,
     str::FromStr,
 };
@@ -11,6 +11,7 @@ use foundry_compilers::{
 };
 
 use alloy_primitives::{keccak256, B256};
+use foundry_compilers_artifacts_solc::Offsets;
 use tracing::debug;
 use zksync_types::H256;
 
@@ -38,6 +39,8 @@ pub struct DualCompiledContract {
     pub evm_bytecode_hash: B256,
     /// Deployed bytecode with solc
     pub evm_deployed_bytecode: Vec<u8>,
+    /// Immutable references with solc
+    pub evm_immutable_references: Option<BTreeMap<String, Vec<Offsets>>>,
     /// Bytecode with solc
     pub evm_bytecode: Vec<u8>,
 }
@@ -126,10 +129,15 @@ impl DualCompiledContracts {
             let deployed_bytecode = deployed_bytecode
                 .as_ref()
                 .and_then(|d| d.bytecode.as_ref().and_then(|b| b.object.as_bytes()));
+            let immutable_references =
+                artifact.get_deployed_bytecode().map(|d| d.immutable_references.clone());
             let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
             if let Some(bytecode) = bytecode {
                 if let Some(deployed_bytecode) = deployed_bytecode {
-                    solc_bytecodes.insert(contract_info, (bytecode, deployed_bytecode.clone()));
+                    solc_bytecodes.insert(
+                        contract_info,
+                        (bytecode, deployed_bytecode.clone(), immutable_references),
+                    );
                 }
             }
         }
@@ -155,7 +163,7 @@ impl DualCompiledContracts {
             if let (Some(bytecode), Some(hash), Some(factory_deps_map)) =
                 (maybe_bytecode, maybe_hash, maybe_factory_deps)
             {
-                if let Some((solc_bytecode, solc_deployed_bytecode)) =
+                if let Some((solc_bytecode, solc_deployed_bytecode, immutable_references)) =
                     solc_bytecodes.get(&contract_info)
                 {
                     // NOTE(zk): unlinked objects are _still_ encoded as valid hex
@@ -181,6 +189,7 @@ impl DualCompiledContracts {
                             zk_factory_deps: factory_deps_vec,
                             evm_bytecode_hash: keccak256(solc_deployed_bytecode),
                             evm_bytecode: solc_bytecode.to_vec(),
+                            evm_immutable_references: immutable_references.clone(),
                             evm_deployed_bytecode: solc_deployed_bytecode.to_vec(),
                         },
                     );
@@ -213,6 +222,36 @@ impl DualCompiledContracts {
         bytecode: &[u8],
     ) -> Option<(&ContractInfo, &DualCompiledContract)> {
         self.contracts.iter().find(|(_, contract)| bytecode.starts_with(&contract.evm_bytecode))
+    }
+
+    /// Finds a contract matching the EVM deployed bytecode with respect to the immutables
+    /// Expects perfect match after removing immutables.
+    pub fn find_by_evm_deployed_bytecode_with_immutables(
+        &self,
+        bytecode: &[u8],
+    ) -> Option<(&ContractInfo, &DualCompiledContract)> {
+        // TODO: should we consider link references here as well?
+        self.contracts.iter().find(|(_, contract)| {
+            if let Some(immutables) = &contract.evm_immutable_references {
+                let mut bytecode_without_immutables = bytecode.to_vec();
+                for offsets in immutables.values() {
+                    for offset in offsets {
+                        let start = offset.start as usize;
+                        let end = (offset.start + offset.length) as usize;
+                        if end > bytecode_without_immutables.len() {
+                            // If the offset is out of bounds, we can't zero it out
+                            return false;
+                        }
+
+                        // Zero out the immutables in the bytecode
+                        bytecode_without_immutables[start..end].fill(0);
+                    }
+                }
+                bytecode_without_immutables == contract.evm_deployed_bytecode
+            } else {
+                bytecode == contract.evm_deployed_bytecode
+            }
+        })
     }
 
     /// Finds a contract matching the ZK bytecode hash
@@ -437,6 +476,7 @@ mod tests {
             zk_factory_deps: Default::default(),
             evm_bytecode_hash: B256::from_slice(&keccak256(&evm_empty_bytes)[..]),
             evm_deployed_bytecode: evm_empty_bytes.clone(),
+            evm_immutable_references: None,
             evm_bytecode: evm_empty_bytes,
         };
 
