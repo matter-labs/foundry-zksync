@@ -16,6 +16,7 @@ workspace = true
 
 [dependencies]
 foundry-cheatcodes-spec.workspace = true
+foundry-cheatcodes-common.workspace = true
 foundry-common.workspace = true
 foundry-compilers.workspace = true
 foundry-config.workspace = true
@@ -23,6 +24,8 @@ foundry-evm-core.workspace = true
 foundry-evm-traces.workspace = true
 foundry-wallets.workspace = true
 forge-script-sequence.workspace = true
+foundry-zksync-core.workspace = true
+foundry-zksync-inspectors.workspace = true
 
 alloy-dyn-abi.workspace = true
 alloy-evm.workspace = true

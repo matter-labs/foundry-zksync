@@ -7,7 +7,7 @@ use crate::{
 };
 use alloy_consensus::TxEnvelope;
 use alloy_genesis::{Genesis, GenesisAccount};
-use alloy_primitives::{map::HashMap, Address, Bytes, B256, U256};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
@@ -30,7 +30,6 @@ use std::{
     fmt::Display,
     path::Path,
 };
-
 mod record_debug_step;
 use record_debug_step::{convert_call_trace_to_debug_step, flatten_call_trace};
 use serde::Serialize;
@@ -40,35 +39,7 @@ pub(crate) mod mapping;
 pub(crate) mod mock;
 pub(crate) mod prank;
 
-/// Records storage slots reads and writes.
-#[derive(Clone, Debug, Default)]
-pub struct RecordAccess {
-    /// Storage slots reads.
-    pub reads: HashMap<Address, Vec<U256>>,
-    /// Storage slots writes.
-    pub writes: HashMap<Address, Vec<U256>>,
-}
-
-impl RecordAccess {
-    /// Records a read access to a storage slot.
-    pub fn record_read(&mut self, target: Address, slot: U256) {
-        self.reads.entry(target).or_default().push(slot);
-    }
-
-    /// Records a write access to a storage slot.
-    ///
-    /// This also records a read internally as `SSTORE` does an implicit `SLOAD`.
-    pub fn record_write(&mut self, target: Address, slot: U256) {
-        self.record_read(target, slot);
-        self.writes.entry(target).or_default().push(slot);
-    }
-
-    /// Clears the recorded reads and writes.
-    pub fn clear(&mut self) {
-        // Also frees memory.
-        *self = Default::default();
-    }
-}
+// Note(zk): The RecordAccess struct is defined in the common crates.
 
 /// Records the `snapshotGas*` cheatcodes.
 #[derive(Clone, Debug)]
@@ -180,6 +151,20 @@ impl Cheatcode for getNonce_1Call {
     }
 }
 
+impl Cheatcode for zkGetTransactionNonceCall {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
+        let Self { account } = self;
+        get_nonce(ccx, account)
+    }
+}
+
+impl Cheatcode for zkGetDeploymentNonceCall {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
+        let Self { account } = self;
+        get_nonce(ccx, account)
+    }
+}
+
 impl Cheatcode for loadCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, slot } = *self;
@@ -263,13 +248,13 @@ impl Cheatcode for dumpStateCall {
 
         // Do not include system account or empty accounts in the dump.
         let skip = |key: &Address, val: &Account| {
-            key == &CHEATCODE_ADDRESS ||
-                key == &CALLER ||
-                key == &HARDHAT_CONSOLE_ADDRESS ||
-                key == &TEST_CONTRACT_ADDRESS ||
-                key == &ccx.caller ||
-                key == &ccx.state.config.evm_opts.sender ||
-                val.is_empty()
+            key == &CHEATCODE_ADDRESS
+                || key == &CALLER
+                || key == &HARDHAT_CONSOLE_ADDRESS
+                || key == &TEST_CONTRACT_ADDRESS
+                || key == &ccx.caller
+                || key == &ccx.state.config.evm_opts.sender
+                || val.is_empty()
         };
 
         let alloc = ccx
@@ -517,6 +502,7 @@ impl Cheatcode for getBlobBaseFeeCall {
 impl Cheatcode for dealCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
+
         let account = journaled_account(ccx.ecx, address)?;
         let old_balance = std::mem::replace(&mut account.info.balance, new_balance);
         let record = DealRecord { address, old_balance, new_balance };
@@ -555,6 +541,7 @@ impl Cheatcode for resetNonceCall {
 impl Cheatcode for setNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
+
         let account = journaled_account(ccx.ecx, account)?;
         // nonce must increment only
         let current = account.info.nonce;
@@ -571,6 +558,7 @@ impl Cheatcode for setNonceCall {
 impl Cheatcode for setNonceUnsafeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
+
         let account = journaled_account(ccx.ecx, account)?;
         account.info.nonce = newNonce;
         Ok(Default::default())
@@ -842,6 +830,7 @@ impl Cheatcode for broadcastRawTransactionCall {
             env.to_owned(),
             journal,
             &mut *executor.get_inspector(ccx.state),
+            Box::new(()),
         )?;
 
         if ccx.state.broadcast.is_some() {
@@ -873,7 +862,7 @@ impl Cheatcode for setBlockhashCall {
 impl Cheatcode for startDebugTraceRecordingCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let Some(tracer) = executor.tracing_inspector().and_then(|t| t.as_mut()) else {
-            return Err(Error::from("no tracer initiated, consider adding -vvv flag"))
+            return Err(Error::from("no tracer initiated, consider adding -vvv flag"));
         };
 
         let mut info = RecordDebugStepInfo {
@@ -904,11 +893,11 @@ impl Cheatcode for startDebugTraceRecordingCall {
 impl Cheatcode for stopAndReturnDebugTraceRecordingCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let Some(tracer) = executor.tracing_inspector().and_then(|t| t.as_mut()) else {
-            return Err(Error::from("no tracer initiated, consider adding -vvv flag"))
+            return Err(Error::from("no tracer initiated, consider adding -vvv flag"));
         };
 
         let Some(record_info) = ccx.state.record_debug_steps_info else {
-            return Err(Error::from("nothing recorded"))
+            return Err(Error::from("nothing recorded"));
         };
 
         // Use the trace nodes to flatten the call trace
@@ -1200,8 +1189,8 @@ fn get_recorded_state_diffs(state: &mut Cheatcodes) -> BTreeMap<Address, Account
             .iter()
             .flatten()
             .filter(|account_access| {
-                !account_access.storageAccesses.is_empty() ||
-                    account_access.oldBalance != account_access.newBalance
+                !account_access.storageAccesses.is_empty()
+                    || account_access.oldBalance != account_access.newBalance
             })
             .for_each(|account_access| {
                 // Record account balance diffs.

@@ -45,6 +45,12 @@ pub const SYSTEM_TRANSACTION_TYPE: u8 = 126;
 /// Default user agent set as the header for requests that don't specify one.
 pub const DEFAULT_USER_AGENT: &str = concat!("foundry/", env!("CARGO_PKG_VERSION"));
 
+pub const POSTHOG_API_KEY: &str = "phc_eTvYMxu4UCkuFkAdY4DK6XzlUwoPppXuAcP1x9FhisG";
+pub const TELEMETRY_CONFIG_NAME: &str = "zksync-tooling";
+
+pub const POSTHOG_API_KEY: &str = "phc_eTvYMxu4UCkuFkAdY4DK6XzlUwoPppXuAcP1x9FhisG";
+pub const TELEMETRY_CONFIG_NAME: &str = "zksync-tooling";
+
 /// Returns whether the sender is a known system sender that is the first tx in every block.
 ///
 /// Transactions from these senders usually don't have a any fee information OR set absurdly high fees that exceed the gas limit (See: <https://github.com/foundry-rs/foundry/pull/10608>)

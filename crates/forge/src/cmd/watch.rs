@@ -295,7 +295,7 @@ pub async fn watch_test(args: TestArgs) -> Result<()> {
                 if last.is_empty() {
                     return;
                 }
-                changed_sol_test_files = last.clone();
+                changed_sol_test_files.clone_from(&last);
             }
 
             // append `--match-path` glob

@@ -24,11 +24,16 @@ members = [
     "crates/macros/",
     "crates/test-utils/",
     "crates/lint/",
+    "crates/strategy/zksync/",
 ]
 resolver = "2"
 
+[workspace.metadata]
+# NOTE(zk): track upstream version after each merge
+metadata.upstream_version = "1.0.0"
+
 [workspace.package]
-version = "1.2.2"
+version = "0.0.21" # x-release-please-version
 edition = "2021"
 # Remember to update clippy.toml as well
 rust-version = "1.86"
@@ -46,8 +51,6 @@ uninlined-format-args = "warn"
 use-self = "warn"
 redundant-clone = "warn"
 octal-escapes = "allow"
-# until <https://github.com/rust-lang/rust-clippy/issues/13885> is fixed
-literal-string-with-formatting-args = "allow"
 result_large_err = "allow"
 
 [workspace.lints.rust]
@@ -151,6 +154,9 @@ regex.opt-level = 3
 regex-syntax.opt-level = 3
 regex-automata.opt-level = 3
 
+# zksync
+zksync_multivm.opt-level = 3
+
 # Override packages which aren't perf-sensitive for faster compilation speed and smaller binary size.
 [profile.release.package]
 alloy-sol-macro-expander.opt-level = "z"
@@ -181,6 +187,7 @@ forge-sol-macro-gen = { path = "crates/sol-macro-gen" }
 forge-script-sequence = { path = "crates/script-sequence" }
 foundry-cheatcodes = { path = "crates/cheatcodes" }
 foundry-cheatcodes-spec = { path = "crates/cheatcodes/spec" }
+foundry-cheatcodes-common = { path = "crates/cheatcodes/common" }
 foundry-cli = { path = "crates/cli" }
 foundry-common = { path = "crates/common" }
 foundry-common-fmt = { path = "crates/common/fmt" }
@@ -196,6 +203,10 @@ foundry-macros = { path = "crates/macros" }
 foundry-test-utils = { path = "crates/test-utils" }
 foundry-wallets = { path = "crates/wallets" }
 foundry-linking = { path = "crates/linking" }
+foundry-zksync-core = { path = "crates/zksync/core" }
+foundry-zksync-compilers = { path = "crates/zksync/compilers" }
+foundry-zksync-inspectors = { path = "crates/zksync/inspectors" }
+foundry-strategy-zksync = { path = "crates/strategy/zksync" }
 
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.17.0", default-features = false }
@@ -248,6 +259,8 @@ alloy-sol-types = "1.0"
 
 alloy-chains = "0.2"
 alloy-rlp = "0.3"
+alloy-zksync = "=0.12.1"
+
 alloy-trie = "0.8.1"
 
 ## op-alloy
@@ -268,6 +281,23 @@ alloy-op-evm = "0.10.0"
 anstream = "0.6"
 anstyle = "1.0"
 terminal_size = "0.4"
+
+## zksync
+anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+anvil_zksync_common = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+anvil_zksync_console = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+anvil_zksync_traces = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "c6cbece8991ecb6ae90dd2d0fb3b662c8bf1c446" }
+zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "f6d8618d870a09467ff24ea32ef57e01af8f311e" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.0.0" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.0.0" }
+zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.0.0" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.0.0" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.0.0" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.0.0" }
 
 # macros
 proc-macro2 = "1.0"
@@ -326,7 +356,7 @@ reqwest = { version = "0.12", default-features = false, features = [
 rustls = "0.23"
 semver = "1"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+serde_json = { version = "=1.0.128", features = ["arbitrary_precision"] }
 similar-asserts = "1.6"
 soldeer-commands = "=0.5.4"
 soldeer-core = { version = "=0.5.4", features = ["serde"] }
@@ -341,6 +371,7 @@ tracing-subscriber = "0.3"
 url = "2"
 vergen = { version = "8", default-features = false }
 yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
+httptest = "0.16.3"
 path-slash = "0.2"
 jiff = "0.2"
 heck = "0.5"
@@ -355,41 +386,7 @@ idna_adapter = "=1.1.0"
 zip-extract = "=0.2.1"
 
 [patch.crates-io]
-## alloy-core
-# alloy-dyn-abi = { path = "../../alloy-rs/core/crates/dyn-abi" }
-# alloy-json-abi = { path = "../../alloy-rs/core/crates/json-abi" }
-# alloy-primitives = { path = "../../alloy-rs/core/crates/primitives" }
-# alloy-sol-macro = { path = "../../alloy-rs/core/crates/sol-macro" }
-# alloy-sol-macro-expander = { path = "../../alloy-rs/core/crates/sol-macro-expander" }
-# alloy-sol-macro-input = { path = "../../alloy-rs/core/crates/sol-macro-input" }
-# alloy-sol-type-parser = { path = "../../alloy-rs/core/crates/sol-type-parser" }
-# alloy-sol-types = { path = "../../alloy-rs/core/crates/sol-types" }
-# syn-solidity = { path = "../../alloy-rs/core/crates/syn-solidity" }
-
-## alloy
-# alloy-consensus = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-contract = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-eips = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-genesis = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-json-rpc = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-network = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-network-primitives = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-provider = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-pubsub = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-rpc-client = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-rpc-types = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-rpc-types-eth = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-serde = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-signer-aws = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-signer-gcp = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-signer-ledger = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-signer-local = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-signer-trezor = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-transport = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-transport-http = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-transport-ipc = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
-# alloy-transport-ws = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+vise = { git = "https://github.com/matter-labs/vise.git", rev = "51669f42f60c50b3a521662a4ecd71212a303299" }
 
 ## alloy-evm
 # alloy-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "8076e12" }

@@ -16,8 +16,11 @@ use foundry_common::{
 use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVersion};
 use foundry_config::Config;
 use foundry_evm::{
-    constants::DEFAULT_CREATE2_DEPLOYER, executors::TracingExecutor, opts::EvmOpts,
-    traces::TraceMode, Env, EnvMut,
+    constants::DEFAULT_CREATE2_DEPLOYER,
+    executors::{strategy::ExecutorStrategy, TracingExecutor},
+    opts::EvmOpts,
+    traces::TraceMode,
+    Env, EnvMut,
 };
 use reqwest::Url;
 use revm::{bytecode::Bytecode, database::Database, primitives::hardfork::SpecId};
@@ -122,15 +125,15 @@ pub fn build_using_cache(
 
                 // Check if Solidity version matches
                 if let Ok(version) = Version::parse(&version) {
-                    if !(artifact.version.major == version.major &&
-                        artifact.version.minor == version.minor &&
-                        artifact.version.patch == version.patch)
+                    if !(artifact.version.major == version.major
+                        && artifact.version.minor == version.minor
+                        && artifact.version.patch == version.patch)
                     {
                         continue;
                     }
                 }
 
-                return Ok(artifact.artifact)
+                return Ok(artifact.artifact);
             }
         }
     }
@@ -185,7 +188,7 @@ fn is_partial_match(
     // 1. Check length of constructor args
     if constructor_args.is_empty() || is_runtime {
         // Assume metadata is at the end of the bytecode
-        return try_extract_and_compare_bytecode(local_bytecode, bytecode)
+        return try_extract_and_compare_bytecode(local_bytecode, bytecode);
     }
 
     // If not runtime, extract constructor args from the end of the bytecode
@@ -224,8 +227,8 @@ fn find_mismatch_in_settings(
         );
         mismatches.push(str);
     }
-    if local_settings.optimizer_runs.is_some_and(|runs| etherscan_settings.runs != runs as u64) ||
-        (local_settings.optimizer_runs.is_none() && etherscan_settings.runs > 0)
+    if local_settings.optimizer_runs.is_some_and(|runs| etherscan_settings.runs != runs as u64)
+        || (local_settings.optimizer_runs.is_none() && etherscan_settings.runs > 0)
     {
         let str = format!(
             "Optimizer runs mismatch: local={}, onchain={}",
@@ -306,6 +309,7 @@ pub async fn get_tracing_executor(
     fork_blk_num: u64,
     evm_version: EvmVersion,
     evm_opts: EvmOpts,
+    strategy: ExecutorStrategy,
 ) -> Result<(Env, TracingExecutor)> {
     fork_config.fork_block_number = Some(fork_blk_num);
     fork_config.evm_version = evm_version;
@@ -321,6 +325,7 @@ pub async fn get_tracing_executor(
         TraceMode::Call,
         is_odyssey,
         create2_deployer,
+        strategy,
     )?;
 
     Ok((env, executor))

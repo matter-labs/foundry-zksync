@@ -3,15 +3,20 @@ name: test
 on:
   push:
     branches:
-      - master
+      - main
+      - "*upstream*"
   pull_request:
+    branches:
+      - main
+      - "*upstream*"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+  group: ${{github.workflow}}-${{github.ref}}
 
 env:
   CARGO_TERM_COLOR: always
+  TARGET_RUST_VERSION: "stable"
   RUST_BACKTRACE: full
 
 jobs:
@@ -21,50 +26,24 @@ jobs:
       profile: default
     secrets: inherit
 
-  docs:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+  doctest:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - name: Build documentation
-        run: cargo doc --workspace --all-features --no-deps --document-private-items
-        env:
-          RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition --enable-index-page -Zunstable-options
-      - name: Deploy documentation
-        uses: peaceiris/actions-gh-pages@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: target/doc
-          force_orphan: true
-
-  doctest:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo test --workspace --doc
-
-  codespell:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: codespell-project/actions-codespell@v2
-        with:
-          skip: "*.json"
+      - name: cargo test
+        run: cargo test --doc -p forge
 
   clippy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    name: clippy
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@clippy
@@ -76,19 +55,19 @@ jobs:
           RUSTFLAGS: -Dwarnings
 
   rustfmt:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly-2024-02-03
+          toolchain: nightly-2024-09-05 # Required for unstable features in rustfmt
           components: rustfmt
-      - run: cargo fmt --all --check
+      - run: cargo +nightly-2024-09-05 fmt --all --check
 
   forge-fmt:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -99,37 +78,117 @@ jobs:
         shell: bash
         run: ./.github/scripts/format.sh --check
 
-  crate-checks:
-    runs-on: ubuntu-latest
+  codespell:
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: codespell-project/actions-codespell@v2
+        with:
+          skip: "*.json"
+
+  crate-checks:
+    # ubuntu-22.04 runs out of disk space
+    runs-on: ubuntu-24.04-github-hosted-16core
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
       - uses: taiki-e/install-action@cargo-hack
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: cargo hack check --each-feature --exclude-features isolate-by-default
+      - name: cargo hack
+        run: cargo hack check --each-feature --exclude-features isolate-by-default
+
+  zk-cargo-test:
+    runs-on: ubuntu-24.04-github-hosted-16core
+    env:
+      ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Run anvil-zksync
+        uses: dutterbutter/anvil-zksync-action@v1.1.0
+        with:
+          mode: fork
+          forkUrl: mainnet
+          log: info
+          logFilePath: anvil_zksync.log
+          target: x86_64-unknown-linux-gnu
+          releaseTag: v0.6.1
+
+      - name: Setup Git config
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "<>"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Run zk tests
+        env:
+          RUST_BACKTRACE: full
+          TEST_MAINNET_URL: http://localhost:8011
+        run: |
+          ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' -E '(test(~zk) or package(~zksync)) and not test(~test_zk_aave_di)'
 
   deny:
     uses: ithacaxyz/ci/.github/workflows/deny.yml@main
 
-  ci-success:
-    runs-on: ubuntu-latest
-    if: always()
-    needs:
-      - nextest
-      - docs
-      - doctest
-      - codespell
-      - clippy
-      - rustfmt
-      - forge-fmt
-      - crate-checks
-      - deny
-    timeout-minutes: 30
+
+  check-ci-install:
+    name: CI install
+    runs-on: ubuntu-24.04
     steps:
-      - name: Decide whether the needed jobs succeeded or failed
-        uses: re-actors/alls-green@release/v1
+      - uses: actions/checkout@v4
+      - name: Install foundry-zksync
+        run: cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/ && cd /tmp && ./install-foundry-zksync
+      - name: Verify installation
+        run: forge --version
+
+  check-ci-install-anvil:
+    name: CI install anvil-zksync
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install foundry-zksync
+        run: |
+          cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/
+          cd /tmp
+          ./install-foundry-zksync
+
+      - name: Verify anvil-zksync installation
+        run: anvil-zksync --version
+  
+  zk-tests-check:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          jobs: ${{ toJSON(needs) }}
+          submodules: recursive
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      - name: Verify zksync tests are not removed
+        run: make zksync-tests-check

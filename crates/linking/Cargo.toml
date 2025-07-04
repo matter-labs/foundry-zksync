@@ -18,3 +18,8 @@ foundry-compilers = { workspace = true, features = ["full"] }
 semver.workspace = true
 alloy-primitives = { workspace = true, features = ["rlp"] }
 thiserror.workspace = true
+tracing.workspace = true
+
+# zk linking utils
+foundry-zksync-core.workspace = true
+foundry-zksync-compilers.workspace = true

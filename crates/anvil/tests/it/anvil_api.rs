@@ -1009,12 +1009,11 @@ async fn test_mine_blks_with_same_timestamp() {
 
     let init_blk = provider.get_block(BlockId::latest()).await.unwrap().unwrap();
 
-    let init_number = init_blk.header.number;
-    let init_timestamp = init_blk.header.timestamp;
-
     // Mine 4 blocks instantly
     let _ = api.anvil_mine(Some(U256::from(4)), None).await;
 
+    let init_number = init_blk.header.number;
+    let init_timestamp = init_blk.header.timestamp;
     let latest_blk_num = api.block_number().unwrap().to::<u64>();
 
     assert_eq!(latest_blk_num, init_number + 4);

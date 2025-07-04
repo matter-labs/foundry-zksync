@@ -9,12 +9,14 @@ use alloy_primitives::{
     map::{hash_map::Entry, HashMap, HashSet},
     Address, LogData, Selector, B256,
 };
+use foundry_cheatcodes_spec::Vm;
 use foundry_common::{
     abi::get_indexed_event, fmt::format_token, get_contract_name, selectors::SelectorKind,
     ContractsByArtifact, SELECTOR_LEN,
 };
+use foundry_config::zksync::ZKSYNC_ARTIFACTS_DIR;
 use foundry_evm_core::{
-    abi::{console, Vm},
+    abi::console,
     constants::{
         CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS,
         TEST_CONTRACT_ADDRESS,
@@ -143,6 +145,9 @@ pub struct CallTraceDecoder {
 
     /// Optional identifier of individual trace steps.
     pub debug_identifier: Option<DebugTraceIdentifier>,
+
+    /// Addresses that are contracts on the ZkVm
+    pub zk_contracts: HashSet<Address>,
 }
 
 impl CallTraceDecoder {
@@ -198,6 +203,8 @@ impl CallTraceDecoder {
             verbosity: 0,
 
             debug_identifier: None,
+
+            zk_contracts: Default::default(),
         }
     }
 
@@ -271,7 +278,7 @@ impl CallTraceDecoder {
         }
 
         trace!(target: "evm::traces", len=addrs.len(), "collecting address identities");
-        for IdentifiedAddress { address, label, contract, abi, artifact_id: _ } in addrs {
+        for IdentifiedAddress { address, label, contract, abi, artifact_id } in addrs {
             let _span = trace_span!(target: "evm::traces", "identity", ?contract, ?label).entered();
 
             if let Some(contract) = contract {
@@ -284,6 +291,12 @@ impl CallTraceDecoder {
 
             if let Some(abi) = abi {
                 self.collect_abi(&abi, Some(address));
+            }
+
+            if let Some(artifact_id) = artifact_id {
+                if artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR) {
+                    self.zk_contracts.insert(address);
+                }
             }
         }
     }

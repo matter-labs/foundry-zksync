@@ -37,13 +37,14 @@ impl EvmFuzzState {
         db: &CacheDB<DB>,
         config: FuzzDictionaryConfig,
         deployed_libs: &[Address],
+        no_zksync_reserved_addresses: bool,
     ) -> Self {
         // Sort accounts to ensure deterministic dictionary generation from the same setUp state.
         let mut accs = db.cache.accounts.iter().collect::<Vec<_>>();
         accs.sort_by_key(|(address, _)| *address);
 
         // Create fuzz dictionary and insert values from db state.
-        let mut dictionary = FuzzDictionary::new(config);
+        let mut dictionary = FuzzDictionary::new(config, no_zksync_reserved_addresses);
         dictionary.insert_db_values(accs);
         Self { inner: Arc::new(RwLock::new(dictionary)), deployed_libs: deployed_libs.to_vec() }
     }
@@ -112,6 +113,8 @@ pub struct FuzzDictionary {
     db_addresses: usize,
     /// Sample typed values that are collected from call result and used across invariant runs.
     sample_values: HashMap<DynSolType, B256IndexSet>,
+    /// Avoid addresses less than 2^16 as they are reserved in zkSync space.
+    no_zksync_reserved_addresses: bool,
 
     misses: usize,
     hits: usize,
@@ -122,13 +125,14 @@ impl fmt::Debug for FuzzDictionary {
         f.debug_struct("FuzzDictionary")
             .field("state_values", &self.state_values.len())
             .field("addresses", &self.addresses)
+            .field("no_zksync_reserved_addresses", &self.no_zksync_reserved_addresses)
             .finish()
     }
 }
 
 impl FuzzDictionary {
-    pub fn new(config: FuzzDictionaryConfig) -> Self {
-        let mut dictionary = Self { config, ..Default::default() };
+    pub fn new(config: FuzzDictionaryConfig, no_zksync_reserved_addresses: bool) -> Self {
+        let mut dictionary = Self { config, no_zksync_reserved_addresses, ..Default::default() };
         dictionary.prefill();
         dictionary
     }
@@ -366,6 +370,11 @@ impl FuzzDictionary {
     #[inline]
     pub fn addresses(&self) -> &AddressIndexSet {
         &self.addresses
+    }
+
+    #[inline]
+    pub fn no_zksync_reserved_addresses(&self) -> bool {
+        self.no_zksync_reserved_addresses
     }
 
     /// Revert values and addresses collected during the run by truncating to initial db len.

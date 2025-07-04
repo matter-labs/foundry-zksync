@@ -29,7 +29,7 @@ use forge_verify::{RetryArgs, VerifierArgs};
 use foundry_block_explorers::EtherscanApiVersion;
 use foundry_cli::{
     opts::{BuildOpts, GlobalArgs},
-    utils::LoadConfig,
+    utils::{self, LoadConfig},
 };
 use foundry_common::{
     abi::{encode_function_args, get_func},
@@ -56,6 +56,7 @@ use foundry_evm::{
     traces::{TraceMode, Traces},
 };
 use foundry_wallets::MultiWalletOpts;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -221,6 +222,10 @@ pub struct ScriptArgs {
 
     #[command(flatten)]
     pub retry: RetryArgs,
+
+    /// Gas per pubdata
+    #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
+    pub zk_gas_per_pubdata: Option<u64>,
 }
 
 impl ScriptArgs {
@@ -401,6 +406,8 @@ impl ScriptArgs {
         known_contracts: &ContractsByArtifact,
         create2_deployer: Address,
     ) -> Result<()> {
+        //TODO: zk mode contract size check
+
         // (name, &init, &deployed)[]
         let mut bytecodes: Vec<(String, &[u8], &[u8])> = vec![];
 
@@ -597,24 +604,30 @@ impl ScriptConfig {
         script_wallets: Wallets,
         debug: bool,
         target: ArtifactId,
+        dual_compiled_contracts: DualCompiledContracts,
     ) -> Result<ScriptRunner> {
-        self._get_runner(Some((known_contracts, script_wallets, target)), debug).await
+        self._get_runner(
+            Some((known_contracts, script_wallets, target, dual_compiled_contracts)),
+            debug,
+        )
+        .await
     }
 
     async fn _get_runner(
         &mut self,
-        cheats_data: Option<(ContractsByArtifact, Wallets, ArtifactId)>,
+        cheats_data: Option<(ContractsByArtifact, Wallets, ArtifactId, DualCompiledContracts)>,
         debug: bool,
     ) -> Result<ScriptRunner> {
         trace!("preparing script runner");
         let env = self.evm_opts.evm_env().await?;
+        let mut strategy = utils::get_executor_strategy(&self.config);
 
         let db = if let Some(fork_url) = self.evm_opts.fork_url.as_ref() {
             match self.backends.get(fork_url) {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork)?;
+                    let backend = Backend::spawn(fork, strategy.runner.new_backend_strategy())?;
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -623,7 +636,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None)?
+            Backend::spawn(None, strategy.runner.new_backend_strategy())?
         };
 
         // We need to enable tracing to decode contract names: local or external.
@@ -638,7 +651,18 @@ impl ScriptConfig {
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions);
 
-        if let Some((known_contracts, script_wallets, target)) = cheats_data {
+        if let Some((known_contracts, script_wallets, target, dual_compiled_contracts)) =
+            cheats_data
+        {
+            strategy.runner.zksync_set_dual_compiled_contracts(
+                strategy.context.as_mut(),
+                dual_compiled_contracts,
+            );
+
+            if let Some(fork_url) = &self.evm_opts.fork_url {
+                strategy.runner.zksync_set_fork_env(strategy.context.as_mut(), fork_url, &env)?;
+            }
+
             builder = builder.inspectors(|stack| {
                 stack
                     .cheatcodes(
@@ -647,6 +671,9 @@ impl ScriptConfig {
                             self.evm_opts.clone(),
                             Some(known_contracts),
                             Some(target),
+                            strategy
+                                .runner
+                                .new_cheatcode_inspector_strategy(strategy.context.as_ref()),
                         )
                         .into(),
                     )
@@ -655,7 +682,8 @@ impl ScriptConfig {
             });
         }
 
-        Ok(ScriptRunner::new(builder.build(env, db), self.evm_opts.clone()))
+        let executor = builder.build(env, db, strategy);
+        Ok(ScriptRunner::new(executor, self.evm_opts.clone()))
     }
 }
 

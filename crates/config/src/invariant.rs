@@ -34,6 +34,8 @@ pub struct InvariantConfig {
     pub timeout: Option<u32>,
     /// Display counterexample as solidity calls.
     pub show_solidity: bool,
+    /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
+    pub no_zksync_reserved_addresses: bool,
 }
 
 impl Default for InvariantConfig {
@@ -51,6 +53,7 @@ impl Default for InvariantConfig {
             show_metrics: false,
             timeout: None,
             show_solidity: false,
+            no_zksync_reserved_addresses: false,
         }
     }
 }
@@ -71,6 +74,7 @@ impl InvariantConfig {
             show_metrics: false,
             timeout: None,
             show_solidity: false,
+            no_zksync_reserved_addresses: false,
         }
     }
 }

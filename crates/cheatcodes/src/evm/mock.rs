@@ -180,7 +180,7 @@ impl Cheatcode for mockFunctionCall {
     }
 }
 
-fn mock_call(
+pub fn mock_call(
     state: &mut Cheatcodes,
     callee: &Address,
     cdata: &Bytes,
@@ -215,7 +215,7 @@ fn make_acc_non_empty(callee: &Address, ecx: &mut CheatsCtxt) -> Result {
 
     let empty_bytecode = acc.info.code.as_ref().is_none_or(Bytecode::is_empty);
     if empty_bytecode {
-        let code = Bytecode::new_raw(Bytes::from_static(&[0u8]));
+        let code = Bytecode::new_raw(Bytes::from_static(&foundry_zksync_core::EMPTY_CODE));
         ecx.journaled_state.set_code(*callee, code);
     }
 

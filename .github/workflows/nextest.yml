@@ -47,8 +47,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrices.outputs.test-matrix) }}
     env:
-      ETH_RPC_URL: https://reth-ethereum.ithaca.xyz/rpc
+      ETH_RPC_URL: https://eth-mainnet.alchemyapi.io/v2/${{ secrets.ALCHEMY_API_KEY }}
       CARGO_PROFILE_DEV_DEBUG: 0
+      # Note(zk): Using our own Alchemy API key to avoid rate limiting issues
+      ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -85,6 +87,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+
       - name: Setup Git config
         run: |
           git config --global user.name "GitHub Actions Bot"

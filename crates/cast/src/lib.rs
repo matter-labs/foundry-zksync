@@ -62,6 +62,9 @@ pub mod tx;
 
 use rlp_converter::Item;
 
+pub mod zksync;
+pub use zksync::*;
+
 #[macro_use]
 extern crate tracing;
 

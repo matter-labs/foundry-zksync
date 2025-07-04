@@ -9,7 +9,11 @@ use proptest::prelude::Strategy;
 
 /// Given a function, it returns a strategy which generates valid calldata
 /// for that function's input types, following declared test fixtures.
-pub fn fuzz_calldata(func: Function, fuzz_fixtures: &FuzzFixtures) -> impl Strategy<Value = Bytes> {
+pub fn fuzz_calldata(
+    func: Function,
+    fuzz_fixtures: &FuzzFixtures,
+    no_zksync_reserved_addresses: bool,
+) -> impl Strategy<Value = Bytes> {
     // We need to compose all the strategies generated for each parameter in all
     // possible combinations, accounting any parameter declared fixture
     let strats = func
@@ -20,6 +24,7 @@ pub fn fuzz_calldata(func: Function, fuzz_fixtures: &FuzzFixtures) -> impl Strat
                 &input.selector_type().parse().unwrap(),
                 fuzz_fixtures.param_fixtures(&input.name),
                 &input.name,
+                no_zksync_reserved_addresses,
             )
         })
         .collect::<Vec<_>>();
@@ -80,7 +85,7 @@ mod tests {
         );
 
         let expected = function.abi_encode_input(&[address_fixture]).unwrap();
-        let strategy = fuzz_calldata(function, &FuzzFixtures::new(fixtures));
+        let strategy = fuzz_calldata(function, &FuzzFixtures::new(fixtures), false);
         let _ = strategy.prop_map(move |fuzzed| {
             assert_eq!(expected, fuzzed);
         });

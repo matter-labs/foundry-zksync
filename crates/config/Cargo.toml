@@ -15,7 +15,7 @@ workspace = true
 
 [dependencies]
 foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
-foundry-compilers = { workspace = true, features = ["svm-solc"] }
+foundry-compilers = { workspace = true, features = ["svm-solc", "async"] }
 
 alloy-chains = { workspace = true, features = ["serde"] }
 alloy-primitives = { workspace = true, features = ["serde"] }
@@ -48,6 +48,9 @@ tracing.workspace = true
 walkdir.workspace = true
 yansi.workspace = true
 clap = { version = "4", features = ["derive"] }
+
+# zksync
+foundry-zksync-compilers.workspace = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 path-slash = "0.2"

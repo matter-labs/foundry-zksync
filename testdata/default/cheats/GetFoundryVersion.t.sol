@@ -8,7 +8,7 @@ contract GetFoundryVersionTest is DSTest {
     Vm constant vm = Vm(HEVM_ADDRESS);
 
     function testGetFoundryVersion() public view {
-        // (e.g. 0.3.0-nightly+3cb96bde9b.1737036656.debug)
+        vm.zkVm(false);
         string memory fullVersionString = vm.getFoundryVersion();
 
         // Step 1: Split the version at "+"

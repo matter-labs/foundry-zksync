@@ -84,7 +84,7 @@ pub fn install() {
     }
 
     let panic_section =
-        "This is a bug. Consider reporting it at https://github.com/foundry-rs/foundry";
+        "This is a bug. Consider reporting it at https://github.com/matter-labs/foundry-zksync";
     let (panic_hook, debug_hook) =
         color_eyre::config::HookBuilder::default().panic_section(panic_section).into_hooks();
     panic_hook.install();

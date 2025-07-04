@@ -10,6 +10,7 @@ use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::Address;
 use auto_impl::auto_impl;
 use backend::DatabaseExt;
+use foundry_zksync_core::Call;
 use revm::{inspector::NoOpInspector, interpreter::CreateInputs, Inspector};
 use revm_inspectors::access_list::AccessListInspector;
 
@@ -66,6 +67,15 @@ pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>
     /// Returns the CREATE2 deployer address.
     fn create2_deployer(&self) -> Address {
         DEFAULT_CREATE2_DEPLOYER
+    }
+
+    /// Appends provided zksync traces.
+    fn trace_zksync(
+        &mut self,
+        _context: &mut EvmContext<&mut dyn DatabaseExt>,
+        _call_traces: Vec<Call>,
+        _record_top_call: bool,
+    ) {
     }
 }
 

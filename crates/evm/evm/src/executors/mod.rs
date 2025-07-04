@@ -46,6 +46,7 @@ use std::{
     borrow::Cow,
     time::{Duration, Instant},
 };
+use strategy::{DeployLibKind, DeployLibResult, ExecutorStrategy};
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -58,6 +59,8 @@ pub use invariant::InvariantExecutor;
 
 mod trace;
 pub use trace::TracingExecutor;
+
+pub mod strategy;
 
 sol! {
     interface ITest {
@@ -80,22 +83,37 @@ sol! {
 /// - `deploy`: a special case of `transact`, specialized for persisting the state of a contract
 ///   deployment
 /// - `setup`: a special case of `transact`, used to set up the environment for a test
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Executor {
     /// The underlying `revm::Database` that contains the EVM storage.
     // Note: We do not store an EVM here, since we are really
     // only interested in the database. REVM's `EVM` is a thin
     // wrapper around spawning a new EVM on every call anyway,
     // so the performance difference should be negligible.
-    backend: Backend,
+    pub backend: Backend,
     /// The EVM environment.
     env: Env,
     /// The Revm inspector stack.
-    inspector: InspectorStack,
+    pub inspector: InspectorStack,
     /// The gas limit for calls and deployments.
     gas_limit: u64,
     /// Whether `failed()` should be called on the test contract to determine if the test failed.
     legacy_assertions: bool,
+
+    pub strategy: ExecutorStrategy,
+}
+
+impl Clone for Executor {
+    fn clone(&self) -> Self {
+        Self {
+            backend: self.backend.clone(),
+            env: self.env.clone(),
+            inspector: self.inspector.clone(),
+            gas_limit: self.gas_limit,
+            legacy_assertions: self.legacy_assertions,
+            strategy: self.strategy.clone(),
+        }
+    }
 }
 
 impl Executor {
@@ -113,6 +131,7 @@ impl Executor {
         inspector: InspectorStack,
         gas_limit: u64,
         legacy_assertions: bool,
+        strategy: ExecutorStrategy,
     ) -> Self {
         // Need to create a non-empty contract on the cheatcodes address so `extcodesize` checks
         // do not fail.
@@ -127,7 +146,7 @@ impl Executor {
             },
         );
 
-        Self { backend, env, inspector, gas_limit, legacy_assertions }
+        Self { backend, env, inspector, gas_limit, legacy_assertions, strategy }
     }
 
     fn clone_with_backend(&self, backend: Backend) -> Self {
@@ -137,7 +156,14 @@ impl Executor {
             self.env.tx.clone(),
             self.spec_id(),
         );
-        Self::new(backend, env, self.inspector().clone(), self.gas_limit, self.legacy_assertions)
+        Self::new(
+            backend,
+            env,
+            self.inspector().clone(),
+            self.gas_limit,
+            self.legacy_assertions,
+            self.strategy.clone(),
+        )
     }
 
     /// Returns a reference to the EVM backend.
@@ -233,10 +259,7 @@ impl Executor {
     /// Set the balance of an account.
     pub fn set_balance(&mut self, address: Address, amount: U256) -> BackendResult<()> {
         trace!(?address, ?amount, "setting account balance");
-        let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
-        account.balance = amount;
-        self.backend_mut().insert_account_info(address, account);
-        Ok(())
+        self.strategy.runner.set_balance(self, address, amount)
     }
 
     /// Gets the balance of an account
@@ -246,11 +269,7 @@ impl Executor {
 
     /// Set the nonce of an account.
     pub fn set_nonce(&mut self, address: Address, nonce: u64) -> BackendResult<()> {
-        let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
-        account.nonce = nonce;
-        self.backend_mut().insert_account_info(address, account);
-        self.env_mut().tx.nonce = nonce;
-        Ok(())
+        self.strategy.runner.set_nonce(self, address, nonce)
     }
 
     /// Returns the nonce of an account.
@@ -298,6 +317,23 @@ impl Executor {
     ) -> Result<DeployResult, EvmError> {
         let env = self.build_test_env(from, TxKind::Create, code, value);
         self.deploy_with_env(env, rd)
+    }
+
+    /// Deploys a library contract and commits the new state to the underlying database.
+    ///
+    /// Executes a `deploy_kind` transaction with the provided parameters
+    /// and persistent database state modifications.
+    ///
+    /// Will return a list of deployment results and transaction requests
+    /// Will also ensure nonce is increased for the sender
+    pub fn deploy_library(
+        &mut self,
+        from: Address,
+        kind: DeployLibKind,
+        value: U256,
+        rd: Option<&RevertDecoder>,
+    ) -> Result<Vec<DeployLibResult>, EvmError> {
+        self.strategy.runner.deploy_library(self, from, kind, value, rd)
     }
 
     /// Deploys a contract using the given `env` and commits the new state to the underlying
@@ -350,7 +386,7 @@ impl Executor {
         trace!(?from, ?to, "setting up contract");
 
         let from = from.unwrap_or(CALLER);
-        self.backend_mut().set_test_contract(to).set_caller(from);
+        self.backend_mut().set_caller(from);
         let calldata = Bytes::from_static(&ITest::setUpCall::SELECTOR);
         let mut res = self.transact_raw(from, to, calldata, U256::ZERO)?;
         res = res.into_result(rd)?;
@@ -461,18 +497,44 @@ impl Executor {
     pub fn call_with_env(&self, mut env: Env) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector().clone();
         let mut backend = CowBackend::new_borrowed(self.backend());
-        let result = backend.inspect(&mut env, &mut inspector)?;
-        convert_executed_result(env, inspector, result, backend.has_state_snapshot_failure())
+
+        let result = self.strategy.runner.call(
+            self.strategy.context.as_ref(),
+            &mut backend,
+            &mut env,
+            &self.env,
+            &mut inspector,
+        )?;
+
+        convert_executed_result(
+            env.clone(),
+            inspector,
+            result,
+            backend.has_state_snapshot_failure(),
+        )
     }
 
     /// Execute the transaction configured in `env.tx`.
     #[instrument(name = "transact", level = "debug", skip_all)]
     pub fn transact_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
-        let mut inspector = self.inspector().clone();
+        let mut inspector = self.inspector.clone();
         let backend = self.backend_mut();
-        let result = backend.inspect(&mut env, &mut inspector)?;
-        let mut result =
-            convert_executed_result(env, inspector, result, backend.has_state_snapshot_failure())?;
+
+        let result_and_state = self.strategy.runner.transact(
+            self.strategy.context.as_mut(),
+            backend,
+            &mut env,
+            &self.env,
+            &mut inspector,
+        )?;
+
+        let mut result = convert_executed_result(
+            env.clone(),
+            inspector,
+            result_and_state,
+            backend.has_state_snapshot_failure(),
+        )?;
+
         self.commit(&mut result);
         Ok(result)
     }
@@ -937,7 +999,7 @@ fn convert_executed_result(
     ResultAndState { result, state: state_changeset }: ResultAndState,
     has_state_snapshot_failure: bool,
 ) -> eyre::Result<RawCallResult> {
-    let (exit_reason, gas_refunded, gas_used, out, exec_logs) = match result {
+    let (exit_reason, gas_refunded, gas_used, out, _exec_logs) = match result {
         ExecutionResult::Success { reason, gas_used, gas_refunded, output, logs, .. } => {
             (reason.into(), gas_refunded, gas_used, Some(output), logs)
         }
@@ -963,12 +1025,8 @@ fn convert_executed_result(
         _ => Bytes::new(),
     };
 
-    let InspectorData { mut logs, labels, traces, coverage, cheatcodes, chisel_state } =
+    let InspectorData { logs, labels, traces, coverage, cheatcodes, chisel_state } =
         inspector.collect();
-
-    if logs.is_empty() {
-        logs = exec_logs;
-    }
 
     let transactions = cheatcodes
         .as_ref()

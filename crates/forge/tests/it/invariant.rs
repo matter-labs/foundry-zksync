@@ -522,7 +522,7 @@ async fn test_invariant_decode_custom_error() {
     );
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_invariant_fuzzed_selected_targets() {
     let filter = Filter::new(".*", ".*", ".*fuzz/invariant/target/FuzzedTargetContracts.t.sol");
     let mut runner = TEST_DATA_DEFAULT.runner_with(|config| {

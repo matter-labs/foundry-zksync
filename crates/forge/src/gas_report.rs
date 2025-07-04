@@ -1,7 +1,7 @@
 //! Gas reports.
 
 use crate::{
-    constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS},
+    constants::CHEATCODE_ADDRESS,
     traces::{CallTraceArena, CallTraceDecoder, CallTraceNode, DecodedCallData},
 };
 use alloy_primitives::map::HashSet;
@@ -11,8 +11,7 @@ use foundry_common::{
     reports::{report_kind, ReportKind},
     TestFunctionExt,
 };
-use foundry_evm::traces::CallKind;
-
+use foundry_evm::{constants::HARDHAT_CONSOLE_ADDRESS, traces::CallKind};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::BTreeMap, fmt::Display};
@@ -105,6 +104,11 @@ impl GasReport {
         if is_create_call {
             trace!(contract_name, "adding create size info");
             contract_info.size = trace.data.len();
+            if decoder.zk_contracts.contains(&node.trace.address) {
+                // Intercepted creates in zkvm mode will have the evm bytecode as input
+                // and the zkvm bytecode as output on the trace.
+                contract_info.size = trace.output.len();
+            }
         }
 
         // Only include top-level calls which account for calldata and base (21.000) cost.

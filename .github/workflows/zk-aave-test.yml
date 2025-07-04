@@ -1,0 +1,52 @@
+name: Weekly ZkSync Aave Test
+
+on:
+  schedule:
+    # Run every Tuesday at 9:00 UTC
+    - cron: '0 9 * * 2'
+  workflow_dispatch: # Allows manual triggering
+
+env:
+  TARGET_RUST_VERSION: stable
+  CARGO_TERM_COLOR: always
+
+jobs:
+  zk-aave-test:
+    runs-on: ubuntu-24.04-github-hosted-16core
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.TARGET_RUST_VERSION }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Run anvil-zksync
+        uses: dutterbutter/anvil-zksync-action@v1.1.0
+        with:
+          mode: fork
+          forkUrl: mainnet
+          log: info
+          logFilePath: anvil_zksync.log
+          target: x86_64-unknown-linux-gnu
+          releaseTag: v0.6.1
+
+      - name: Setup Git config
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "<>"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Run zk-aave test
+        env:
+          RUST_BACKTRACE: full
+          TEST_MAINNET_URL: http://localhost:8011
+        run: |
+          ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --package '*' --lib --test '*' --filter-expr 'test(~test_zk_aave_di)'

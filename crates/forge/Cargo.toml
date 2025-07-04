@@ -23,6 +23,7 @@ path = "tests/ui.rs"
 harness = false
 
 [dependencies]
+
 # lib
 foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
 foundry-common.workspace = true
@@ -32,6 +33,8 @@ foundry-evm.workspace = true
 foundry-evm-core.workspace = true
 foundry-wallets.workspace = true
 foundry-linking.workspace = true
+foundry-zksync-core.workspace = true
+foundry-zksync-compilers.workspace = true
 forge-script-sequence.workspace = true
 
 comfy-table.workspace = true
@@ -67,6 +70,8 @@ alloy-hardforks.workspace = true
 
 revm.workspace = true
 
+alloy-zksync.workspace = true
+
 clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
 clap_complete = "4"
 clap_complete_fig = "4"
@@ -94,6 +99,7 @@ watchexec-events = "6.0"
 watchexec-signals = "5.0"
 clearscreen = "4.0"
 evm-disassembler.workspace = true
+rustls = { version = "0.23", features = ["ring"] }
 
 # doc server
 axum = { workspace = true, features = ["ws"] }
@@ -103,6 +109,13 @@ opener = "0.7"
 # soldeer
 soldeer-commands.workspace = true
 quick-junit = "0.5.0"
+
+# zk
+zksync_types.workspace = true
+zksync_telemetry.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+tikv-jemallocator = { workspace = true, optional = true }
 
 [dev-dependencies]
 anvil.workspace = true

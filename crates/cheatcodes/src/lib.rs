@@ -43,24 +43,32 @@ mod env;
 pub use env::set_execution_context;
 
 mod evm;
+pub use evm::{
+    journaled_account,
+    mock::{make_acc_non_empty, mock_call},
+    DealRecord,
+};
 
 mod fs;
 
 mod inspector;
+pub use inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx, InnerEcx};
 
 mod json;
 
 mod script;
-pub use script::{Wallets, WalletsInner};
+pub use script::{Broadcast, Wallets, WalletsInner};
 
 mod string;
 
 mod test;
-pub use test::expect::ExpectedCallTracker;
+pub use test::expect::handle_expect_emit;
 
 mod toml;
 
 mod utils;
+
+pub mod strategy;
 
 /// Cheatcode implementation.
 pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
@@ -90,12 +98,14 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     }
 }
 
-pub(crate) trait DynCheatcode: 'static {
+pub trait DynCheatcode: 'static + std::any::Any {
     fn cheatcode(&self) -> &'static spec::Cheatcode<'static>;
 
     fn as_debug(&self) -> &dyn std::fmt::Debug;
 
     fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result;
+
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 impl<T: Cheatcode> DynCheatcode for T {
@@ -112,6 +122,11 @@ impl<T: Cheatcode> DynCheatcode for T {
     #[inline]
     fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         self.apply_full(ccx, executor)
+    }
+
+    #[inline]
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -136,13 +151,13 @@ impl dyn DynCheatcode {
 /// The cheatcode context, used in `Cheatcode`.
 pub struct CheatsCtxt<'cheats, 'evm, 'db, 'db2> {
     /// The cheatcodes inspector state.
-    pub(crate) state: &'cheats mut Cheatcodes,
+    pub state: &'cheats mut Cheatcodes,
     /// The EVM data.
     pub(crate) ecx: &'evm mut EthEvmContext<&'db mut (dyn DatabaseExt + 'db2)>,
     /// The original `msg.sender`.
-    pub(crate) caller: Address,
+    pub caller: Address,
     /// Gas limit of the current cheatcode call.
-    pub(crate) gas_limit: u64,
+    pub gas_limit: u64,
 }
 
 impl<'db, 'db2> std::ops::Deref for CheatsCtxt<'_, '_, 'db, 'db2> {

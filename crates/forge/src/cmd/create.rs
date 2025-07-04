@@ -35,6 +35,8 @@ use foundry_config::{
 use serde_json::json;
 use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
 
+mod zksync;
+
 merge_impl_figment_convert!(CreateArgs, build, eth);
 
 /// CLI arguments for `forge create`.
@@ -58,6 +60,7 @@ pub struct CreateArgs {
         long,
         value_hint = ValueHint::FilePath,
         value_name = "PATH",
+        conflicts_with = "constructor_args",
     )]
     constructor_args_path: Option<PathBuf>,
 
@@ -98,13 +101,15 @@ pub struct CreateArgs {
 
     #[command(flatten)]
     retry: RetryArgs,
+
+    #[command(flatten)]
+    pub zksync: zksync::ZkCreateArgs,
 }
 
 impl CreateArgs {
     /// Executes the command to create a contract
     pub async fn run(mut self) -> Result<()> {
         let mut config = self.load_config()?;
-
         // Install missing dependencies.
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
             // need to re-configure here to also catch additional remappings
@@ -114,54 +119,62 @@ impl CreateArgs {
         // Find Project & Compile
         let project = config.project()?;
 
-        let target_path = if let Some(ref mut path) = self.contract.path {
-            canonicalize(project.root().join(path))?
+        if self.build.compiler.zk.enabled() {
+            self.run_zksync(project).await
+            // NOTE(zk): we want the indent here so any change from
+            // upstream causes a conflict so we replay the changes to zk-specific code
         } else {
-            project.find_contract_path(&self.contract.name)?
-        };
+            let target_path = if let Some(ref mut path) = self.contract.path {
+                canonicalize(project.root().join(path))?
+            } else {
+                project.find_contract_path(&self.contract.name)?
+            };
 
-        let output = compile::compile_target(&target_path, &project, shell::is_json())?;
+            let output = compile::compile_target(&target_path, &project, shell::is_json())?;
 
-        let (abi, bin, id) = remove_contract(output, &target_path, &self.contract.name)?;
+            let (abi, bin, id) = remove_contract(output, &target_path, &self.contract.name)?;
 
-        let bin = match bin.object {
-            BytecodeObject::Bytecode(_) => bin.object,
-            _ => {
-                let link_refs = bin
-                    .link_references
-                    .iter()
-                    .flat_map(|(path, names)| {
-                        names.keys().map(move |name| format!("\t{name}: {path}"))
-                    })
-                    .collect::<Vec<String>>()
-                    .join("\n");
-                eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
-            }
-        };
+            let bin = match bin.object {
+                BytecodeObject::Bytecode(_) => bin.object,
+                _ => {
+                    let link_refs = bin
+                        .link_references
+                        .iter()
+                        .flat_map(|(path, names)| {
+                            names.keys().map(move |name| format!("\t{name}: {path}"))
+                        })
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                }
+            };
 
-        // Add arguments to constructor
-        let params = if let Some(constructor) = &abi.constructor {
-            let constructor_args =
-                self.constructor_args_path.clone().map(read_constructor_args_file).transpose()?;
-            self.parse_constructor_args(
-                constructor,
-                constructor_args.as_deref().unwrap_or(&self.constructor_args),
-            )?
-        } else {
-            vec![]
-        };
+            // Add arguments to constructor
+            let params = if let Some(constructor) = &abi.constructor {
+                let constructor_args = self
+                    .constructor_args_path
+                    .clone()
+                    .map(read_constructor_args_file)
+                    .transpose()?;
+                self.parse_constructor_args(
+                    constructor,
+                    constructor_args.as_deref().unwrap_or(&self.constructor_args),
+                )?
+            } else {
+                vec![]
+            };
 
-        let provider = utils::get_provider(&config)?;
+            let provider = utils::get_provider(&config)?;
 
-        // respect chain, if set explicitly via cmd args
-        let chain_id = if let Some(chain_id) = self.chain_id() {
-            chain_id
-        } else {
-            provider.get_chain_id().await?
-        };
+            // respect chain, if set explicitly via cmd args
+            let chain_id = if let Some(chain_id) = self.chain_id() {
+                chain_id
+            } else {
+                provider.get_chain_id().await?
+            };
 
-        // Whether to broadcast the transaction or not
-        let dry_run = !self.broadcast;
+            // Whether to broadcast the transaction or not
+            let dry_run = !self.broadcast;
 
         if self.unlocked {
             // Deploy with unlocked account
@@ -245,6 +258,7 @@ impl CreateArgs {
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
+            zksync: self.build.compiler.zk.enabled(),
         };
 
         // Check config for Etherscan API Keys to avoid preflight check failing if no
@@ -253,7 +267,7 @@ impl CreateArgs {
         verify.etherscan.key =
             config.get_etherscan_config_with_chain(Some(chain.into()))?.map(|c| c.key);
 
-        let context = verify.resolve_context().await?;
+        let context = verify.resolve_either_context().await?;
 
         verify.verification_provider()?.preflight_verify_check(verify, context).await?;
         Ok(())
@@ -347,7 +361,7 @@ impl CreateArgs {
                     .constructor()
                     .ok_or_else(|| eyre::eyre!("could not find constructor"))?
                     .abi_encode_input(&args)?;
-                constructor_args = Some(hex::encode(encoded_args));
+                constructor_args = Some(hex::encode_prefixed(encoded_args));
             }
 
             self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
@@ -436,6 +450,7 @@ impl CreateArgs {
             show_standard_json_input: self.show_standard_json_input,
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
+            zksync: self.build.compiler.zk.enabled(),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
@@ -450,7 +465,9 @@ impl CreateArgs {
         constructor: &Constructor,
         constructor_args: &[String],
     ) -> Result<Vec<DynSolValue>> {
-        let mut params = Vec::with_capacity(constructor.inputs.len());
+        let expected_params = constructor.inputs.len();
+
+        let mut params = Vec::with_capacity(expected_params);
         for (input, arg) in constructor.inputs.iter().zip(constructor_args) {
             // resolve the input type directly
             let ty = input
@@ -458,6 +475,17 @@ impl CreateArgs {
                 .wrap_err_with(|| format!("Could not resolve constructor arg: input={input}"))?;
             params.push((ty, arg));
         }
+
+        let actual_params = params.len();
+
+        if actual_params != expected_params {
+            tracing::warn!(
+                given = actual_params,
+                expected = expected_params,
+               "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
+            );
+        }
+
         let params = params.iter().map(|(ty, arg)| (ty, arg.as_str()));
         parse_tokens(params).map_err(Into::into)
     }
@@ -602,6 +630,8 @@ pub enum ContractDeploymentError {
     ContractNotDeployed,
     #[error(transparent)]
     RpcError(#[from] TransportError),
+    #[error("failed building transaction")]
+    TransactionBuildError,
 }
 
 impl From<PendingTransactionError> for ContractDeploymentError {

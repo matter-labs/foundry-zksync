@@ -1,0 +1,40 @@
+[package]
+name = "foundry-zksync-compilers"
+description = "ZKsync extensions for foundry compilers"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+foundry-compilers = { workspace = true, features = ["svm-solc"] }
+foundry-compilers-artifacts-solc = "0.14.0"
+alloy-primitives.workspace = true
+alloy-json-abi.workspace = true
+tracing.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+semver.workspace = true
+itertools.workspace = true
+walkdir.workspace = true
+reqwest.workspace = true
+yansi.workspace = true
+eyre.workspace = true
+fs4 = "0.8.2"
+dirs = "5"
+path-slash = "0.2"
+
+# zk
+zksync_types.workspace = true
+
+[dev-dependencies]
+similar-asserts.workspace = true
+fd-lock = "4.0.2"
+tempfile.workspace = true
+foundry-test-utils.workspace = true
+

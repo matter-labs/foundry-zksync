@@ -26,6 +26,8 @@ pub struct FuzzConfig {
     pub failure_persist_dir: Option<PathBuf>,
     /// Name of the file to record fuzz failures, defaults to `failures`.
     pub failure_persist_file: Option<String>,
+    /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
+    pub no_zksync_reserved_addresses: bool,
     /// show `console.log` in fuzz test, defaults to `false`
     pub show_logs: bool,
     /// Optional timeout (in seconds) for each property test
@@ -42,6 +44,7 @@ impl Default for FuzzConfig {
             gas_report_samples: 256,
             failure_persist_dir: None,
             failure_persist_file: None,
+            no_zksync_reserved_addresses: false,
             show_logs: false,
             timeout: None,
         }
@@ -54,6 +57,7 @@ impl FuzzConfig {
         Self {
             failure_persist_dir: Some(cache_dir),
             failure_persist_file: Some("failures".to_string()),
+            no_zksync_reserved_addresses: false,
             ..Default::default()
         }
     }

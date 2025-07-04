@@ -1,34 +1,23 @@
-<!--
-Thank you for your Pull Request. Please provide a description above and review
-the requirements below.
+# What :computer: 
+* First thing updated with this PR
+* Second thing updated with this PR
+* Third thing updated with this PR
 
-Bug fixes and new features should include tests.
+# Why :hand:
+* Reason why first thing was added to PR
+* Reason why second thing was added to PR
+* Reason why third thing was added to PR
 
-Contributors guide: https://github.com/foundry-rs/foundry/blob/master/CONTRIBUTING.md
+# Evidence :camera:
+Include screenshots, screen recordings, or `console` output here demonstrating that your changes work as intended
 
-The contributors guide includes instructions for running rustfmt and building the
-documentation.
--->
+# Documentation :books:
+Please ensure the following before submitting your PR:
 
-<!-- ** Please select "Allow edits from maintainers" in the PR Options ** -->
+- [ ] Check if these changes affect any documented features or workflows.
+- [ ] Update the [book](https://github.com/matter-labs/foundry-zksync-book) if these changes affect any documented features or workflows.
 
-## Motivation
+<!-- All sections below are optional. You can uncomment any section applicable to your Pull Request. -->
 
-<!--
-Explain the context and why you're making that change. What is the problem
-you're trying to solve? In some cases there is not a problem and this can be
-thought of as being the motivation for your change.
--->
-
-## Solution
-
-<!--
-Summarize the solution and provide any necessary context needed to understand
-the code change.
--->
-
-## PR Checklist
-
-- [ ] Added Tests
-- [ ] Added Documentation
-- [ ] Breaking changes
+<!-- # Notes :memo:
+* Any notes/thoughts that the reviewers should know prior to reviewing the code? -->

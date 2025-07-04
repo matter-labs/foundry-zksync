@@ -22,6 +22,7 @@ use foundry_evm::{
         invariant::{
             check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
+        strategy::DeployLibKind,
         CallResult, EvmError, Executor, ITest, RawCallResult,
     },
     fuzz::{
@@ -133,28 +134,41 @@ impl<'a> ContractRunner<'a> {
 
         let mut result = TestSetup::default();
         for code in &self.mcr.libs_to_deploy {
-            let deploy_result = self.executor.deploy(
+            let deploy_result = self.executor.deploy_library(
                 LIBRARY_DEPLOYER,
-                code.clone(),
+                DeployLibKind::Create(code.clone()),
                 U256::ZERO,
                 Some(&self.mcr.revert_decoder),
             );
 
-            // Record deployed library address.
-            if let Ok(deployed) = &deploy_result {
-                result.deployed_libs.push(deployed.address);
-            }
+            let deployments = match deploy_result {
+                Err(err) => vec![Err(err)],
+                Ok(deployments) => deployments.into_iter().map(Ok).collect(),
+            };
 
-            let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
-            result.extend(raw, TraceKind::Deployment);
-            if reason.is_some() {
-                result.reason = reason;
-                return Ok(result);
+            for deploy_result in
+                deployments.into_iter().map(|result| result.map(|deployment| deployment.result))
+            {
+                // Record deployed library address.
+                if let Ok(deployed) = &deploy_result {
+                    result.deployed_libs.push(deployed.address);
+                }
+
+                let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
+                result.extend(raw, TraceKind::Deployment);
+                if reason.is_some() {
+                    result.reason = reason;
+                    return Ok(result);
+                }
             }
         }
 
         let address = self.sender.create(self.executor.get_nonce(self.sender)?);
         result.address = address;
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
+        self.executor.backend_mut().set_test_contract(address);
 
         // Set the contracts initial balance before deployment, so it is available during
         // construction
@@ -186,6 +200,15 @@ impl<'a> ContractRunner<'a> {
         self.executor.set_balance(LIBRARY_DEPLOYER, self.initial_balance())?;
 
         self.executor.deploy_create2_deployer()?;
+
+        // Test contract has already been deployed so we can migrate the database to zkEVM storage
+        // in the next runner execution. Additionally we can allow persisting the next nonce update
+        // to simulate EVM behavior where only the tx that deploys the test contract increments the
+        // nonce.
+        if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
+            debug!("test contract deployed");
+            cheatcodes.strategy.runner.base_contract_deployed(cheatcodes.strategy.context.as_mut());
+        }
 
         // Optionally call the `setUp` function
         if call_setup {
@@ -306,7 +329,7 @@ impl<'a> ContractRunner<'a> {
                 [("setUp()".to_string(), TestResult::fail("multiple setUp functions".to_string()))]
                     .into(),
                 warnings,
-            )
+            );
         }
 
         // Check if `afterInvariant` function with valid signature declared.
@@ -322,7 +345,7 @@ impl<'a> ContractRunner<'a> {
                 )]
                 .into(),
                 warnings,
-            )
+            );
         }
         let call_after_invariant = after_invariant_fns.first().is_some_and(|after_invariant_fn| {
             let match_sig = after_invariant_fn.name == "afterInvariant";
@@ -361,7 +384,7 @@ impl<'a> ContractRunner<'a> {
                 start.elapsed(),
                 [(fail_msg, TestResult::setup_result(setup))].into(),
                 warnings,
-            )
+            );
         }
 
         // Filter out functions sequentially since it's very fast and there is no need to do it

@@ -27,6 +27,8 @@ use foundry_evm_core::AsEnvMut;
 use revm::state::AccountInfo;
 use std::path::PathBuf;
 
+mod zksync;
+
 impl_figment_convert!(VerifyBytecodeArgs);
 
 /// CLI arguments for `forge verify-bytecode`.
@@ -90,6 +92,10 @@ pub struct VerifyBytecodeArgs {
     /// Ignore verification for creation or runtime bytecode.
     #[arg(long, value_name = "BYTECODE_TYPE")]
     pub ignore: Option<BytecodeType>,
+
+    /// Verify for zksync
+    #[clap(long)]
+    pub zksync: bool,
 }
 
 impl figment::Provider for VerifyBytecodeArgs {
@@ -125,9 +131,13 @@ impl VerifyBytecodeArgs {
     /// Run the `verify-bytecode` command to verify the bytecode onchain against the locally built
     /// bytecode.
     pub async fn run(mut self) -> Result<()> {
+        if self.zksync {
+            return zksync::run(self).await;
+        }
         // Setup
         let config = self.load_config()?;
         let provider = utils::get_provider(&config)?;
+        let strategy = utils::get_executor_strategy(&config);
 
         // If chain is not set, we try to get it from the RPC.
         // If RPC is not set, the default chain is used.
@@ -240,6 +250,7 @@ impl VerifyBytecodeArgs {
                 gen_blk_num,
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
+                strategy.clone(),
             )
             .await?;
 
@@ -441,6 +452,7 @@ impl VerifyBytecodeArgs {
                 simulation_block - 1, // env.fork_block_number
                 etherscan_metadata.evm_version()?.unwrap_or(EvmVersion::default()),
                 evm_opts,
+                strategy.clone(),
             )
             .await?;
             env.evm_env.block_env.number = simulation_block;

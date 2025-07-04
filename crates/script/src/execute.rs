@@ -66,6 +66,7 @@ impl LinkedState {
 
         let target_contract = build_data.get_target_contract()?;
 
+        //TODO: zk bytecode? factory deps?
         let bytecode = target_contract.bytecode().ok_or_eyre("target contract has no bytecode")?;
 
         let (func, calldata) = args.get_method_and_calldata(&target_contract.abi)?;
@@ -108,6 +109,7 @@ impl PreExecutionState {
                 self.script_wallets.clone(),
                 self.args.debug,
                 self.build_data.build_data.target.clone(),
+                self.build_data.build_data.dual_compiled_contracts.clone().unwrap_or_default(),
             )
             .await?;
         let result = self.execute_with_runner(&mut runner).await?;
