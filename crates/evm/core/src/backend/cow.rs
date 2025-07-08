@@ -13,6 +13,7 @@ use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
+use eyre::WrapErr;
 use foundry_fork_db::DatabaseError;
 use revm::{
     bytecode::Bytecode,

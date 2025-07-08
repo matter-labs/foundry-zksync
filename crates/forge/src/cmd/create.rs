@@ -176,40 +176,41 @@ impl CreateArgs {
             // Whether to broadcast the transaction or not
             let dry_run = !self.broadcast;
 
-        if self.unlocked {
-            // Deploy with unlocked account
-            let sender = self.eth.wallet.from.expect("required");
-            self.deploy(
-                abi,
-                bin,
-                params,
-                provider,
-                chain_id,
-                sender,
-                config.transaction_timeout,
-                id,
-                dry_run,
-            )
-            .await
-        } else {
-            // Deploy with signer
-            let signer = self.eth.wallet.signer().await?;
-            let deployer = signer.address();
-            let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                .wallet(EthereumWallet::new(signer))
-                .connect_provider(provider);
-            self.deploy(
-                abi,
-                bin,
-                params,
-                provider,
-                chain_id,
-                deployer,
-                config.transaction_timeout,
-                id,
-                dry_run,
-            )
-            .await
+            if self.unlocked {
+                // Deploy with unlocked account
+                let sender = self.eth.wallet.from.expect("required");
+                self.deploy(
+                    abi,
+                    bin,
+                    params,
+                    provider,
+                    chain_id,
+                    sender,
+                    config.transaction_timeout,
+                    id,
+                    dry_run,
+                )
+                .await
+            } else {
+                // Deploy with signer
+                let signer = self.eth.wallet.signer().await?;
+                let deployer = signer.address();
+                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
+                    .wallet(EthereumWallet::new(signer))
+                    .connect_provider(provider);
+                self.deploy(
+                    abi,
+                    bin,
+                    params,
+                    provider,
+                    chain_id,
+                    deployer,
+                    config.transaction_timeout,
+                    id,
+                    dry_run,
+                )
+                .await
+            }
         }
     }
 

@@ -430,7 +430,7 @@ fn sanitize_response(res: impl AsRef<str>) -> Result<Response<Vec<Metadata>>> {
 
 #[cfg(test)]
 mod tests {
-    use revm_primitives::hex;
+    use revm::primitives::hex;
 
     use super::*;
 

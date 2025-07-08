@@ -1,4 +1,4 @@
-use forge::revm::primitives::SpecId;
+use revm::primitives::hardfork::SpecId;
 use foundry_test_utils::{forgetest_async, util, Filter, TestCommand, TestProject};
 use semver::Version;
 

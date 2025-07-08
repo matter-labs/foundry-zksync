@@ -4,7 +4,7 @@ use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use foundry_test_utils::{forgetest_async, util, TestProject};
 
 use crate::test_helpers::run_zk_script_test;
-use forge::revm::primitives::SpecId;
+use revm::primitives::hardfork::SpecId;
 use foundry_test_utils::Filter;
 
 #[tokio::test(flavor = "multi_thread")]

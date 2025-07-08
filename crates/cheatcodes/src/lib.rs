@@ -28,6 +28,9 @@ pub use inspector::{
 pub use spec::{CheatcodeDef, Vm};
 pub use Vm::ForgeContext;
 
+// Exposed for ZKsync usage.
+pub use evm::{journaled_account, mock::make_acc_non_empty};
+
 #[macro_use]
 mod error;
 
@@ -43,16 +46,12 @@ mod env;
 pub use env::set_execution_context;
 
 mod evm;
-pub use evm::{
-    journaled_account,
-    mock::{make_acc_non_empty, mock_call},
-    DealRecord,
-};
+pub use evm::{mock::mock_call, DealRecord};
 
 mod fs;
 
 mod inspector;
-pub use inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx, InnerEcx};
+pub use inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx};
 
 mod json;
 
@@ -153,7 +152,7 @@ pub struct CheatsCtxt<'cheats, 'evm, 'db, 'db2> {
     /// The cheatcodes inspector state.
     pub state: &'cheats mut Cheatcodes,
     /// The EVM data.
-    pub(crate) ecx: &'evm mut EthEvmContext<&'db mut (dyn DatabaseExt + 'db2)>,
+    pub ecx: &'evm mut EthEvmContext<&'db mut (dyn DatabaseExt + 'db2)>,
     /// The original `msg.sender`.
     pub caller: Address,
     /// Gas limit of the current cheatcode call.

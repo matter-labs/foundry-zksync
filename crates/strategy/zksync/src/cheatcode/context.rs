@@ -9,7 +9,7 @@ use foundry_zksync_compilers::dual_compiled_contracts::{
     DualCompiledContract, DualCompiledContracts,
 };
 use foundry_zksync_core::{vm::ZkEnv, ZkPaymasterData, H256};
-use revm::primitives::Bytecode;
+use revm::state::Bytecode;
 
 use super::types::ZkStartupMigration;
 

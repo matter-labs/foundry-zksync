@@ -1,19 +1,21 @@
 use std::{any::Any, fmt::Debug};
 
 use crate::{
-    backend::update_state,
-    utils::{configure_tx_req_env, new_evm_with_inspector},
-    InspectorExt,
+    backend::{update_state, JournaledState},
+    env::AsEnvMut,
+    evm::new_evm_with_inspector,
+    utils::configure_tx_req_env,
+    Env, InspectorExt,
 };
 
 use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
+use alloy_evm::Evm;
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
 use revm::{
-    db::CacheDB,
-    primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
-    DatabaseCommit, DatabaseRef, JournaledState,
+    context_interface::result::ResultAndState, database::CacheDB, primitives::HashSet,
+    DatabaseCommit, DatabaseRef,
 };
 use serde::{Deserialize, Serialize};
 
@@ -73,7 +75,7 @@ pub trait BackendStrategyRunner: Debug + Send + Sync + BackendStrategyRunnerExt 
     fn inspect(
         &self,
         backend: &mut Backend,
-        env: &mut EnvWithHandlerCfg,
+        env: &mut Env,
         inspector: &mut dyn InspectorExt,
         inspect_ctx: Box<dyn Any>,
     ) -> Result<ResultAndState>;
@@ -142,15 +144,15 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
     fn inspect(
         &self,
         backend: &mut Backend,
-        env: &mut EnvWithHandlerCfg,
+        env: &mut Env,
         inspector: &mut dyn InspectorExt,
         _inspect_ctx: Box<dyn Any>,
     ) -> Result<ResultAndState> {
-        let mut evm = crate::utils::new_evm_with_inspector(backend, env.clone(), inspector);
+        let mut evm = crate::evm::new_evm_with_inspector(backend, env.to_owned(), inspector);
 
-        let res = evm.transact().wrap_err("EVM error")?;
+        let res = evm.transact(env.tx.clone()).wrap_err("EVM error")?;
 
-        env.env = evm.context.evm.inner.env;
+        *env = evm.as_env_mut().to_owned();
 
         Ok(res)
     }
@@ -209,13 +211,12 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         backend.commit(journaled_state.state.clone());
 
         let res = {
-            configure_tx_req_env(&mut env, tx, None)?;
-            let env = backend.env_with_handler_cfg(env);
+            configure_tx_req_env(&mut env.as_env_mut(), tx, None)?;
 
             let mut db = backend.clone();
-            let mut evm = new_evm_with_inspector(&mut db, env, inspector);
-            evm.context.evm.journaled_state.depth = journaled_state.depth + 1;
-            evm.transact()?
+            let mut evm = new_evm_with_inspector(&mut db, env.to_owned(), inspector);
+            evm.journaled_state.depth = journaled_state.depth + 1;
+            evm.transact(env.tx)?
         };
 
         backend.commit(res.state);
@@ -277,7 +278,9 @@ impl EvmBackendMergeStrategy {
         // need to mock empty journal entries in case the current checkpoint is higher than the
         // existing journal entries
         while active_journaled_state.journal.len() > target_fork.journaled_state.journal.len() {
-            target_fork.journaled_state.journal.push(Default::default());
+            // TODO(merge)
+            todo!("What should we do here?");
+            // target_fork.journaled_state.journal.push(Default::default());
         }
 
         *active_journaled_state = target_fork.journaled_state.clone();
@@ -307,24 +310,24 @@ impl EvmBackendMergeStrategy {
         active: &CacheDB<ExtDB>,
         fork_db: &mut ForkDB,
     ) {
-        let mut acc = if let Some(acc) = active.accounts.get(&addr).cloned() {
+        let mut acc = if let Some(acc) = active.cache.accounts.get(&addr).cloned() {
             acc
         } else {
             // Account does not exist
             return;
         };
 
-        if let Some(code) = active.contracts.get(&acc.info.code_hash).cloned() {
-            fork_db.contracts.insert(acc.info.code_hash, code);
+        if let Some(code) = active.cache.contracts.get(&acc.info.code_hash).cloned() {
+            fork_db.cache.contracts.insert(acc.info.code_hash, code);
         }
 
-        if let Some(fork_account) = fork_db.accounts.get_mut(&addr) {
+        if let Some(fork_account) = fork_db.cache.accounts.get_mut(&addr) {
             // This will merge the fork's tracked storage with active storage and update values
             fork_account.storage.extend(std::mem::take(&mut acc.storage));
             // swap them so we can insert the account as whole in the next step
             std::mem::swap(&mut fork_account.storage, &mut acc.storage);
         }
 
-        fork_db.accounts.insert(addr, acc);
+        fork_db.cache.accounts.insert(addr, acc);
     }
 }

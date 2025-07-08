@@ -23,7 +23,7 @@ use foundry_evm::{
     executors::{EvmError, TracingExecutor},
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
-    utils::{configure_tx_env, configure_zksync_tx_env},
+    utils::configure_tx_env,
     Env,
 };
 use foundry_evm_core::env::AsEnvMut;
@@ -386,5 +386,47 @@ impl figment::Provider for RunArgs {
         }
 
         Ok(Map::from([(Config::selected_profile(), map)]))
+    }
+}
+
+/// Configures the env for the given RPC transaction.
+/// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
+pub fn configure_zksync_tx_env(
+    env: &mut Env,
+    outer_tx: &ZkTransaction,
+) -> foundry_zksync_core::ZkTransactionMetadata {
+    use alloy_primitives::TxKind;
+    use foundry_zksync_core::convert::{ConvertH160, ConvertU256};
+    use zksync_types::ExecuteTransactionCommon;
+
+    // Extract fields from the raw zkSync transaction format
+
+    // Set basic transaction fields
+    env.tx.caller = outer_tx.initiator_account().to_address();
+
+    env.tx.kind = TxKind::Call(
+        outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
+    );
+    env.tx.gas_limit = match &outer_tx.common_data {
+        ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
+        _ => outer_tx.gas_limit().as_u64(),
+    };
+    env.tx.nonce = outer_tx.nonce().expect("nonce not found in common_data").0.into();
+
+    env.tx.value = outer_tx.execute.value.to_ru256();
+
+    env.tx.data = outer_tx.execute.calldata.clone().into();
+    env.tx.gas_price = outer_tx.max_fee_per_gas().low_u128();
+
+    match &outer_tx.common_data {
+        // Set zkSync specific metadata
+        ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: Some(common_data.paymaster_params.clone()),
+        },
+        _ => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: None,
+        },
     }
 }

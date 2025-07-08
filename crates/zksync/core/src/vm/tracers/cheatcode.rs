@@ -147,7 +147,7 @@ pub struct CallContext {
     pub is_static: bool,
     /// L1 block hashes to return when `BLOCKHASH` opcode is encountered. This ensures consistency
     /// when returning environment data in L2.
-    pub block_hashes: HashMap<rU256, FixedBytes<32>>,
+    pub block_hashes: HashMap<rU256, FixedBytes<32>>, // TODO(merge): change to u64
     /// Whether to record storage accesses.
     pub record_storage_accesses: bool,
 }
@@ -199,9 +199,9 @@ impl CheatcodeTracer {
 
         let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
 
-        !ignored_known_addresses.contains(&target) &&
-            (contract_code == hash_bytecode(&EMPTY_CODE) ||
-                contract_code == StorageValue::zero())
+        !ignored_known_addresses.contains(&target)
+            && (contract_code == hash_bytecode(&EMPTY_CODE)
+                || contract_code == StorageValue::zero())
     }
 }
 
@@ -281,9 +281,9 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     let value = U256::from(current.context_u128_value);
                     let to = current.code_address;
 
-                    let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS &&
-                        (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) ||
-                            calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
+                    let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS
+                        && (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE)
+                            || calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
                     {
                         let mut params = ethabi::decode(
                             &[
@@ -353,8 +353,9 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                 // We skip recording the base call for `expectCall` cheatcode that initiated this
                 // transaction. The initial call is recorded in revm when it was
                 // made, and before being dispatched to zkEVM.
-                let is_base_call = current.code_address.to_address() == self.call_context.contract &&
-                    self.call_context
+                let is_base_call = current.code_address.to_address() == self.call_context.contract
+                    && self
+                        .call_context
                         .input
                         .as_ref()
                         .map(|input| input.0.as_ref() == calldata.as_slice())
@@ -398,8 +399,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     None => mocks
                         .iter_mut()
                         .find(|(mock, _)| {
-                            calldata.get(..mock.calldata.len()) == Some(&mock.calldata[..]) &&
-                                mock.value.is_none_or(|value| value == call_value)
+                            calldata.get(..mock.calldata.len()) == Some(&mock.calldata[..])
+                                && mock.value.is_none_or(|value| value == call_value)
                         })
                         .map(|(_, v)| v),
                 } {
@@ -445,8 +446,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.get_current_stack();
 
-            if current.code_address == CONTRACT_DEPLOYER_ADDRESS &&
-                calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
+            if current.code_address == CONTRACT_DEPLOYER_ADDRESS
+                && calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
             {
                 let address = H256::from_slice(&calldata[4..36]).to_h160().to_address();
                 if self.call_context.tx_caller == address {
@@ -464,8 +465,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
 
-            if current.msg_sender == BOOTLOADER_ADDRESS &&
-                calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION)
+            if current.msg_sender == BOOTLOADER_ADDRESS
+                && calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION)
             {
                 self.farcall_handler.set_action(
                     CallDepth::next(),
@@ -497,8 +498,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
 
-            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
-                calldata.starts_with(&SELECTOR_BASE_FEE)
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS
+                && calldata.starts_with(&SELECTOR_BASE_FEE)
             {
                 self.farcall_handler
                     .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
@@ -510,8 +511,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
 
-            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
-                calldata.starts_with(&SELECTOR_BLOCK_HASH)
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS
+                && calldata.starts_with(&SELECTOR_BLOCK_HASH)
             {
                 let block_number = U256::from(&calldata[4..36]);
                 let block_hash = self
@@ -529,8 +530,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
                 let current = state.vm_local_state.callstack.current;
 
-                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS &&
-                    calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
+                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS
+                    && calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
                 {
                     let mut params = ethabi::decode(
                         &[

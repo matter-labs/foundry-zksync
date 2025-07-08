@@ -10,7 +10,6 @@ use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::Address;
 use auto_impl::auto_impl;
 use backend::DatabaseExt;
-use foundry_zksync_core::Call;
 use revm::{inspector::NoOpInspector, interpreter::CreateInputs, Inspector};
 use revm_inspectors::access_list::AccessListInspector;
 
@@ -37,6 +36,8 @@ pub mod opts;
 pub mod precompiles;
 pub mod state_snapshot;
 pub mod utils;
+
+pub type Ecx<'a, 'b, 'c> = &'a mut EthEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 
 /// An extension trait that allows us to add additional hooks to Inspector for later use in
 /// handlers.
@@ -70,10 +71,11 @@ pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>
     }
 
     /// Appends provided zksync traces.
+    // TODO(merge): Should be moved outside of the upstream codebase
     fn trace_zksync(
         &mut self,
-        _context: &mut EvmContext<&mut dyn DatabaseExt>,
-        _call_traces: Vec<Call>,
+        _context: Ecx,
+        _call_traces: Box<dyn std::any::Any>, // holds `Vec<Call>`
         _record_top_call: bool,
     ) {
     }

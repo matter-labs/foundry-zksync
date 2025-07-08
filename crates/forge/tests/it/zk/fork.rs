@@ -2,7 +2,7 @@
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_provider::Provider;
-use forge::revm::primitives::SpecId;
+use revm::primitives::hardfork::SpecId;
 use foundry_common::provider::try_get_zksync_http_provider;
 use foundry_test_utils::{
     forgetest_async,

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
-use forge::revm::primitives::SpecId;
+use revm::primitives::hardfork::SpecId;
 use foundry_config::Config;
 use foundry_test_utils::Filter;
 

@@ -1182,6 +1182,7 @@ impl CastSubcommand {
             Self::Logs(_) => "logs",
             Self::DecodeTransaction { tx: _ } => "decode-transaction",
             Self::TxPool { command: _ } => "tx-pool",
+            Self::DAEstimate(_) => "da-estimate",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()
     }

@@ -19,7 +19,6 @@ use crate::{
 };
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_evm::eth::EthEvmContext;
-use alloy_network::TransactionBuilder4844;
 use alloy_primitives::{
     hex,
     map::{AddressHashMap, HashMap, HashSet},
@@ -38,11 +37,10 @@ use foundry_evm_core::{
     backend::{DatabaseError, DatabaseExt, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
     evm::{new_evm_with_existing_context, FoundryEvm},
-    InspectorExt,
+    Env, InspectorExt,
 };
 use foundry_evm_traces::TracingInspectorConfig;
 use foundry_wallets::multi_wallet::MultiWallet;
-use foundry_zksync_core::Call;
 use foundry_zksync_inspectors::TraceCollector;
 use itertools::Itertools;
 use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
@@ -55,8 +53,8 @@ use revm::{
     handler::FrameResult,
     interpreter::{
         interpreter_types::{Jumps, MemoryTr},
-        CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, FrameInput, Gas, Host,
-        InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
+        CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome, FrameInput,
+        Gas, Host, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
     },
     state::EvmStorageSlot,
     Inspector, Journal,
@@ -118,40 +116,46 @@ pub trait CheatcodesExecutor {
         None
     }
 
-    fn trace_zksync(&mut self, ccx_state: &mut Cheatcodes, ecx: Ecx, call_traces: Vec<Call>) {
+    fn trace_zksync(
+        &mut self,
+        ccx_state: &mut Cheatcodes,
+        ecx: Ecx,
+        call_traces: Box<dyn std::any::Any>, // TODO(merge): Should me moved elsewhere, represents `Vec<Call>`
+    ) {
         let mut inspector = self.get_inspector(ccx_state);
+        inspector.trace_zksync(ecx, call_traces, false);
 
         // We recreate the EvmContext here to satisfy the lifetime parameters as 'static, with
         // regards to the inspector's lifetime.
-        let mut ecx_inner = EvmContext {
-            inner: InnerEvmContext {
-                env: std::mem::take(&mut ecx.env),
-                journaled_state: std::mem::replace(
-                    &mut ecx.journaled_state,
-                    revm::JournaledState::new(Default::default(), Default::default()),
-                ),
-                error: std::mem::replace(&mut ecx.error, Ok(())),
-                l1_block_info: std::mem::take(&mut ecx.l1_block_info),
-                db: &mut ecx.db as &mut dyn DatabaseExt,
-            },
-            precompiles: Default::default(),
-        };
-        inspector.trace_zksync(&mut ecx_inner, call_traces, false);
+        // let mut ecx_inner = EthEvmContext {
+        //     inner: InnerEvmContext {
+        //         env,
+        //         journaled_state: std::mem::replace(
+        //             &mut ecx.journaled_state,
+        //             revm::JournaledState::new(Default::default(), Default::default()),
+        //         ),
+        //         error: std::mem::replace(&mut ecx.error, Ok(())),
+        //         l1_block_info: std::mem::take(&mut ecx.l1_block_info),
+        //         db: &mut ecx.db as &mut dyn DatabaseExt,
+        //     },
+        //     precompiles: Default::default(),
+        // };
+        // inspector.trace_zksync(env, &mut ecx_inner, call_traces, false);
 
-        // re-apply the modified fields to the original ecx.
-        let env = std::mem::take(&mut ecx_inner.env);
-        let journaled_state = std::mem::replace(
-            &mut ecx_inner.journaled_state,
-            revm::JournaledState::new(Default::default(), Default::default()),
-        );
-        let error = std::mem::replace(&mut ecx_inner.error, Ok(()));
-        let l1_block_info = std::mem::take(&mut ecx_inner.l1_block_info);
-        drop(ecx_inner);
+        // // re-apply the modified fields to the original ecx.
+        // let env = std::mem::take(&mut env);
+        // let journaled_state = std::mem::replace(
+        //     &mut ecx_inner.journaled_state,
+        //     revm::JournaledState::new(Default::default(), Default::default()),
+        // );
+        // let error = std::mem::replace(&mut ecx_inner.error, Ok(()));
+        // let l1_block_info = std::mem::take(&mut ecx_inner.l1_block_info);
+        // drop(ecx_inner);
 
-        ecx.env = env;
-        ecx.journaled_state = journaled_state;
-        ecx.error = error;
-        ecx.l1_block_info = l1_block_info;
+        // ecx.env = env;
+        // ecx.journaled_state = journaled_state;
+        // ecx.error = error;
+        // ecx.l1_block_info = l1_block_info;
     }
 }
 
@@ -566,7 +570,6 @@ impl Clone for Cheatcodes {
             broadcast: self.broadcast.clone(),
             broadcastable_transactions: self.broadcastable_transactions.clone(),
             config: self.config.clone(),
-            context: self.context.clone(),
             fs_commit: self.fs_commit,
             serialized_jsons: self.serialized_jsons.clone(),
             eth_deals: self.eth_deals.clone(),
@@ -583,6 +586,8 @@ impl Clone for Cheatcodes {
             wallets: self.wallets.clone(),
             strategy: self.strategy.clone(),
             access_list: self.access_list.clone(),
+            test_context: self.test_context.clone(),
+            rng: self.rng.clone(),
         }
     }
 }
@@ -777,9 +782,7 @@ impl Cheatcodes {
             });
         }
 
-        let gas = Gas::new(input.gas_limit());
         let curr_depth = ecx.journaled_state.depth();
-        let ecx_inner = &mut ecx.inner;
         let gas = Gas::new(input.gas_limit());
 
         // Apply our prank
@@ -832,7 +835,7 @@ impl Cheatcodes {
                         self.strategy.context.as_mut(),
                         self.config.clone(),
                         &input,
-                        ecx_inner,
+                        ecx,
                         broadcast,
                         &mut self.broadcastable_transactions,
                     );
@@ -1016,9 +1019,7 @@ impl Cheatcodes {
         }
 
         self.strategy.runner.zksync_remove_duplicate_account_access(self);
-        self.strategy.runner.zksync_record_create_address(self.strategy.context.as_mut(), &outcome);
-
-        outcome
+        self.strategy.runner.zksync_record_create_address(self.strategy.context.as_mut(), outcome);
     }
 
     pub fn create_with_executor(
@@ -1091,15 +1092,15 @@ impl Cheatcodes {
             };
         }
 
-        // NOTE(zk): renamed from `ecx` because we need the full one later
-        // and this helps with borrow checker
-        let ecx_inner = &mut ecx.inner;
-
         if call.target_address == HARDHAT_CONSOLE_ADDRESS {
             return None;
         }
 
-        self.strategy.runner.zksync_set_deployer_call_input(self.strategy.context.as_mut(), call);
+        self.strategy.runner.zksync_set_deployer_call_input(
+            ecx,
+            self.strategy.context.as_mut(),
+            call,
+        );
 
         // Handle expected calls
 
@@ -1170,8 +1171,7 @@ impl Cheatcodes {
                 if prank.delegate_call {
                     call.target_address = prank.new_caller;
                     call.caller = prank.new_caller;
-                    // NOTE(zk): ecx_inner vs upstream's ecx used here
-                    let acc = ecx_inner.journaled_state.account(prank.new_caller);
+                    let acc = ecx.journaled_state.account(prank.new_caller);
                     call.value = CallValue::Apparent(acc.info.balance);
                     if let Some(new_origin) = prank.new_origin {
                         ecx.tx.caller = new_origin;
@@ -1242,7 +1242,7 @@ impl Cheatcodes {
                         self.strategy.context.as_mut(),
                         self.config.clone(),
                         call,
-                        ecx_inner,
+                        ecx,
                         broadcast,
                         &mut self.broadcastable_transactions,
                         self.active_delegation.take(),

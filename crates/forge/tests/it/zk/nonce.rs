@@ -2,7 +2,7 @@ use crate::{
     config::TestConfig,
     test_helpers::{run_zk_script_test, TEST_DATA_DEFAULT},
 };
-use forge::revm::primitives::SpecId;
+use revm::primitives::hardfork::SpecId;
 use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
 
 forgetest_async!(setup_block_on_script_test, |prj, cmd| {

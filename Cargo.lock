@@ -4770,7 +4770,6 @@ dependencies = [
  "foundry-evm-core",
  "foundry-evm-traces",
  "foundry-wallets",
- "foundry-zksync-core",
  "foundry-zksync-inspectors",
  "itertools 0.14.0",
  "jsonpath_lib",
@@ -5189,7 +5188,6 @@ dependencies = [
  "foundry-evm-abi",
  "foundry-fork-db",
  "foundry-test-utils",
- "foundry-zksync-core",
  "futures 0.3.31",
  "itertools 0.14.0",
  "op-revm",
@@ -5202,7 +5200,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "zksync_types",
 ]
 
 [[package]]
@@ -5349,6 +5346,7 @@ name = "foundry-strategy-zksync"
 version = "0.0.21"
 dependencies = [
  "alloy-eips",
+ "alloy-evm",
  "alloy-json-abi",
  "alloy-network",
  "alloy-primitives",
@@ -5475,6 +5473,7 @@ dependencies = [
 name = "foundry-zksync-core"
 version = "0.0.21"
 dependencies = [
+ "alloy-evm",
  "alloy-json-abi",
  "alloy-network",
  "alloy-primitives",
@@ -5509,6 +5508,7 @@ dependencies = [
 name = "foundry-zksync-inspectors"
 version = "0.0.21"
 dependencies = [
+ "alloy-evm",
  "alloy-primitives",
  "foundry-evm-core",
  "foundry-evm-traces",

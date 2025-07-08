@@ -1,9 +1,25 @@
 use crate::cmd::{
-    bind::BindArgs, bind_json, build::BuildArgs, cache::CacheArgs, clone::CloneArgs,
-    compiler::CompilerArgs, config, coverage, create::CreateArgs, doc::DocArgs, eip712, flatten,
-    fmt::FmtArgs, geiger, generate, init::InitArgs, inspect, install::InstallArgs, lint::LintArgs,
-    remappings::RemappingArgs, remove::RemoveArgs, selectors::SelectorsSubcommands, snapshot,
-    soldeer, test, tree, update,
+    bind::BindArgs,
+    bind_json,
+    build::BuildArgs,
+    cache::{CacheArgs, CacheSubcommands},
+    clone::CloneArgs,
+    compiler::CompilerArgs,
+    config, coverage,
+    create::CreateArgs,
+    doc::DocArgs,
+    eip712, flatten,
+    fmt::FmtArgs,
+    geiger,
+    generate::{self, GenerateSubcommands},
+    init::InitArgs,
+    inspect,
+    install::InstallArgs,
+    lint::LintArgs,
+    remappings::RemappingArgs,
+    remove::RemoveArgs,
+    selectors::SelectorsSubcommands,
+    snapshot, soldeer, test, tree, update,
 };
 use clap::{Parser, Subcommand, ValueHint};
 use forge_script::ScriptArgs;
@@ -215,6 +231,7 @@ impl ForgeSubcommand {
             Self::Soldeer(_) => ("soldeer", None),
             Self::Eip712(_) => ("eip712", None),
             Self::BindJson(_) => ("bind-json", None),
+            Self::Lint(_) => ("lint", None),
         };
         TelemetryProps::new()
             .insert("command", Some(command_name))

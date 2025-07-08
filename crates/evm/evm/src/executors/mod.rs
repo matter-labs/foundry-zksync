@@ -518,7 +518,7 @@ impl Executor {
     #[instrument(name = "transact", level = "debug", skip_all)]
     pub fn transact_with_env(&mut self, mut env: Env) -> eyre::Result<RawCallResult> {
         let mut inspector = self.inspector.clone();
-        let backend = self.backend_mut();
+        let backend = &mut self.backend;
 
         let result_and_state = self.strategy.runner.transact(
             self.strategy.context.as_mut(),

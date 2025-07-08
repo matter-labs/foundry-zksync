@@ -1,7 +1,7 @@
 //! Forge tests for basic zkysnc functionality.
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
-use forge::revm::primitives::SpecId;
+use revm::primitives::hardfork::SpecId;
 use foundry_test_utils::Filter;
 
 #[tokio::test(flavor = "multi_thread")]

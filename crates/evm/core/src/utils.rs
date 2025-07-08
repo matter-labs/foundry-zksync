@@ -15,11 +15,11 @@ use foundry_config::NamedChain;
 use revm::primitives::hardfork::SpecId;
 pub use revm::state::EvmState as StateChangeset;
 
-use foundry_zksync_core::{
-    convert::{ConvertH160, ConvertU256},
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-};
-use zksync_types::{ExecuteTransactionCommon, Transaction as ZkTransaction};
+// use foundry_zksync_core::{
+//     convert::{ConvertH160, ConvertU256},
+//     DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+// };
+// use zksync_types::{ExecuteTransactionCommon, Transaction as ZkTransaction};
 
 use crate::EnvMut;
 
@@ -106,43 +106,43 @@ pub fn configure_tx_env(env: &mut EnvMut<'_>, tx: &Transaction<AnyTxEnvelope>) {
     }
 }
 
-/// Configures the env for the given RPC transaction.
-/// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
-pub fn configure_zksync_tx_env(
-    env: &mut revm::primitives::Env,
-    outer_tx: &ZkTransaction,
-) -> foundry_zksync_core::ZkTransactionMetadata {
-    // Extract fields from the raw zkSync transaction format
+// /// Configures the env for the given RPC transaction.
+// /// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
+// pub fn configure_zksync_tx_env(
+//     env: &mut revm::primitives::Env,
+//     outer_tx: &ZkTransaction,
+// ) -> foundry_zksync_core::ZkTransactionMetadata {
+//     // Extract fields from the raw zkSync transaction format
 
-    // Set basic transaction fields
-    env.tx.caller = outer_tx.initiator_account().to_address();
+//     // Set basic transaction fields
+//     env.tx.caller = outer_tx.initiator_account().to_address();
 
-    env.tx.transact_to = TxKind::Call(
-        outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
-    );
-    env.tx.gas_limit = match &outer_tx.common_data {
-        ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
-        _ => outer_tx.gas_limit().as_u64(),
-    };
-    env.tx.nonce = Some(outer_tx.nonce().expect("nonce not found in common_data").0.into());
+//     env.tx.transact_to = TxKind::Call(
+//         outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
+//     );
+//     env.tx.gas_limit = match &outer_tx.common_data {
+//         ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
+//         _ => outer_tx.gas_limit().as_u64(),
+//     };
+//     env.tx.nonce = Some(outer_tx.nonce().expect("nonce not found in common_data").0.into());
 
-    env.tx.value = outer_tx.execute.value.to_ru256();
+//     env.tx.value = outer_tx.execute.value.to_ru256();
 
-    env.tx.data = outer_tx.execute.calldata.clone().into();
-    env.tx.gas_price = outer_tx.max_fee_per_gas().to_ru256();
+//     env.tx.data = outer_tx.execute.calldata.clone().into();
+//     env.tx.gas_price = outer_tx.max_fee_per_gas().to_ru256();
 
-    match &outer_tx.common_data {
-        // Set zkSync specific metadata
-        ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
-            factory_deps: outer_tx.execute.factory_deps.clone(),
-            paymaster_data: Some(common_data.paymaster_params.clone()),
-        },
-        _ => foundry_zksync_core::ZkTransactionMetadata {
-            factory_deps: outer_tx.execute.factory_deps.clone(),
-            paymaster_data: None,
-        },
-    }
-}
+//     match &outer_tx.common_data {
+//         // Set zkSync specific metadata
+//         ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
+//             factory_deps: outer_tx.execute.factory_deps.clone(),
+//             paymaster_data: Some(common_data.paymaster_params.clone()),
+//         },
+//         _ => foundry_zksync_core::ZkTransactionMetadata {
+//             factory_deps: outer_tx.execute.factory_deps.clone(),
+//             paymaster_data: None,
+//         },
+//     }
+// }
 
 /// Configures the env for the given RPC transaction request.
 /// `impersonated_from` is the address of the impersonated account. This helps account for an

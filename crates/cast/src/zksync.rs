@@ -56,10 +56,10 @@ fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
 
 impl ZkTransactionOpts {
     pub fn has_zksync_args(&self) -> bool {
-        self.paymaster_address.is_some() ||
-            self.custom_signature.is_some() ||
-            !self.factory_deps.is_empty() ||
-            self.gas_per_pubdata.is_some()
+        self.paymaster_address.is_some()
+            || self.custom_signature.is_some()
+            || !self.factory_deps.is_empty()
+            || self.gas_per_pubdata.is_some()
     }
 
     /// Builds a base ZkSync transaction request from the common parameters
@@ -160,7 +160,7 @@ where
 
         if let Some(func) = func {
             // decode args into tokens
-            decoded = match func.abi_decode_output(res.as_ref(), false) {
+            decoded = match func.abi_decode_output(res.as_ref()) {
                 Ok(decoded) => decoded,
                 Err(err) => {
                     // ensure the address is a contract

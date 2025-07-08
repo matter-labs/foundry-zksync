@@ -11,7 +11,7 @@ use foundry_cheatcodes::{CheatcodesExecutor, Wallets};
 use foundry_evm_core::{
     backend::{DatabaseExt, JournaledState},
     evm::new_evm_with_inspector,
-    ContextExt, Env, InspectorExt,
+    ContextExt, Ecx, Env, InspectorExt,
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
@@ -1146,8 +1146,8 @@ impl InspectorExt for InspectorStackRefMut<'_> {
 
     fn trace_zksync(
         &mut self,
-        ecx: &mut EvmContext<&mut dyn DatabaseExt>,
-        call_traces: Vec<Call>,
+        ecx: Ecx,
+        call_traces: Box<dyn std::any::Any>, // TODO(merge): should be moved elsewhere, represents `Vec<Call>`
         record_top_call: bool,
     ) {
         call_inspectors!([&mut self.tracer], |inspector| InspectorExt::trace_zksync(
@@ -1270,8 +1270,8 @@ impl InspectorExt for InspectorStack {
 
     fn trace_zksync(
         &mut self,
-        ecx: &mut EvmContext<&mut dyn DatabaseExt>,
-        call_traces: Vec<Call>,
+        ecx: Ecx,
+        call_traces: Box<dyn std::any::Any>, // TODO(merge): should be moved elsewhere, represents `Vec<Call>`
         record_top_call: bool,
     ) {
         self.as_mut().trace_zksync(ecx, call_traces, record_top_call);

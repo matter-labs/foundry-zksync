@@ -1,5 +1,6 @@
+use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, Bytes, Log, U256};
-use foundry_evm_core::{backend::DatabaseExt, InspectorExt};
+use foundry_evm_core::{backend::DatabaseExt, Env, InspectorExt};
 use foundry_evm_traces::{
     CallTraceArena, GethTraceBuilder, ParityTraceBuilder, TracingInspector, TracingInspectorConfig,
 };
@@ -8,11 +9,13 @@ use foundry_zksync_core::{
     Call,
 };
 use revm::{
+    context::{ContextTr, CreateScheme},
+    inspector::JournalExt,
     interpreter::{
         CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Gas,
         InstructionResult, Interpreter, InterpreterResult,
     },
-    Database, EvmContext, Inspector,
+    Database, Inspector,
 };
 
 /// A Wrapper around [TracingInspector] to allow adding zkEVM traces.
@@ -112,61 +115,48 @@ impl TraceCollector {
     }
 }
 
-impl<DB> Inspector<DB> for TraceCollector
+impl<CTX> Inspector<CTX> for TraceCollector
 where
-    DB: Database,
+    CTX: ContextTr<Journal: JournalExt>,
 {
     #[inline]
-    fn step(&mut self, interp: &mut Interpreter, context: &mut EvmContext<DB>) {
+    fn step(&mut self, interp: &mut Interpreter, context: &mut CTX) {
         self.inner.step(interp, context)
     }
 
     #[inline]
-    fn step_end(&mut self, interp: &mut Interpreter, context: &mut EvmContext<DB>) {
+    fn step_end(&mut self, interp: &mut Interpreter, context: &mut CTX) {
         self.inner.step_end(interp, context)
     }
 
-    fn log(&mut self, interp: &mut Interpreter, context: &mut EvmContext<DB>, log: &Log) {
+    fn log(&mut self, interp: &mut Interpreter, context: &mut CTX, log: Log) {
         self.inner.log(interp, context, log)
     }
 
-    fn call(
-        &mut self,
-        context: &mut EvmContext<DB>,
-        inputs: &mut CallInputs,
-    ) -> Option<CallOutcome> {
+    fn call(&mut self, context: &mut CTX, inputs: &mut CallInputs) -> Option<CallOutcome> {
         self.inner.call(context, inputs)
     }
 
-    fn call_end(
-        &mut self,
-        context: &mut EvmContext<DB>,
-        inputs: &CallInputs,
-        outcome: CallOutcome,
-    ) -> CallOutcome {
+    fn call_end(&mut self, context: &mut CTX, inputs: &CallInputs, outcome: &mut CallOutcome) {
         self.inner.call_end(context, inputs, outcome)
     }
 
-    fn create(
-        &mut self,
-        context: &mut EvmContext<DB>,
-        inputs: &mut CreateInputs,
-    ) -> Option<CreateOutcome> {
+    fn create(&mut self, context: &mut CTX, inputs: &mut CreateInputs) -> Option<CreateOutcome> {
         self.inner.create(context, inputs)
     }
 
     fn create_end(
         &mut self,
-        context: &mut EvmContext<DB>,
+        context: &mut CTX,
         inputs: &CreateInputs,
-        outcome: CreateOutcome,
-    ) -> CreateOutcome {
+        outcome: &mut CreateOutcome,
+    ) {
         self.inner.create_end(context, inputs, outcome)
     }
 
     fn eofcreate(
         &mut self,
-        context: &mut EvmContext<DB>,
+        context: &mut CTX,
         inputs: &mut EOFCreateInputs,
     ) -> Option<CreateOutcome> {
         self.inner.eofcreate(context, inputs)
@@ -174,33 +164,37 @@ where
 
     fn eofcreate_end(
         &mut self,
-        context: &mut EvmContext<DB>,
+        context: &mut CTX,
         inputs: &EOFCreateInputs,
-        outcome: CreateOutcome,
-    ) -> CreateOutcome {
+        outcome: &mut CreateOutcome,
+    ) {
         self.inner.eofcreate_end(context, inputs, outcome)
     }
 
     fn selfdestruct(&mut self, contract: Address, target: Address, value: U256) {
-        <TracingInspector as Inspector<DB>>::selfdestruct(&mut self.inner, contract, target, value)
+        <TracingInspector as Inspector<CTX>>::selfdestruct(&mut self.inner, contract, target, value)
     }
 }
 
 impl InspectorExt for TraceCollector {
     fn trace_zksync(
         &mut self,
-        context: &mut EvmContext<&mut dyn DatabaseExt>,
-        call_traces: Vec<Call>,
+        context: foundry_evm_core::Ecx,
+        call_traces: Box<dyn std::any::Any>,
         record_top_call: bool,
     ) {
+        let call_traces = *call_traces
+            .downcast::<Vec<Call>>()
+            .expect("TraceCollector::trace_zksync expected call traces to be a Vec<Call>");
+
         fn trace_call_recursive(
             tracer: &mut TracingInspector,
-            context: &mut EvmContext<&mut dyn DatabaseExt>,
+            context: foundry_evm_core::Ecx,
             call: Call,
             suppressed_top_call: bool,
         ) -> u64 {
             let inputs = &mut CallInputs {
-                input: call.input.into(),
+                input: revm::interpreter::CallInput::Bytes(call.input.into()),
                 gas_limit: call.gas,
                 scheme: revm::interpreter::CallScheme::Call,
                 caller: call.from.to_address(),
@@ -212,8 +206,8 @@ impl InspectorExt for TraceCollector {
                 return_memory_offset: Default::default(),
             };
             let is_first_non_system_call = if !suppressed_top_call {
-                !foundry_zksync_core::is_system_address(inputs.caller) &&
-                    !foundry_zksync_core::is_system_address(inputs.target_address)
+                !foundry_zksync_core::is_system_address(inputs.caller)
+                    && !foundry_zksync_core::is_system_address(inputs.target_address)
             } else {
                 false
             };
@@ -221,9 +215,9 @@ impl InspectorExt for TraceCollector {
             // We ignore traces from system addresses, the default account abstraction calls on
             // caller address, and the original call (identified when neither `to` or
             // `from` are system addresses) since it is already included in EVM trace.
-            let record_trace = !is_first_non_system_call &&
-                !foundry_zksync_core::is_system_address(inputs.target_address) &&
-                inputs.target_address != context.env.tx.caller;
+            let record_trace = !is_first_non_system_call
+                && !foundry_zksync_core::is_system_address(inputs.target_address)
+                && inputs.target_address != context.tx.caller;
 
             let mut outcome = if let Some(reason) = &call.revert_reason {
                 CallOutcome {
@@ -249,9 +243,9 @@ impl InspectorExt for TraceCollector {
             let mut create_inputs = if is_create {
                 Some(CreateInputs {
                     caller: inputs.caller,
-                    scheme: revm::primitives::CreateScheme::Create,
+                    scheme: CreateScheme::Create,
                     value: inputs.value.get(),
-                    init_code: inputs.input.clone(),
+                    init_code: inputs.input.bytes(context),
                     gas_limit: inputs.gas_limit,
                 })
             } else {
@@ -295,7 +289,7 @@ impl InspectorExt for TraceCollector {
             // finish span
             if record_trace {
                 if let Some(inputs) = &mut create_inputs {
-                    let outcome = if let Some(reason) = call.revert_reason {
+                    let mut outcome = if let Some(reason) = call.revert_reason {
                         CreateOutcome {
                             result: InterpreterResult {
                                 result: InstructionResult::Revert,
@@ -315,12 +309,12 @@ impl InspectorExt for TraceCollector {
                         }
                     };
 
-                    tracer.create_end(context, inputs, outcome);
+                    tracer.create_end(context, inputs, &mut outcome);
                 } else {
                     if extra_gas != 0 {
                         outcome.result.gas = Gas::new_spent(outcome.result.gas.spent() + extra_gas);
                     }
-                    tracer.call_end(context, inputs, outcome);
+                    tracer.call_end(context, inputs, &mut outcome);
                 }
             }
 

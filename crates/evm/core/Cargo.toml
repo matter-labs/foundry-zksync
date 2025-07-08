@@ -17,7 +17,7 @@ workspace = true
 foundry-cheatcodes-spec.workspace = true
 foundry-common.workspace = true
 foundry-config.workspace = true
-foundry-zksync-core.workspace = true
+# foundry-zksync-core.workspace = true
 foundry-evm-abi.workspace = true
 
 alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
@@ -64,6 +64,6 @@ thiserror.workspace = true
 tokio = { workspace = true, features = ["time", "macros"] }
 tracing.workspace = true
 url.workspace = true
-zksync_types.workspace = true
+# zksync_types.workspace = true
 [dev-dependencies]
 foundry-test-utils.workspace = true

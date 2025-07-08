@@ -1,23 +1,24 @@
 use std::any::Any;
 
+use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Ok, Result};
 use foundry_evm::{
     backend::{
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        update_state, Backend, DatabaseExt,
+        update_state, Backend, DatabaseExt, JournaledState,
     },
-    InspectorExt,
+    Env, InspectorExt,
 };
-use foundry_evm_core::backend::{
-    strategy::{BackendStrategyForkInfo, BackendStrategyRunner, EvmBackendStrategyRunner},
-    BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
+use foundry_evm_core::{
+    backend::{
+        strategy::{BackendStrategyForkInfo, BackendStrategyRunner, EvmBackendStrategyRunner},
+        BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
+    },
+    AsEnvMut as _,
 };
-use revm::{
-    primitives::{Env, EnvWithHandlerCfg, HashSet, ResultAndState},
-    DatabaseCommit, JournaledState,
-};
+use revm::{context::result::ResultAndState, primitives::HashSet, DatabaseCommit};
 use serde::{Deserialize, Serialize};
 
 use crate::backend::{
@@ -34,7 +35,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
     fn inspect(
         &self,
         backend: &mut Backend,
-        env: &mut EnvWithHandlerCfg,
+        env: &mut Env,
         inspector: &mut dyn InspectorExt,
         inspect_ctx: Box<dyn Any>,
     ) -> Result<ResultAndState> {
@@ -50,7 +51,8 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             Some(&mut persisted_factory_deps),
             Some(inspect_ctx.factory_deps),
             inspect_ctx.paymaster_data,
-            env,
+            env.evm_env.clone(),
+            env.tx.clone(),
             &inspect_ctx.zk_env,
             backend,
         );
@@ -58,13 +60,14 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         let ctx = get_context(backend.strategy.context.as_mut());
         ctx.persisted_factory_deps = persisted_factory_deps;
 
-        let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
+        let mut evm_context =
+            EthEvmContext::new(backend as &mut dyn DatabaseExt, env.evm_env.cfg_env.spec);
 
         // patch evm context with real caller
-        evm_context.env.tx.caller = env.tx.caller;
+        evm_context.tx.caller = env.tx.caller;
 
         result.map(|(result, call_traces)| {
-            inspector.trace_zksync(&mut evm_context, call_traces, true);
+            inspector.trace_zksync(&mut evm_context, Box::new(call_traces), true);
             result
         })
     }
@@ -151,8 +154,10 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         backend.commit(journaled_state.state.clone());
 
         let res = {
-            configure_tx_req_env(&mut env, tx, None)?;
-            let mut env = backend.env_with_handler_cfg(env);
+            configure_tx_req_env(&mut env.as_env_mut(), tx, None)?;
+            // TODO(merge): should we do something here?
+            // let mut env = backend.env_with_handler_cfg(env);
+            let mut env = env.clone();
 
             let inspect_ctx = get_inspect_context(inspect_ctx);
             let mut persisted_factory_deps =
@@ -162,7 +167,8 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
                 Some(&mut persisted_factory_deps),
                 Some(inspect_ctx.factory_deps),
                 inspect_ctx.paymaster_data,
-                &mut env,
+                env.evm_env.clone(),
+                env.tx.clone(),
                 &inspect_ctx.zk_env,
                 backend,
             );
@@ -170,14 +176,15 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             let ctx = get_context(backend.strategy.context.as_mut());
             ctx.persisted_factory_deps = persisted_factory_deps;
 
-            let mut evm_context = revm::EvmContext::new(backend as &mut dyn DatabaseExt);
+            let mut evm_context =
+                EthEvmContext::new(backend as &mut dyn DatabaseExt, env.evm_env.cfg_env.spec);
 
             // Patch evm context with real caller and real depth
-            evm_context.env.tx.caller = env.tx.caller;
+            evm_context.tx.caller = env.tx.caller;
             evm_context.journaled_state.depth = journaled_state.depth + 1;
 
             result.map(|(result, call_traces)| {
-                inspector.trace_zksync(&mut evm_context, call_traces, true);
+                inspector.trace_zksync(&mut evm_context, Box::new(call_traces), true);
                 result
             })?
         };
