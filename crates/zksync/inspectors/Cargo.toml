@@ -12,7 +12,6 @@ repository.workspace = true
 exclude.workspace = true
 
 [dependencies]
-alloy-evm.workspace = true
 foundry-evm-core.workspace = true
 foundry-evm-traces.workspace = true
 foundry-zksync-core.workspace = true

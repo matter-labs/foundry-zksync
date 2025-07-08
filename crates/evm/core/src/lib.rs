@@ -74,7 +74,7 @@ pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>
     // TODO(merge): Should be moved outside of the upstream codebase
     fn trace_zksync(
         &mut self,
-        _context: Ecx,
+        _context: Ecx<'_, '_, '_>,
         _call_traces: Box<dyn std::any::Any>, // holds `Vec<Call>`
         _record_top_call: bool,
     ) {

@@ -1,6 +1,5 @@
-use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, Bytes, Log, U256};
-use foundry_evm_core::{backend::DatabaseExt, Env, InspectorExt};
+use foundry_evm_core::InspectorExt;
 use foundry_evm_traces::{
     CallTraceArena, GethTraceBuilder, ParityTraceBuilder, TracingInspector, TracingInspectorConfig,
 };
@@ -15,7 +14,7 @@ use revm::{
         CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Gas,
         InstructionResult, Interpreter, InterpreterResult,
     },
-    Database, Inspector,
+    Inspector,
 };
 
 /// A Wrapper around [TracingInspector] to allow adding zkEVM traces.

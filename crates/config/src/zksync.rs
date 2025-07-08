@@ -287,7 +287,10 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
             }
             SolcReq::Local(path) => {
                 if !path.is_file() {
-                    return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())));
+                    return Err(SolcError::msg(format!(
+                        "`solc` {} does not exist",
+                        path.display()
+                    )));
                 }
                 let version = get_solc_version_info(path)?.version;
                 Solc::new_with_version(
@@ -397,11 +400,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use foundry_compilers::solc::SolcCompiler;
-    use semver::Version;
-
-    use crate::Config;
-
     use super::*;
 
     #[test]

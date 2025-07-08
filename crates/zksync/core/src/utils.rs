@@ -94,7 +94,7 @@ pub fn get_private_key(private_key: &Option<String>) -> Result<H256> {
     match private_key {
         Some(pkey) => {
             let val = hex::decode(pkey)
-                .map_err(|e| eyre::Report::msg(format!("Error parsing private key: {}", e)))?;
+                .map_err(|e| eyre::Report::msg(format!("Error parsing private key: {e}")))?;
             Ok(H256::from_slice(&val))
         }
         None => {

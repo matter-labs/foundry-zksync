@@ -371,9 +371,9 @@ fn get_env_historical_block_count() -> u32 {
     let name = "ZK_DEBUG_HISTORICAL_BLOCK_HASHES";
     std::env::var(name)
         .map(|value| {
-            value.parse::<u32>().unwrap_or_else(|err| {
-                panic!("failed parsing env variable {}={}, {:?}", name, value, err)
-            })
+            value
+                .parse::<u32>()
+                .unwrap_or_else(|err| panic!("failed parsing env variable {name}={value}, {err:?}"))
         })
         .map(|num| num.min(256))
         .unwrap_or(256)

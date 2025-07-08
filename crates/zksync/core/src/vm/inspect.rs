@@ -617,7 +617,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         let tx_results_pretty = TransactionSummary::new(l2_gas_price, &tx, &tx_result, None);
         let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
 
-        sh_println!("{tx_results_pretty}");
+        sh_println!("{tx_results_pretty}").unwrap();
 
         if !call_traces.is_empty() {
             let call_traces = call_traces.clone();
@@ -804,9 +804,9 @@ where
 {
     std::env::var(name)
         .map(|value| {
-            value.parse::<T>().unwrap_or_else(|err| {
-                panic!("failed parsing env variable {}={}, {:?}", name, value, err)
-            })
+            value
+                .parse::<T>()
+                .unwrap_or_else(|err| panic!("failed parsing env variable {name}={value}, {err:?}"))
         })
         .unwrap_or_default()
 }

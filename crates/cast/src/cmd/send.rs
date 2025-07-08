@@ -199,7 +199,7 @@ impl SendTxArgs {
                     send_zk_transaction(zk_provider, builder, &eth, zk_tx, zk_code).await?;
 
                 let provider =
-                    ProviderBuilder::<_, _, AnyNetwork>::default().on_provider(&provider);
+                    ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(&provider);
 
                 handle_transaction_result(
                     &Cast::new(provider),

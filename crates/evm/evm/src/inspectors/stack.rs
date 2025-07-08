@@ -1,6 +1,6 @@
 use super::{
     Cheatcodes, CheatsConfig, ChiselState, CoverageCollector, CustomPrintTracer, Fuzzer,
-    LogCollector, RevertDiagnostic, ScriptExecutionInspector, TracingInspector,
+    LogCollector, RevertDiagnostic, ScriptExecutionInspector,
 };
 use alloy_evm::{eth::EthEvmContext, Evm};
 use alloy_primitives::{
@@ -15,7 +15,6 @@ use foundry_evm_core::{
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
-use foundry_zksync_core::Call;
 use foundry_zksync_inspectors::TraceCollector;
 use revm::{
     context::{
@@ -1146,7 +1145,7 @@ impl InspectorExt for InspectorStackRefMut<'_> {
 
     fn trace_zksync(
         &mut self,
-        ecx: Ecx,
+        ecx: Ecx<'_, '_, '_>,
         call_traces: Box<dyn std::any::Any>, // TODO(merge): should be moved elsewhere, represents `Vec<Call>`
         record_top_call: bool,
     ) {
@@ -1270,7 +1269,7 @@ impl InspectorExt for InspectorStack {
 
     fn trace_zksync(
         &mut self,
-        ecx: Ecx,
+        ecx: Ecx<'_, '_, '_>,
         call_traces: Box<dyn std::any::Any>, // TODO(merge): should be moved elsewhere, represents `Vec<Call>`
         record_top_call: bool,
     ) {

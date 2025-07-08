@@ -3,7 +3,6 @@ use crate::{
     traces::identifier::SignaturesIdentifier,
     Cast, SimpleCast,
 };
-use alloy_consensus::transaction::{Recovered, SignerRecoverable};
 use alloy_dyn_abi::{DynSolValue, ErrorExt, EventExt};
 use alloy_ens::{namehash, ProviderEnsExt};
 use alloy_primitives::{eip191_hash_message, hex, keccak256, Address, B256};

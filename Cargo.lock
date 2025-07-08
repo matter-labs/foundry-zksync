@@ -5141,7 +5141,6 @@ dependencies = [
  "foundry-evm-traces",
  "foundry-linking",
  "foundry-zksync-compilers",
- "foundry-zksync-core",
  "foundry-zksync-inspectors",
  "indicatif",
  "parking_lot",
@@ -5508,7 +5507,6 @@ dependencies = [
 name = "foundry-zksync-inspectors"
 version = "0.0.21"
 dependencies = [
- "alloy-evm",
  "alloy-primitives",
  "foundry-evm-core",
  "foundry-evm-traces",

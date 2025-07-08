@@ -535,7 +535,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     fn zksync_try_create(
         &self,
         state: &mut Cheatcodes,
-        ecx: Ecx,
+        ecx: Ecx<'_, '_, '_>,
         input: &dyn CommonCreateInput,
         executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CreateOutcome> {
@@ -778,7 +778,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     fn zksync_try_call(
         &self,
         state: &mut Cheatcodes,
-        ecx: Ecx,
+        ecx: Ecx<'_, '_, '_>,
         call: &CallInputs,
         executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CallOutcome> {

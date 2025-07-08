@@ -326,8 +326,8 @@ impl ProviderBuilder {
             );
         }
 
-        let provider =
-            AlloyProviderBuilder::<_, _, Zksync>::default().on_provider(RootProvider::new(client));
+        let provider = AlloyProviderBuilder::<_, _, Zksync>::default()
+            .connect_provider(RootProvider::new(client));
 
         Ok(provider)
     }
