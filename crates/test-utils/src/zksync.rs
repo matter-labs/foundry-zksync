@@ -275,8 +275,8 @@ impl ZkSyncNode {
         let system_contracts = SystemContracts::from_options(
             SystemContractsOptions::BuiltInWithoutSecurity,
             None,
-            ProtocolVersionId::Version26,
-            false,
+            ProtocolVersionId::Version27,
+            true,
             BoojumConfig::default(),
         );
         let storage_key_layout = StorageKeyLayout::ZkEra;

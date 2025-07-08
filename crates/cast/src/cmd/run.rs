@@ -223,6 +223,15 @@ impl RunArgs {
             executor.spec_id(),
         );
 
+        if self.zk_force {
+            // Set up fee parameters.
+            executor.strategy.runner.zksync_set_fork_env(
+                executor.strategy.context.as_mut(),
+                &config.get_rpc_url_or_localhost_http()?,
+                &env,
+            )?;
+        }
+
         // Set the state to the moment right before the transaction
         if !self.quick {
             if !shell::is_json() {
