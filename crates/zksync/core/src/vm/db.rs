@@ -106,7 +106,7 @@ where
                     None
                 } else {
                     account.info.code.as_ref().map(|code| {
-                        (H256::from(account.info.code_hash.0), code.bytecode().to_vec())
+                        (H256::from(account.info.code_hash.0), code.original_bytes().to_vec())
                     })
                 }
             })
@@ -144,16 +144,15 @@ where
             .iter()
             .map(|c| (c.deployed_contract_hash, c.deployed_contract.bytecode.clone()));
 
-        let state_to_factory_deps =
-            ecx.journaled_state.state.values().flat_map(|account| {
-                if account.info.is_empty_code_hash() {
-                    None
-                } else {
-                    account.info.code.as_ref().map(|code| {
-                        (H256::from(account.info.code_hash.0), code.bytecode().to_vec())
-                    })
-                }
-            });
+        let state_to_factory_deps = ecx.journaled_state.state.values().flat_map(|account| {
+            if account.info.is_empty_code_hash() {
+                None
+            } else {
+                account.info.code.as_ref().map(|code| {
+                    (H256::from(account.info.code_hash.0), code.original_bytes().to_vec())
+                })
+            }
+        });
 
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
@@ -316,7 +315,7 @@ where
                 .find_map(|account| {
                     if account.info.code_hash == hash_b256 {
                         return Some(
-                            account.info.code.clone().map(|code| code.bytecode().to_vec()),
+                            account.info.code.clone().map(|code| code.original_bytes().to_vec()),
                         );
                     }
                     None
@@ -327,7 +326,7 @@ where
                         .db()
                         .code_by_hash(hash_b256)
                         .ok()
-                        .map(|bytecode| bytecode.bytecode().to_vec())
+                        .map(|bytecode| bytecode.original_bytes().to_vec())
                 })
         })
     }

@@ -77,9 +77,11 @@ impl ZksyncCheatcodeInspectorStrategyContext {
                 zk_deployed_bytecode: zk_deployed_bytecode.clone(),
                 zk_factory_deps: Default::default(),
                 evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
-                evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone()).bytecode().to_vec(),
+                evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone())
+                    .original_bytes()
+                    .to_vec(),
                 evm_immutable_references: Some(Default::default()),
-                evm_bytecode: Bytecode::new_raw(empty_bytes).bytecode().to_vec(),
+                evm_bytecode: Bytecode::new_raw(empty_bytes).original_bytes().to_vec(),
             },
         );
 

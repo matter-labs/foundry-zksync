@@ -614,6 +614,17 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     }
 
     if tracing::enabled!(target: "anvil_zksync_core::formatter", tracing::Level::INFO) {
+        let mut tx = tx.clone();
+        // TODO(merge): hack to get this part of code working without panicking.
+        if let zksync_types::ExecuteTransactionCommon::L2(tx_common) = &mut tx.common_data {
+            if tx_common.input.is_none() {
+                tx_common.input = Some(zksync_types::InputData {
+                    hash: Default::default(),
+                    data: Default::default(),
+                })
+            }
+        }
+
         let tx_results_pretty = TransactionSummary::new(l2_gas_price, &tx, &tx_result, None);
         let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
 
