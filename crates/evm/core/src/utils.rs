@@ -118,8 +118,8 @@ pub fn configure_tx_env(env: &mut EnvMut<'_>, tx: &Transaction<AnyTxEnvelope>) {
 //     env.tx.caller = outer_tx.initiator_account().to_address();
 
 //     env.tx.transact_to = TxKind::Call(
-//         outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
-//     );
+//         outer_tx.recipient_account().expect("recipient_account not found in
+// execute").to_address(),     );
 //     env.tx.gas_limit = match &outer_tx.common_data {
 //         ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
 //         _ => outer_tx.gas_limit().as_u64(),

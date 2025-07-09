@@ -935,8 +935,8 @@ impl Backend {
         for tx in full_block.inner.transactions.txns() {
             // System transactions such as on L2s don't contain any pricing info so we skip them
             // otherwise this would cause reverts
-            if is_known_system_sender(tx.inner().inner.signer())
-                || tx.ty() == SYSTEM_TRANSACTION_TYPE
+            if is_known_system_sender(tx.inner().inner.signer()) ||
+                tx.ty() == SYSTEM_TRANSACTION_TYPE
             {
                 trace!(tx=?tx.tx_hash(), "skipping system transaction");
                 continue;

@@ -388,11 +388,7 @@ impl<I: InspectorExt> InspectorHandler for FoundryHandler<'_, I> {
                 result: InterpreterResult {
                     result: InstructionResult::Revert,
                     output: Bytes::copy_from_slice(
-                        format!(
-                            "missing CREATE2 deployer: {create2_deployer}",
-                            call_inputs.target_address
-                        )
-                        .as_bytes(),
+                        format!("missing CREATE2 deployer: {create2_deployer}").as_bytes(),
                     ),
                     gas: Gas::new(gas_limit),
                 },

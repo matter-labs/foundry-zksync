@@ -141,8 +141,8 @@ impl RunArgs {
             .ok_or_else(|| eyre::eyre!("tx not found: {:?}", tx_hash))?;
 
         // check if the tx is a system transaction
-        if is_known_system_sender(tx.from())
-            || tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
+        if is_known_system_sender(tx.from()) ||
+            tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
         {
             return Err(eyre::eyre!(
                 "{:?} is a system transaction.\nReplaying system transactions is currently not supported.",
@@ -250,8 +250,8 @@ impl RunArgs {
                     // System transactions such as on L2s don't contain any pricing info so
                     // we skip them otherwise this would cause
                     // reverts
-                    if is_known_system_sender(tx.from())
-                        || tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
+                    if is_known_system_sender(tx.from()) ||
+                        tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
                     {
                         pb.set_position((index + 1) as u64);
                         continue;

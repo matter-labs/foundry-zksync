@@ -159,9 +159,9 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InitState> {
         let etherscan_api_version = config.get_etherscan_api_version(Some(chain));
         let etherscan_api_key = config.get_etherscan_api_key(Some(chain));
         // mark it as legacy if requested or the chain is legacy and no 7702 is provided.
-        let legacy = tx_opts.legacy
-            || (chain.is_legacy() && tx_opts.auth.is_none())
-            || config.zksync.run_in_zk_mode();
+        let legacy = tx_opts.legacy ||
+            (chain.is_legacy() && tx_opts.auth.is_none()) ||
+            config.zksync.run_in_zk_mode();
 
         if let Some(gas_limit) = tx_opts.gas_limit {
             tx.set_gas_limit(gas_limit.to());
@@ -377,8 +377,8 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InputState> {
             self.tx.max_fee_per_blob_gas = Some(self.provider.get_blob_base_fee().await?)
         }
 
-        if !self.legacy
-            && (self.tx.max_fee_per_gas.is_none() || self.tx.max_priority_fee_per_gas.is_none())
+        if !self.legacy &&
+            (self.tx.max_fee_per_gas.is_none() || self.tx.max_priority_fee_per_gas.is_none())
         {
             let estimate = self.provider.estimate_eip1559_fees().await?;
 

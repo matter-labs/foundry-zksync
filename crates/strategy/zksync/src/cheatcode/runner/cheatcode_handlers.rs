@@ -238,8 +238,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 if let Some((existing, _)) =
                     ctx.dual_compiled_contracts.iter().find(|(_, contract)| {
-                        contract.evm_bytecode_hash == new_contract.evm_bytecode_hash
-                            && contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
+                        contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
+                            contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
                     })
                 {
                     warn!(

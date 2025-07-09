@@ -205,8 +205,8 @@ impl InspectorExt for TraceCollector {
                 return_memory_offset: Default::default(),
             };
             let is_first_non_system_call = if !suppressed_top_call {
-                !foundry_zksync_core::is_system_address(inputs.caller)
-                    && !foundry_zksync_core::is_system_address(inputs.target_address)
+                !foundry_zksync_core::is_system_address(inputs.caller) &&
+                    !foundry_zksync_core::is_system_address(inputs.target_address)
             } else {
                 false
             };
@@ -214,9 +214,9 @@ impl InspectorExt for TraceCollector {
             // We ignore traces from system addresses, the default account abstraction calls on
             // caller address, and the original call (identified when neither `to` or
             // `from` are system addresses) since it is already included in EVM trace.
-            let record_trace = !is_first_non_system_call
-                && !foundry_zksync_core::is_system_address(inputs.target_address)
-                && inputs.target_address != context.tx.caller;
+            let record_trace = !is_first_non_system_call &&
+                !foundry_zksync_core::is_system_address(inputs.target_address) &&
+                inputs.target_address != context.tx.caller;
 
             let mut outcome = if let Some(reason) = &call.revert_reason {
                 CallOutcome {
