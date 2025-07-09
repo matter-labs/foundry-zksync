@@ -44,16 +44,6 @@ impl ZksyncBackendMerge {
             );
         }
 
-        // need to mock empty journal entries in case the current checkpoint is higher than the
-        // existing journal entries
-        while active_journaled_state.journal.len() > target_fork.journaled_state.journal.len() {
-            // TODO(merge): Is it adequate?
-            target_fork
-                .journaled_state
-                .journal
-                .push(revm::JournalEntry::AccountTouched { address: Address::repeat_byte(0x5a) });
-        }
-
         *active_journaled_state = target_fork.journaled_state.clone();
     }
 
