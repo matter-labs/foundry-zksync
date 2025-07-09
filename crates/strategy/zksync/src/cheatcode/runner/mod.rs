@@ -500,7 +500,6 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     ) {
         let ctx = get_context(ctx);
 
-        ctx.set_deployer_call_input_factory_deps.clear();
         if call.target_address == DEFAULT_CREATE2_DEPLOYER && ctx.using_zk_vm {
             call.target_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;
             call.bytecode_address = DEFAULT_CREATE2_DEPLOYER_ZKSYNC;

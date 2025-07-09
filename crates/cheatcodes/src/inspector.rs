@@ -1949,6 +1949,18 @@ impl InspectorExt for Cheatcodes {
     fn create2_deployer(&self) -> Address {
         self.config.evm_opts.create2_deployer
     }
+
+    fn zksync_set_deployer_call_input(
+        &mut self,
+        context: Ecx<'_, '_, '_>,
+        call_inputs: &mut CallInputs,
+    ) {
+        self.strategy.runner.zksync_set_deployer_call_input(
+            context,
+            self.strategy.context.as_mut(),
+            call_inputs,
+        );
+    }
 }
 
 impl Cheatcodes {

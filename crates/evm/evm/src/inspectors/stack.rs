@@ -1143,6 +1143,16 @@ impl InspectorExt for InspectorStackRefMut<'_> {
         self.inner.create2_deployer
     }
 
+    fn zksync_set_deployer_call_input(
+        &mut self,
+        context: Ecx<'_, '_, '_>,
+        call_inputs: &mut CallInputs,
+    ) {
+        call_inspectors!([&mut self.cheatcodes], |inspector| {
+            InspectorExt::zksync_set_deployer_call_input(inspector, context, call_inputs)
+        });
+    }
+
     fn trace_zksync(
         &mut self,
         ecx: Ecx<'_, '_, '_>,
@@ -1265,6 +1275,14 @@ impl InspectorExt for InspectorStack {
 
     fn create2_deployer(&self) -> Address {
         self.create2_deployer
+    }
+
+    fn zksync_set_deployer_call_input(
+        &mut self,
+        context: Ecx<'_, '_, '_>,
+        call_inputs: &mut CallInputs,
+    ) {
+        self.as_mut().zksync_set_deployer_call_input(context, call_inputs);
     }
 
     fn trace_zksync(
