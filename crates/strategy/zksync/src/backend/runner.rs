@@ -155,8 +155,6 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
 
         let res = {
             configure_tx_req_env(&mut env.as_env_mut(), tx, None)?;
-            // TODO(merge): should we do something here?
-            // let mut env = backend.env_with_handler_cfg(env);
             let env = env.clone();
 
             let inspect_ctx = get_inspect_context(inspect_ctx);

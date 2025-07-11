@@ -147,7 +147,7 @@ pub struct CallContext {
     pub is_static: bool,
     /// L1 block hashes to return when `BLOCKHASH` opcode is encountered. This ensures consistency
     /// when returning environment data in L2.
-    pub block_hashes: HashMap<rU256, FixedBytes<32>>, // TODO(merge): change to u64
+    pub block_hashes: HashMap<rU256, FixedBytes<32>>, // TODO(zk): change to u64
     /// Whether to record storage accesses.
     pub record_storage_accesses: bool,
 }

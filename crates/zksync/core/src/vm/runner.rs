@@ -57,7 +57,7 @@ where
         block: evm_env.block_env,
         cfg: evm_env.cfg_env,
         tx,
-        journaled_state: Journal::new(db), // TODO(merge): Should we set spec ID here?
+        journaled_state: Journal::new(db),
         local: Default::default(),
         chain: (),
         error: Ok(()),

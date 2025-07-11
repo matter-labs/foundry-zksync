@@ -1,6 +1,6 @@
 use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{hex, FixedBytes, Log};
-use anvil_zksync_config::types::{BoojumConfig, SystemContractsOptions as Options};
+use anvil_zksync_config::types::SystemContractsOptions as Options;
 use anvil_zksync_core::{
     formatter::transaction::summary::TransactionSummary, system_contracts::SystemContracts,
 };
@@ -489,7 +489,7 @@ static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = Laz
         None,
         DEFAULT_PROTOCOL_VERSION,
         true,
-        BoojumConfig::default(),
+        Default::default(),
     )
     .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
     .clone()
@@ -615,7 +615,9 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 
     if tracing::enabled!(target: "anvil_zksync_core::formatter", tracing::Level::INFO) {
         let mut tx = tx.clone();
-        // TODO(merge): hack to get this part of code working without panicking.
+        // TODO: This is a hack to be able to print traces on demand. If `tx_common.input` is not
+        // set, getting tx hash will panic.
+        // It will not print correct transaction hash though.
         if let zksync_types::ExecuteTransactionCommon::L2(tx_common) = &mut tx.common_data {
             if tx_common.input.is_none() {
                 tx_common.input = Some(zksync_types::InputData {
