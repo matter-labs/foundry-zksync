@@ -157,7 +157,7 @@ no_storage_caching = false
 # Whether to store the referenced sources in the metadata as literal data.
 use_literal_content = false
 # use ipfs method to generate the metadata hash, solc's default.
-# To not include the metadata hash, to allow for deterministic code: https://docs.soliditylang.org/en/latest/metadata.html, use "none"
+# To not include the metadata hash, to allow for deterministic code: https://docs.soliditylang.org/en/latest/metadata.html, use "none" (evm compilation only, field will be ignored for zksync)
 bytecode_hash = "ipfs"
 # Whether to append the CBOR-encoded metadata file.
 cbor_metadata = true
@@ -197,6 +197,7 @@ seed = '0x3e8'
 dictionary_weight = 40
 include_storage = true
 include_push_bytes = true
+no_zksync_reserved_addresses = true
 
 [invariant]
 runs = 256
@@ -207,11 +208,45 @@ dictionary_weight = 80
 include_storage = true
 include_push_bytes = true
 shrink_run_limit = 5000
+no_zksync_reserved_addresses = true
 
 [fmt]
 line_length = 100
 tab_width = 2
 bracket_spacing = true
+```
+
+#### ZkSync settings
+
+ZkSync configuration can be tweaked with the [`ZkSyncConfig`](./src/zksync.rs) object.
+The `zksync` settings must be prefixed with the profile they correspond to:
+`[profile.default.zksync]` belongs to the `[profile.default]` profile
+
+``` toml
+[profile.default.zksync] 
+# Compile contracts for zkVM
+compile = false 
+# Enable zkVM at startup, needs `compile = true` to have effect
+startup = true
+# By default the latest supported version is used
+zksolc = "1.5.0" 
+# By default the corresponding solc patched version from matter-labs is used
+solc_path = "./solc-0.8.23-1.0.1"
+# By default, no value is passed and the default for the compiler (keccak256) will be used
+hash_type = "none"
+# Allow compiler to use mode 'z' if contracts won't fit in the EraVM bytecode 
+# size limitations
+fallback_oz = false 
+# Enable EraVM extensions (ex system-mode)
+enable_eravm_extensions = false
+# Force compilation via EVMLA instead of Yul codegen pipeline
+force_evmla = false 
+# Enable optimizer on zksolc (defaults to true)
+optimizer = true 
+# zksolc optimizer mode (0 | 1 | 2 | 3 | s | z)
+optimizer_mode = '3'
+# zksolc optimizer details 
+optimizer_details = { ... }
 ```
 
 #### Additional Optimizer settings

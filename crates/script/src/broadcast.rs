@@ -1,30 +1,36 @@
 use crate::{
-    ScriptArgs, ScriptConfig, build::LinkedBuildData, progress::ScriptProgress,
-    sequence::ScriptSequenceKind, verify::BroadcastedState,
+    build::LinkedBuildData, progress::ScriptProgress, sequence::ScriptSequenceKind,
+    verify::BroadcastedState, ScriptArgs, ScriptConfig,
 };
 use alloy_chains::{Chain, NamedChain};
 use alloy_consensus::TxEnvelope;
-use alloy_eips::{BlockId, eip2718::Encodable2718};
+use alloy_eips::{eip2718::Encodable2718, BlockId};
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
 use alloy_primitives::{
-    Address, TxHash,
     map::{AddressHashMap, AddressHashSet},
     utils::format_units,
+    Address, Address, Bytes, TxHash, TxHash,
 };
-use alloy_provider::{Provider, utils::Eip1559Estimation};
+use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
-use eyre::{Context, Result, bail};
+use alloy_zksync::network::{
+    transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType, Zksync,
+};
+use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_batch_support, has_different_gas_calc};
 use foundry_common::{
-    TransactionMaybeSigned,
-    provider::{RetryProvider, get_http_provider, try_get_http_provider},
-    shell,
+    provider::{
+        get_http_provider, try_get_http_provider, try_get_zksync_http_provider, RetryProvider,
+    },
+    provider::{get_http_provider, try_get_http_provider, RetryProvider},
+    shell, shell, TransactionMaybeSigned, TransactionMaybeSigned,
 };
 use foundry_config::Config;
-use futures::{StreamExt, future::join_all};
+use foundry_zksync_core::convert::ConvertH160;
+use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{cmp::Ordering, sync::Arc};
 
@@ -57,14 +63,24 @@ pub async fn next_nonce(
     Ok(provider.get_transaction_count(caller).block_id(block_id).await?)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn send_transaction(
     provider: Arc<RetryProvider>,
+    zk_provider: Arc<RetryProvider<Zksync>>,
     mut kind: SendTransactionKind<'_>,
     sequential_broadcast: bool,
     is_fixed_gas_limit: bool,
     estimate_via_rpc: bool,
     estimate_multiplier: u64,
+    gas_per_pubdata: Option<u64>,
 ) -> Result<TxHash> {
+    let zk_tx_meta =
+        if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
+            foundry_strategy_zksync::try_get_zksync_transaction_metadata(&tx.other)
+        } else {
+            None
+        };
+
     if let SendTransactionKind::Raw(tx, _) | SendTransactionKind::Unlocked(tx) = &mut kind {
         if sequential_broadcast {
             let from = tx.from.expect("no sender");
@@ -100,31 +116,66 @@ pub async fn send_transaction(
         // Chains which use `eth_estimateGas` are being sent sequentially and require their
         // gas to be re-estimated right before broadcasting.
         if !is_fixed_gas_limit && estimate_via_rpc {
-            estimate_gas(tx, &provider, estimate_multiplier).await?;
+            // We skip estimating gas for zk transactions as the fee is estimated manually later.
+            if zk_tx_meta.is_none() {
+                estimate_gas(tx, &provider, estimate_multiplier).await?;
+            }
         }
     }
 
-    let pending = match kind {
+    let pending_tx_hash = match kind {
         SendTransactionKind::Unlocked(tx) => {
             debug!("sending transaction from unlocked account {:?}", tx);
 
             // Submit the transaction
-            provider.send_transaction(tx).await?
+            *provider.send_transaction(tx).await?.tx_hash()
         }
         SendTransactionKind::Raw(tx, signer) => {
             debug!("sending transaction: {:?}", tx);
-            let signed = tx.build(signer).await?;
 
-            // Submit the raw transaction
-            provider.send_raw_transaction(signed.encoded_2718().as_ref()).await?
+            if let Some(zk_tx_meta) = zk_tx_meta {
+                let mut inner = tx.inner.clone();
+                inner.transaction_type = Some(TxType::Eip712 as u8);
+                let mut zk_tx: ZkTransactionRequest = inner.into();
+                if !zk_tx_meta.factory_deps.is_empty() {
+                    zk_tx.set_factory_deps(
+                        zk_tx_meta.factory_deps.iter().map(Bytes::from_iter).collect(),
+                    );
+                }
+                if let Some(paymaster_data) = &zk_tx_meta.paymaster_data {
+                    zk_tx.set_paymaster_params(
+                        alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
+                            paymaster: paymaster_data.paymaster.to_address(),
+                            paymaster_input: paymaster_data.paymaster_input.clone().into(),
+                        },
+                    );
+                }
+
+                foundry_zksync_core::estimate_fee(
+                    &mut zk_tx,
+                    &zk_provider,
+                    estimate_multiplier,
+                    gas_per_pubdata,
+                )
+                .await?;
+
+                let zk_signer = alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
+                let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
+
+                *zk_provider.send_raw_transaction(signed.as_ref()).await?.tx_hash()
+            } else {
+                let signed = tx.build(signer).await?.encoded_2718();
+                // Submit the raw transaction
+                *provider.send_raw_transaction(signed.as_ref()).await?.tx_hash()
+            }
         }
         SendTransactionKind::Signed(tx) => {
             debug!("sending transaction: {:?}", tx);
-            provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?
+            *provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?.tx_hash()
         }
     };
 
-    Ok(*pending.tx_hash())
+    Ok(pending_tx_hash)
 }
 
 /// How to send a single transaction
@@ -269,6 +320,7 @@ impl BundledState {
             let mut sequence = self.sequence.sequences_mut().get_mut(i).unwrap();
 
             let provider = Arc::new(try_get_http_provider(sequence.rpc_url())?);
+            let zk_provider = Arc::new(try_get_zksync_http_provider(sequence.rpc_url())?);
             let already_broadcasted = sequence.receipts.len();
 
             let seq_progress = progress.get_sequence_progress(i, sequence);
@@ -281,7 +333,20 @@ impl BundledState {
                     self.args.with_gas_price,
                     self.args.priority_gas_price,
                 ) {
-                    (true, Some(gas_price), _) => (Some(gas_price.to()), None),
+                    (true, Some(gas_price), priority_fee) => (
+                        Some(gas_price.to()),
+                        if self.script_config.config.zksync.run_in_zk_mode() {
+                            // NOTE(zk): Zksync is marked as legacy in alloy chains but it is
+                            // compliant with EIP-1559 so we need to
+                            // pass down the user provided values
+                            priority_fee.map(|fee| Eip1559Estimation {
+                                max_fee_per_gas: gas_price.to(),
+                                max_priority_fee_per_gas: fee.to(),
+                            })
+                        } else {
+                            None
+                        },
+                    ),
                     (true, None, _) => (Some(provider.get_gas_price().await?), None),
                     (false, Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) => (
                         None,
@@ -291,17 +356,27 @@ impl BundledState {
                         }),
                     ),
                     (false, _, _) => {
-                        let mut fees = provider.estimate_eip1559_fees().await.wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
+                        if self.script_config.config.zksync.run_in_zk_mode() {
+                            // NOTE(zk): We need to avoid estimating eip1559 fees for zk
+                            // transactions as the fee is estimated
+                            // later. This branch is for non legacy chains (zkchains).
+                            (Some(provider.get_gas_price().await?), None)
+                        } else {
+                            let mut fees = provider
+                                .estimate_eip1559_fees()
+                                .await
+                                .wrap_err("Failed to estimate EIP1559 fees. This chain might not support EIP1559, try adding --legacy to your command.")?;
 
-                        if let Some(gas_price) = self.args.with_gas_price {
-                            fees.max_fee_per_gas = gas_price.to();
+                            if let Some(gas_price) = self.args.with_gas_price {
+                                fees.max_fee_per_gas = gas_price.to();
+                            }
+
+                            if let Some(priority_gas_price) = self.args.priority_gas_price {
+                                fees.max_priority_fee_per_gas = priority_gas_price.to();
+                            }
+
+                            (None, Some(fees))
                         }
-
-                        if let Some(priority_gas_price) = self.args.priority_gas_price {
-                            fees.max_priority_fee_per_gas = priority_gas_price.to();
-                        }
-
-                        (None, Some(fees))
                     }
                 };
 
@@ -331,6 +406,15 @@ impl BundledState {
 
                                 if let Some(gas_price) = gas_price {
                                     tx.set_gas_price(gas_price);
+                                    if self.script_config.config.zksync.run_in_zk_mode() {
+                                        // NOTE(zk): Also set EIP-1559 fees for zk transactions
+                                        if let Some(eip1559_fees) = eip1559_fees {
+                                            tx.set_max_priority_fee_per_gas(
+                                                eip1559_fees.max_priority_fee_per_gas,
+                                            );
+                                            tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
+                                        }
+                                    }
                                 } else {
                                     let eip1559_fees = eip1559_fees.expect("was set above");
                                     tx.set_max_priority_fee_per_gas(
@@ -375,11 +459,13 @@ impl BundledState {
                     for (kind, is_fixed_gas_limit) in batch {
                         let fut = send_transaction(
                             provider.clone(),
+                            zk_provider.clone(),
                             kind.clone(),
                             sequential_broadcast,
                             *is_fixed_gas_limit,
                             estimate_via_rpc,
                             self.args.gas_estimate_multiplier,
+                            self.args.zk_gas_per_pubdata,
                         );
                         pending_transactions.push(fut);
                     }

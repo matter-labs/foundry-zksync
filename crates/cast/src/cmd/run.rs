@@ -1,36 +1,39 @@
 use alloy_consensus::Transaction;
 use alloy_network::{AnyNetwork, TransactionResponse};
 use alloy_primitives::{
-    Address, Bytes,
     map::{HashMap, HashSet},
+    Address, Bytes,
 };
 use alloy_provider::{Provider, RootProvider};
 use alloy_rpc_types::BlockTransactions;
+use alloy_serde::OtherFields;
 use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
-    utils::{TraceResult, handle_traces, init_progress},
+    utils::{self, handle_traces, init_progress, TraceResult},
 };
-use foundry_common::{SYSTEM_TRANSACTION_TYPE, is_known_system_sender, shell};
+use foundry_common::{is_known_system_sender, shell, SYSTEM_TRANSACTION_TYPE};
 use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{
-    Config,
     figment::{
-        self, Figment, Metadata, Profile,
+        self,
         value::{Dict, Map},
+        Figment, Metadata, Profile,
     },
+    Config,
 };
 use foundry_evm::{
-    Env,
     executors::{EvmError, TracingExecutor},
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode, Traces},
     utils::configure_tx_env,
+    Env,
 };
 use foundry_evm_core::env::AsEnvMut;
 
 use crate::utils::apply_chain_and_block_specific_env_changes;
+use zksync_types::Transaction as ZkTransaction;
 
 /// CLI arguments for `cast run`.
 #[derive(Clone, Debug, Parser)]
@@ -105,6 +108,16 @@ pub struct RunArgs {
     /// Disable block gas limit check.
     #[arg(long)]
     pub disable_block_gas_limit: bool,
+
+    /// Run a ZKsync transaction.
+    #[arg(long = "zksync")]
+    zk_force: bool,
+
+    /// Disables storage caching entirely.
+    /// NOTE(zk) This is needed so tests don't cache anvil-zksync responses, could also be useful
+    /// upstream.
+    #[arg(long)]
+    no_storage_caching: bool,
 }
 
 impl RunArgs {
@@ -117,6 +130,9 @@ impl RunArgs {
         let figment = Into::<Figment>::into(&self.rpc).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
         let mut config = Config::from_provider(figment)?.sanitized();
+        config.zksync.compile = self.zk_force;
+        config.no_storage_caching = self.no_storage_caching;
+        let strategy = utils::get_executor_strategy(&config);
 
         let compute_units_per_second =
             if self.no_rate_limit { Some(u64::MAX) } else { self.compute_units_per_second };
@@ -147,6 +163,19 @@ impl RunArgs {
 
         // fetch the block the transaction was mined in
         let block = provider.get_block(tx_block_number.into()).full().await?;
+
+        // Only fetch raw block data if zk_force is enabled
+        let mut raw_block = None;
+        if self.zk_force {
+            raw_block = Some(
+                provider
+                    .raw_request::<_, Vec<ZkTransaction>>(
+                        "zks_getRawBlockTransactions".into(),
+                        vec![serde_json::json!(tx_block_number)],
+                    )
+                    .await?,
+            );
+        }
 
         // we need to fork off the parent block
         config.fork_block_number = Some(tx_block_number - 1);
@@ -194,6 +223,7 @@ impl RunArgs {
             odyssey,
             create2_deployer,
             None,
+            strategy,
         )?;
         let mut env = Env::new_with_spec_id(
             env.evm_env.cfg_env.clone(),
@@ -201,6 +231,15 @@ impl RunArgs {
             env.tx.clone(),
             executor.spec_id(),
         );
+
+        if self.zk_force {
+            // Set up fee parameters.
+            executor.strategy.runner.zksync_set_fork_env(
+                executor.strategy.context.as_mut(),
+                &config.get_rpc_url_or_localhost_http()?,
+                &env,
+            )?;
+        }
 
         // Set the state to the moment right before the transaction
         if !self.quick {
@@ -230,7 +269,27 @@ impl RunArgs {
                         break;
                     }
 
-                    configure_tx_env(&mut env.as_env_mut(), &tx.inner);
+                    if self.zk_force {
+                        let raw_tx = &raw_block
+                            .as_ref()
+                            .unwrap()
+                            .get(index)
+                            .expect("Failed to get transaction");
+                        let metadata = configure_zksync_tx_env(&mut env, raw_tx);
+                        let mut other_fields = OtherFields::default();
+                        other_fields.insert(
+                            foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                            serde_json::to_value(metadata)
+                                .expect("Failed to serialize ZkTransactionMetadata"),
+                        );
+
+                        executor.strategy.runner.zksync_set_transaction_context(
+                            executor.strategy.context.as_mut(),
+                            other_fields,
+                        );
+                    } else {
+                        configure_tx_env(&mut env.as_env_mut(), &tx.inner);
+                    }
 
                     if let Some(to) = Transaction::to(tx) {
                         trace!(tx=?tx.tx_hash(),?to, "executing previous call transaction");
@@ -269,7 +328,32 @@ impl RunArgs {
         let result = {
             executor.set_trace_printer(self.trace_printer);
 
-            configure_tx_env(&mut env.as_env_mut(), &tx.inner);
+            if self.zk_force {
+                let raw_txs = raw_block
+                    .as_ref()
+                    .ok_or_else(|| eyre::eyre!("Raw block data not available"))?;
+
+                // Find the raw transaction that matches our target transaction hash
+                let raw_tx = raw_txs
+                    .iter()
+                    .find(|raw_tx| raw_tx.hash() == zksync_types::H256::from(tx.tx_hash().0))
+                    .ok_or_else(|| eyre::eyre!("Could not find target transaction in raw block"))?;
+
+                let metadata = configure_zksync_tx_env(&mut env, raw_tx);
+                let mut other_fields = OtherFields::default();
+                other_fields.insert(
+                    foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                    serde_json::to_value(metadata)
+                        .expect("Failed to serialize ZkTransactionMetadata"),
+                );
+
+                executor.strategy.runner.zksync_set_transaction_context(
+                    executor.strategy.context.as_mut(),
+                    other_fields,
+                );
+            } else {
+                configure_tx_env(&mut env.as_env_mut(), &tx.inner);
+            }
 
             if let Some(to) = Transaction::to(&tx) {
                 trace!(tx=?tx.tx_hash(), to=?to, "executing call transaction");
@@ -364,5 +448,47 @@ impl figment::Provider for RunArgs {
         }
 
         Ok(Map::from([(Config::selected_profile(), map)]))
+    }
+}
+
+/// Configures the env for the given RPC transaction.
+/// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
+pub fn configure_zksync_tx_env(
+    env: &mut Env,
+    outer_tx: &ZkTransaction,
+) -> foundry_zksync_core::ZkTransactionMetadata {
+    use alloy_primitives::TxKind;
+    use foundry_zksync_core::convert::{ConvertH160, ConvertU256};
+    use zksync_types::ExecuteTransactionCommon;
+
+    // Extract fields from the raw zkSync transaction format
+
+    // Set basic transaction fields
+    env.tx.caller = outer_tx.initiator_account().to_address();
+
+    env.tx.kind = TxKind::Call(
+        outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
+    );
+    env.tx.gas_limit = match &outer_tx.common_data {
+        ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
+        _ => outer_tx.gas_limit().as_u64(),
+    };
+    env.tx.nonce = outer_tx.nonce().expect("nonce not found in common_data").0.into();
+
+    env.tx.value = outer_tx.execute.value.to_ru256();
+
+    env.tx.data = outer_tx.execute.calldata.clone().into();
+    env.tx.gas_price = outer_tx.max_fee_per_gas().low_u128();
+
+    match &outer_tx.common_data {
+        // Set zkSync specific metadata
+        ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: Some(common_data.paymaster_params.clone()),
+        },
+        _ => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: None,
+        },
     }
 }

@@ -3,7 +3,6 @@ use crate::{
     opts::{Cast as CastArgs, CastSubcommand, ToBaseArgs},
     traces::identifier::SignaturesIdentifier,
 };
-use alloy_consensus::transaction::{Recovered, SignerRecoverable};
 use alloy_dyn_abi::{DynSolValue, ErrorExt, EventExt};
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_ens::{ProviderEnsExt, namehash};
@@ -26,6 +25,7 @@ use foundry_common::{
     shell, stdin,
 };
 use std::time::Instant;
+use zksync_telemetry::{get_telemetry, TelemetryProps};
 
 /// Run the `cast` command-line interface.
 pub fn run() -> Result<()> {
@@ -51,6 +51,8 @@ pub fn setup() -> Result<()> {
 /// Run the subcommand.
 #[tokio::main]
 pub async fn run_command(args: CastArgs) -> Result<()> {
+    let telemetry = get_telemetry().expect("telemetry is not initialized");
+    let telemetry_props = args.cmd.get_telemetry_props();
     match args.cmd {
         // Constants
         CastSubcommand::MaxInt { r#type } => {
@@ -718,13 +720,8 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
         CastSubcommand::DecodeTransaction { tx } => {
             let tx = stdin::unwrap_line(tx)?;
             let tx = SimpleCast::decode_raw_transaction(&tx)?;
-
-            if let Ok(signer) = tx.recover_signer() {
-                let recovered = Recovered::new_unchecked(tx, signer);
-                sh_println!("{}", serde_json::to_string_pretty(&recovered)?)?;
-            } else {
-                sh_println!("{}", serde_json::to_string_pretty(&tx)?)?;
-            }
+            // not using tx.recover_signer
+            sh_println!("{}", serde_json::to_string_pretty(&tx)?)?
         }
         CastSubcommand::RecoverAuthority { auth } => {
             let auth: SignedAuthorization = serde_json::from_str(&auth).unwrap();
@@ -735,6 +732,10 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
             cmd.run().await?;
         }
     };
+
+    let _ = telemetry
+        .track_event("cast", TelemetryProps::new().insert("params", Some(telemetry_props)).take())
+        .await;
 
     /// Prints slice of tokens using [`format_tokens`] or [`format_tokens_raw`] depending whether
     /// the shell is in JSON mode.

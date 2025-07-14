@@ -1,16 +1,16 @@
 use crate::{
-    ScriptArgs, ScriptConfig,
     build::LinkedBuildData,
-    sequence::{ScriptSequenceKind, get_commit_hash},
+    sequence::{get_commit_hash, ScriptSequenceKind},
+    ScriptArgs, ScriptConfig,
 };
-use alloy_primitives::{Address, hex};
-use eyre::{Result, eyre};
+use alloy_primitives::{hex, Address};
+use eyre::{eyre, Result};
 use forge_script_sequence::{AdditionalContract, ScriptSequence};
-use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs, provider::VerificationProviderType};
+use forge_verify::{provider::VerificationProviderType, RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::opts::{EtherscanOpts, ProjectPathOpts};
 use foundry_common::ContractsByArtifact;
-use foundry_compilers::{Project, artifacts::EvmVersion, info::ContractInfo};
-use foundry_config::{Chain, Config};
+use foundry_compilers::{artifacts::EvmVersion, info::ContractInfo, Project};
+use foundry_config::{zksync::ZKSYNC_ARTIFACTS_DIR, Chain, Config};
 use semver::Version;
 
 /// State after we have broadcasted the script.
@@ -53,6 +53,7 @@ pub struct VerifyBundle {
     pub retry: RetryArgs,
     pub verifier: VerifierArgs,
     pub via_ir: bool,
+    pub zksync: bool,
 }
 
 impl VerifyBundle {
@@ -80,6 +81,7 @@ impl VerifyBundle {
         };
 
         let via_ir = config.via_ir;
+        let zksync = config.zksync.should_compile();
 
         Self {
             num_of_optimizations,
@@ -89,6 +91,7 @@ impl VerifyBundle {
             retry,
             verifier,
             via_ir,
+            zksync,
         }
     }
 
@@ -163,6 +166,99 @@ impl VerifyBundle {
                     guess_constructor_args: false,
                     compilation_profile: Some(artifact.profile.to_string()),
                     language: None,
+                    zksync: self.zksync,
+                };
+
+                return Some(verify);
+            }
+        }
+        None
+    }
+
+    /// Given a `VerifyBundle` and contract details, it tries to generate a valid `VerifyArgs` to
+    /// use against the `contract_address` in the ZKsync context.
+    pub fn get_verify_args_zk(
+        &self,
+        contract_address: Address,
+        data: &[u8],
+        libraries: &[String],
+        evm_version: EvmVersion,
+    ) -> Option<VerifyArgs> {
+        if data.len() < 4 {
+            warn!("failed decoding verify input data, invalid data length, require minimum of 4 bytes");
+            return None;
+        }
+        let selector = hex::encode(&data[..4]);
+        let is_create2 = match selector.as_str() {
+            foundry_zksync_core::SELECTOR_CONTRACT_DEPLOYER_CREATE => false,
+            foundry_zksync_core::SELECTOR_CONTRACT_DEPLOYER_CREATE2 => true,
+            _ => {
+                warn!("failed decoding verify input data, invalid selector {selector:?}");
+                return None;
+            }
+        };
+        let (bytecode_hash, constructor_args) = if is_create2 {
+            let (_salt, bytecode_hash, constructor_args) =
+                foundry_zksync_core::try_decode_create2(data)
+                    .inspect_err(|err| warn!("failed parsing create2 verify data: {err:?}"))
+                    .ok()?;
+            (bytecode_hash, constructor_args)
+        } else {
+            foundry_zksync_core::try_decode_create(data)
+                .inspect_err(|err| warn!("failed parsing create verify data: {err:?}"))
+                .ok()?
+        };
+
+        let known_zksync_contracts = self.known_contracts.iter().filter(|(artifact, _)| {
+            let is_zksync_artifact = artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR);
+            is_zksync_artifact
+        });
+        for (artifact, contract) in known_zksync_contracts {
+            let Some(bytecode) = contract.bytecode() else { continue };
+
+            let contract_bytecode_hash = foundry_zksync_core::hash_bytecode(bytecode);
+            if bytecode_hash == contract_bytecode_hash {
+                if artifact.source.extension().is_some_and(|e| e.to_str() == Some("vy")) {
+                    warn!("Skipping verification of Vyper contract: {}", artifact.name);
+                }
+
+                let contract = ContractInfo {
+                    path: Some(artifact.source.to_string_lossy().to_string()),
+                    name: artifact.name.clone(),
+                };
+
+                // We strip the build metadadata information, since it can lead to
+                // etherscan not identifying it correctly. eg:
+                // `v0.8.10+commit.fc410830.Linux.gcc` != `v0.8.10+commit.fc410830`
+                let version = Version::new(
+                    artifact.version.major,
+                    artifact.version.minor,
+                    artifact.version.patch,
+                );
+
+                let verify = VerifyArgs {
+                    address: contract_address,
+                    contract: Some(contract),
+                    compiler_version: Some(version.to_string()),
+                    constructor_args: Some(hex::encode(constructor_args)),
+                    constructor_args_path: None,
+                    num_of_optimizations: self.num_of_optimizations,
+                    etherscan: self.etherscan.clone(),
+                    rpc: Default::default(),
+                    flatten: false,
+                    force: false,
+                    skip_is_verified_check: true,
+                    watch: true,
+                    retry: self.retry,
+                    libraries: libraries.to_vec(),
+                    root: None,
+                    verifier: self.verifier.clone(),
+                    via_ir: self.via_ir,
+                    evm_version: Some(evm_version),
+                    show_standard_json_input: false,
+                    guess_constructor_args: false,
+                    compilation_profile: None, //TODO(zk): get compilation profile
+                    zksync: self.zksync,
                 };
 
                 return Some(verify);
@@ -204,19 +300,32 @@ async fn verify_contracts(
 
             // Verify contract created directly from the transaction
             if let (Some(address), Some(data)) = (receipt.contract_address, tx.tx().input()) {
-                match verify.get_verify_args(
-                    address,
-                    offset,
-                    data,
-                    &sequence.libraries,
-                    config.evm_version,
-                ) {
-                    Some(verify) => future_verifications.push(verify.run()),
-                    None => unverifiable_contracts.push(address),
-                };
+                if config.zksync.run_in_zk_mode() {
+                    match verify.get_verify_args_zk(
+                        address,
+                        data,
+                        &sequence.libraries,
+                        config.evm_version,
+                    ) {
+                        Some(verify) => future_verifications.push(verify.run()),
+                        None => unverifiable_contracts.push(address),
+                    };
+                } else {
+                    match verify.get_verify_args(
+                        address,
+                        offset,
+                        data,
+                        &sequence.libraries,
+                        config.evm_version,
+                    ) {
+                        Some(verify) => future_verifications.push(verify.run()),
+                        None => unverifiable_contracts.push(address),
+                    };
+                }
             }
 
             // Verify potential contracts created during the transaction execution
+            // This will fail in ZKsync context due to `init_code` usage.
             for AdditionalContract { address, init_code, .. } in &tx.additional_contracts {
                 match verify.get_verify_args(
                     *address,

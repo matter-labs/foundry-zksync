@@ -1,34 +1,34 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    Env, InspectorExt, backend::DatabaseExt, constants::DEFAULT_CREATE2_DEPLOYER_CODEHASH,
+    backend::DatabaseExt, constants::DEFAULT_CREATE2_DEPLOYER_CODEHASH, Env, InspectorExt,
 };
 use alloy_consensus::constants::KECCAK_EMPTY;
 use alloy_evm::{
-    Evm, EvmEnv,
     eth::EthEvmContext,
     precompiles::{DynPrecompile, PrecompilesMap},
+    Evm, EvmEnv,
 };
 use alloy_primitives::{Address, Bytes, U256};
 use foundry_fork_db::DatabaseError;
 use revm::{
-    Context, ExecuteEvm, Journal,
     context::{
-        BlockEnv, CfgEnv, ContextTr, CreateScheme, Evm as RevmEvm, JournalTr, LocalContext, TxEnv,
         result::{EVMError, HaltReason, ResultAndState},
+        BlockEnv, CfgEnv, ContextTr, CreateScheme, Evm as RevmEvm, JournalTr, LocalContext, TxEnv,
     },
     handler::{
-        EthFrame, EthPrecompiles, FrameInitOrResult, FrameResult, Handler, ItemOrResult,
-        MainnetHandler, instructions::EthInstructions,
+        instructions::EthInstructions, EthFrame, EthPrecompiles, FrameInitOrResult, FrameResult,
+        Handler, ItemOrResult, MainnetHandler,
     },
     inspector::InspectorHandler,
     interpreter::{
-        CallInput, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome,
-        FrameInput, Gas, InstructionResult, InterpreterResult, interpreter::EthInterpreter,
-        return_ok,
+        interpreter::EthInterpreter, return_ok, CallInput, CallInputs, CallOutcome, CallScheme,
+        CallValue, CreateInputs, CreateOutcome, FrameInput, Gas, InstructionResult,
+        InterpreterResult,
     },
-    precompile::{PrecompileSpecId, Precompiles, secp256r1::P256VERIFY},
+    precompile::{secp256r1::P256VERIFY, PrecompileSpecId, Precompiles},
     primitives::hardfork::SpecId,
+    Context, ExecuteEvm, Journal,
 };
 
 pub fn new_evm_with_inspector<'i, 'db, I: InspectorExt + ?Sized>(
@@ -305,15 +305,28 @@ impl<'db, I: InspectorExt> Handler for FoundryHandler<'db, I> {
 
             // Decode address from output.
             let address = match result.instruction_result() {
-                return_ok!() => Address::try_from(result.output().as_ref())
-                    .map_err(|_| {
-                        result.result = InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output: "invalid CREATE2 factory output".into(),
-                            gas: Gas::new(call_inputs.gas_limit),
-                        };
-                    })
-                    .ok(),
+                return_ok!() => {
+                    let output = result.output().as_ref();
+                    let address = if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                        // ZkSync: Address in the last 20 bytes of a 32-byte word
+                        // We want to error out if the address is not valid as
+                        // Address::from_slice() does
+                        Address::try_from(&output[12..32])
+                    } else {
+                        // Standard EVM: Full output as address
+                        Address::try_from(output)
+                    };
+
+                    address
+                        .map_err(|_| {
+                            result.result = InterpreterResult {
+                                result: InstructionResult::Revert,
+                                output: "invalid CREATE2 factory output".into(),
+                                gas: Gas::new(call_inputs.gas_limit),
+                            };
+                        })
+                        .ok()
+                }
                 _ => None,
             };
 
@@ -338,6 +351,7 @@ impl<I: InspectorExt> InspectorHandler for FoundryHandler<'_, I> {
 
         let ItemOrResult::Item(FrameInput::Create(inputs)) = &frame_or_result else {
             return Ok(frame_or_result);
+            return Ok(frame_or_result);
         };
 
         let CreateScheme::Create2 { salt } = inputs.scheme else { return Ok(frame_or_result) };
@@ -352,13 +366,24 @@ impl<I: InspectorExt> InspectorHandler for FoundryHandler<'_, I> {
         let create2_deployer = evm.inspector.create2_deployer();
 
         // Generate call inputs for CREATE2 factory.
-        let call_inputs = get_create2_factory_call_inputs(salt, inputs, create2_deployer);
+        let mut call_inputs = get_create2_factory_call_inputs(salt, inputs, create2_deployer);
+        evm.inspector.zksync_set_deployer_call_input(&mut evm.ctx, &mut call_inputs);
 
         // Push data about current override to the stack.
         self.create2_overrides.push((evm.journal().depth(), call_inputs.clone()));
 
         // Sanity check that CREATE2 deployer exists.
-        let code_hash = evm.journal().load_account(create2_deployer)?.info.code_hash;
+        // NOTE(zk): made mut to apply later check
+        let mut code_hash = evm.journal().load_account(create2_deployer)?.info.code_hash;
+        // NOTE(zk): We check which deployer we are using to separate the logic for zkSync
+        // and original foundry.
+        // TODO(zk): adding this check to skip comparing to evm create2 deployer
+        // hash, should we compare vs zkevm one?
+        let mut zk_is_create2_deployer = false;
+        if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+            code_hash = evm.journal().load_account(call_inputs.target_address)?.info.code_hash;
+            zk_is_create2_deployer = true;
+        }
         if code_hash == KECCAK_EMPTY {
             return Ok(ItemOrResult::Result(FrameResult::Call(CallOutcome {
                 result: InterpreterResult {
@@ -385,3 +410,12 @@ impl<I: InspectorExt> InspectorHandler for FoundryHandler<'_, I> {
         Ok(ItemOrResult::Item(FrameInput::Call(Box::new(call_inputs))))
     }
 }
+
+/*
+ * ZKsync
+ */
+
+/// The default CREATE2 deployer for zkSync (0x0000000000000000000000000000000000010000)
+/// See: https://github.com/zkSync-Community-Hub/zksync-developers/discussions/519
+pub const DEFAULT_CREATE2_DEPLOYER_ZKSYNC: Address =
+    alloy_primitives::address!("0000000000000000000000000000000000010000");

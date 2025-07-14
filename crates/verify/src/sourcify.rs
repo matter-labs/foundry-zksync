@@ -1,6 +1,7 @@
 use crate::{
-    provider::{VerificationContext, VerificationProvider},
+    provider::VerificationProvider,
     verify::{VerifyArgs, VerifyCheckArgs},
+    zk_provider::CompilerVerificationContext,
 };
 use alloy_primitives::map::HashMap;
 use async_trait::async_trait;
@@ -23,13 +24,17 @@ impl VerificationProvider for SourcifyVerificationProvider {
     async fn preflight_verify_check(
         &mut self,
         args: VerifyArgs,
-        context: VerificationContext,
+        context: CompilerVerificationContext,
     ) -> Result<()> {
         let _ = self.prepare_request(&args, &context)?;
         Ok(())
     }
 
-    async fn verify(&mut self, args: VerifyArgs, context: VerificationContext) -> Result<()> {
+    async fn verify(
+        &mut self,
+        args: VerifyArgs,
+        context: CompilerVerificationContext,
+    ) -> Result<()> {
         let body = self.prepare_request(&args, &context)?;
 
         trace!("submitting verification request {:?}", body);
@@ -43,7 +48,7 @@ impl VerificationProvider for SourcifyVerificationProvider {
                 async {
                     sh_println!(
                         "\nSubmitting verification for [{}] {:?}.",
-                        context.target_name,
+                        context.target_name(),
                         args.address.to_string()
                     )?;
                     let response = client
@@ -112,7 +117,7 @@ impl SourcifyVerificationProvider {
     fn prepare_request(
         &self,
         args: &VerifyArgs,
-        context: &VerificationContext,
+        context: &CompilerVerificationContext,
     ) -> Result<SourcifyVerifyRequest> {
         let metadata = context.get_target_metadata()?;
         let imports = context.get_target_imports()?;
@@ -122,7 +127,7 @@ impl SourcifyVerificationProvider {
         let metadata = serde_json::to_string_pretty(&metadata)?;
         files.insert("metadata.json".to_string(), metadata);
 
-        let contract_path = context.target_path.clone();
+        let contract_path = context.target_path().clone();
         let filename = contract_path.file_name().unwrap().to_string_lossy().to_string();
         files.insert(filename, fs::read_to_string(&contract_path)?);
 

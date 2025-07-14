@@ -1,7 +1,7 @@
 use crate::{bytecode::VerifyBytecodeArgs, types::VerificationType};
 use alloy_dyn_abi::DynSolValue;
 use alloy_primitives::{Address, Bytes, TxKind};
-use alloy_provider::{Provider, network::AnyRpcBlock};
+use alloy_provider::{network::AnyRpcBlock, Provider};
 use alloy_rpc_types::BlockId;
 use clap::ValueEnum;
 use eyre::{OptionExt, Result};
@@ -16,8 +16,11 @@ use foundry_common::{
 use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVersion};
 use foundry_config::Config;
 use foundry_evm::{
-    Env, EnvMut, constants::DEFAULT_CREATE2_DEPLOYER, executors::TracingExecutor, opts::EvmOpts,
+    constants::DEFAULT_CREATE2_DEPLOYER,
+    executors::{strategy::ExecutorStrategy, TracingExecutor},
+    opts::EvmOpts,
     traces::TraceMode,
+    Env, EnvMut,
 };
 use reqwest::Url;
 use revm::{bytecode::Bytecode, database::Database, primitives::hardfork::SpecId};
@@ -306,6 +309,7 @@ pub async fn get_tracing_executor(
     fork_blk_num: u64,
     evm_version: EvmVersion,
     evm_opts: EvmOpts,
+    strategy: ExecutorStrategy,
 ) -> Result<(Env, TracingExecutor)> {
     fork_config.fork_block_number = Some(fork_blk_num);
     fork_config.evm_version = evm_version;
@@ -322,6 +326,7 @@ pub async fn get_tracing_executor(
         is_odyssey,
         create2_deployer,
         None,
+        strategy,
     )?;
 
     Ok((env, executor))

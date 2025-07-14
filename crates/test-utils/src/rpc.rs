@@ -103,6 +103,18 @@ pub fn next_ws_archive_rpc_url() -> String {
 
 /// Returns a URL that has access to archive state.
 fn next_archive_url(is_ws: bool) -> String {
+    // First try to use ALCHEMY_API_KEY if it exists
+    if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
+        let url = if is_ws {
+            format!("wss://eth-mainnet.g.alchemy.com/v2/{alchemy_key}")
+        } else {
+            format!("https://eth-mainnet.g.alchemy.com/v2/{alchemy_key}")
+        };
+        eprintln!("--- next_archive_url(is_ws={is_ws}) = using ALCHEMY_API_KEY ---");
+        return url;
+    }
+
+    // Fall back to existing logic
     let urls = archive_urls(is_ws);
     let url = next(urls);
     eprintln!("--- next_archive_url(is_ws={is_ws}) = {url} ---");
@@ -156,7 +168,38 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
         let host = RETH_HOSTS[idx];
         if is_ws { format!("{host}/ws") } else { format!("{host}/rpc") }
     } else {
-        // DRPC for other networks used in tests.
+        // Try Alchemy API Key from environment first for non-Mainnet chains
+        if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
+            let subdomain_prefix = match chain {
+                Optimism => Some("opt-mainnet"),
+                Arbitrum => Some("arb-mainnet"),
+                Polygon => Some("polygon-mainnet"),
+                Sepolia => Some("eth-sepolia"),
+                _ => None, // Only use Alchemy for configured chains
+            };
+            if let Some(subdomain_prefix) = subdomain_prefix {
+                eprintln!("--- Using ALCHEMY_API_KEY env var for chain: {chain} ---");
+                // Note: Key is leaked to get 'static str, matching previous pattern
+                let key_ref: &'static str = Box::leak(alchemy_key.into_boxed_str());
+                let host = format!("{subdomain_prefix}.g.alchemy.com");
+                // Return the fully constructed Alchemy URL directly
+                let url = if is_ws {
+                    format!("wss://{host}/v2/{key_ref}")
+                } else {
+                    format!("https://{host}/v2/{key_ref}")
+                };
+                eprintln!("--- next_url(is_ws={is_ws}, chain={chain:?}) = {url} ---");
+                return url;
+            } else {
+                eprintln!(
+                    "--- ALCHEMY_API_KEY found, but chain {chain} not configured. Falling back. ---"
+                );
+            }
+        } else {
+            eprintln!("--- ALCHEMY_API_KEY not found. Falling back. ---");
+        }
+
+        // DRPC for other networks used in tests (Fallback if Alchemy key not used)
         let idx = next_idx() % DRPC_KEYS.len();
         let key = DRPC_KEYS[idx];
 
@@ -164,11 +207,14 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
             Arbitrum => "arbitrum",
             Polygon => "polygon",
             Sepolia => "sepolia",
+            // Keep existing behavior for unspecified chains
             _ => "",
         };
+        // This format string remains the domain part for DRPC
         format!("lb.drpc.org/ogrpc?network={network}&dkey={key}")
     };
 
+    // This part constructs the final URL only if the Alchemy check didn't return early
     let url = if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") };
 
     eprintln!("--- next_url(is_ws={is_ws}, chain={chain:?}) = {url} ---");

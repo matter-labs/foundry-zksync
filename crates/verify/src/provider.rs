@@ -2,6 +2,8 @@ use crate::{
     etherscan::EtherscanVerificationProvider,
     sourcify::SourcifyVerificationProvider,
     verify::{VerifyArgs, VerifyCheckArgs},
+    zk_provider::CompilerVerificationContext,
+    zksync::ZkVerificationProvider,
 };
 use alloy_json_abi::JsonAbi;
 use async_trait::async_trait;
@@ -108,11 +110,15 @@ pub trait VerificationProvider {
     async fn preflight_verify_check(
         &mut self,
         args: VerifyArgs,
-        context: VerificationContext,
+        context: CompilerVerificationContext,
     ) -> Result<()>;
 
     /// Sends the actual verify request for the targeted contract.
-    async fn verify(&mut self, args: VerifyArgs, context: VerificationContext) -> Result<()>;
+    async fn verify(
+        &mut self,
+        args: VerifyArgs,
+        context: CompilerVerificationContext,
+    ) -> Result<()>;
 
     /// Checks whether the contract is verified.
     async fn check(&self, args: VerifyCheckArgs) -> Result<()>;
@@ -127,6 +133,7 @@ impl FromStr for VerificationProviderType {
             "s" | "sourcify" => Ok(Self::Sourcify),
             "b" | "blockscout" => Ok(Self::Blockscout),
             "o" | "oklink" => Ok(Self::Oklink),
+            "z" | "zksync" => Ok(Self::ZKsync),
             "c" | "custom" => Ok(Self::Custom),
             _ => Err(format!("Unknown provider: {s}")),
         }
@@ -148,6 +155,9 @@ impl fmt::Display for VerificationProviderType {
             Self::Oklink => {
                 write!(f, "oklink")?;
             }
+            Self::ZKsync => {
+                write!(f, "zksync")?;
+            }
             Self::Custom => {
                 write!(f, "custom")?;
             }
@@ -163,6 +173,8 @@ pub enum VerificationProviderType {
     Sourcify,
     Blockscout,
     Oklink,
+    #[clap(name = "zksync")]
+    ZKsync,
     /// Custom verification provider, requires compatibility with the Etherscan API.
     Custom,
 }
@@ -192,6 +204,10 @@ impl VerificationProviderType {
         //    verifier.
         if matches!(self, Self::Blockscout | Self::Oklink | Self::Custom) {
             return Ok(Box::<EtherscanVerificationProvider>::default());
+        }
+
+        if matches!(self, Self::ZKsync) {
+            return Ok(Box::<ZkVerificationProvider>::default());
         }
 
         // 4. If no `--verifier` is specified but `ETHERSCAN_API_KEY` is set, default to Etherscan.

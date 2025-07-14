@@ -23,6 +23,7 @@ use foundry_compilers::{
     solc::SolcSettings,
 };
 use num_format::{Locale, ToFormattedString};
+
 use std::{
     collections::BTreeMap,
     fmt::Display,
@@ -31,6 +32,8 @@ use std::{
     str::FromStr,
     time::Instant,
 };
+
+mod zksync;
 
 /// Builder type to configure how to compile a project.
 ///
@@ -62,6 +65,9 @@ pub struct ProjectCompiler {
     /// Extra files to include, that are not necessarily in the project's source dir.
     files: Vec<PathBuf>,
 
+    /// Set zksync specific settings based on context
+    zksync: bool,
+
     /// Whether to compile with dynamic linking tests and scripts.
     dynamic_test_linking: bool,
 }
@@ -86,6 +92,7 @@ impl ProjectCompiler {
             bail: None,
             ignore_eip_3860: false,
             files: Vec::new(),
+            zksync: false,
             dynamic_test_linking: false,
         }
     }
@@ -276,8 +283,11 @@ impl ProjectCompiler {
                 sh_println!()?;
             }
 
-            let mut size_report =
-                SizeReport { report_kind: report_kind(), contracts: BTreeMap::new() };
+            let mut size_report = SizeReport {
+                report_kind: report_kind(),
+                contracts: BTreeMap::new(),
+                zksync: self.zksync,
+            };
 
             let mut artifacts: BTreeMap<String, Vec<_>> = BTreeMap::new();
             for (id, artifact) in output.artifact_ids().filter(|(id, _)| {
@@ -351,6 +361,8 @@ pub struct SizeReport {
     report_kind: ReportKind,
     /// `contract name -> info`
     pub contracts: BTreeMap<String, ContractInfo>,
+    /// Using zksync size report
+    pub zksync: bool,
 }
 
 impl SizeReport {
@@ -376,12 +388,20 @@ impl SizeReport {
 
     /// Returns true if any contract exceeds the runtime size limit, excluding dev contracts.
     pub fn exceeds_runtime_size_limit(&self) -> bool {
-        self.max_runtime_size() > CONTRACT_RUNTIME_SIZE_LIMIT
+        if self.zksync {
+            self.max_runtime_size() > zksync::ZKSYNC_CONTRACT_SIZE_LIMIT
+        } else {
+            self.max_runtime_size() > CONTRACT_RUNTIME_SIZE_LIMIT
+        }
     }
 
     /// Returns true if any contract exceeds the initcode size limit, excluding dev contracts.
     pub fn exceeds_initcode_size_limit(&self) -> bool {
-        self.max_init_size() > CONTRACT_INITCODE_SIZE_LIMIT
+        if self.zksync {
+            self.max_init_size() > zksync::ZKSYNC_CONTRACT_SIZE_LIMIT
+        } else {
+            self.max_init_size() > CONTRACT_INITCODE_SIZE_LIMIT
+        }
     }
 }
 
@@ -440,20 +460,27 @@ impl SizeReport {
             .iter()
             .filter(|(_, c)| !c.is_dev_contract && (c.runtime_size > 0 || c.init_size > 0));
         for (name, contract) in contracts {
-            let runtime_margin =
-                CONTRACT_RUNTIME_SIZE_LIMIT as isize - contract.runtime_size as isize;
-            let init_margin = CONTRACT_INITCODE_SIZE_LIMIT as isize - contract.init_size as isize;
+            let ((runtime_margin, runtime_color), (init_margin, init_color)) = if self.zksync {
+                Self::zk_limits_table_format(contract)
+            } else {
+                let runtime_margin =
+                    CONTRACT_RUNTIME_SIZE_LIMIT as isize - contract.runtime_size as isize;
+                let init_margin =
+                    CONTRACT_INITCODE_SIZE_LIMIT as isize - contract.init_size as isize;
 
-            let runtime_color = match contract.runtime_size {
-                ..18_000 => Color::Reset,
-                18_000..=CONTRACT_RUNTIME_SIZE_LIMIT => Color::Yellow,
-                _ => Color::Red,
-            };
+                let runtime_color = match contract.runtime_size {
+                    ..18_000 => Color::Reset,
+                    18_000..=CONTRACT_RUNTIME_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
 
-            let init_color = match contract.init_size {
-                ..36_000 => Color::Reset,
-                36_000..=CONTRACT_INITCODE_SIZE_LIMIT => Color::Yellow,
-                _ => Color::Red,
+                let init_color = match contract.init_size {
+                    ..36_000 => Color::Reset,
+                    36_000..=CONTRACT_INITCODE_SIZE_LIMIT => Color::Yellow,
+                    _ => Color::Red,
+                };
+
+                ((runtime_margin, runtime_color), (init_margin, init_color))
             };
 
             let locale = &Locale::en;

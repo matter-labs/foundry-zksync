@@ -11241,6 +11241,146 @@
       "group": "toml",
       "status": "stable",
       "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkGetDeploymentNonce",
+        "description": "Gets the deployment nonce of a zksync account.",
+        "declaration": "function zkGetDeploymentNonce(address account) external view returns (uint64 nonce);",
+        "visibility": "external",
+        "mutability": "view",
+        "signature": "zkGetDeploymentNonce(address)",
+        "selector": "0xa607a7c5",
+        "selectorBytes": [
+          166,
+          7,
+          167,
+          197
+        ]
+      },
+      "group": "evm",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkGetTransactionNonce",
+        "description": "Gets the transaction nonce of a zksync account.",
+        "declaration": "function zkGetTransactionNonce(address account) external view returns (uint64 nonce);",
+        "visibility": "external",
+        "mutability": "view",
+        "signature": "zkGetTransactionNonce(address)",
+        "selector": "0xe092ad12",
+        "selectorBytes": [
+          224,
+          146,
+          173,
+          18
+        ]
+      },
+      "group": "evm",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkRegisterContract",
+        "description": "Registers bytecodes for ZK-VM for transact/call and create instructions.",
+        "declaration": "function zkRegisterContract(string calldata name, bytes32 evmBytecodeHash, bytes calldata evmDeployedBytecode, bytes calldata evmBytecode, bytes32 zkBytecodeHash, bytes calldata zkDeployedBytecode) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkRegisterContract(string,bytes32,bytes,bytes,bytes32,bytes)",
+        "selector": "0x428cb039",
+        "selectorBytes": [
+          66,
+          140,
+          176,
+          57
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkUseFactoryDep",
+        "description": "Marks the contract to be injected as a factory dependency in the next transaction",
+        "declaration": "function zkUseFactoryDep(string calldata name) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkUseFactoryDep(string)",
+        "selector": "0xd0a87595",
+        "selectorBytes": [
+          208,
+          168,
+          117,
+          149
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkUsePaymaster",
+        "description": "Enables/Disables use of a paymaster for ZK transactions.",
+        "declaration": "function zkUsePaymaster(address paymaster_address, bytes calldata paymaster_input) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkUsePaymaster(address,bytes)",
+        "selector": "0x2800ccd8",
+        "selectorBytes": [
+          40,
+          0,
+          204,
+          216
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkVm",
+        "description": "Enables/Disables use ZK-VM usage for transact/call and create instructions.",
+        "declaration": "function zkVm(bool enable) external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkVm(bool)",
+        "selector": "0x9d7804fe",
+        "selectorBytes": [
+          157,
+          120,
+          4,
+          254
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
+    },
+    {
+      "func": {
+        "id": "zkVmSkip",
+        "description": "When running in zkEVM context, skips the next CREATE or CALL, executing it on the EVM instead.\nAll `CREATE`s executed within this skip, will automatically have `CALL`s to their target addresses\nexecuted in the EVM, and need not be marked with this cheatcode at every usage location.",
+        "declaration": "function zkVmSkip() external pure;",
+        "visibility": "external",
+        "mutability": "pure",
+        "signature": "zkVmSkip()",
+        "selector": "0x99c48bb9",
+        "selectorBytes": [
+          153,
+          196,
+          139,
+          185
+        ]
+      },
+      "group": "testing",
+      "status": "stable",
+      "safety": "safe"
     }
   ]
 }

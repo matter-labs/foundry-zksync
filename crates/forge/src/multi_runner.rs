@@ -18,22 +18,27 @@ use foundry_evm::{
     Env,
     backend::Backend,
     decode::RevertDecoder,
-    executors::{Executor, ExecutorBuilder},
+    executors::{
+        strategy::{ExecutorStrategy, LinkOutput},
+        Executor, ExecutorBuilder,
+    },
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
-use foundry_linking::{LinkOutput, Linker};
 use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
 use std::{
-    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
     sync::{Arc, mpsc},
     time::Instant,
+};
+
+use foundry_zksync_compilers::compilers::{
+    artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
 };
 
 #[derive(Debug, Clone)]
@@ -64,6 +69,9 @@ pub struct MultiContractRunner {
 
     /// The base configuration for the test runner.
     pub tcfg: TestRunnerConfig,
+
+    /// Execution strategy.
+    pub strategy: ExecutorStrategy,
 }
 
 impl std::ops::Deref for MultiContractRunner {
@@ -173,7 +181,7 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let db = Backend::spawn(self.fork.take())?;
+        let db = Backend::spawn(self.fork.take(), self.strategy.runner.new_backend_strategy())?;
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
@@ -249,7 +257,12 @@ impl MultiContractRunner {
 
         debug!("start executing all tests in contract");
 
-        let executor = self.tcfg.executor(self.known_contracts.clone(), artifact_id, db.clone());
+        let executor = self.tcfg.executor(
+            self.known_contracts.clone(),
+            artifact_id,
+            db.clone(),
+            self.strategy.clone(),
+        );
         let runner = ContractRunner::new(
             &identifier,
             contract,
@@ -347,13 +360,16 @@ impl TestRunnerConfig {
         known_contracts: ContractsByArtifact,
         artifact_id: &ArtifactId,
         db: Backend,
+        strategy: ExecutorStrategy,
     ) -> Executor {
         let cheats_config = Arc::new(CheatsConfig::new(
             &self.config,
             self.evm_opts.clone(),
             Some(known_contracts),
             Some(artifact_id.clone()),
+            strategy.runner.new_cheatcode_inspector_strategy(strategy.context.as_ref()),
         ));
+
         ExecutorBuilder::new()
             .inspectors(|stack| {
                 stack
@@ -367,7 +383,7 @@ impl TestRunnerConfig {
             .spec_id(self.spec_id)
             .gas_limit(self.evm_opts.gas_limit())
             .legacy_assertions(self.config.legacy_assertions)
-            .build(self.env.clone(), db)
+            .build(self.env.clone(), db, strategy)
     }
 
     fn trace_mode(&self) -> TraceMode {
@@ -473,9 +489,15 @@ impl MultiContractRunnerBuilder {
         self,
         root: &Path,
         output: &ProjectCompileOutput,
+        zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
         env: Env,
         evm_opts: EvmOpts,
+        mut strategy: ExecutorStrategy,
     ) -> Result<MultiContractRunner> {
+        if let Some(zk_output) = zk_output {
+            strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk_output);
+        }
+
         let contracts = output
             .artifact_ids()
             .map(|(id, v)| (id.with_stripped_file_prefixes(root), v))
@@ -545,7 +567,9 @@ impl MultiContractRunnerBuilder {
 
                 config: self.config,
             },
+            strategy
         })
+    }
     }
 }
 

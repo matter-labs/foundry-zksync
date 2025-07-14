@@ -1,11 +1,11 @@
 use super::Result;
-use crate::Vm::Rpc;
-use alloy_primitives::{U256, map::AddressHashMap};
-use foundry_common::{ContractsByArtifact, fs::normalize_path};
-use foundry_compilers::{ArtifactId, ProjectPathsConfig, utils::canonicalize};
+use crate::{strategy::CheatcodeInspectorStrategy, Vm::Rpc};
+use alloy_primitives::{map::AddressHashMap, U256};
+use foundry_common::{fs::normalize_path, ContractsByArtifact};
+use foundry_compilers::{utils::canonicalize, ArtifactId, ProjectPathsConfig};
 use foundry_config::{
-    Config, FsPermissions, ResolvedRpcEndpoint, ResolvedRpcEndpoints, RpcEndpoint, RpcEndpointUrl,
-    cache::StorageCachingConfig, fs_permissions::FsAccessKind,
+    cache::StorageCachingConfig, fs_permissions::FsAccessKind, Config, FsPermissions,
+    ResolvedRpcEndpoint, ResolvedRpcEndpoints, RpcEndpoint, RpcEndpointUrl,
 };
 use foundry_evm_core::opts::EvmOpts;
 use std::{
@@ -53,6 +53,8 @@ pub struct CheatsConfig {
     pub available_artifacts: Option<ContractsByArtifact>,
     /// Currently running artifact.
     pub running_artifact: Option<ArtifactId>,
+    /// The behavior strategy.
+    pub strategy: CheatcodeInspectorStrategy,
     /// Whether to enable legacy (non-reverting) assertions.
     pub assertions_revert: bool,
     /// Optional seed for the RNG algorithm.
@@ -75,11 +77,13 @@ pub struct ChainData {
 
 impl CheatsConfig {
     /// Extracts the necessary settings from the Config
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         config: &Config,
         evm_opts: EvmOpts,
         available_artifacts: Option<ContractsByArtifact>,
         running_artifact: Option<ArtifactId>,
+        strategy: CheatcodeInspectorStrategy,
     ) -> Self {
         let mut allowed_paths = vec![config.root.clone()];
         allowed_paths.extend(config.libs.iter().cloned());
@@ -109,6 +113,7 @@ impl CheatsConfig {
             labels: config.labels.clone(),
             available_artifacts,
             running_artifact,
+            strategy,
             assertions_revert: config.assertions_revert,
             seed: config.fuzz.seed,
             internal_expect_revert: config.allow_internal_expect_revert,
@@ -119,7 +124,13 @@ impl CheatsConfig {
 
     /// Returns a new `CheatsConfig` configured with the given `Config` and `EvmOpts`.
     pub fn clone_with(&self, config: &Config, evm_opts: EvmOpts) -> Self {
-        Self::new(config, evm_opts, self.available_artifacts.clone(), self.running_artifact.clone())
+        Self::new(
+            config,
+            evm_opts,
+            self.available_artifacts.clone(),
+            self.running_artifact.clone(),
+            self.strategy.clone(),
+        )
     }
 
     /// Attempts to canonicalize (see [std::fs::canonicalize]) the path.
@@ -313,6 +324,7 @@ impl Default for CheatsConfig {
             labels: Default::default(),
             available_artifacts: Default::default(),
             running_artifact: Default::default(),
+            strategy: CheatcodeInspectorStrategy::new_evm(),
             assertions_revert: true,
             seed: None,
             internal_expect_revert: false,
@@ -350,8 +362,7 @@ fn create_default_chains() -> HashMap<String, ChainData> {
         ChainData {
             name: "Sepolia".to_string(),
             chain_id: 11155111,
-            default_rpc_url: "https://sepolia.infura.io/v3/b9794ad1ddf84dfb8c34d6bb5dca2001"
-                .to_string(),
+            default_rpc_url: "https://1rpc.io/sepolia".to_string(),
         },
     );
 
@@ -720,6 +731,7 @@ mod tests {
             Default::default(),
             None,
             None,
+            CheatcodeInspectorStrategy::new_evm(),
         )
     }
 

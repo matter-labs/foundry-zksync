@@ -12,3 +12,4 @@ mod repros;
 mod spec;
 mod table;
 mod vyper;
+mod zk;

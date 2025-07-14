@@ -12,6 +12,8 @@ use foundry_evm_traces::TraceMode;
 use revm::{primitives::hardfork::SpecId, state::Bytecode};
 use std::ops::{Deref, DerefMut};
 
+use super::strategy::ExecutorStrategy;
+
 /// A default executor with tracing enabled
 pub struct TracingExecutor {
     executor: Executor,
@@ -27,7 +29,8 @@ impl TracingExecutor {
         create2_deployer: Address,
         state_overrides: Option<StateOverride>,
     ) -> eyre::Result<Self> {
-        let db = Backend::spawn(fork)?;
+        let db = Backend::spawn(fork, strategy.runner.new_backend_strategy())?;
+
         // configures a bare version of the evm executor: no cheatcode inspector is enabled,
         // tracing will be enabled only for the targeted transaction
         let mut executor = ExecutorBuilder::new()
@@ -35,7 +38,7 @@ impl TracingExecutor {
                 stack.trace_mode(trace_mode).odyssey(odyssey).create2_deployer(create2_deployer)
             })
             .spec_id(evm_spec_id(version.unwrap_or_default(), odyssey))
-            .build(env, db);
+            .build(env, db, strategy);
 
         // Apply the state overrides.
         if let Some(state_overrides) = state_overrides {

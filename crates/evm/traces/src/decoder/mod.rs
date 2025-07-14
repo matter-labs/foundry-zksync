@@ -1,20 +1,22 @@
 use crate::{
-    CallTrace, CallTraceArena, CallTraceNode, DecodedCallData,
     debug::DebugTraceIdentifier,
     identifier::{IdentifiedAddress, LocalTraceIdentifier, SignaturesIdentifier, TraceIdentifier},
+    CallTrace, CallTraceArena, CallTraceNode, DecodedCallData,
 };
 use alloy_dyn_abi::{DecodedEvent, DynSolValue, EventExt, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Error, Event, Function, JsonAbi};
 use alloy_primitives::{
-    Address, B256, LogData, Selector,
-    map::{HashMap, HashSet, hash_map::Entry},
+    map::{hash_map::Entry, HashMap, HashSet},
+    Address, LogData, Selector, B256,
 };
+use foundry_cheatcodes_spec::Vm;
 use foundry_common::{
-    ContractsByArtifact, SELECTOR_LEN, abi::get_indexed_event, fmt::format_token,
-    get_contract_name, selectors::SelectorKind,
+    abi::get_indexed_event, fmt::format_token, get_contract_name, selectors::SelectorKind,
+    ContractsByArtifact, SELECTOR_LEN,
 };
+use foundry_config::zksync::ZKSYNC_ARTIFACTS_DIR;
 use foundry_evm_core::{
-    abi::{Vm, console},
+    abi::{console, Vm},
     constants::{
         CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, HARDHAT_CONSOLE_ADDRESS,
         TEST_CONTRACT_ADDRESS,
@@ -153,6 +155,9 @@ pub struct CallTraceDecoder {
 
     /// Disable showing of labels.
     pub disable_labels: bool,
+
+    /// Addresses that are contracts on the ZkVm
+    pub zk_contracts: HashSet<Address>,
 }
 
 impl CallTraceDecoder {
@@ -210,6 +215,8 @@ impl CallTraceDecoder {
             debug_identifier: None,
 
             disable_labels: false,
+
+            zk_contracts: Default::default(),
         }
     }
 
@@ -287,7 +294,7 @@ impl CallTraceDecoder {
         }
 
         trace!(target: "evm::traces", len=addrs.len(), "collecting address identities");
-        for IdentifiedAddress { address, label, contract, abi, artifact_id: _ } in addrs {
+        for IdentifiedAddress { address, label, contract, abi, artifact_id } in addrs {
             let _span = trace_span!(target: "evm::traces", "identity", ?contract, ?label).entered();
 
             if let Some(contract) = contract {
@@ -300,6 +307,12 @@ impl CallTraceDecoder {
 
             if let Some(abi) = abi {
                 self.collect_abi(&abi, Some(address));
+            }
+
+            if let Some(artifact_id) = artifact_id {
+                if artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR) {
+                    self.zk_contracts.insert(address);
+                }
             }
         }
     }

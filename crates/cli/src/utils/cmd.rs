@@ -24,6 +24,10 @@ use foundry_evm::{
         render_trace_arena_inner,
     },
 };
+use foundry_zksync_compilers::compilers::{
+    artifact_output::zk::{ZkArtifactOutput, ZkContractArtifact},
+    zksolc::ZkSolcCompiler,
+};
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
@@ -72,6 +76,43 @@ pub fn remove_contract(
         .into_owned();
 
     Ok((abi, bin, id))
+}
+
+/// Given a `Project`'s output, removes the matching ABI, Bytecode and
+/// Runtime Bytecode of the given contract.
+#[track_caller]
+pub fn remove_zk_contract(
+    output: &mut ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>,
+    path: &Path,
+    name: &str,
+) -> Result<(ZkContractArtifact, ArtifactId)> {
+    let mut other = Vec::new();
+
+    let Some(id) = output.artifact_ids().find_map(|(id, _)| {
+        if id.name == name && id.source == path {
+            Some(id)
+        } else {
+            other.push(id.name);
+            None
+        }
+    }) else {
+        let mut err = format!("could not find artifact: `{name}`");
+        if let Some(suggestion) = super::did_you_mean(name, other).pop() {
+            if suggestion != name {
+                err = format!(
+                    r#"{err}
+
+        Did you mean `{suggestion}`?"#
+                );
+            }
+        }
+        eyre::bail!(err)
+    };
+
+    let contract =
+        output.remove(id.source.as_ref(), &id.name).expect("contract found to exist in zk output");
+
+    Ok((contract, id))
 }
 
 /// Helper function for finding a contract by ContractName
@@ -192,6 +233,9 @@ pub fn has_different_gas_calc(chain_id: u64) -> bool {
 /// True if it supports broadcasting in batches.
 pub fn has_batch_support(chain_id: u64) -> bool {
     if let Some(chain) = Chain::from(chain_id).named() {
+        if matches!(chain, NamedChain::ZkSync | NamedChain::ZkSyncTestnet) {
+            return false
+        };
         return !chain.is_arbitrum();
     }
     true

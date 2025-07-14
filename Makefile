@@ -151,3 +151,11 @@ dprint-check: ## Check formatting with dprint
 		cargo install dprint; \
 	fi
 	dprint check
+.PHONY: zksync-tests
+zksync-tests:
+	cargo nextest list -E 'test(~zk) | package(~zk)' -T human --color never > zksync-tests
+
+.PHONY: zksync-tests-check
+zksync-tests-check:
+	cargo nextest list -E 'test(~zk) | package(~zk)' -T human --color never > /tmp/zksync-tests-check
+	git diff zksync-tests /tmp/zksync-tests-check

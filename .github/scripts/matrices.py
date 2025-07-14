@@ -71,8 +71,9 @@ t_linux_x86 = Target("ubuntu-latest", "x86_64-unknown-linux-gnu", "linux-amd64")
 # TODO: Figure out how to make this work
 # t_linux_arm = Target("ubuntu-latest", "aarch64-unknown-linux-gnu", "linux-aarch64")
 t_macos = Target("macos-latest", "aarch64-apple-darwin", "macosx-aarch64")
-t_windows = Target("windows-latest", "x86_64-pc-windows-msvc", "windows-amd64")
-targets = [t_linux_x86, t_windows] if is_pr else [t_linux_x86, t_macos, t_windows]
+# NOTE(zk): ZKsync-era doesn't support windows as of now
+# t_windows = Target("windows-latest", "x86_64-pc-windows-msvc", "windows-amd64")
+targets = [t_linux_x86] if is_pr else [t_linux_x86, t_macos]
 
 config = [
     Case(
@@ -115,7 +116,8 @@ def main():
                     os_str = f" ({target.target})"
 
                 name = case.name
-                flags = f"-E '{case.filter}'"
+                # NOTE(zk): filter out zk tests from upstream ci runs
+                flags = f"-E '{case.filter} & not (test(~zk) or test(~test_zk_aave_di) or package(~zksync))'"
                 if case.n_partitions > 1:
                     s = f"{partition}/{case.n_partitions}"
                     name += f" ({s})"

@@ -1,42 +1,8 @@
 use crate::{Cheatcode, Cheatcodes, CheatsCtxt, Result, Vm::*};
 use alloy_primitives::{Address, Bytes, U256};
+use foundry_cheatcodes_common::mock::{MockCallDataContext, MockCallReturnData};
 use revm::{bytecode::Bytecode, context::JournalTr, interpreter::InstructionResult};
-use std::{cmp::Ordering, collections::VecDeque};
-
-/// Mocked call data.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct MockCallDataContext {
-    /// The partial calldata to match for mock
-    pub calldata: Bytes,
-    /// The value to match for mock
-    pub value: Option<U256>,
-}
-
-/// Mocked return data.
-#[derive(Clone, Debug)]
-pub struct MockCallReturnData {
-    /// The return type for the mocked call
-    pub ret_type: InstructionResult,
-    /// Return data or error
-    pub data: Bytes,
-}
-
-impl PartialOrd for MockCallDataContext {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for MockCallDataContext {
-    fn cmp(&self, other: &Self) -> Ordering {
-        // Calldata matching is reversed to ensure that a tighter match is
-        // returned if an exact match is not found. In case, there is
-        // a partial match to calldata that is more specific than
-        // a match to a msg.value, then the more specific calldata takes
-        // precedence.
-        self.calldata.cmp(&other.calldata).reverse().then(self.value.cmp(&other.value).reverse())
-    }
-}
+use std::collections::VecDeque;
 
 impl Cheatcode for clearMockedCallsCall {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
@@ -180,7 +146,7 @@ impl Cheatcode for mockFunctionCall {
     }
 }
 
-fn mock_call(
+pub fn mock_call(
     state: &mut Cheatcodes,
     callee: &Address,
     cdata: &Bytes,
@@ -210,12 +176,14 @@ fn mock_calls(
 
 // Etches a single byte onto the account if it is empty to circumvent the `extcodesize`
 // check Solidity might perform.
-fn make_acc_non_empty(callee: &Address, ecx: &mut CheatsCtxt) -> Result {
+pub fn make_acc_non_empty(callee: &Address, ecx: &mut CheatsCtxt) -> Result {
     let acc = ecx.journaled_state.load_account(*callee)?;
 
     let empty_bytecode = acc.info.code.as_ref().is_none_or(Bytecode::is_empty);
     if empty_bytecode {
-        let code = Bytecode::new_raw(Bytes::from_static(&[0u8]));
+        // TODO(zk): Is it OK to set empty ZKsync bytecode here?
+        pub const EMPTY_CODE_ZKSYNC: [u8; 32] = [0; 32]; // Empty code that is valid from ZKsync VM perspective.
+        let code = Bytecode::new_raw(Bytes::from_static(&EMPTY_CODE_ZKSYNC));
         ecx.journaled_state.set_code(*callee, code);
     }
 

@@ -1,5 +1,5 @@
 use clap::Parser;
-use foundry_compilers::artifacts::{EvmVersion, output_selection::ContractOutputSelection};
+use foundry_compilers::artifacts::{output_selection::ContractOutputSelection, EvmVersion};
 use serde::Serialize;
 
 mod core;
@@ -10,6 +10,9 @@ pub use self::paths::ProjectPathOpts;
 
 mod utils;
 pub use self::utils::{solar_pcx_from_build_opts, solar_pcx_from_solc_project};
+
+mod zksync;
+pub use self::zksync::ZkSyncArgs;
 
 // A set of solc compiler settings that can be set via command line arguments, which are intended
 // to be merged into an existing `foundry_config::Config`.
@@ -57,6 +60,10 @@ pub struct CompilerOpts {
     #[arg(long, num_args(1..), value_name = "SELECTOR")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub extra_output_files: Vec<ContractOutputSelection>,
+
+    #[clap(flatten)]
+    #[serde(skip)]
+    pub zk: ZkSyncArgs,
 }
 
 #[cfg(test)]

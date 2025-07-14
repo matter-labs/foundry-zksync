@@ -1,34 +1,36 @@
 //! The Forge test runner.
 
 use crate::{
-    MultiContractRunner, TestFilter,
-    fuzz::{BaseCounterExample, invariant::BasicTxDetails},
-    multi_runner::{TestContract, TestRunnerConfig, is_matching_test},
-    progress::{TestsProgress, start_fuzz_progress},
+    fuzz::{invariant::BasicTxDetails, BaseCounterExample},
+    multi_runner::{is_matching_test, TestContract, TestRunnerConfig},
+    progress::{start_fuzz_progress, TestsProgress},
     result::{SuiteResult, TestResult, TestSetup},
+    MultiContractRunner, TestFilter,
 };
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_primitives::{Address, Bytes, U256, address, map::HashMap};
+use alloy_primitives::{address, map::HashMap, Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{TestFunctionExt, TestFunctionKind, contracts::ContractsByAddress};
+use foundry_common::{contracts::ContractsByAddress, TestFunctionExt, TestFunctionKind};
 use foundry_compilers::utils::canonicalized;
 use foundry_config::{Config, InvariantConfig};
 use foundry_evm::{
     constants::CALLER,
     decode::RevertDecoder,
     executors::{
-        CallResult, EvmError, Executor, ITest, RawCallResult,
         fuzz::FuzzedExecutor,
         invariant::{
-            InvariantExecutor, InvariantFuzzError, check_sequence, replay_error, replay_run,
+            check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
+        strategy::DeployLibKind,
+        CallResult, EvmError, Executor, ITest, RawCallResult,
     },
     fuzz::{
-        CounterExample, FuzzFixtures, fixture_name,
+        fixture_name,
         invariant::{CallDetails, InvariantContract},
+        CounterExample, FuzzFixtures,
     },
-    traces::{TraceKind, TraceMode, load_contracts},
+    traces::{load_contracts, TraceKind, TraceMode},
 };
 use itertools::Itertools;
 use proptest::test_runner::{
@@ -133,28 +135,41 @@ impl<'a> ContractRunner<'a> {
 
         let mut result = TestSetup::default();
         for code in &self.mcr.libs_to_deploy {
-            let deploy_result = self.executor.deploy(
+            let deploy_result = self.executor.deploy_library(
                 LIBRARY_DEPLOYER,
-                code.clone(),
+                DeployLibKind::Create(code.clone()),
                 U256::ZERO,
                 Some(&self.mcr.revert_decoder),
             );
 
-            // Record deployed library address.
-            if let Ok(deployed) = &deploy_result {
-                result.deployed_libs.push(deployed.address);
-            }
+            let deployments = match deploy_result {
+                Err(err) => vec![Err(err)],
+                Ok(deployments) => deployments.into_iter().map(Ok).collect(),
+            };
 
-            let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
-            result.extend(raw, TraceKind::Deployment);
-            if reason.is_some() {
-                result.reason = reason;
-                return Ok(result);
+            for deploy_result in
+                deployments.into_iter().map(|result| result.map(|deployment| deployment.result))
+            {
+                // Record deployed library address.
+                if let Ok(deployed) = &deploy_result {
+                    result.deployed_libs.push(deployed.address);
+                }
+
+                let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
+                result.extend(raw, TraceKind::Deployment);
+                if reason.is_some() {
+                    result.reason = reason;
+                    return Ok(result);
+                }
             }
         }
 
         let address = self.sender.create(self.executor.get_nonce(self.sender)?);
         result.address = address;
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
+        self.executor.backend_mut().set_test_contract(address);
 
         // Set the contracts initial balance before deployment, so it is available during
         // construction
@@ -186,6 +201,15 @@ impl<'a> ContractRunner<'a> {
         self.executor.set_balance(LIBRARY_DEPLOYER, self.initial_balance())?;
 
         self.executor.deploy_create2_deployer()?;
+
+        // Test contract has already been deployed so we can migrate the database to zkEVM storage
+        // in the next runner execution. Additionally we can allow persisting the next nonce update
+        // to simulate EVM behavior where only the tx that deploys the test contract increments the
+        // nonce.
+        if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
+            debug!("test contract deployed");
+            cheatcodes.strategy.runner.base_contract_deployed(cheatcodes.strategy.context.as_mut());
+        }
 
         // Optionally call the `setUp` function
         if call_setup {

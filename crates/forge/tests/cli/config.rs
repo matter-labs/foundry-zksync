@@ -173,6 +173,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         compilation_restrictions: Default::default(),
         script_execution_protection: true,
         _non_exhaustive: (),
+        zksync: Default::default(),
     };
     prj.write_config(input.clone());
     let config = cmd.config();
@@ -965,6 +966,9 @@ contract CounterTest {
     cmd.forge_fuse().args(["build"]).assert_success();
 });
 
+// NOTE(zk): This test output differs from the original due to zksync integration:
+// 1. Additional zksync-specific configuration items are present
+// 2. Some existing configuration items appear in a different order
 #[cfg(not(feature = "isolate-by-default"))]
 forgetest_init!(test_default_config, |prj, cmd| {
     prj.write_config(Config::default());
@@ -1058,6 +1062,18 @@ endpoints = "all"
 access = "read"
 path = "out"
 
+[profile.default.zksync]
+compile = false
+startup = false
+size_fallback = false
+enable_eravm_extensions = false
+force_evmla = false
+llvm_options = []
+optimizer = true
+optimizer_mode = "3"
+suppressed_warnings = []
+suppressed_errors = []
+
 [fmt]
 line_length = 120
 tab_width = 4
@@ -1099,6 +1115,7 @@ max_fuzz_dictionary_values = 6553600
 gas_report_samples = 256
 failure_persist_dir = "cache/fuzz"
 failure_persist_file = "failures"
+no_zksync_reserved_addresses = false
 show_logs = false
 
 [invariant]
@@ -1120,6 +1137,7 @@ corpus_min_size = 0
 failure_persist_dir = "cache/invariant"
 show_metrics = true
 show_solidity = false
+no_zksync_reserved_addresses = false
 
 [labels]
 
@@ -1210,6 +1228,7 @@ exclude = []
     "gas_report_samples": 256,
     "failure_persist_dir": "cache/fuzz",
     "failure_persist_file": "failures",
+    "no_zksync_reserved_addresses": false,
     "show_logs": false,
     "timeout": null
   },
@@ -1233,7 +1252,8 @@ exclude = []
     "failure_persist_dir": "cache/invariant",
     "show_metrics": true,
     "timeout": null,
-    "show_solidity": false
+    "show_solidity": false,
+    "no_zksync_reserved_addresses": false
   },
   "ffi": false,
   "allow_internal_expect_revert": false,
@@ -1329,7 +1349,24 @@ exclude = []
   "transaction_timeout": 120,
   "additional_compiler_profiles": [],
   "compilation_restrictions": [],
-  "script_execution_protection": true
+  "script_execution_protection": true,
+  "zksync": {
+    "compile": false,
+    "startup": false,
+    "zksolc": null,
+    "solc_path": null,
+    "hash_type": null,
+    "bytecode_hash": null,
+    "size_fallback": false,
+    "enable_eravm_extensions": false,
+    "force_evmla": false,
+    "llvm_options": [],
+    "optimizer": true,
+    "optimizer_mode": "3",
+    "optimizer_details": null,
+    "suppressed_warnings": [],
+    "suppressed_errors": []
+  }
 }
 
 "#]]);

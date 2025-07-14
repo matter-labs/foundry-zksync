@@ -102,6 +102,14 @@ impl TestFunctionExt for String {
     fn tfe_has_inputs(&self) -> bool {
         false
     }
+
+    fn is_after_invariant(&self) -> bool {
+        self.as_str().is_after_invariant()
+    }
+
+    fn is_fixture(&self) -> bool {
+        self.as_str().is_fixture()
+    }
 }
 
 impl TestFunctionExt for str {

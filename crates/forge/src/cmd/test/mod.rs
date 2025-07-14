@@ -41,6 +41,7 @@ use foundry_config::{
 };
 use foundry_debugger::Debugger;
 use foundry_evm::traces::identifier::TraceIdentifiers;
+use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -285,6 +286,7 @@ impl TestArgs {
     pub async fn execute_tests(mut self) -> Result<TestOutcome> {
         // Merge all configs.
         let (mut config, mut evm_opts) = self.load_config_and_evm_opts()?;
+        let mut strategy = utils::get_executor_strategy(&config);
 
         // Explicitly enable isolation for gas reports for more correct gas accounting.
         if self.gas_report {
@@ -316,6 +318,22 @@ impl TestArgs {
 
         let output = compiler.compile(&project)?;
 
+        let (zk_output, dual_compiled_contracts) = if config.zksync.should_compile() {
+            let zk_project =
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
+
+            let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
+            let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
+
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
+            let dual_compiled_contracts =
+                DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths);
+
+            (Some(zk_output), Some(dual_compiled_contracts))
+        } else {
+            (None, None)
+        };
+
         // Create test options from general project settings and compiler output.
         let project_root = &project.paths.root;
 
@@ -346,6 +364,12 @@ impl TestArgs {
 
         // Prepare the test builder.
         let config = Arc::new(config);
+
+        strategy.runner.zksync_set_dual_compiled_contracts(
+            strategy.context.as_mut(),
+            dual_compiled_contracts.unwrap_or_default(),
+        );
+
         let runner = MultiContractRunnerBuilder::new(config.clone())
             .set_debug(should_debug)
             .set_decode_internal(decode_internal)
@@ -354,8 +378,7 @@ impl TestArgs {
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .enable_isolation(evm_opts.isolate)
-            .odyssey(evm_opts.odyssey)
-            .build::<MultiCompiler>(project_root, &output, env, evm_opts)?;
+            .build::<MultiCompiler>(project_root, &output, zk_output, env, evm_opts, strategy)?;
 
         let libraries = runner.libraries.clone();
         let mut outcome = self.run_tests(runner, config, verbosity, &filter, &output).await?;
@@ -416,7 +439,6 @@ impl TestArgs {
                 )
                 .sources(sources)
                 .breakpoints(test_result.breakpoints.clone());
-
             if let Some(decoder) = &outcome.last_run_decoder {
                 builder = builder.decoder(decoder);
             }

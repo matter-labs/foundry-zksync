@@ -30,7 +30,6 @@ use std::{
     fmt::Display,
     path::Path,
 };
-
 mod record_debug_step;
 use record_debug_step::{convert_call_trace_to_debug_step, flatten_call_trace};
 use serde::Serialize;
@@ -39,36 +38,6 @@ mod fork;
 pub(crate) mod mapping;
 pub(crate) mod mock;
 pub(crate) mod prank;
-
-/// Records storage slots reads and writes.
-#[derive(Clone, Debug, Default)]
-pub struct RecordAccess {
-    /// Storage slots reads.
-    pub reads: HashMap<Address, Vec<U256>>,
-    /// Storage slots writes.
-    pub writes: HashMap<Address, Vec<U256>>,
-}
-
-impl RecordAccess {
-    /// Records a read access to a storage slot.
-    pub fn record_read(&mut self, target: Address, slot: U256) {
-        self.reads.entry(target).or_default().push(slot);
-    }
-
-    /// Records a write access to a storage slot.
-    ///
-    /// This also records a read internally as `SSTORE` does an implicit `SLOAD`.
-    pub fn record_write(&mut self, target: Address, slot: U256) {
-        self.record_read(target, slot);
-        self.writes.entry(target).or_default().push(slot);
-    }
-
-    /// Clears the recorded reads and writes.
-    pub fn clear(&mut self) {
-        // Also frees memory.
-        *self = Default::default();
-    }
-}
 
 /// Records the `snapshotGas*` cheatcodes.
 #[derive(Clone, Debug)]
@@ -177,6 +146,20 @@ impl Cheatcode for getNonce_1Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { wallet } = self;
         get_nonce(ccx, &wallet.addr)
+    }
+}
+
+impl Cheatcode for zkGetTransactionNonceCall {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
+        let Self { account } = self;
+        get_nonce(ccx, account)
+    }
+}
+
+impl Cheatcode for zkGetDeploymentNonceCall {
+    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
+        let Self { account } = self;
+        get_nonce(ccx, account)
     }
 }
 
@@ -517,6 +500,7 @@ impl Cheatcode for getBlobBaseFeeCall {
 impl Cheatcode for dealCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account: address, newBalance: new_balance } = *self;
+
         let account = journaled_account(ccx.ecx, address)?;
         let old_balance = std::mem::replace(&mut account.info.balance, new_balance);
         let record = DealRecord { address, old_balance, new_balance };
@@ -555,6 +539,7 @@ impl Cheatcode for resetNonceCall {
 impl Cheatcode for setNonceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
+
         let account = journaled_account(ccx.ecx, account)?;
         // nonce must increment only
         let current = account.info.nonce;
@@ -571,6 +556,7 @@ impl Cheatcode for setNonceCall {
 impl Cheatcode for setNonceUnsafeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { account, newNonce } = *self;
+
         let account = journaled_account(ccx.ecx, account)?;
         account.info.nonce = newNonce;
         Ok(Default::default())
@@ -842,6 +828,7 @@ impl Cheatcode for broadcastRawTransactionCall {
             env.to_owned(),
             journal,
             &mut *executor.get_inspector(ccx.state),
+            Box::new(()),
         )?;
 
         if ccx.state.broadcast.is_some() {
@@ -1149,10 +1136,7 @@ fn read_callers(state: &Cheatcodes, default_sender: &Address, call_depth: usize)
 }
 
 /// Ensures the `Account` is loaded and touched.
-pub(super) fn journaled_account<'a>(
-    ecx: Ecx<'a, '_, '_>,
-    addr: Address,
-) -> Result<&'a mut Account> {
+pub fn journaled_account<'a>(ecx: Ecx<'a, '_, '_>, addr: Address) -> Result<&'a mut Account> {
     ecx.journaled_state.load_account(addr)?;
     ecx.journaled_state.touch(addr);
     Ok(ecx.journaled_state.state.get_mut(&addr).expect("account is loaded"))

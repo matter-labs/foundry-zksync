@@ -5,9 +5,14 @@
 version = 2
 yanked = "warn"
 ignore = [
+    # proc-macro-error is unmaintained
+    "RUSTSEC-2024-0370",
+    # Used by boojum
+    # derivative is unmaintained
+    "RUSTSEC-2024-0388",
     # https://rustsec.org/advisories/RUSTSEC-2024-0436 paste! is unmaintained
     "RUSTSEC-2024-0436",
-    # https://rustsec.org/advisories/RUSTSEC-2024-0437 protobuf! Crash due to uncontrolled recursion in protobuf crate.
+    # protobuf in trezor_client
     "RUSTSEC-2024-0437",
     # https://rustsec.org/advisories/RUSTSEC-2025-0021 gitoxide uses SHA-1 hash implementations without any collision detection, leaving it vulnerable to hash collision attacks.
     "RUSTSEC-2025-0021",
@@ -23,7 +28,6 @@ multiple-versions = "allow"
 wildcards = "allow"
 highlight = "all"
 # List of crates to deny
-deny = [{ name = "openssl" }]
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = []
 # Similarly to `skip` allows you to skip certain crates during duplicate
@@ -31,6 +35,9 @@ skip = []
 # dependencies starting at the specified crate, up to a certain depth, which is
 # by default infinite
 skip-tree = []
+deny = [
+    "openssl", # Only use rust-tls in the project
+]
 
 [licenses]
 version = 2
@@ -41,7 +48,11 @@ confidence-threshold = 0.8
 # [possible values: any SPDX 3.7 short identifier (+ optional exception)].
 allow = [
     "0BSD",
-    "Apache-2.0 WITH LLVM-exception",
+    "ISC",
+    "Unlicense",
+    "MPL-2.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
     "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
@@ -49,13 +60,22 @@ allow = [
     "CC0-1.0",
     "CDDL-1.0",
     "CDLA-Permissive-2.0",
+    "Zlib",
     "ISC",
     "MIT",
     "MPL-2.0",
     "OpenSSL",
     "Unicode-3.0",
     "Unlicense",
+    "OpenSSL",
+    "Apache-2.0 WITH LLVM-exception",
     "WTFPL",
+    "BSL-1.0",
+    "0BSD",
+    "WTFPL",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "CDDL-1.0",
     "Zlib",
 ]
 
@@ -70,6 +90,9 @@ exceptions = [
     { allow = ["CC0-1.0"], name = "notify" },
     { allow = ["CC0-1.0"], name = "dunce" },
     { allow = ["CC0-1.0"], name = "aurora-engine-modexp" },
+    # Allow CDLA-Permissive-2.0 for webpki crates
+    { allow = ["CDLA-Permissive-2.0"], name = "webpki-root-certs" },
+    { allow = ["CDLA-Permissive-2.0"], name = "webpki-roots" },
 ]
 # copyleft = "deny"
 
@@ -97,9 +120,14 @@ unknown-registry = "warn"
 # in the allow list is encountered
 unknown-git = "deny"
 allow-git = [
+    "https://github.com/foundry-rs/foundry",
     "https://github.com/alloy-rs/alloy",
     "https://github.com/foundry-rs/compilers",
     "https://github.com/foundry-rs/foundry-fork-db",
-    "https://github.com/paradigmxyz/revm-inspectors",
-    "https://github.com/bluealloy/revm",
+    "https://github.com/nbaztec/zksync-telemetry",
+    "https://github.com/nbaztec/anvil-zksync",
+    "https://github.com/Romsters/posthog-rs",
 ]
+
+[sources.allow-org]
+github = ["matter-labs"]

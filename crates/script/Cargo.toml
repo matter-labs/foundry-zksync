@@ -25,6 +25,9 @@ foundry-wallets.workspace = true
 foundry-linking.workspace = true
 foundry-block-explorers.workspace = true
 forge-script-sequence.workspace = true
+foundry-strategy-zksync.workspace = true
+foundry-zksync-core.workspace = true
+foundry-zksync-compilers.workspace = true
 
 serde.workspace = true
 eyre.workspace = true
@@ -55,6 +58,7 @@ alloy-dyn-abi.workspace = true
 alloy-primitives.workspace = true
 alloy-eips.workspace = true
 alloy-consensus.workspace = true
+alloy-zksync.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -4,7 +4,7 @@ use crate::{
 };
 use alloy_primitives::{B256, Bytes};
 use alloy_provider::Provider;
-use eyre::{OptionExt, Result};
+use eyre::{Context, OptionExt, Result};
 use forge_script_sequence::ScriptSequence;
 use foundry_cheatcodes::Wallets;
 use foundry_common::{
@@ -15,11 +15,18 @@ use foundry_compilers::{
     artifacts::{BytecodeObject, Libraries},
     compilers::{Language, multi::MultiCompilerLanguage},
     info::ContractInfo,
+    solc::SolcLanguage,
     utils::source_files_iter,
 };
 use foundry_evm::traces::debug::ContractSources;
 use foundry_linking::Linker;
+use foundry_zksync_compilers::{
+    compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
+    dual_compiled_contracts::DualCompiledContracts,
+};
 use std::{path::PathBuf, str::FromStr, sync::Arc};
+
+mod zksync;
 
 /// Container for the compiled contracts.
 #[derive(Debug)]
@@ -28,8 +35,11 @@ pub struct BuildData {
     pub project_root: PathBuf,
     /// The compiler output.
     pub output: ProjectCompileOutput,
+    /// The zk compiler output
+    pub zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
     /// ID of target contract artifact.
     pub target: ArtifactId,
+    pub dual_compiled_contracts: Option<DualCompiledContracts>,
 }
 
 impl BuildData {
@@ -39,7 +49,7 @@ impl BuildData {
 
     /// Links contracts. Uses CREATE2 linking when possible, otherwise falls back to
     /// default linking with sender nonce and address.
-    pub async fn link(self, script_config: &ScriptConfig) -> Result<LinkedBuildData> {
+    pub async fn link(mut self, script_config: &ScriptConfig) -> Result<LinkedBuildData> {
         let create2_deployer = script_config.evm_opts.create2_deployer;
         let can_use_create2 = if let Some(fork_url) = &script_config.evm_opts.fork_url {
             let provider = try_get_http_provider(fork_url)?;
@@ -52,6 +62,8 @@ impl BuildData {
         };
 
         let known_libraries = script_config.config.libraries_with_remappings()?;
+
+        // TODO(zk): evaluate using strategies here as well
 
         let maybe_create2_link_output = can_use_create2
             .then(|| {
@@ -66,32 +78,59 @@ impl BuildData {
             })
             .flatten();
 
-        let (libraries, predeploy_libs) = if let Some(output) = maybe_create2_link_output {
-            (
-                output.libraries,
-                ScriptPredeployLibraries::Create2(
-                    output.libs_to_deploy,
-                    script_config.config.create2_library_salt,
-                ),
-            )
-        } else {
-            let output = self.get_linker().link_with_nonce_or_address(
-                known_libraries,
-                script_config.evm_opts.sender,
-                script_config.sender_nonce,
-                [&self.target],
-            )?;
+        let (libraries, predeploy_libs, uses_create2) =
+            if let Some(output) = maybe_create2_link_output {
+                (
+                    output.libraries,
+                    ScriptPredeployLibraries::Create2(
+                        output.libs_to_deploy,
+                        script_config.config.create2_library_salt,
+                    ),
+                    true,
+                )
+            } else {
+                let output = self.get_linker().link_with_nonce_or_address(
+                    known_libraries.clone(),
+                    script_config.evm_opts.sender,
+                    script_config.sender_nonce,
+                    [&self.target],
+                )?;
 
-            (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy))
-        };
+                (output.libraries, ScriptPredeployLibraries::Default(output.libs_to_deploy), false)
+            };
 
-        LinkedBuildData::new(libraries, predeploy_libs, self)
+        let known_contracts = self
+            .get_linker()
+            .get_linked_artifacts(&libraries)
+            .context("retrieving fully linked artifacts")?;
+        let known_contracts =
+            self.zk_link(script_config, known_libraries, known_contracts, uses_create2).await?;
+
+        LinkedBuildData::new(
+            libraries,
+            predeploy_libs,
+            ContractsByArtifact::new(known_contracts),
+            self,
+        )
     }
 
     /// Links the build data with the given libraries. Expects supplied libraries set being enough
     /// to fully link target contract.
-    pub fn link_with_libraries(self, libraries: Libraries) -> Result<LinkedBuildData> {
-        LinkedBuildData::new(libraries, ScriptPredeployLibraries::Default(Vec::new()), self)
+    pub async fn link_with_libraries(
+        mut self,
+        script_config: &ScriptConfig,
+        libraries: Libraries,
+    ) -> Result<LinkedBuildData> {
+        let known_contracts = self.get_linker().get_linked_artifacts(&libraries)?;
+        let known_contracts =
+            self.zk_link(script_config, libraries.clone(), known_contracts, false).await?;
+
+        LinkedBuildData::new(
+            libraries,
+            ScriptPredeployLibraries::Default(Vec::new()),
+            ContractsByArtifact::new(known_contracts),
+            self,
+        )
     }
 }
 
@@ -129,6 +168,7 @@ impl LinkedBuildData {
     pub fn new(
         libraries: Libraries,
         predeploy_libraries: ScriptPredeployLibraries,
+        known_contracts: ContractsByArtifact,
         build_data: BuildData,
     ) -> Result<Self> {
         let sources = ContractSources::from_project_output(
@@ -136,9 +176,6 @@ impl LinkedBuildData {
             &build_data.project_root,
             Some(&libraries),
         )?;
-
-        let known_contracts =
-            ContractsByArtifact::new(build_data.get_linker().get_linked_artifacts(&libraries)?);
 
         Ok(Self { build_data, known_contracts, libraries, predeploy_libraries, sources })
     }
@@ -191,6 +228,31 @@ impl PreprocessedState {
 
         let output = ProjectCompiler::new().files(sources_to_compile).compile(&project)?;
 
+        let mut zk_output = None;
+        // ZK
+        let dual_compiled_contracts = if script_config.config.zksync.should_compile() {
+            let zk_project = foundry_config::zksync::config_create_project(
+                &script_config.config,
+                script_config.config.cache,
+                false,
+            )?;
+            let sources_to_compile =
+                source_files_iter(project.paths.sources.as_path(), SolcLanguage::FILE_EXTENSIONS)
+                    .chain([target_path.clone()]);
+
+            let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
+
+            zk_output = Some(zk_compiler.zksync_compile(&zk_project)?);
+            Some(DualCompiledContracts::new(
+                &output,
+                zk_output.as_ref().unwrap(),
+                &project.paths,
+                &zk_project.paths,
+            ))
+        } else {
+            None
+        };
+
         let mut target_id: Option<ArtifactId> = None;
 
         // Find target artfifact id by name and path in compilation artifacts.
@@ -231,7 +293,13 @@ impl PreprocessedState {
             args,
             script_config,
             script_wallets,
-            build_data: BuildData { output, target, project_root: project.root().to_path_buf() },
+            build_data: BuildData {
+                output,
+                zk_output,
+                target,
+                project_root: project.root().to_path_buf(),
+                dual_compiled_contracts,
+            },
         })
     }
 }
@@ -321,7 +389,10 @@ impl CompiledState {
             ScriptSequenceKind::Multi(_) => Libraries::default(),
         };
 
-        let linked_build_data = build_data.link_with_libraries(libraries)?;
+        // NOTE(zk): we added `script_config` to be able
+        // to retrieve the appropriate `zksolc` compiler version
+        // from the config to be used during linking
+        let linked_build_data = build_data.link_with_libraries(&script_config, libraries).await?;
 
         Ok(BundledState {
             args,

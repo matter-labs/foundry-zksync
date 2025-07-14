@@ -16,6 +16,7 @@ workspace = true
 [dependencies]
 foundry-block-explorers.workspace = true
 foundry-common.workspace = true
+foundry-cheatcodes-spec.workspace = true
 foundry-compilers.workspace = true
 foundry-linking.workspace = true
 foundry-config.workspace = true

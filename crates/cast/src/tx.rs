@@ -27,7 +27,7 @@ use serde_json::value::RawValue;
 use std::fmt::Write;
 
 /// Different sender kinds used by [`CastTxBuilder`].
-#[expect(clippy::large_enum_variant)]
+#[allow(clippy::large_enum_variant)]
 pub enum SenderKind<'a> {
     /// An address without signer. Used for read-only calls and transactions sent through unlocked
     /// accounts.
@@ -159,7 +159,9 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InitState> {
         let etherscan_api_version = config.get_etherscan_api_version(Some(chain));
         let etherscan_api_key = config.get_etherscan_api_key(Some(chain));
         // mark it as legacy if requested or the chain is legacy and no 7702 is provided.
-        let legacy = tx_opts.legacy || (chain.is_legacy() && tx_opts.auth.is_none());
+        let legacy = tx_opts.legacy ||
+            (chain.is_legacy() && tx_opts.auth.is_none()) ||
+            config.zksync.run_in_zk_mode();
 
         if let Some(gas_limit) = tx_opts.gas_limit {
             tx.set_gas_limit(gas_limit.to());
@@ -361,6 +363,7 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InputState> {
         }
 
         if !fill {
+            self.tx.nonce = Some(tx_nonce);
             return Ok((self.tx, self.state.func));
         }
 
@@ -392,6 +395,7 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InputState> {
             self.estimate_gas().await?;
         }
 
+        self.tx.nonce = Some(tx_nonce);
         Ok((self.tx, self.state.func))
     }
 

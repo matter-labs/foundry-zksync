@@ -10,7 +10,11 @@ use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::Address;
 use auto_impl::auto_impl;
 use backend::DatabaseExt;
-use revm::{Inspector, inspector::NoOpInspector, interpreter::CreateInputs};
+use revm::{
+    inspector::NoOpInspector,
+    interpreter::{CallInputs, CreateInputs},
+    Inspector,
+};
 use revm_inspectors::access_list::AccessListInspector;
 
 #[macro_use]
@@ -35,6 +39,8 @@ pub mod opts;
 pub mod precompiles;
 pub mod state_snapshot;
 pub mod utils;
+
+pub type Ecx<'a, 'b, 'c> = &'a mut EthEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 
 /// An extension trait that allows us to add additional hooks to Inspector for later use in
 /// handlers.
@@ -65,6 +71,24 @@ pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>
     /// Returns the CREATE2 deployer address.
     fn create2_deployer(&self) -> Address {
         DEFAULT_CREATE2_DEPLOYER
+    }
+
+    fn zksync_set_deployer_call_input(
+        &mut self,
+        _context: Ecx<'_, '_, '_>,
+        _call_inputs: &mut CallInputs,
+    ) {
+        // No-op by default, can be overridden in the inspector.
+    }
+
+    /// Appends provided zksync traces.
+    // TODO(merge): Should be moved outside of the upstream codebase
+    fn trace_zksync(
+        &mut self,
+        _context: Ecx<'_, '_, '_>,
+        _call_traces: Box<dyn std::any::Any>, // holds `Vec<Call>`
+        _record_top_call: bool,
+    ) {
     }
 }
 

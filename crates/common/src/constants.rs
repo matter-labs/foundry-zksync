@@ -1,6 +1,6 @@
 //! Commonly used constants.
 
-use alloy_primitives::{Address, address};
+use alloy_primitives::{address, Address};
 use std::time::Duration;
 
 /// The dev chain-id, inherited from hardhat
@@ -42,6 +42,9 @@ pub const SYSTEM_TRANSACTION_TYPE: u8 = 126;
 
 /// Default user agent set as the header for requests that don't specify one.
 pub const DEFAULT_USER_AGENT: &str = concat!("foundry/", env!("CARGO_PKG_VERSION"));
+
+pub const POSTHOG_API_KEY: &str = "phc_eTvYMxu4UCkuFkAdY4DK6XzlUwoPppXuAcP1x9FhisG";
+pub const TELEMETRY_CONFIG_NAME: &str = "zksync-tooling";
 
 /// Prefix for auto-generated type bindings using `forge bind-json`.
 pub const TYPE_BINDING_PREFIX: &str = "string constant schema_";

@@ -5,6 +5,8 @@ pub use foundry_evm_coverage::LineCoverageCollector;
 pub use foundry_evm_fuzz::Fuzzer;
 pub use foundry_evm_traces::{StackSnapshotType, TracingInspector, TracingInspectorConfig};
 
+pub use foundry_zksync_inspectors::TraceCollector;
+
 pub use revm_inspectors::access_list::AccessListInspector;
 
 mod custom_printer;

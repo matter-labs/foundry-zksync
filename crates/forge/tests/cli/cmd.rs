@@ -12,6 +12,7 @@ use foundry_test_utils::{
     util::{OutputExt, TestCommand, read_string},
 };
 use semver::Version;
+use similar_asserts::assert_eq;
 use std::{
     fs,
     path::Path,
@@ -3787,6 +3788,19 @@ contract FooBarTest is DSTest {
     .unwrap();
 
     cmd.args(["test", "--gas-report"]).assert_success();
+});
+
+forgetest_init!(zk_can_init_with_zksync, |prj, cmd| {
+    cmd.args(["init", "--zksync", "--force"]).assert_success();
+
+    // Check that zkout/ is in .gitignore
+    let gitignore_path = prj.root().join(".gitignore");
+    assert!(gitignore_path.exists());
+    let gitignore_contents = std::fs::read_to_string(&gitignore_path).unwrap();
+    assert!(gitignore_contents.contains("zkout/"));
+
+    // Assert that forge-zksync-std is installed
+    assert!(prj.root().join("lib/forge-zksync-std").exists());
 });
 
 // <https://github.com/foundry-rs/foundry/issues/5847>

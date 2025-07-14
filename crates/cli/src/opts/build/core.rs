@@ -3,19 +3,20 @@ use crate::{opts::CompilerOpts, utils::LoadConfig};
 use clap::{Parser, ValueHint};
 use eyre::Result;
 use foundry_compilers::{
-    Project,
-    artifacts::{RevertStrings, remappings::Remapping},
+    artifacts::{remappings::Remapping, RevertStrings},
     compilers::multi::MultiCompiler,
     utils::canonicalized,
+    Project,
 };
 use foundry_config::{
-    Config, Remappings, figment,
+    figment,
     figment::{
-        Figment, Metadata, Profile, Provider,
         error::Kind::InvalidType,
         value::{Dict, Map, Value},
+        Figment, Metadata, Profile, Provider,
     },
     filter::SkipBuildFilter,
+    Config, Remappings,
 };
 use serde::Serialize;
 use std::path::PathBuf;
@@ -184,7 +185,14 @@ impl<'a> From<&'a BuildOpts> for Figment {
             .with_figment(&figment);
         remappings
             .extend(figment.extract_inner::<Vec<Remapping>>("remappings").unwrap_or_default());
-        figment = figment.merge(("remappings", remappings.into_inner())).merge(args);
+        // override only set values from the CLI for zksync
+        let zksync =
+            args.compiler.zk.apply_overrides(figment.extract_inner("zksync").unwrap_or_default());
+
+        figment = figment
+            .merge(("remappings", remappings.into_inner()))
+            .merge(args)
+            .merge(("zksync", zksync));
 
         if let Some(skip) = &args.skip {
             let mut skip = skip.iter().map(|s| s.file_pattern().to_string()).collect::<Vec<_>>();

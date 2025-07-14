@@ -1,12 +1,13 @@
 //! The `forge verify-bytecode` command.
 
 use crate::{
-    RetryArgs,
     etherscan::EtherscanVerificationProvider,
     provider::{VerificationContext, VerificationProvider, VerificationProviderType},
     utils::is_host_only,
+    zk_provider::CompilerVerificationContext,
+    RetryArgs,
 };
-use alloy_primitives::{Address, map::HashSet};
+use alloy_primitives::{map::HashSet, Address};
 use alloy_provider::Provider;
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::Result;
@@ -15,13 +16,15 @@ use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
     utils::{self, LoadConfig},
 };
-use foundry_common::{ContractsByArtifact, compile::ProjectCompiler};
+use foundry_common::{compile::ProjectCompiler, ContractsByArtifact};
 use foundry_compilers::{artifacts::EvmVersion, compilers::solc::Solc, info::ContractInfo};
-use foundry_config::{Config, SolcReq, figment, impl_figment_convert, impl_figment_convert_cast};
+use foundry_config::{figment, impl_figment_convert, impl_figment_convert_cast, Config, SolcReq};
 use itertools::Itertools;
 use reqwest::Url;
 use semver::BuildMetadata;
 use std::path::PathBuf;
+
+mod zksync;
 
 /// The programming language used for smart contract development.
 ///
@@ -164,6 +167,10 @@ pub struct VerifyArgs {
     /// Defaults to `solidity` if none provided.
     #[arg(long, value_enum)]
     pub language: Option<ContractLanguage>,
+
+    /// Verify for zksync
+    #[clap(long)]
+    pub zksync: bool,
 }
 
 impl_figment_convert!(VerifyArgs);
@@ -229,7 +236,7 @@ impl VerifyArgs {
             None => config.chain.unwrap_or_default(),
         };
 
-        let context = self.resolve_context().await?;
+        let context = self.resolve_either_context().await?;
 
         // Set Etherscan options.
         self.etherscan.chain = Some(chain);
@@ -288,7 +295,19 @@ impl VerifyArgs {
 
     /// Resolves [VerificationContext] object either from entered contract name or by trying to
     /// match bytecode located at given address.
-    pub async fn resolve_context(&self) -> Result<VerificationContext> {
+    pub async fn resolve_either_context(&self) -> Result<CompilerVerificationContext> {
+        if self.zksync {
+            self.zk_resolve_context().await.map(CompilerVerificationContext::ZkSolc)
+        } else {
+            self.resolve_context().await.map(CompilerVerificationContext::Solc)
+        }
+    }
+
+    /// Resolves [VerificationContext] object either from entered contract name or by trying to
+    /// match bytecode located at given address.
+    ///
+    /// Will assume configured compiler is solc or equivalent
+    async fn resolve_context(&self) -> Result<VerificationContext> {
         let mut config = self.load_config()?;
         config.libraries.extend(self.libraries.clone());
 
@@ -302,7 +321,6 @@ impl VerifyArgs {
             };
 
             let cache = project.read_cache_file().ok();
-
             let mut version = if let Some(ref version) = self.compiler_version {
                 version.trim_start_matches('v').parse()?
             } else if let Some(ref solc) = config.solc {
@@ -337,7 +355,6 @@ impl VerifyArgs {
                     "If cache is disabled, compiler version must be either provided with `--compiler-version` option or set in foundry.toml"
                 )
             };
-
             let settings = if let Some(profile) = &self.compilation_profile {
                 if profile == "default" {
                     &project.settings

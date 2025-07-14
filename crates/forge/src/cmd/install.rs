@@ -80,6 +80,10 @@ pub struct DependencyInstallOpts {
     /// Create a commit after installing the dependencies.
     #[arg(long)]
     pub commit: bool,
+
+    /// Install ZKsync specific libraries.
+    #[arg(long)]
+    pub zksync: bool,
 }
 
 impl DependencyInstallOpts {

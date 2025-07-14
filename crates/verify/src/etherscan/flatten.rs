@@ -15,6 +15,8 @@ use foundry_compilers::{
 use semver::{BuildMetadata, Version};
 use std::path::Path;
 
+mod zksync;
+
 #[derive(Debug)]
 pub struct EtherscanFlattenedSource;
 impl EtherscanSourceProvider for EtherscanFlattenedSource {

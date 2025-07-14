@@ -1,14 +1,17 @@
 use super::{ScriptConfig, ScriptResult};
 use crate::build::ScriptPredeployLibraries;
 use alloy_eips::eip7702::SignedAuthorization;
-use alloy_primitives::{Address, Bytes, TxKind, U256};
-use alloy_rpc_types::TransactionRequest;
+use alloy_primitives::{Address, Bytes, U256};
+use alloy_serde::OtherFields;
 use eyre::Result;
 use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
 use foundry_evm::{
     constants::CALLER,
-    executors::{DeployResult, EvmError, ExecutionErr, Executor, RawCallResult},
+    executors::{
+        strategy::{DeployLibKind, DeployLibResult},
+        DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
+    },
     opts::EvmOpts,
     revm::interpreter::{InstructionResult, return_ok},
     traces::{TraceKind, Traces},
@@ -36,7 +39,7 @@ impl ScriptRunner {
         script_config: &ScriptConfig,
         is_broadcast: bool,
     ) -> Result<(Address, ScriptResult)> {
-        trace!(target: "script", "executing setUP()");
+        info!(target: "script", "executing setUP()");
 
         if !is_broadcast {
             if self.evm_opts.sender == Config::DEFAULT_SENDER {
@@ -58,29 +61,36 @@ impl ScriptRunner {
         let mut library_transactions = VecDeque::new();
         let mut traces = Traces::default();
 
+        // NOTE(zk): below we moved the logic into the strategy
+        // so we can override it in the zksync strategy
+        // Additionally, we have a list of results to register
+        // both the EVM and EraVM deployment
+
         // Deploy libraries
         match libraries {
             ScriptPredeployLibraries::Default(libraries) => libraries.iter().for_each(|code| {
-                let result = self
+                let results = self
                     .executor
-                    .deploy(self.evm_opts.sender, code.clone(), U256::ZERO, None)
-                    .expect("couldn't deploy library")
-                    .raw;
+                    .deploy_library(
+                        self.evm_opts.sender,
+                        DeployLibKind::Create(code.clone()),
+                        U256::ZERO,
+                        None,
+                    )
+                    .expect("couldn't deploy library");
 
-                if let Some(deploy_traces) = result.traces {
-                    traces.push((TraceKind::Deployment, deploy_traces));
-                }
-
-                library_transactions.push_back(BroadcastableTransaction {
-                    rpc: self.evm_opts.fork_url.clone(),
-                    transaction: TransactionRequest {
-                        from: Some(self.evm_opts.sender),
-                        input: code.clone().into(),
-                        nonce: Some(sender_nonce + library_transactions.len() as u64),
-                        ..Default::default()
+                for DeployLibResult { result, tx } in results {
+                    if let Some(deploy_traces) = result.raw.traces {
+                        traces.push((TraceKind::Deployment, deploy_traces));
                     }
-                    .into(),
-                })
+
+                    if let Some(transaction) = tx {
+                        library_transactions.push_back(BroadcastableTransaction {
+                            rpc: self.evm_opts.fork_url.clone(),
+                            transaction,
+                        });
+                    }
+                }
             }),
             ScriptPredeployLibraries::Create2(libraries, salt) => {
                 let create2_deployer = self.executor.create2_deployer();
@@ -90,40 +100,30 @@ impl ScriptRunner {
                     if !self.executor.is_empty_code(address)? {
                         continue;
                     }
-                    let calldata = [salt.as_ref(), library.as_ref()].concat();
-                    let result = self
+
+                    let results = self
                         .executor
-                        .transact_raw(
+                        .deploy_library(
                             self.evm_opts.sender,
-                            create2_deployer,
-                            calldata.clone().into(),
+                            DeployLibKind::Create2(*salt, library.clone()),
                             U256::from(0),
+                            None,
                         )
                         .expect("couldn't deploy library");
 
-                    if let Some(deploy_traces) = result.traces {
-                        traces.push((TraceKind::Deployment, deploy_traces));
-                    }
-
-                    library_transactions.push_back(BroadcastableTransaction {
-                        rpc: self.evm_opts.fork_url.clone(),
-                        transaction: TransactionRequest {
-                            from: Some(self.evm_opts.sender),
-                            input: calldata.into(),
-                            nonce: Some(sender_nonce + library_transactions.len() as u64),
-                            to: Some(TxKind::Call(create2_deployer)),
-                            ..Default::default()
+                    for DeployLibResult { result, tx } in results {
+                        if let Some(deploy_traces) = result.raw.traces {
+                            traces.push((TraceKind::Deployment, deploy_traces));
                         }
-                        .into(),
-                    });
-                }
 
-                // Sender nonce is not incremented when performing CALLs. We need to manually
-                // increase it.
-                self.executor.set_nonce(
-                    self.evm_opts.sender,
-                    sender_nonce + library_transactions.len() as u64,
-                )?;
+                        if let Some(transaction) = tx {
+                            library_transactions.push_back(BroadcastableTransaction {
+                                rpc: self.evm_opts.fork_url.clone(),
+                                transaction,
+                            });
+                        }
+                    }
+                }
             }
         };
 
@@ -143,6 +143,14 @@ impl ScriptRunner {
         if self.evm_opts.sender == CALLER {
             self.executor.set_nonce(self.evm_opts.sender, u64::MAX / 2)?;
         }
+
+        // NOTE(zk): Address recomputed again after the nonce modification as it will
+        // differ in case of evm_opts.sender == CALLER
+        let zk_actual_script_address = CALLER.create(self.executor.get_nonce(CALLER)?);
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
+        self.executor.backend_mut().set_test_contract(zk_actual_script_address);
 
         // Deploy an instance of the contract
         let DeployResult {
@@ -164,9 +172,19 @@ impl ScriptRunner {
 
         traces.extend(constructor_traces.map(|traces| (TraceKind::Deployment, traces)));
 
+        // Script has already been deployed so we can migrate the database to zkEVM storage
+        // in the next runner execution. Additionally we can allow persisting the next nonce update
+        // to simulate EVM behavior where only the tx that deploys the test contract increments the
+        // nonce.
+        if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
+            debug!("script deployed");
+            cheatcodes.strategy.runner.base_contract_deployed(cheatcodes.strategy.context.as_mut());
+        }
+
         // Optionally call the `setUp` function
         let (success, gas_used, labeled_addresses, transactions) = if !setup {
-            self.executor.backend_mut().set_test_contract(address);
+            // NOTE(zk): keeping upstream code for context. Test contract is only set on this branch
+            // self.executor.backend_mut().set_test_contract(address);
             (true, 0, Default::default(), Some(library_transactions))
         } else {
             match self.executor.setup(Some(self.evm_opts.sender), address, None) {
@@ -240,7 +258,15 @@ impl ScriptRunner {
         calldata: Option<Bytes>,
         value: Option<U256>,
         authorization_list: Option<Vec<SignedAuthorization>>,
+        other_fields: Option<OtherFields>,
     ) -> Result<ScriptResult> {
+        if let Some(other_fields) = other_fields {
+            self.executor.strategy.runner.zksync_set_transaction_context(
+                self.executor.strategy.context.as_mut(),
+                other_fields,
+            );
+        }
+
         if let Some(to) = to {
             self.call(
                 from,
