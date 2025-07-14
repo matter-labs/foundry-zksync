@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.0.22](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.21...foundry-zksync-v0.0.22) (2025-07-14)
+
+
+### Features
+
+* Upstream ab753e9ca ([#1083](https://github.com/matter-labs/foundry-zksync/issues/1083)) ([35f1cb1](https://github.com/matter-labs/foundry-zksync/commit/35f1cb187bda0ad8a9b15ad280c516b1202d9863))
+* Upstream ab753e9ca-merge ([#1084](https://github.com/matter-labs/foundry-zksync/issues/1084)) ([6aa835b](https://github.com/matter-labs/foundry-zksync/commit/6aa835bd9def31ec9a4bc22d8ab5cf130d446487))
+
+
+### Bug Fixes
+
+* force prevrandao on rootstock testnet ([6aa835b](https://github.com/matter-labs/foundry-zksync/commit/6aa835bd9def31ec9a4bc22d8ab5cf130d446487))
+
 ## [0.0.21](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.20...foundry-zksync-v0.0.21) (2025-06-20)
 
 
