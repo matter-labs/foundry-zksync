@@ -8,6 +8,7 @@ use eyre::Result;
 use foundry_cli::{handler, utils};
 use foundry_common::shell;
 use foundry_evm::inspectors::cheatcodes::{set_execution_context, ForgeContext};
+use zksync_telemetry::{get_telemetry, TelemetryProps};
 
 /// Run the `forge` command line interface.
 pub fn run() -> Result<()> {
@@ -32,6 +33,8 @@ pub fn setup() -> Result<()> {
 
 /// Run the subcommand.
 pub fn run_command(args: Forge) -> Result<()> {
+    let telemetry = get_telemetry().expect("telemetry is not initialized");
+    let telemetry_props = args.cmd.get_telemetry_props();
     // Set the execution context based on the subcommand.
     let context = match &args.cmd {
         ForgeSubcommand::Test(_) => ForgeContext::Test,
@@ -51,7 +54,7 @@ pub fn run_command(args: Forge) -> Result<()> {
     set_execution_context(context);
 
     // Run the subcommand.
-    match args.cmd {
+    let result = match args.cmd {
         ForgeSubcommand::Test(cmd) => {
             if cmd.is_watch() {
                 utils::block_on(watch::watch_test(cmd))
@@ -107,7 +110,10 @@ pub fn run_command(args: Forge) -> Result<()> {
         ForgeSubcommand::Clean { root } => {
             let config = utils::load_config_with_root(root.as_deref())?;
             let project = config.project()?;
+            let zk_project =
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
             config.cleanup(&project)?;
+            config.cleanup(&zk_project)?;
             Ok(())
         }
         ForgeSubcommand::Snapshot(cmd) => {
@@ -152,5 +158,17 @@ pub fn run_command(args: Forge) -> Result<()> {
         ForgeSubcommand::Eip712(cmd) => cmd.run(),
         ForgeSubcommand::BindJson(cmd) => cmd.run(),
         ForgeSubcommand::Lint(cmd) => cmd.run(),
-    }
+    };
+
+    let _ = utils::block_on(
+        telemetry.track_event(
+            "forge",
+            TelemetryProps::new()
+                .insert("params", Some(telemetry_props))
+                .insert("result", Some(if result.is_ok() { "success" } else { "failure" }))
+                .take(),
+        ),
+    );
+
+    result
 }

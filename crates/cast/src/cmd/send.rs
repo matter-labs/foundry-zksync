@@ -1,9 +1,11 @@
 use crate::{
     tx::{self, CastTxBuilder},
+    zksync::ZkTransactionOpts,
     Cast,
 };
 use alloy_ens::NameOrAddress;
 use alloy_network::{AnyNetwork, EthereumWallet};
+use alloy_primitives::TxHash;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -17,6 +19,8 @@ use foundry_cli::{
 };
 use std::{path::PathBuf, str::FromStr};
 
+mod zksync;
+use zksync::send_zk_transaction;
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
 pub struct SendTxArgs {
@@ -66,6 +70,14 @@ pub struct SendTxArgs {
         help_heading = "Transaction options"
     )]
     path: Option<PathBuf>,
+
+    /// Zksync Transaction
+    #[command(flatten)]
+    zk_tx: ZkTransactionOpts,
+
+    /// Force a zksync eip-712 transaction and apply CREATE overrides
+    #[arg(long = "zksync")]
+    zk_force: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -99,9 +111,13 @@ impl SendTxArgs {
             unlocked,
             path,
             timeout,
+            zk_tx,
+            zk_force,
         } = self;
 
         let blob_data = if let Some(path) = path { Some(std::fs::read(path)?) } else { None };
+
+        let mut zk_code = Default::default();
 
         let code = if let Some(SendTxSubcommands::Create {
             code,
@@ -109,6 +125,8 @@ impl SendTxArgs {
             args: constructor_args,
         }) = command
         {
+            zk_code = Some(code.clone());
+
             // ensure we don't violate settings for transactions that can't be CREATE: 7702 and 4844
             // which require mandatory target
             if to.is_none() && tx.auth.is_some() {
@@ -128,6 +146,7 @@ impl SendTxArgs {
         };
 
         let config = eth.load_config()?;
+
         let provider = utils::get_provider(&config)?;
 
         let builder = CastTxBuilder::new(&provider, tx, &config)
@@ -172,20 +191,41 @@ impl SendTxArgs {
         // If we cannot successfully instantiate a local signer, then we will assume we don't have
         // enough information to sign and we must bail.
         } else {
-            // Retrieve the signer, and bail if it can't be constructed.
-            let signer = eth.wallet.signer().await?;
-            let from = signer.address();
+            // NOTE(zk): Avoid initializing `signer` twice as it will error out with Ledger, so we
+            // move the signers to their respective blocks.
+            if zk_tx.has_zksync_args() || zk_force {
+                let zk_provider = utils::get_provider_zksync(&config)?;
+                let tx_hash =
+                    send_zk_transaction(zk_provider, builder, &eth, zk_tx, zk_code).await?;
 
-            tx::validate_from_address(eth.wallet.from, from)?;
+                let provider =
+                    ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(&provider);
 
-            let (tx, _) = builder.build(&signer).await?;
+                handle_transaction_result(
+                    &Cast::new(provider),
+                    &tx_hash,
+                    cast_async,
+                    confirmations,
+                    timeout,
+                )
+                .await
+            } else {
+                // Retrieve the signer, and bail if it can't be constructed.
+                let signer = eth.wallet.signer().await?;
+                let from = signer.address();
 
-            let wallet = EthereumWallet::from(signer);
-            let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-                .wallet(wallet)
-                .connect_provider(&provider);
+                tx::validate_from_address(eth.wallet.from, from)?;
 
-            cast_send(provider, tx, cast_async, confirmations, timeout).await
+                // Standard transaction
+                let (tx, _) = builder.build(&signer).await?;
+
+                let wallet = EthereumWallet::from(signer);
+                let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
+                    .wallet(wallet)
+                    .connect_provider(&provider);
+
+                cast_send(provider, tx, cast_async, confirmations, timeout).await
+            }
         }
     }
 }
@@ -202,6 +242,16 @@ async fn cast_send<P: Provider<AnyNetwork>>(
 
     let tx_hash = pending_tx.inner().tx_hash();
 
+    handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
+}
+
+async fn handle_transaction_result<P: Provider<AnyNetwork>>(
+    cast: &Cast<P>,
+    tx_hash: &TxHash,
+    cast_async: bool,
+    confs: u64,
+    timeout: u64,
+) -> Result<()> {
     if cast_async {
         sh_println!("{tx_hash:#x}")?;
     } else {

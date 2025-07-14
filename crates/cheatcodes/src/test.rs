@@ -13,6 +13,46 @@ pub(crate) mod assume;
 pub(crate) mod expect;
 pub(crate) mod revert_handlers;
 
+impl Cheatcode for zkVmCall {
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
+    }
+}
+
+impl Cheatcode for zkVmSkipCall {
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
+    }
+}
+
+impl Cheatcode for zkUsePaymasterCall {
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
+    }
+}
+
+impl Cheatcode for zkUseFactoryDepCall {
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
+    }
+}
+
+impl Cheatcode for zkRegisterContractCall {
+    fn apply_stateful(&self, _ccx: &mut CheatsCtxt) -> Result {
+        // Does nothing by default.
+        // ZK-related logic is implemented in the corresponding strategy object.
+        Ok(Default::default())
+    }
+}
+
 impl Cheatcode for breakpoint_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { char } = self;

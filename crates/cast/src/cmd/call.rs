@@ -1,7 +1,7 @@
 use crate::{
     traces::TraceKind,
     tx::{CastTxBuilder, SenderKind},
-    Cast,
+    zksync, Cast, ZkCast, ZkTransactionOpts,
 };
 use alloy_ens::NameOrAddress;
 use alloy_primitives::{Address, Bytes, TxKind, U256};
@@ -9,6 +9,7 @@ use alloy_rpc_types::{
     state::{StateOverride, StateOverridesBuilder},
     BlockId, BlockNumberOrTag,
 };
+use alloy_serde::OtherFields;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -120,6 +121,14 @@ pub struct CallArgs {
     #[command(flatten)]
     eth: EthereumOpts,
 
+    /// Zksync Transaction
+    #[command(flatten)]
+    zk_tx: ZkTransactionOpts,
+
+    /// Force a zksync eip-712 transaction and apply CREATE overrides
+    #[arg(long = "zksync")]
+    zk_force: bool,
+
     /// Use current project artifacts for trace decoding.
     #[arg(long, visible_alias = "la")]
     pub with_local_artifacts: bool,
@@ -178,8 +187,14 @@ impl CallArgs {
     pub async fn run(self) -> Result<()> {
         let figment = Into::<Figment>::into(&self.eth).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
+
+        let is_zk = self.zk_tx.has_zksync_args() || self.zk_force;
+
         let mut config = Config::from_provider(figment)?.sanitized();
         let state_overrides = self.get_state_overrides()?;
+        config.zksync.compile = is_zk;
+
+        let mut strategy = utils::get_executor_strategy(&config);
 
         let Self {
             to,
@@ -196,6 +211,7 @@ impl CallArgs {
             labels,
             data,
             with_local_artifacts,
+            zk_tx,
             ..
         } = self;
 
@@ -204,8 +220,11 @@ impl CallArgs {
         }
 
         let provider = utils::get_provider(&config)?;
+
         let sender = SenderKind::from_wallet_opts(eth.wallet).await?;
         let from = sender.address();
+
+        let mut zkcode = Default::default();
 
         let code = if let Some(CallSubcommands::Create {
             code,
@@ -214,6 +233,7 @@ impl CallArgs {
             value,
         }) = command
         {
+            zkcode = Some(code.clone());
             sig = create_sig;
             args = create_args;
             if let Some(value) = value {
@@ -233,10 +253,36 @@ impl CallArgs {
             .build_raw(sender)
             .await?;
 
+        // TODO(zk): add --trace support
         if trace {
             if let Some(BlockId::Number(BlockNumberOrTag::Number(block_number))) = self.block {
                 // Override Config `fork_block_number` (if set) with CLI value.
                 config.fork_block_number = Some(block_number);
+            }
+
+            let mut other_fields = OtherFields::default();
+
+            if is_zk {
+                let metadata = foundry_zksync_core::ZkTransactionMetadata {
+                    factory_deps: zk_tx.factory_deps.iter().map(|x| x.to_vec()).collect(),
+                    paymaster_data: zk_tx
+                        .paymaster_input
+                        .clone()
+                        .filter(|data| !data.is_empty())
+                        .map(|data| zksync_types::transaction_request::PaymasterParams {
+                            paymaster: Default::default(),
+                            paymaster_input: data.to_vec(),
+                        }),
+                };
+
+                other_fields.insert(
+                    foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                    serde_json::to_value(metadata)
+                        .expect("Failed to serialize ZkTransactionMetadata"),
+                );
+
+                let ctx = strategy.context.as_mut();
+                strategy.runner.zksync_set_transaction_context(ctx, other_fields);
             }
 
             let create2_deployer = evm_opts.create2_deployer;
@@ -262,6 +308,7 @@ impl CallArgs {
                 trace_mode,
                 odyssey,
                 create2_deployer,
+                strategy,
             )?;
 
             let value = tx.value.unwrap_or_default();
@@ -306,10 +353,23 @@ impl CallArgs {
             return Ok(());
         }
 
-        sh_println!(
-            "{}",
-            Cast::new(provider).call(&tx, func.as_ref(), block, state_overrides).await?
-        )?;
+        if is_zk {
+            // ensure we are calling either the target func
+            // or `create` in case of deployment
+            // as the original evm func would be the constructor
+            let func = func.map(|func| zksync::convert_func(&tx, func)).transpose()?;
+            let zk_tx = zksync::convert_tx(tx, zk_tx, zkcode).await?;
+
+            let cast = Cast::new(provider);
+            let zk_cast = ZkCast::new(utils::get_provider_zksync(&config)?, cast);
+
+            sh_println!("{}", zk_cast.call_zk(&zk_tx, func.as_ref(), block).await?)?;
+        } else {
+            sh_println!(
+                "{}",
+                Cast::new(provider).call(&tx, func.as_ref(), block, state_overrides).await?
+            )?;
+        }
 
         Ok(())
     }

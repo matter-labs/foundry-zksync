@@ -11,3 +11,4 @@ mod invariant;
 mod repros;
 mod spec;
 mod vyper;
+mod zk;

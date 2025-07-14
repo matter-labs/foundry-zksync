@@ -13,6 +13,7 @@ use eyre::Result;
 use foundry_cli::opts::{EtherscanOpts, GlobalArgs, RpcOpts};
 use foundry_common::version::{LONG_VERSION, SHORT_VERSION};
 use std::{path::PathBuf, str::FromStr};
+use zksync_telemetry::TelemetryProps;
 
 /// A Swiss Army knife for interacting with Ethereum applications from the command line.
 #[derive(Parser)]
@@ -33,6 +34,7 @@ pub struct Cast {
 }
 
 #[derive(Subcommand)]
+#[allow(clippy::large_enum_variant)]
 pub enum CastSubcommand {
     /// Prints the maximum value of the given integer type.
     #[command(visible_aliases = &["--max-int", "maxi"])]
@@ -1068,6 +1070,122 @@ pub enum CastSubcommand {
     /// Estimates the data availability size of a given opstack block.
     #[command(name = "da-estimate")]
     DAEstimate(DAEstimateArgs),
+}
+
+impl CastSubcommand {
+    pub fn get_telemetry_props(&self) -> TelemetryProps {
+        let command_name = match self {
+            Self::MaxInt { r#type: _ } => "max-int",
+            Self::MinInt { r#type: _ } => "min-int",
+            Self::MaxUint { r#type: _ } => "max-uint",
+            Self::AddressZero => "address-zero",
+            Self::HashZero => "hash-zero",
+            Self::FromUtf8 { text: _ } => "from-utf8",
+            Self::ToAscii { hexdata: _ } => "to-ascii",
+            Self::ToUtf8 { hexdata: _ } => "to-utf8",
+            Self::FromFixedPoint { value: _, decimals: _ } => "from-fixed-point",
+            Self::ToFixedPoint { value: _, decimals: _ } => "to-fixed-point",
+            Self::ConcatHex { data: _ } => "concat-hex",
+            Self::FromBin => "from-bin",
+            Self::ToHexdata { input: _ } => "to-hexdata",
+            Self::ToCheckSumAddress { address: _ } => "to-check-sum-address",
+            Self::ToUint256 { value: _ } => "to-uint256",
+            Self::ToInt256 { value: _ } => "to-int256",
+            Self::ToUnit { value: _, unit: _ } => "to-unit",
+            Self::ParseUnits { value: _, unit: _ } => "parse-units",
+            Self::FormatUnits { value: _, unit: _ } => "format-units",
+            Self::FromWei { value: _, unit: _ } => "from-wei",
+            Self::ToWei { value: _, unit: _ } => "to-wei",
+            Self::FromRlp { value: _, as_int: _ } => "from-rlp",
+            Self::ToRlp { value: _ } => "to-rlp",
+            Self::ToHex(ToBaseArgs { value: _, base_in: _ }) => "to-hex",
+            Self::ToDec(ToBaseArgs { value: _, base_in: _ }) => "to-dec",
+            Self::ToBase { base: ToBaseArgs { value: _, base_in: _ }, base_out: _ } => "to-base",
+            Self::ToBytes32 { bytes: _ } => "to-bytes32",
+            Self::FormatBytes32String { string: _ } => "from-bytes32-string",
+            Self::ParseBytes32String { bytes: _ } => "parse-bytes32-string",
+            Self::ParseBytes32Address { bytes: _ } => "parse-bytes32-address",
+            Self::DecodeAbi { sig: _, calldata: _, input: _ } => "decode-abi",
+            Self::AbiEncode { sig: _, packed: _, args: _ } => "abi-encode",
+            Self::DecodeCalldata { sig: _, calldata: _ } => "decode-calldata",
+            Self::CalldataEncode { sig: _, args: _, file: _ } => "calldata-encode",
+            Self::DecodeString { data: _ } => "decode-string",
+            Self::DecodeEvent { sig: _, data: _ } => "decode-event",
+            Self::DecodeError { sig: _, data: _ } => "decode-error",
+            Self::Interface(_) => "interface",
+            Self::CreationCode(_) => "creation-code",
+            Self::ConstructorArgs(_) => "constructor-args",
+            Self::Artifact(_) => "artifact",
+            Self::Bind(_) => "bind",
+            Self::PrettyCalldata { calldata: _, offline: _ } => "pretty-calldata",
+            Self::Sig { sig: _, optimize: _ } => "sig",
+            Self::AccessList(_) => "access-list",
+            Self::Age { block: _, rpc: _ } => "age",
+            Self::Balance { block: _, who: _, ether: _, rpc: _, erc20: _ } => "balance",
+            Self::BaseFee { block: _, rpc: _ } => "base-fee",
+            Self::Block { block: _, full: _, field: _, rpc: _ } => "block",
+            Self::BlockNumber { rpc: _, block: _ } => "block-number",
+            Self::Chain { rpc: _ } => "chain",
+            Self::ChainId { rpc: _ } => "chain-id",
+            Self::Client { rpc: _ } => "client",
+            Self::Code { block: _, who: _, disassemble: _, rpc: _ } => "code",
+            Self::Codesize { block: _, who: _, rpc: _ } => "codesize",
+            Self::ComputeAddress { address: _, nonce: _, rpc: _ } => "compute-address",
+            Self::Disassemble { bytecode: _ } => "disassemble",
+            Self::Selectors { bytecode: _, resolve: _ } => "selectors",
+            Self::FindBlock(_) => "find-block",
+            Self::GasPrice { rpc: _ } => "gas-price",
+            Self::Index { key_type: _, key: _, slot_number: _ } => "index",
+            Self::IndexErc7201 { id: _, formula_id: _ } => "index-erc7201",
+            Self::Implementation { block: _, beacon: _, who: _, rpc: _ } => "implementation",
+            Self::Admin { block: _, who: _, rpc: _ } => "admin",
+            Self::Nonce { block: _, who: _, rpc: _ } => "nonce",
+            Self::Codehash { block: _, who: _, slots: _, rpc: _ } => "codehash",
+            Self::StorageRoot { block: _, who: _, slots: _, rpc: _ } => "storage-root",
+            Self::Proof { address: _, slots: _, rpc: _, block: _ } => "proof",
+            Self::Rpc(_) => "rpc",
+            Self::Storage(_) => "storage",
+            Self::Call(_) => "call",
+            Self::Estimate(_) => "estimate",
+            Self::MakeTx(_) => "make-tx",
+            Self::PublishTx { raw_tx: _, cast_async: _, rpc: _ } => "publish-tx",
+            Self::Receipt { tx_hash: _, field: _, cast_async: _, confirmations: _, rpc: _ } => {
+                "receipt"
+            }
+            Self::Run(_) => "run",
+            Self::SendTx(_) => "send-tx",
+            Self::Tx { tx_hash: _, field: _, raw: _, rpc: _, from: _, nonce: _ } => "tx",
+            Self::FourByte { selector: _ } => "four-byte",
+            Self::FourByteCalldata { calldata: _ } => "four-byte-calldata",
+            Self::FourByteEvent { topic: _ } => "four-byte-event",
+            Self::UploadSignature { signatures: _ } => "upload-signature",
+            Self::Namehash { name: _ } => "namehash",
+            Self::LookupAddress { who: _, rpc: _, verify: _ } => "lookup-address",
+            Self::ResolveName { who: _, rpc: _, verify: _ } => "resolve-name",
+            Self::Keccak { data: _ } => "keccak",
+            Self::HashMessage { message: _ } => "hash-message",
+            Self::SigEvent { event_string: _ } => "sig-event",
+            Self::LeftShift { value: _, bits: _, base_in: _, base_out: _ } => "left-shift",
+            Self::RightShift { value: _, bits: _, base_in: _, base_out: _ } => "right-shift",
+            Self::Source {
+                address: _,
+                directory: _,
+                explorer_api_url: _,
+                explorer_url: _,
+                etherscan: _,
+                flatten: _,
+            } => "source",
+            Self::Create2(_) => "create2",
+            Self::Wallet { command: _ } => "wallet",
+            Self::Completions { shell: _ } => "completions",
+            Self::GenerateFigSpec => "generate-fig-spec",
+            Self::Logs(_) => "logs",
+            Self::DecodeTransaction { tx: _ } => "decode-transaction",
+            Self::TxPool { command: _ } => "tx-pool",
+            Self::DAEstimate(_) => "da-estimate",
+        };
+        TelemetryProps::new().insert("command", Some(command_name)).take()
+    }
 }
 
 /// CLI arguments for `cast --to-base`.

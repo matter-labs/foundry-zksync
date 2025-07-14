@@ -15,6 +15,12 @@ use foundry_config::NamedChain;
 use revm::primitives::hardfork::SpecId;
 pub use revm::state::EvmState as StateChangeset;
 
+// use foundry_zksync_core::{
+//     convert::{ConvertH160, ConvertU256},
+//     DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+// };
+// use zksync_types::{ExecuteTransactionCommon, Transaction as ZkTransaction};
+
 use crate::EnvMut;
 
 /// Depending on the configured chain id and block number this should apply any specific changes

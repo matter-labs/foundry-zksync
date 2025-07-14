@@ -2,6 +2,8 @@ use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::{backend::Backend, Env};
 use revm::primitives::hardfork::SpecId;
 
+use super::strategy::ExecutorStrategy;
+
 /// The builder that allows to configure an evm [`Executor`] which a stack of optional
 /// [`revm::Inspector`]s, such as [`Cheatcodes`].
 ///
@@ -18,6 +20,7 @@ pub struct ExecutorBuilder {
     gas_limit: Option<u64>,
     /// The spec ID.
     spec_id: SpecId,
+
     legacy_assertions: bool,
 }
 
@@ -73,7 +76,7 @@ impl ExecutorBuilder {
 
     /// Builds the executor as configured.
     #[inline]
-    pub fn build(self, env: Env, db: Backend) -> Executor {
+    pub fn build(self, env: Env, db: Backend, strategy: ExecutorStrategy) -> Executor {
         let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
         if stack.block.is_none() {
             stack.block = Some(env.evm_env.block_env.clone());
@@ -88,6 +91,6 @@ impl ExecutorBuilder {
             env.tx,
             spec_id,
         );
-        Executor::new(db, env, stack.build(), gas_limit, legacy_assertions)
+        Executor::new(db, env, stack.build(), gas_limit, legacy_assertions, strategy)
     }
 }

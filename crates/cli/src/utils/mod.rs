@@ -1,12 +1,15 @@
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::U256;
 use alloy_provider::{network::AnyNetwork, Provider};
+use alloy_zksync::network::Zksync;
 use eyre::{ContextCompat, Result};
 use foundry_common::{
     provider::{ProviderBuilder, RetryProvider},
     shell,
 };
 use foundry_config::{Chain, Config};
+use foundry_evm::executors::strategy::ExecutorStrategy;
+use foundry_strategy_zksync::ZksyncExecutorStrategyBuilder;
 use serde::de::DeserializeOwned;
 use std::{
     ffi::OsStr,
@@ -90,6 +93,22 @@ pub fn abi_to_solidity(abi: &JsonAbi, name: &str) -> Result<String> {
 /// RPC
 pub fn get_provider(config: &Config) -> Result<RetryProvider> {
     get_provider_builder(config)?.build()
+}
+
+pub fn get_executor_strategy(config: &Config) -> ExecutorStrategy {
+    if config.zksync.should_compile() {
+        info!("using zksync strategy");
+        ExecutorStrategy::new_zksync()
+    } else {
+        info!("using evm strategy");
+        ExecutorStrategy::new_evm()
+    }
+}
+
+/// Returns a [RetryProvider] instantiated using [Config]'s
+/// RPC for ZKsync
+pub fn get_provider_zksync(config: &Config) -> Result<RetryProvider<Zksync>> {
+    get_provider_builder(config)?.build_zksync()
 }
 
 /// Returns a [ProviderBuilder] instantiated using [Config] values.

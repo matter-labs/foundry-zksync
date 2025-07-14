@@ -5,14 +5,12 @@ use alloy_dyn_abi::{DecodedEvent, DynSolValue, EventExt};
 use alloy_json_abi::Event;
 use alloy_primitives::{address, b256, Address, U256};
 use forge::{
+    constants::HARDHAT_CONSOLE_ADDRESS,
     decode::decode_console_logs,
     result::{TestKind, TestStatus},
 };
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
-use foundry_evm::{
-    constants::HARDHAT_CONSOLE_ADDRESS,
-    traces::{CallKind, CallTraceDecoder, DecodedCallData, TraceKind},
-};
+use foundry_evm::traces::{CallKind, CallTraceDecoder, DecodedCallData, TraceKind};
 use foundry_test_utils::Filter;
 use std::sync::Arc;
 
@@ -55,6 +53,7 @@ macro_rules! test_repro {
         }
     };
 }
+pub(crate) use test_repro;
 
 async fn repro_config(issue: usize, should_fail: bool, sender: Option<Address>) -> TestConfig {
     foundry_test_utils::init_tracing();

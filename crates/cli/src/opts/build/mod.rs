@@ -8,6 +8,9 @@ pub use self::core::BuildOpts;
 mod paths;
 pub use self::paths::ProjectPathOpts;
 
+mod zksync;
+pub use self::zksync::ZkSyncArgs;
+
 // A set of solc compiler settings that can be set via command line arguments, which are intended
 // to be merged into an existing `foundry_config::Config`.
 //
@@ -54,6 +57,10 @@ pub struct CompilerOpts {
     #[arg(long, num_args(1..), value_name = "SELECTOR")]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub extra_output_files: Vec<ContractOutputSelection>,
+
+    #[clap(flatten)]
+    #[serde(skip)]
+    pub zk: ZkSyncArgs,
 }
 
 #[cfg(test)]

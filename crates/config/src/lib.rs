@@ -126,6 +126,9 @@ use bind_json::BindJsonConfig;
 mod compilation;
 pub use compilation::{CompilationRestrictions, SettingsOverrides};
 
+pub mod zksync;
+use zksync::ZkSyncConfig;
+
 /// Foundry configuration
 ///
 /// # Defaults
@@ -538,6 +541,9 @@ pub struct Config {
     #[doc(hidden)]
     #[serde(skip)]
     pub _non_exhaustive: (),
+
+    /// @zkSync zkSolc configuration and settings
+    pub zksync: ZkSyncConfig,
 }
 
 /// Mapping of fallback standalone sections. See [`FallbackProfileProvider`].
@@ -1782,6 +1788,23 @@ impl Config {
         self.root.join(Self::FILE_NAME)
     }
 
+    /// Sets the non-inlinable libraries inside a `foundry.toml` file but only if it exists the
+    /// 'libraries' entry
+    ///
+    /// # Errors
+    ///
+    /// An error if the `foundry.toml` could not be parsed.
+    pub fn update_libraries(&self) -> eyre::Result<()> {
+        self.update(|doc| {
+            let profile = self.profile.as_str().as_str();
+            let libraries: toml_edit::Value =
+                self.libraries.iter().map(toml_edit::Value::from).collect();
+            let libraries = toml_edit::value(libraries);
+            doc[Self::PROFILE_SECTION][profile]["libraries"] = libraries;
+            true
+        })
+    }
+
     /// Returns the selected profile.
     ///
     /// If the `FOUNDRY_PROFILE` env variable is not set, this returns the `DEFAULT_PROFILE`.
@@ -2417,6 +2440,7 @@ impl Default for Config {
             compilation_restrictions: Default::default(),
             script_execution_protection: true,
             _non_exhaustive: (),
+            zksync: Default::default(),
         }
     }
 }

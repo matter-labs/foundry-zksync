@@ -1,6 +1,6 @@
 //! A wrapper around `Backend` that is clone-on-write used for fuzzing.
 
-use super::BackendError;
+use super::{strategy::BackendStrategy, BackendError, ForkInfo};
 use crate::{
     backend::{
         diagnostic::RevertDiagnostic, Backend, DatabaseExt, JournaledState, LocalForkId,
@@ -9,11 +9,9 @@ use crate::{
     fork::{CreateFork, ForkId},
     AsEnvMut, Env, EnvMut, InspectorExt,
 };
-use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
-use eyre::WrapErr;
 use foundry_fork_db::DatabaseError;
 use revm::{
     bytecode::Bytecode,
@@ -23,7 +21,7 @@ use revm::{
     state::{Account, AccountInfo},
     Database, DatabaseCommit,
 };
-use std::{borrow::Cow, collections::BTreeMap};
+use std::{any::Any, borrow::Cow, collections::BTreeMap};
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
@@ -48,9 +46,9 @@ pub struct CowBackend<'a> {
     /// No calls on the `CowBackend` will ever persistently modify the `backend`'s state.
     pub backend: Cow<'a, Backend>,
     /// Keeps track of whether the backed is already initialized
-    is_initialized: bool,
+    pub is_initialized: bool,
     /// The [SpecId] of the current backend.
-    spec_id: SpecId,
+    pub spec_id: SpecId,
 }
 
 impl<'a> CowBackend<'a> {
@@ -68,19 +66,14 @@ impl<'a> CowBackend<'a> {
         &mut self,
         env: &mut Env,
         inspector: &mut I,
+        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<ResultAndState> {
         // this is a new call to inspect with a new env, so even if we've cloned the backend
         // already, we reset the initialized state
         self.is_initialized = false;
         self.spec_id = env.evm_env.cfg_env.spec;
 
-        let mut evm = crate::evm::new_evm_with_inspector(self, env.to_owned(), inspector);
-
-        let res = evm.transact(env.tx.clone()).wrap_err("EVM error")?;
-
-        *env = evm.as_env_mut().to_owned();
-
-        Ok(res)
+        self.backend.strategy.runner.inspect(self.backend.to_mut(), env, inspector, inspect_ctx)
     }
 
     /// Returns whether there was a state snapshot failure in the backend.
@@ -100,7 +93,7 @@ impl<'a> CowBackend<'a> {
             env.evm_env.cfg_env.spec = self.spec_id;
             backend.initialize(&env);
             self.is_initialized = true;
-            return backend
+            return backend;
         }
         self.backend.to_mut()
     }
@@ -108,13 +101,21 @@ impl<'a> CowBackend<'a> {
     /// Returns a mutable instance of the Backend if it is initialized.
     fn initialized_backend_mut(&mut self) -> Option<&mut Backend> {
         if self.is_initialized {
-            return Some(self.backend.to_mut())
+            return Some(self.backend.to_mut());
         }
         None
     }
 }
 
 impl DatabaseExt for CowBackend<'_> {
+    fn get_fork_info(&mut self, id: LocalForkId) -> eyre::Result<ForkInfo> {
+        self.backend.to_mut().get_fork_info(id)
+    }
+
+    fn get_strategy(&mut self) -> &mut BackendStrategy {
+        &mut self.backend.to_mut().strategy
+    }
+
     fn snapshot_state(&mut self, journaled_state: &JournaledState, env: &mut EnvMut<'_>) -> U256 {
         self.backend_mut(env).snapshot_state(journaled_state, env)
     }
@@ -132,7 +133,7 @@ impl DatabaseExt for CowBackend<'_> {
     fn delete_state_snapshot(&mut self, id: U256) -> bool {
         // delete state snapshot requires a previous snapshot to be initialized
         if let Some(backend) = self.initialized_backend_mut() {
-            return backend.delete_state_snapshot(id)
+            return backend.delete_state_snapshot(id);
         }
         false
     }
@@ -207,12 +208,14 @@ impl DatabaseExt for CowBackend<'_> {
         mut env: Env,
         journaled_state: &mut JournaledState,
         inspector: &mut dyn InspectorExt,
+        inspect_ctx: Box<dyn Any>,
     ) -> eyre::Result<()> {
         self.backend_mut(&env.as_env_mut()).transact_from_tx(
             transaction,
             env,
             journaled_state,
             inspector,
+            inspect_ctx,
         )
     }
 
@@ -265,6 +268,10 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.is_persistent(acc)
     }
 
+    fn persistent_accounts(&self) -> Vec<Address> {
+        self.backend.persistent_accounts()
+    }
+
     fn remove_persistent_account(&mut self, account: &Address) -> bool {
         self.backend.to_mut().remove_persistent_account(account)
     }
@@ -287,6 +294,10 @@ impl DatabaseExt for CowBackend<'_> {
 
     fn set_blockhash(&mut self, block_number: U256, block_hash: B256) {
         self.backend.to_mut().set_blockhash(block_number, block_hash);
+    }
+
+    fn get_test_contract_address(&self) -> Option<Address> {
+        self.backend.get_test_contract_address()
     }
 }
 

@@ -18,9 +18,12 @@ use foundry_compilers::{
     },
     solc::SolcLanguage,
 };
+use foundry_config::Config;
 use regex::Regex;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, str::FromStr, sync::LazyLock};
+
+mod zksync;
 
 /// CLI arguments for `forge inspect`.
 #[derive(Clone, Debug, Parser)]
@@ -73,7 +76,17 @@ impl InspectArgs {
         // Build the project
         let project = modified_build_args.project()?;
         let compiler = ProjectCompiler::new().quiet(true);
+
         let target_path = find_target_path(&project, &contract)?;
+
+        if modified_build_args.compiler.zk.enabled() {
+            let should_compile_with_zksolc = zksync::check_command_for_field(&field)?;
+            if should_compile_with_zksolc {
+                let config = Config { ..Default::default() };
+                return zksync::inspect(&field, config, target_path, contract.name());
+            }
+        }
+
         let mut output = compiler.files([target_path.clone()]).compile(&project)?;
 
         // Find the artifact
@@ -179,7 +192,7 @@ fn parse_event_params(ev_params: &[EventParam]) -> String {
         .iter()
         .map(|p| {
             if let Some(ty) = p.internal_type() {
-                return internal_ty(ty)
+                return internal_ty(ty);
             }
             p.ty.clone()
         })
@@ -189,7 +202,7 @@ fn parse_event_params(ev_params: &[EventParam]) -> String {
 
 fn print_abi(abi: &JsonAbi) -> Result<()> {
     if shell::is_json() {
-        return print_json(abi)
+        return print_json(abi);
     }
 
     let headers = vec![Cell::new("Type"), Cell::new("Signature"), Cell::new("Selector")];
@@ -280,7 +293,7 @@ pub fn print_storage_layout(storage_layout: Option<&StorageLayout>) -> Result<()
     };
 
     if shell::is_json() {
-        return print_json(&storage_layout)
+        return print_json(&storage_layout);
     }
 
     let headers = vec![
@@ -313,7 +326,7 @@ fn print_method_identifiers(method_identifiers: &Option<BTreeMap<String, String>
     };
 
     if shell::is_json() {
-        return print_json(method_identifiers)
+        return print_json(method_identifiers);
     }
 
     let headers = vec![Cell::new("Method"), Cell::new("Identifier")];
@@ -539,7 +552,8 @@ fn print_json(obj: &impl serde::Serialize) -> Result<()> {
     Ok(())
 }
 
-fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<()> {
+// NOTE(zk): we make this public so that we can use it in `zksolc` module.
+pub(crate) fn print_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<()> {
     sh_println!("{}", get_json_str(obj, key)?)?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 use super::{
     Cheatcodes, CheatsConfig, ChiselState, CoverageCollector, CustomPrintTracer, Fuzzer,
-    LogCollector, RevertDiagnostic, ScriptExecutionInspector, TracingInspector,
+    LogCollector, RevertDiagnostic, ScriptExecutionInspector,
 };
 use alloy_evm::{eth::EthEvmContext, Evm};
 use alloy_primitives::{
@@ -11,10 +11,11 @@ use foundry_cheatcodes::{CheatcodesExecutor, Wallets};
 use foundry_evm_core::{
     backend::{DatabaseExt, JournaledState},
     evm::new_evm_with_inspector,
-    ContextExt, Env, InspectorExt,
+    ContextExt, Ecx, Env, InspectorExt,
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
+use foundry_zksync_inspectors::TraceCollector;
 use revm::{
     context::{
         result::{ExecutionResult, Output},
@@ -300,7 +301,7 @@ pub struct InspectorStackInner {
     pub fuzzer: Option<Fuzzer>,
     pub log_collector: Option<LogCollector>,
     pub printer: Option<CustomPrintTracer>,
-    pub tracer: Option<TracingInspector>,
+    pub tracer: Option<TraceCollector>,
     pub script_execution_inspector: Option<ScriptExecutionInspector>,
     pub enable_isolation: bool,
     pub odyssey: bool,
@@ -326,7 +327,7 @@ impl CheatcodesExecutor for InspectorStackInner {
         Box::new(InspectorStackRefMut { cheatcodes: Some(cheats), inner: self })
     }
 
-    fn tracing_inspector(&mut self) -> Option<&mut Option<TracingInspector>> {
+    fn tracing_inspector(&mut self) -> Option<&mut Option<TraceCollector>> {
         Some(&mut self.tracer)
     }
 }
@@ -687,7 +688,7 @@ impl InspectorStackRefMut<'_> {
         for (addr, mut acc) in res.state {
             let Some(acc_mut) = ecx.journaled_state.state.get_mut(&addr) else {
                 ecx.journaled_state.state.insert(addr, acc);
-                continue
+                continue;
             };
 
             // make sure accounts that were warmed earlier do not become cold
@@ -702,7 +703,7 @@ impl InspectorStackRefMut<'_> {
             for (key, val) in acc.storage {
                 let Some(slot_mut) = acc_mut.storage.get_mut(&key) else {
                     acc_mut.storage.insert(key, val);
-                    continue
+                    continue;
                 };
                 slot_mut.present_value = val.present_value;
                 slot_mut.is_cold &= val.is_cold;
@@ -988,9 +989,20 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
 
         call_inspectors!(
             #[ret]
-            [&mut self.tracer, &mut self.coverage, &mut self.cheatcodes],
+            [&mut self.tracer, &mut self.coverage],
             |inspector| inspector.create(ecx, create).map(Some),
         );
+
+        ecx.journaled_state.depth += self.in_inner_context as usize;
+        if let Some(cheatcodes) = self.cheatcodes.as_deref_mut() {
+            if let Some(output) = cheatcodes.create_with_executor(ecx, create, self.inner) {
+                if output.result.result != InstructionResult::Continue {
+                    ecx.journaled_state.depth -= self.in_inner_context as usize;
+                    return Some(output);
+                }
+            }
+        }
+        ecx.journaled_state.depth -= self.in_inner_context as usize;
 
         if !matches!(create.scheme, CreateScheme::Create2 { .. }) &&
             self.enable_isolation &&
@@ -1130,6 +1142,31 @@ impl InspectorExt for InspectorStackRefMut<'_> {
     fn create2_deployer(&self) -> Address {
         self.inner.create2_deployer
     }
+
+    fn zksync_set_deployer_call_input(
+        &mut self,
+        context: Ecx<'_, '_, '_>,
+        call_inputs: &mut CallInputs,
+    ) {
+        call_inspectors!([&mut self.cheatcodes], |inspector| {
+            InspectorExt::zksync_set_deployer_call_input(inspector, context, call_inputs)
+        });
+    }
+
+    fn trace_zksync(
+        &mut self,
+        ecx: Ecx<'_, '_, '_>,
+        call_traces: Box<dyn std::any::Any>, /* TODO(merge): should be moved elsewhere,
+                                              * represents `Vec<Call>` */
+        record_top_call: bool,
+    ) {
+        call_inspectors!([&mut self.tracer], |inspector| InspectorExt::trace_zksync(
+            inspector,
+            ecx,
+            call_traces,
+            record_top_call
+        ));
+    }
 }
 
 impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStack {
@@ -1239,6 +1276,24 @@ impl InspectorExt for InspectorStack {
 
     fn create2_deployer(&self) -> Address {
         self.create2_deployer
+    }
+
+    fn zksync_set_deployer_call_input(
+        &mut self,
+        context: Ecx<'_, '_, '_>,
+        call_inputs: &mut CallInputs,
+    ) {
+        self.as_mut().zksync_set_deployer_call_input(context, call_inputs);
+    }
+
+    fn trace_zksync(
+        &mut self,
+        ecx: Ecx<'_, '_, '_>,
+        call_traces: Box<dyn std::any::Any>, /* TODO(merge): should be moved elsewhere,
+                                              * represents `Vec<Call>` */
+        record_top_call: bool,
+    ) {
+        self.as_mut().trace_zksync(ecx, call_traces, record_top_call);
     }
 }
 

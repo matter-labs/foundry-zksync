@@ -12,14 +12,15 @@ extern crate tracing;
 mod etherscan;
 
 pub mod provider;
+pub mod zk_provider;
 
 pub mod bytecode;
+pub mod retry;
+mod sourcify;
+mod zksync;
 pub use bytecode::VerifyBytecodeArgs;
 
-pub mod retry;
 pub use retry::RetryArgs;
-
-mod sourcify;
 
 pub mod verify;
 pub use verify::{VerifierArgs, VerifyArgs, VerifyCheckArgs};

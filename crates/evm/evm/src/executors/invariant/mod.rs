@@ -525,6 +525,7 @@ impl<'a> InvariantExecutor<'a> {
             self.executor.backend().mem_db(),
             self.config.dictionary,
             deployed_libs,
+            self.config.no_zksync_reserved_addresses,
         );
 
         // Creates the invariant strategy.

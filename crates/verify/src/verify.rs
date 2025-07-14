@@ -4,6 +4,7 @@ use crate::{
     etherscan::EtherscanVerificationProvider,
     provider::{VerificationContext, VerificationProvider, VerificationProviderType},
     utils::is_host_only,
+    zk_provider::CompilerVerificationContext,
     RetryArgs,
 };
 use alloy_primitives::{map::HashSet, Address};
@@ -22,6 +23,8 @@ use itertools::Itertools;
 use reqwest::Url;
 use semver::BuildMetadata;
 use std::path::PathBuf;
+
+mod zksync;
 
 /// Verification provider arguments
 #[derive(Clone, Debug, Parser)]
@@ -147,6 +150,10 @@ pub struct VerifyArgs {
 
     #[command(flatten)]
     pub verifier: VerifierArgs,
+
+    /// Verify for zksync
+    #[clap(long)]
+    pub zksync: bool,
 }
 
 impl_figment_convert!(VerifyArgs);
@@ -212,7 +219,7 @@ impl VerifyArgs {
             None => config.chain.unwrap_or_default(),
         };
 
-        let context = self.resolve_context().await?;
+        let context = self.resolve_either_context().await?;
 
         // Set Etherscan options.
         self.etherscan.chain = Some(chain);
@@ -223,7 +230,7 @@ impl VerifyArgs {
                 .create_verify_request(&self, &context)
                 .await?;
             sh_println!("{}", args.source)?;
-            return Ok(())
+            return Ok(());
         }
 
         let verifier_url = self.verifier.verifier_url.clone();
@@ -271,7 +278,19 @@ impl VerifyArgs {
 
     /// Resolves [VerificationContext] object either from entered contract name or by trying to
     /// match bytecode located at given address.
-    pub async fn resolve_context(&self) -> Result<VerificationContext> {
+    pub async fn resolve_either_context(&self) -> Result<CompilerVerificationContext> {
+        if self.zksync {
+            self.zk_resolve_context().await.map(CompilerVerificationContext::ZkSolc)
+        } else {
+            self.resolve_context().await.map(CompilerVerificationContext::Solc)
+        }
+    }
+
+    /// Resolves [VerificationContext] object either from entered contract name or by trying to
+    /// match bytecode located at given address.
+    ///
+    /// Will assume configured compiler is solc or equivalent
+    async fn resolve_context(&self) -> Result<VerificationContext> {
         let mut config = self.load_config()?;
         config.libraries.extend(self.libraries.clone());
 
@@ -285,7 +304,6 @@ impl VerifyArgs {
             };
 
             let cache = project.read_cache_file().ok();
-
             let mut version = if let Some(ref version) = self.compiler_version {
                 version.trim_start_matches('v').parse()?
             } else if let Some(ref solc) = config.solc {
@@ -316,7 +334,6 @@ impl VerifyArgs {
             } else {
                 eyre::bail!("If cache is disabled, compiler version must be either provided with `--compiler-version` option or set in foundry.toml")
             };
-
             let settings = if let Some(profile) = &self.compilation_profile {
                 if profile == "default" {
                     &project.settings

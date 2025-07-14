@@ -33,6 +33,11 @@ pub use script::{ScriptOutcome, ScriptTester};
 
 pub mod ui_runner;
 
+// TODO(zk): remove once anvil supports zksync node
+mod zksync;
+pub use httptest;
+pub use zksync::{Fork, MockServer, RpcRequest, ZkSyncNode};
+
 // re-exports for convenience
 pub use foundry_compilers;
 

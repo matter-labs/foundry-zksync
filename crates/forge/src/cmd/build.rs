@@ -6,7 +6,7 @@ use foundry_common::{compile::ProjectCompiler, shell};
 use foundry_compilers::{
     compilers::{multi::MultiCompilerLanguage, Language},
     utils::source_files_iter,
-    Project, ProjectCompileOutput,
+    Project,
 };
 use foundry_config::{
     figment::{
@@ -66,7 +66,9 @@ pub struct BuildArgs {
 }
 
 impl BuildArgs {
-    pub fn run(self) -> Result<ProjectCompileOutput> {
+    // TODO(zk): We cannot return `ProjectCompileOutput` as there's currently no way to return
+    // a common type from solc and zksolc branches.
+    pub fn run(self) -> Result<()> {
         let mut config = self.load_config()?;
 
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
@@ -74,37 +76,78 @@ impl BuildArgs {
             config = self.load_config()?;
         }
 
-        let project = config.project()?;
+        if !config.zksync.should_compile() {
+            let project = config.project()?;
 
-        // Collect sources to compile if build subdirectories specified.
-        let mut files = vec![];
-        if let Some(paths) = &self.paths {
-            for path in paths {
-                let joined = project.root().join(path);
-                let path = if joined.exists() { &joined } else { path };
-                files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+            // Collect sources to compile if build subdirectories specified.
+            let mut files = vec![];
+            if let Some(paths) = &self.paths {
+                for path in paths {
+                    let joined = project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+                }
+
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
             }
-            if files.is_empty() {
-                eyre::bail!("No source files found in specified build paths.")
+
+            let format_json = shell::is_json();
+            let compiler = ProjectCompiler::new()
+                .files(files)
+                .dynamic_test_linking(config.dynamic_test_linking)
+                .print_names(self.names)
+                .print_sizes(self.sizes)
+                .ignore_eip_3860(self.ignore_eip_3860)
+                .bail(!format_json);
+
+            let output = compiler.compile(&project)?;
+
+            if format_json && !self.names && !self.sizes {
+                sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
             }
+
+            // NOTE(zk): We skip returning output because currently there's no way to return from
+            // this function due to differing solc and zksolc project output types, and
+            // no way to return a default from either branch. Ok(output)
+            Ok(())
+        } else {
+            let zk_project =
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
+
+            // Collect sources to compile if build subdirectories specified.
+            let mut files = vec![];
+            if let Some(paths) = &self.paths {
+                for path in paths {
+                    let joined = zk_project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+                }
+
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
+            }
+
+            let format_json = shell::is_json();
+            let zk_compiler = ProjectCompiler::new()
+                .files(files)
+                .print_names(self.names)
+                .print_sizes(self.sizes)
+                .zksync_sizes()
+                .bail(!format_json);
+
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
+
+            if format_json && !self.names && !self.sizes {
+                sh_println!("{}", serde_json::to_string_pretty(&zk_output.output())?)?;
+            }
+
+            // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
+            // solc output. This is safe currently as the output is simply dropped.
+            Ok(())
         }
-
-        let format_json = shell::is_json();
-        let compiler = ProjectCompiler::new()
-            .files(files)
-            .dynamic_test_linking(config.dynamic_test_linking)
-            .print_names(self.names)
-            .print_sizes(self.sizes)
-            .ignore_eip_3860(self.ignore_eip_3860)
-            .bail(!format_json);
-
-        let output = compiler.compile(&project)?;
-
-        if format_json && !self.names && !self.sizes {
-            sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
-        }
-
-        Ok(output)
     }
 
     /// Returns the `Project` for the current workspace

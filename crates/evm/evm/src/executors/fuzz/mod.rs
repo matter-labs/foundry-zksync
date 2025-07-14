@@ -89,9 +89,10 @@ impl FuzzedExecutor {
         // Stores the fuzz test execution data.
         let execution_data = RefCell::new(FuzzTestData::default());
         let state = self.build_fuzz_state(deployed_libs);
+        let no_zksync_reserved_addresses = state.dictionary_read().no_zksync_reserved_addresses();
         let dictionary_weight = self.config.dictionary.dictionary_weight.min(100);
         let strategy = proptest::prop_oneof![
-            100 - dictionary_weight => fuzz_calldata(func.clone(), fuzz_fixtures),
+            100 - dictionary_weight => fuzz_calldata(func.clone(), fuzz_fixtures, no_zksync_reserved_addresses),
             dictionary_weight => fuzz_calldata_from_state(func.clone(), &state),
         ];
         // We want to collect at least one trace which will be displayed to user.
@@ -274,13 +275,19 @@ impl FuzzedExecutor {
 
     /// Stores fuzz state for use with [fuzz_calldata_from_state]
     pub fn build_fuzz_state(&self, deployed_libs: &[Address]) -> EvmFuzzState {
-        if let Some(fork_db) = self.executor.backend().active_fork_db() {
-            EvmFuzzState::new(fork_db, self.config.dictionary, deployed_libs)
-        } else {
+        if let Some(fork_db) = self.executor.backend.active_fork_db() {
             EvmFuzzState::new(
-                self.executor.backend().mem_db(),
+                fork_db,
                 self.config.dictionary,
                 deployed_libs,
+                self.config.no_zksync_reserved_addresses,
+            )
+        } else {
+            EvmFuzzState::new(
+                self.executor.backend.mem_db(),
+                self.config.dictionary,
+                deployed_libs,
+                self.config.no_zksync_reserved_addresses,
             )
         }
     }

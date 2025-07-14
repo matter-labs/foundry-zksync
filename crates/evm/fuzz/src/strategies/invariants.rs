@@ -89,12 +89,13 @@ fn select_random_sender(
     senders: Rc<SenderFilters>,
     dictionary_weight: u32,
 ) -> impl Strategy<Value = Address> {
+    let no_zksync_reserved_addresses = fuzz_state.dictionary_read().no_zksync_reserved_addresses();
     if !senders.targeted.is_empty() {
         any::<prop::sample::Index>().prop_map(move |index| *index.get(&senders.targeted)).boxed()
     } else {
         assert!(dictionary_weight <= 100, "dictionary_weight must be <= 100");
         proptest::prop_oneof![
-            100 - dictionary_weight => fuzz_param(&alloy_dyn_abi::DynSolType::Address),
+            100 - dictionary_weight => fuzz_param(&alloy_dyn_abi::DynSolType::Address, no_zksync_reserved_addresses),
             dictionary_weight => fuzz_param_from_state(&alloy_dyn_abi::DynSolType::Address, fuzz_state),
         ]
         .prop_map(move |addr| addr.as_address().unwrap())
@@ -112,11 +113,13 @@ pub fn fuzz_contract_with_calldata(
     target: Address,
     func: Function,
 ) -> impl Strategy<Value = CallDetails> {
+    let no_zksync_reserved_addresses = fuzz_state.dictionary_read().no_zksync_reserved_addresses();
+
     // We need to compose all the strategies generated for each parameter in all possible
     // combinations.
     // `prop_oneof!` / `TupleUnion` `Arc`s for cheap cloning.
     prop_oneof![
-        60 => fuzz_calldata(func.clone(), fuzz_fixtures),
+        60 => fuzz_calldata(func.clone(), fuzz_fixtures, no_zksync_reserved_addresses),
         40 => fuzz_calldata_from_state(func, fuzz_state),
     ]
     .prop_map(move |calldata| {
