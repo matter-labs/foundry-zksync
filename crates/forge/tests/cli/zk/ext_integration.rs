@@ -86,7 +86,12 @@ fn test_zk_zkemail_zk_email_verify() {
         .run()
 }
 
+// TODO:
+// This dependency is no longer available: https://github.com/zkemail/email-tx-builder/blob/895e1fe943e967b0faab6a476f3b82b37d14300d/packages/contracts/package.json#L18
+// This test probably can only be restored once `email-tx-builder` is updated to use a different
+// dep.
 #[test]
+#[ignore = "depends on LayerZero-labs/solidity-stringutils, which seems to be removed from GH"]
 fn test_zk_zkemail_email_tx_builder() {
     ExtTester::new("zkemail", "email-tx-builder", "main")
         .args([
@@ -106,9 +111,14 @@ fn test_zk_zkemail_email_tx_builder() {
         .run()
 }
 
+// TODO:
+// This dependency is no longer available: https://github.com/zkemail/email-tx-builder/blob/895e1fe943e967b0faab6a476f3b82b37d14300d/packages/contracts/package.json#L18
+// This test probably can only be restored once `email-tx-builder` is updated to use a different
+// dep.
 #[test]
+#[ignore = "depends on LayerZero-labs/solidity-stringutils, which seems to be removed from GH"]
 fn test_zk_zkemail_jwt_tx_builder() {
-    ExtTester::new("zkemail", "jwt-tx-builder", "main")
+    ExtTester::new("zkemail", "zk-jwt", "main")
         .args([
             "--zksync",
             "--root",

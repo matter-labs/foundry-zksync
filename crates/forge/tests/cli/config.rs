@@ -148,6 +148,7 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         build_info: false,
         build_info_path: None,
         fmt: Default::default(),
+        lint: Default::default(),
         doc: Default::default(),
         bind_json: Default::default(),
         fs_permissions: Default::default(),
@@ -164,12 +165,10 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         assertions_revert: true,
         legacy_assertions: false,
         extra_args: vec![],
-        eof_version: None,
         odyssey: false,
         transaction_timeout: 120,
         additional_compiler_profiles: Default::default(),
         compilation_restrictions: Default::default(),
-        eof: false,
         script_execution_protection: true,
         _non_exhaustive: (),
         zksync: Default::default(),
@@ -1044,7 +1043,6 @@ assertions_revert = true
 legacy_assertions = false
 odyssey = false
 transaction_timeout = 120
-eof = false
 additional_compiler_profiles = []
 compilation_restrictions = []
 script_execution_protection = true
@@ -1084,6 +1082,11 @@ wrap_comments = false
 ignore = []
 contract_new_lines = false
 sort_imports = false
+
+[lint]
+severity = []
+exclude_lints = []
+ignore = []
 
 [doc]
 out = "docs"
@@ -1289,6 +1292,11 @@ exclude = []
     "contract_new_lines": false,
     "sort_imports": false
   },
+  "lint": {
+    "severity": [],
+    "exclude_lints": [],
+    "ignore": []
+  },
   "doc": {
     "out": "docs",
     "title": "",
@@ -1320,7 +1328,6 @@ exclude = []
   "legacy_assertions": false,
   "odyssey": false,
   "transaction_timeout": 120,
-  "eof": false,
   "additional_compiler_profiles": [],
   "compilation_restrictions": [],
   "script_execution_protection": true,

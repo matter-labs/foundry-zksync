@@ -36,7 +36,7 @@ skip = []
 # by default infinite
 skip-tree = []
 deny = [
-    "openssl" # Only use rust-tls in the project
+    "openssl", # Only use rust-tls in the project
 ]
 
 [licenses]
@@ -47,17 +47,24 @@ confidence-threshold = 0.8
 # See https://spdx.org/licenses/ for list of possible licenses
 # [possible values: any SPDX 3.7 short identifier (+ optional exception)].
 allow = [
-    "MIT",
-    "Apache-2.0",
+    "0BSD",
     "ISC",
     "Unlicense",
     "MPL-2.0",
     "Unicode-DFS-2016",
     "CC0-1.0",
+    "Apache-2.0",
     "BSD-2-Clause",
     "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDDL-1.0",
+    "CDLA-Permissive-2.0",
     "Zlib",
     "ISC",
+    "MIT",
+    "MPL-2.0",
+    "OpenSSL",
     "Unicode-3.0",
     "Unlicense",
     "OpenSSL",
@@ -70,8 +77,6 @@ allow = [
     "MPL-2.0",
     "CDDL-1.0",
     "Zlib",
-    "OpenSSL",
-    "CDLA-Permissive-2.0",
 ]
 
 # Allow 1 or more licenses on a per-crate basis, so that particular licenses
@@ -116,6 +121,8 @@ unknown-registry = "warn"
 unknown-git = "deny"
 allow-git = [
     "https://github.com/foundry-rs/foundry",
+    "https://github.com/alloy-rs/alloy",
+    "https://github.com/foundry-rs/foundry-fork-db",
     "https://github.com/nbaztec/zksync-telemetry",
     "https://github.com/nbaztec/anvil-zksync",
     "https://github.com/Romsters/posthog-rs",

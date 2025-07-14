@@ -1,9 +1,12 @@
+use alloy_evm::{eth::EthEvmContext, EvmEnv};
 use alloy_primitives::{hex, map::HashMap};
 use itertools::Itertools;
 use revm::{
+    context::{CreateScheme, JournalTr, TransactTo, TxEnv},
+    context_interface::result::ResultAndState,
     interpreter::{CallInputs, CallScheme, CallValue},
-    primitives::{Address, CreateScheme, Env, ResultAndState, TransactTo, B256, U256 as rU256},
-    Database, EvmContext, InnerEvmContext,
+    primitives::{Address, B256, U256 as rU256},
+    Database, Journal,
 };
 use tracing::{debug, info};
 use zksync_basic_types::H256;
@@ -32,7 +35,8 @@ pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
     paymaster_data: Option<PaymasterParams>,
-    env: &'a mut Env,
+    evm_env: EvmEnv,
+    tx: TxEnv,
     zk_env: &ZkEnv,
     db: &'a mut DB,
 ) -> eyre::Result<(ResultAndState, Vec<Call>)>
@@ -40,7 +44,7 @@ where
     DB: Database + ?Sized,
     <DB as Database>::Error: Debug,
 {
-    info!(calldata = ?env.tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
+    info!(calldata = ?tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
 
     let paymaster_params = PaymasterParams {
         paymaster: paymaster_data.as_ref().map_or_else(Default::default, |data| data.paymaster),
@@ -49,10 +53,18 @@ where
             .map_or_else(Vec::new, |data| data.paymaster_input.to_vec()),
     };
 
-    let mut ecx = EvmContext::new_with_env(db, Box::new(env.clone()));
-    let caller = env.tx.caller;
+    let mut ecx = EthEvmContext {
+        block: evm_env.block_env,
+        cfg: evm_env.cfg_env,
+        tx,
+        journaled_state: Journal::new(db),
+        local: Default::default(),
+        chain: (),
+        error: Ok(()),
+    };
+    let caller = ecx.tx.caller;
     let nonce = ZKVMData::new(&mut ecx).get_tx_nonce(caller);
-    let (transact_to, is_create) = match env.tx.transact_to {
+    let (transact_to, is_create) = match ecx.tx.kind {
         TransactTo::Call(to) => {
             let to = to.to_h160();
             (to, to == CONTRACT_DEPLOYER_ADDRESS || to == CREATE2_FACTORY_ADDRESS)
@@ -64,30 +76,30 @@ where
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         Some(transact_to),
-        env.tx.data.to_vec(),
+        ecx.tx.data.to_vec(),
         (nonce as u32).into(),
         Fee {
             gas_limit,
             max_fee_per_gas,
-            max_priority_fee_per_gas: env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+            max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
             gas_per_pubdata_limit: zk_env.gas_per_pubdata().into(),
         },
         caller.to_h160(),
-        env.tx.value.to_u256(),
+        ecx.tx.value.to_u256(),
         factory_deps.unwrap_or_default(),
         paymaster_params,
     );
 
     let call_ctx = CallContext {
-        tx_caller: env.tx.caller,
-        msg_sender: env.tx.caller,
+        tx_caller: ecx.tx.caller,
+        msg_sender: ecx.tx.caller,
         contract: transact_to.to_address(),
-        input: if is_create { None } else { Some(env.tx.data.clone()) },
+        input: if is_create { None } else { Some(ecx.tx.data.clone()) },
         delegate_as: None,
-        block_number: env.block.number,
-        block_timestamp: env.block.timestamp,
+        block_number: rU256::from(ecx.block.number),
+        block_timestamp: rU256::from(ecx.block.timestamp),
         block_hashes: get_historical_block_hashes(&mut ecx),
-        block_basefee: min(max_fee_per_gas.to_ru256(), env.block.basefee),
+        block_basefee: min(max_fee_per_gas.to_ru256(), rU256::from(ecx.block.basefee)),
         is_create,
         is_static: false,
         record_storage_accesses: false,
@@ -100,15 +112,16 @@ where
     };
 
     match inspect::<_, DB::Error>(tx, &mut ecx, &mut ccx, call_ctx) {
-        Ok(ZKVMExecutionResult { execution_result: result, call_traces, .. }) => {
-            Ok((ResultAndState { result, state: ecx.journaled_state.finalize().0 }, call_traces))
-        }
+        Ok(ZKVMExecutionResult { execution_result: result, call_traces, .. }) => Ok((
+            ResultAndState { result, state: ecx.journaled_state.finalize().state },
+            call_traces,
+        )),
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
 }
 
 /// Retrieves L2 ETH balance for a given address.
-pub fn balance<DB>(address: Address, ecx: &mut EvmContext<DB>) -> rU256
+pub fn balance<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -119,7 +132,7 @@ where
 
 /// Retrieves bytecode hash stored at a given address.
 #[allow(dead_code)]
-pub fn code_hash<DB>(address: Address, ecx: &mut EvmContext<DB>) -> B256
+pub fn code_hash<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> B256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -128,7 +141,7 @@ where
 }
 
 /// Retrieves transaction nonce for a given address.
-pub fn tx_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u128
+pub fn tx_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> u128
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -137,7 +150,7 @@ where
 }
 
 /// Retrieves deployment nonce for a given address.
-pub fn deploy_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>) -> u128
+pub fn deploy_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> u128
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -162,7 +175,7 @@ pub struct ZkCreateInputs {
 /// * `call.init_code` should be valid EraVM's ContractDeployer input
 pub fn create<DB, E>(
     inputs: ZkCreateInputs,
-    ecx: &mut EvmContext<DB>,
+    ecx: &mut EthEvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
@@ -174,7 +187,7 @@ where
     info!("create tx {}", hex::encode(&create_input));
     // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
     // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
-    let caller = ecx.env.tx.caller;
+    let caller = ecx.tx.caller;
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
@@ -196,7 +209,7 @@ where
         Fee {
             gas_limit,
             max_fee_per_gas,
-            max_priority_fee_per_gas: ecx.env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+            max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
             gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
         },
         caller.to_h160(),
@@ -206,14 +219,14 @@ where
     );
 
     let call_ctx = CallContext {
-        tx_caller: ecx.env.tx.caller,
+        tx_caller: ecx.tx.caller,
         msg_sender,
         contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
         input: None,
         delegate_as: None,
-        block_number: ecx.env.block.number,
-        block_timestamp: ecx.env.block.timestamp,
-        block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
+        block_number: rU256::from(ecx.block.number),
+        block_timestamp: rU256::from(ecx.block.timestamp),
+        block_basefee: min(max_fee_per_gas.to_ru256(), rU256::from(ecx.block.basefee)),
         block_hashes: get_historical_block_hashes(ecx),
         is_create: true,
         is_static: false,
@@ -227,17 +240,18 @@ where
 pub fn call<DB, E>(
     call: &CallInputs,
     factory_deps: Vec<Vec<u8>>,
-    ecx: &mut EvmContext<DB>,
+    ecx: &mut EthEvmContext<DB>,
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    info!(?call, "call tx {}", hex::encode(&call.input));
+    let input = call.input.bytes(ecx);
+    info!(?call, "call tx {}", hex::encode(&input));
     // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
     // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
-    let caller = ecx.env.tx.caller;
+    let caller = ecx.tx.caller;
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
@@ -254,12 +268,12 @@ where
 
     let tx = L2Tx::new(
         Some(call.bytecode_address.to_h160()),
-        call.input.to_vec(),
+        input.to_vec(),
         (nonce as u32).into(),
         Fee {
             gas_limit,
             max_fee_per_gas,
-            max_priority_fee_per_gas: ecx.env.tx.gas_priority_fee.unwrap_or_default().to_u256(),
+            max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
             gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
         },
         caller.to_h160(),
@@ -276,18 +290,18 @@ where
     // CallCode          => { address: contract.address, caller: contract.address }
     // DelegateCall      => { address: contract.address, caller: contract.caller }
     let call_ctx = CallContext {
-        tx_caller: ecx.env.tx.caller,
+        tx_caller: ecx.tx.caller,
         msg_sender: call.caller,
         contract: call.bytecode_address,
-        input: Some(call.input.clone()),
+        input: Some(input),
         delegate_as: match call.scheme {
             CallScheme::DelegateCall => Some(call.target_address),
             _ => None,
         },
-        block_number: ecx.env.block.number,
-        block_timestamp: ecx.env.block.timestamp,
+        block_number: rU256::from(ecx.block.number),
+        block_timestamp: rU256::from(ecx.block.timestamp),
         block_hashes: get_historical_block_hashes(ecx),
-        block_basefee: min(max_fee_per_gas.to_ru256(), ecx.env.block.basefee),
+        block_basefee: min(max_fee_per_gas.to_ru256(), rU256::from(ecx.block.basefee)),
         is_create: false,
         is_static: call.is_static,
         record_storage_accesses: ccx.record_storage_accesses,
@@ -305,6 +319,9 @@ pub fn encode_create_params(
     let (name, salt) = match scheme {
         CreateScheme::Create => ("create", H256::zero()),
         CreateScheme::Create2 { salt } => ("create2", salt.to_h256()),
+        CreateScheme::Custom { .. } => {
+            unimplemented!("Custom create scheme is not supported in foundry-zksync")
+        }
     };
 
     // TODO (SMA-1608): We should not re-implement the ABI parts in different places, instead have
@@ -328,19 +345,18 @@ pub fn encode_create_params(
 }
 
 /// Get historical block hashes mapped to block numbers. This excludes the current block.
-fn get_historical_block_hashes<DB: Database>(ecx: &mut EvmContext<DB>) -> HashMap<rU256, B256> {
+fn get_historical_block_hashes<DB: Database>(ecx: &mut EthEvmContext<DB>) -> HashMap<rU256, B256> {
     let mut block_hashes = HashMap::default();
     let num_blocks = get_env_historical_block_count();
     tracing::debug!("fetching last {num_blocks} block hashes");
     for i in 1..=num_blocks {
-        let (block_number, overflow) =
-            ecx.env.block.number.overflowing_sub(alloy_primitives::U256::from(i));
+        let (block_number, overflow) = ecx.block.number.overflowing_sub(i as u64);
         if overflow {
             break;
         }
-        match ecx.block_hash(block_number.to_u256().as_u64()) {
+        match ecx.journaled_state.database.block_hash(block_number) {
             Ok(block_hash) => {
-                block_hashes.insert(block_number, block_hash);
+                block_hashes.insert(rU256::from(block_number), block_hash);
             }
             Err(_) => break,
         }
@@ -355,9 +371,9 @@ fn get_env_historical_block_count() -> u32 {
     let name = "ZK_DEBUG_HISTORICAL_BLOCK_HASHES";
     std::env::var(name)
         .map(|value| {
-            value.parse::<u32>().unwrap_or_else(|err| {
-                panic!("failed parsing env variable {}={}, {:?}", name, value, err)
-            })
+            value
+                .parse::<u32>()
+                .unwrap_or_else(|err| panic!("failed parsing env variable {name}={value}, {err:?}"))
         })
         .map(|num| num.min(256))
         .unwrap_or(256)

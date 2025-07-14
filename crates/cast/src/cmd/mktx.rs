@@ -2,8 +2,10 @@ use crate::{
     tx::{self, CastTxBuilder, SenderKind},
     zksync::{NoopWallet, ZkTransactionOpts},
 };
+use alloy_ens::NameOrAddress;
 use alloy_network::{eip2718::Encodable2718, EthereumWallet, TransactionBuilder};
 use alloy_primitives::hex;
+use alloy_provider::Provider;
 use alloy_signer::Signer;
 use alloy_zksync::wallet::ZksyncWallet;
 use clap::Parser;
@@ -12,7 +14,6 @@ use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
     utils::{get_provider, LoadConfig},
 };
-use foundry_common::ens::NameOrAddress;
 use std::{path::PathBuf, str::FromStr};
 
 mod zksync;
@@ -64,6 +65,10 @@ pub struct MakeTxArgs {
     /// Relaxes the wallet requirement.
     #[arg(long, requires = "from")]
     raw_unsigned: bool,
+
+    /// Call `eth_signTransaction` using the `--from` argument or $ETH_FROM as sender
+    #[arg(long, requires = "from", conflicts_with = "raw_unsigned")]
+    ethsign: bool,
 }
 
 #[derive(Debug, Parser)]
@@ -84,8 +89,19 @@ pub enum MakeTxSubcommands {
 
 impl MakeTxArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, command, tx, path, eth, zk_tx, zk_force, raw_unsigned } =
-            self;
+        let Self {
+            to,
+            mut sig,
+            mut args,
+            command,
+            tx,
+            path,
+            eth,
+            zk_tx,
+            zk_force,
+            raw_unsigned,
+            ethsign,
+        } = self;
 
         let blob_data = if let Some(path) = path { Some(std::fs::read(path)?) } else { None };
 
@@ -109,7 +125,7 @@ impl MakeTxArgs {
         let provider = get_provider(&config)?;
 
         // NOTE(zk): tx is built in two steps as signer might have a different type
-        let tx_builder = CastTxBuilder::new(provider, tx, &config)
+        let tx_builder = CastTxBuilder::new(&provider, tx, &config)
             .await?
             .with_to(to)
             .await?
@@ -126,7 +142,16 @@ impl MakeTxArgs {
             return Ok(());
         }
 
-        // Retrieve the signer, and bail if it can't be constructed.
+        if ethsign {
+            // Use "eth_signTransaction" to sign the transaction only works if the node/RPC has
+            // unlocked accounts.
+            let (tx, _) = tx_builder.build(config.sender).await?;
+            let signed_tx = provider.sign_transaction(tx).await?;
+
+            sh_println!("{signed_tx}")?;
+            return Ok(());
+        }
+
         // NOTE(zk): if custom signature is sent, signer is not used so
         // we do not bail in that case, the Result is kept instead
         let (from, maybe_signer) = if zk_tx.custom_signature.is_some() {
@@ -136,6 +161,8 @@ impl MakeTxArgs {
                 eyre::bail!("expected address via --from option to be used for custom signature");
             }
         } else {
+            // Default to using the local signer.
+            // Get the signer from the wallet, and fail if it can't be constructed.
             let signer = eth.wallet.signer().await?;
             let from = signer.address();
 

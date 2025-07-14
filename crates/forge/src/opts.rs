@@ -10,11 +10,12 @@ use crate::cmd::{
     doc::DocArgs,
     eip712, flatten,
     fmt::FmtArgs,
-    geiger, generate,
-    generate::GenerateSubcommands,
+    geiger,
+    generate::{self, GenerateSubcommands},
     init::InitArgs,
     inspect,
     install::InstallArgs,
+    lint::LintArgs,
     remappings::RemappingArgs,
     remove::RemoveArgs,
     selectors::SelectorsSubcommands,
@@ -148,6 +149,10 @@ pub enum ForgeSubcommand {
     /// Format Solidity source files.
     Fmt(FmtArgs),
 
+    /// Lint Solidity source files
+    #[command(visible_alias = "l")]
+    Lint(LintArgs),
+
     /// Get specialized information about a smart contract.
     #[command(visible_alias = "in")]
     Inspect(inspect::InspectArgs),
@@ -226,6 +231,7 @@ impl ForgeSubcommand {
             Self::Soldeer(_) => ("soldeer", None),
             Self::Eip712(_) => ("eip712", None),
             Self::BindJson(_) => ("bind-json", None),
+            Self::Lint(_) => ("lint", None),
         };
         TelemetryProps::new()
             .insert("command", Some(command_name))

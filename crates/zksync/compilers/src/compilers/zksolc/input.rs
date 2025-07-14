@@ -272,19 +272,16 @@ mod tests {
 
         assert!(
             json_old["settings"]["llvmOptions"].is_null(),
-            "llvmOptions should be null for old version JSON: {}",
-            json_old
+            "llvmOptions should be null for old version JSON: {json_old}",
         );
         assert!(
             json_old["settings"]["LLVMOptions"].is_array(),
-            "LLVMOptions should be an array for old version JSON: {}",
-            json_old
+            "LLVMOptions should be an array for old version JSON: {json_old}",
         );
         assert_eq!(
             json_old["settings"]["LLVMOptions"].as_array().unwrap(),
             &llvm_options.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>(),
-            "LLVMOptions value mismatch for old version JSON: {}",
-            json_old
+            "LLVMOptions value mismatch for old version JSON: {json_old}",
         );
 
         // Test with zksolc version > 1.5.11 (e.g., 1.5.12)
@@ -295,19 +292,16 @@ mod tests {
 
         assert!(
             json_new["settings"]["LLVMOptions"].is_null(),
-            "LLVMOptions should be null for new version JSON: {}",
-            json_new
+            "LLVMOptions should be null for new version JSON: {json_new}",
         );
         assert!(
             json_new["settings"]["llvmOptions"].is_array(),
-            "llvmOptions should be an array for new version JSON: {}",
-            json_new
+            "llvmOptions should be an array for new version JSON: {json_new}",
         );
         assert_eq!(
             json_new["settings"]["llvmOptions"].as_array().unwrap(),
             &llvm_options.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>(),
-            "llvmOptions value mismatch for new version JSON: {}",
-            json_new
+            "llvmOptions value mismatch for new version JSON: {json_new}",
         );
     }
 }

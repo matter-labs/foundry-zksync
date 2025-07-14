@@ -5,7 +5,7 @@ use std::{path::Path, sync::LazyLock};
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::{address, hex, Address, Bytes};
 use forge::{
-    revm::primitives::SpecId,
+    revm::primitives::hardfork::SpecId,
     traces::{CallKind, CallTraceNode, SparsedTraceArena, TraceKind},
 };
 use foundry_common::{fs, sh_println};
@@ -331,7 +331,7 @@ fn assert_execution_trace(
                 assert_recursive(&expected_node.children, &actual_node.children)
             {
                 failure.path.insert(0, idx);
-                return Some(failure)
+                return Some(failure);
             }
         }
         None

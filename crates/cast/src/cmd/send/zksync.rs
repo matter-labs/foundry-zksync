@@ -33,7 +33,7 @@ pub async fn send_zk_transaction(
         let zk_wallet = ZksyncWallet::from(signer.clone());
         let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
             .wallet(zk_wallet.clone())
-            .on_provider(&zk_provider);
+            .connect_provider(&zk_provider);
         send_transaction_internal(zk_provider, tx, zk_tx_opts, zk_code).await
     } else if let Some(from) = eth_opts.wallet.from {
         let (tx, _) = builder.build_raw(SenderKind::Address(from)).await?;
@@ -41,7 +41,7 @@ pub async fn send_zk_transaction(
         let zk_wallet = NoopWallet { address: from };
         let zk_provider = ProviderBuilder::<_, _, Zksync>::default()
             .wallet(zk_wallet.clone())
-            .on_provider(&zk_provider);
+            .connect_provider(&zk_provider);
         send_transaction_internal(zk_provider, tx, zk_tx_opts, zk_code).await
     } else {
         eyre::bail!("expected address via --from option to be used for custom signature");

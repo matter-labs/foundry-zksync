@@ -56,8 +56,14 @@ forgetest_async!(zk_script_execution_with_gas_multiplier, |prj, cmd| {
     let private_key = get_rich_wallet_key();
 
     // Test with insufficient gas multiplier (should fail)
-    let insufficient_multiplier_args =
+    let mut insufficient_multiplier_args =
         create_script_args(&private_key, &url, "--gas-estimate-multiplier", "1");
+
+    // TODO(zk): `cast` currently hangs if transaction is dropped from mempool, thus we add timeout
+    // for transactions. See https://github.com/alloy-rs/alloy/issues/2678
+    insufficient_multiplier_args.push("--timeout");
+    insufficient_multiplier_args.push("5");
+
     cmd.arg("script").args(&insufficient_multiplier_args);
     cmd.assert_failure();
     cmd.forge_fuse();

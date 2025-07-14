@@ -5,10 +5,7 @@ use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
 use eyre::Result;
 use foundry_linking::LinkerError;
-use revm::{
-    primitives::{Env, EnvWithHandlerCfg, ResultAndState},
-    Database,
-};
+use revm::{context::result::ResultAndState, Database};
 
 use foundry_compilers::ProjectCompileOutput;
 use foundry_config::Config;
@@ -23,6 +20,7 @@ use foundry_evm::{
         EvmError, Executor,
     },
     inspectors::InspectorStack,
+    Env,
 };
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
@@ -158,8 +156,8 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         &self,
         ctx: &dyn ExecutorStrategyContext,
         backend: &mut CowBackend<'_>,
-        env: &mut EnvWithHandlerCfg,
-        executor_env: &EnvWithHandlerCfg,
+        env: &mut Env,
+        executor_env: &Env,
         inspector: &mut InspectorStack,
     ) -> eyre::Result<ResultAndState> {
         let ctx = get_context_ref(ctx);
@@ -182,8 +180,8 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         backend: &mut Backend,
-        env: &mut EnvWithHandlerCfg,
-        executor_env: &EnvWithHandlerCfg,
+        env: &mut Env,
+        executor_env: &Env,
         inspector: &mut InspectorStack,
     ) -> eyre::Result<ResultAndState> {
         let ctx = get_context(ctx);
@@ -193,7 +191,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             Some(zk_tx) => {
                 // apply fork-related env instead of cheatcode handler
                 // since it won't be set by zkEVM
-                env.block = executor_env.block.clone();
+                env.evm_env.block_env = executor_env.evm_env.block_env.clone();
                 env.tx.gas_price = executor_env.tx.gas_price;
 
                 backend.inspect(
@@ -237,8 +235,8 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
     ) -> Result<()> {
         let ctx = get_context(ctx);
 
-        let provider = zksync_provider().with_recommended_fillers().on_http(fork_url.parse()?);
-        let block_number = env.block.number.try_into()?;
+        let provider = zksync_provider().with_recommended_fillers().connect_http(fork_url.parse()?);
+        let block_number = env.evm_env.block_env.number;
         // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
         let maybe_block_details = tokio::task::block_in_place(move || {
             tokio::runtime::Handle::current().block_on(provider.get_block_details(block_number))

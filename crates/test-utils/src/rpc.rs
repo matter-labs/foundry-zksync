@@ -11,7 +11,7 @@ use std::sync::{
 };
 
 fn shuffled<T>(mut vec: Vec<T>) -> Vec<T> {
-    vec.shuffle(&mut rand::thread_rng());
+    vec.shuffle(&mut rand::rng());
     vec
 }
 
@@ -53,7 +53,6 @@ static ETHERSCAN_KEYS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
         "C7I2G4JTA5EPYS42Z8IZFEIMQNI5GXIJEV",
         "A15KZUMZXXCK1P25Y1VP1WGIVBBHIZDS74",
         "3IA6ASNQXN8WKN7PNFX7T72S9YG56X9FPG",
-        "ZUB97R31KSYX7NYVW6224Q6EYY6U56H591",
     ])
 });
 
@@ -159,6 +158,10 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
         return "https://mainnet.base.org".to_string();
     }
 
+    if matches!(chain, Optimism) {
+        return "https://mainnet.optimism.io".to_string();
+    }
+
     if matches!(chain, BinanceSmartChainTestnet) {
         return "https://bsc-testnet-rpc.publicnode.com".to_string();
     }
@@ -209,7 +212,6 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
         let key = DRPC_KEYS[idx];
 
         let network = match chain {
-            Optimism => "optimism",
             Arbitrum => "arbitrum",
             Polygon => "polygon",
             Sepolia => "sepolia",

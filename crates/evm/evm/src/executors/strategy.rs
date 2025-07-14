@@ -11,16 +11,14 @@ use foundry_config::Config;
 use foundry_evm_core::{
     backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
+    Env,
 };
 use foundry_linking::LinkerError;
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::DualCompiledContracts,
 };
-use revm::{
-    primitives::{Env, EnvWithHandlerCfg, ResultAndState},
-    DatabaseRef,
-};
+use revm::{context::result::ResultAndState, DatabaseRef};
 
 use crate::inspectors::InspectorStack;
 
@@ -111,8 +109,8 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         &self,
         ctx: &dyn ExecutorStrategyContext,
         backend: &mut CowBackend<'_>,
-        env: &mut EnvWithHandlerCfg,
-        executor_env: &EnvWithHandlerCfg,
+        env: &mut Env,
+        executor_env: &Env,
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState>;
 
@@ -121,8 +119,8 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         backend: &mut Backend,
-        env: &mut EnvWithHandlerCfg,
-        executor_env: &EnvWithHandlerCfg,
+        env: &mut Env,
+        executor_env: &Env,
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState>;
 
@@ -208,6 +206,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         let mut account = executor.backend().basic_ref(address)?.unwrap_or_default();
         account.nonce = nonce;
         executor.backend_mut().insert_account_info(address, account);
+        executor.env_mut().tx.nonce = nonce;
 
         Ok(())
     }
@@ -243,8 +242,8 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         &self,
         _ctx: &dyn ExecutorStrategyContext,
         backend: &mut CowBackend<'_>,
-        env: &mut EnvWithHandlerCfg,
-        _executor_env: &EnvWithHandlerCfg,
+        env: &mut Env,
+        _executor_env: &Env,
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState> {
         backend.inspect(env, inspector, Box::new(()))
@@ -254,8 +253,8 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         &self,
         _ctx: &mut dyn ExecutorStrategyContext,
         backend: &mut Backend,
-        env: &mut EnvWithHandlerCfg,
-        _executor_env: &EnvWithHandlerCfg,
+        env: &mut Env,
+        _executor_env: &Env,
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState> {
         backend.inspect(env, inspector, Box::new(()))

@@ -397,11 +397,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use foundry_compilers::solc::SolcCompiler;
-    use semver::Version;
-
-    use crate::Config;
-
     use super::*;
 
     #[test]

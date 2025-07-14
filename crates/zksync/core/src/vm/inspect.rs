@@ -1,6 +1,9 @@
+use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{hex, FixedBytes, Log};
-use anvil_zksync_config::types::{BoojumConfig, SystemContractsOptions as Options};
-use anvil_zksync_core::{formatter::Formatter, system_contracts::SystemContracts};
+use anvil_zksync_config::types::SystemContractsOptions as Options;
+use anvil_zksync_core::{
+    formatter::transaction::summary::TransactionSummary, system_contracts::SystemContracts,
+};
 use anvil_zksync_traces::{
     build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
     identifier::SignaturesIdentifier, render_trace_arena_inner,
@@ -9,13 +12,16 @@ use core::convert::Into;
 use foundry_common::sh_println;
 use itertools::Itertools;
 use revm::{
-    db::states::StorageSlot,
-    primitives::{
-        Address, Bytecode, Bytes, EVMResultGeneric, ExecutionResult as rExecutionResult,
-        HaltReason, HashMap as rHashMap, Log as rLog, OutOfGasError, Output, SuccessReason, B256,
-        U256 as rU256,
+    bytecode::Bytecode,
+    context::{
+        result::{
+            ExecutionResult as rExecutionResult, HaltReason, OutOfGasError, Output, SuccessReason,
+        },
+        JournalTr,
     },
-    Database, EvmContext,
+    database::states::StorageSlot,
+    primitives::{Address, Bytes, HashMap as rHashMap, Log as rLog, B256, U256 as rU256},
+    Database,
 };
 use std::{
     collections::HashMap,
@@ -78,7 +84,7 @@ pub struct ZKVMExecutionResult {
 }
 
 /// Revm-style result with ZKVM Execution
-pub type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
+pub type ZKVMResult<E> = Result<ZKVMExecutionResult, E>;
 
 /// Same as [`inspect`] but batches factory deps to account for size limitations.
 ///
@@ -88,7 +94,7 @@ pub type ZKVMResult<E> = EVMResultGeneric<ZKVMExecutionResult, E>;
 // TODO: should we make this transparent in `inspect` directly?
 pub fn inspect_as_batch<DB, E>(
     tx: L2Tx,
-    ecx: &mut EvmContext<DB>,
+    ecx: &mut EthEvmContext<DB>,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
@@ -135,34 +141,17 @@ where
                     account_accesses: result.account_accesses,
                 });
             }
-            (
-                Some(ZKVMExecutionResult {
-                    logs: aggregated_logs,
-                    call_traces: aggregated_call_traces,
-                    execution_result:
-                        rExecutionResult::Success {
-                            reason: agg_reason,
-                            gas_used: agg_gas_used,
-                            gas_refunded: agg_gas_refunded,
-                            logs: agg_logs,
-                            output: agg_output,
-                        },
-                    recorded_immutables: aggregated_recorded_immutables,
-                    account_accesses: aggregated_storage_accesses,
-                }),
-                rExecutionResult::Success { reason, gas_used, gas_refunded, logs, output },
-            ) => {
-                aggregated_logs.append(&mut result.logs);
-                aggregated_call_traces.append(&mut result.call_traces);
-                aggregated_recorded_immutables.extend(result.recorded_immutables);
-                aggregated_storage_accesses.extend(result.account_accesses);
-                *agg_reason = reason;
-                *agg_gas_used += gas_used;
-                *agg_gas_refunded += gas_refunded;
-                agg_logs.extend(logs);
-                *agg_output = output;
+            (Some(zk_result), reth_result) => {
+                assert!(
+                    matches!(reth_result, rExecutionResult::Success { .. }),
+                    "aggregated result must only contain success, got: {reth_result:?}"
+                );
+                zk_result.logs.append(&mut result.logs);
+                zk_result.call_traces.append(&mut result.call_traces);
+                zk_result.recorded_immutables.extend(result.recorded_immutables);
+                zk_result.account_accesses.extend(result.account_accesses);
+                zk_result.execution_result = reth_result;
             }
-            _ => unreachable!("aggregated result must only contain success"),
         }
 
         // Increment the nonce manually if there are other transactions
@@ -180,7 +169,7 @@ where
 /// State changes will be reflected in the given `Env`, `DB`, `JournaledState`.
 pub fn inspect<DB, E>(
     mut tx: L2Tx,
-    ecx: &mut EvmContext<DB>,
+    ecx: &mut EthEvmContext<DB>,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
@@ -188,10 +177,10 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let chain_id = if ecx.env.cfg.chain_id <= u32::MAX as u64 {
-        L2ChainId::from(ecx.env.cfg.chain_id as u32)
+    let chain_id = if ecx.cfg.chain_id <= u32::MAX as u64 {
+        L2ChainId::from(ecx.cfg.chain_id as u32)
     } else {
-        warn!(provided = ?ecx.env.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
+        warn!(provided = ?ecx.cfg.chain_id, using = DEFAULT_CHAIN_ID, "using default chain id as provided chain_id does not fit into u32");
         L2ChainId::from(DEFAULT_CHAIN_ID)
     };
 
@@ -399,17 +388,19 @@ where
     }
 
     for (address, storage) in storage {
-        ecx.load_account(address).expect("account could not be loaded");
-        ecx.touch(&address);
+        ecx.journaled_state.load_account(address).expect("account could not be loaded");
+        ecx.journaled_state.touch(address);
 
         for (key, value) in storage {
-            ecx.sstore(address, key, value.present_value).expect("failed writing to slot");
+            ecx.journaled_state
+                .sstore(address, key, value.present_value)
+                .expect("failed writing to slot");
         }
     }
 
     for (address, (code_hash, code)) in codes {
-        ecx.load_account(address).expect("account could not be loaded");
-        ecx.touch(&address);
+        ecx.journaled_state.load_account(address).expect("account could not be loaded");
+        ecx.journaled_state.touch(address);
         let account = ecx.journaled_state.state.get_mut(&address).expect("account is loaded");
 
         account.info.code_hash = code_hash;
@@ -421,7 +412,7 @@ where
 
 /// Assign gas parameters that satisfy zkSync's fee model.
 pub fn gas_params<DB>(
-    ecx: &mut EvmContext<DB>,
+    ecx: &mut EthEvmContext<DB>,
     caller: Address,
     paymaster_params: &PaymasterParams,
 ) -> (U256, U256)
@@ -429,9 +420,9 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let value = ecx.env.tx.value.to_u256();
-    let gas_price = ecx.env.tx.gas_price.to_u256();
-    let gas_limit = ecx.env.tx.gas_limit.into();
+    let value = ecx.tx.value.to_u256();
+    let gas_price = U256::from(ecx.tx.gas_price);
+    let gas_limit = ecx.tx.gas_limit.into();
 
     let dev_mode = gas_price.is_zero();
     if !dev_mode {
@@ -498,7 +489,7 @@ static BASELINE_CONTRACTS: LazyLock<zksync_contracts::BaseSystemContracts> = Laz
         None,
         DEFAULT_PROTOCOL_VERSION,
         true,
-        BoojumConfig::default(),
+        Default::default(),
     )
     .contracts(zksync_vm_interface::TxExecutionMode::VerifyExecute, false)
     .clone()
@@ -512,6 +503,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     call_ctx: CallContext,
 ) -> InnerZkVmResult {
     let batch_env = create_l1_batch_env(storage.clone(), &ccx.zk_env);
+    let l2_gas_price = batch_env.fee_input.fair_l2_gas_price();
 
     let system_env = create_system_env(BASELINE_CONTRACTS.clone(), chain_id);
 
@@ -543,7 +535,7 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         )
         .into_tracer_pointer(),
     ];
-    let compressed_bytecodes = vm.push_transaction(tx).compressed_bytecodes.into_owned();
+    let compressed_bytecodes = vm.push_transaction(tx.clone()).compressed_bytecodes.into_owned();
     let mut tx_result = vm.inspect(&mut tracers.into(), InspectExecutionMode::OneTx);
 
     let mut call_traces = Arc::try_unwrap(call_tracer_result).unwrap().take().unwrap_or_default();
@@ -622,10 +614,23 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
     }
 
     if tracing::enabled!(target: "anvil_zksync_core::formatter", tracing::Level::INFO) {
-        let mut formatter = Formatter::new();
+        let mut tx = tx.clone();
+        // TODO: This is a hack to be able to print traces on demand. If `tx_common.input` is not
+        // set, getting tx hash will panic.
+        // It will not print correct transaction hash though.
+        if let zksync_types::ExecuteTransactionCommon::L2(tx_common) = &mut tx.common_data {
+            if tx_common.input.is_none() {
+                tx_common.input = Some(zksync_types::InputData {
+                    hash: Default::default(),
+                    data: Default::default(),
+                })
+            }
+        }
+
+        let tx_results_pretty = TransactionSummary::new(l2_gas_price, &tx, &tx_result, None);
         let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
 
-        formatter.print_vm_details(&tx_result);
+        sh_println!("{tx_results_pretty}").unwrap();
 
         if !call_traces.is_empty() {
             let call_traces = call_traces.clone();
@@ -784,7 +789,7 @@ impl ConsoleLogParser {
 
         let input = current_call.input.clone();
 
-        let Ok(call) = console::hh::ConsoleCalls::abi_decode(&input, false) else {
+        let Ok(call) = console::hh::ConsoleCalls::abi_decode(&input) else {
             return;
         };
 
@@ -812,9 +817,9 @@ where
 {
     std::env::var(name)
         .map(|value| {
-            value.parse::<T>().unwrap_or_else(|err| {
-                panic!("failed parsing env variable {}={}, {:?}", name, value, err)
-            })
+            value
+                .parse::<T>()
+                .unwrap_or_else(|err| panic!("failed parsing env variable {name}={value}, {err:?}"))
         })
         .unwrap_or_default()
 }

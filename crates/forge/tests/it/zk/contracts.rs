@@ -1,12 +1,12 @@
 //! Forge tests for zksync contracts.
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
-use forge::revm::primitives::SpecId;
 use foundry_config::fs_permissions::PathPermission;
 use foundry_test_utils::{
     util::{self, OutputExt},
     Filter,
 };
+use revm::primitives::hardfork::SpecId;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_can_call_function() {

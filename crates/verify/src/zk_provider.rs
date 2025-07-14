@@ -17,7 +17,7 @@ use foundry_zksync_compilers::compilers::{
         self, ZkSolc, ZkSolcCompiler, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
     },
 };
-use revm_primitives::Bytes;
+use revm::primitives::Bytes;
 use semver::Version;
 use std::path::PathBuf;
 

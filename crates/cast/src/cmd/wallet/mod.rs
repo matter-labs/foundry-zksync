@@ -1,8 +1,8 @@
-use crate::revm::primitives::Authorization;
 use alloy_chains::Chain;
 use alloy_dyn_abi::TypedData;
-use alloy_primitives::{hex, Address, PrimitiveSignature as Signature, B256, U256};
+use alloy_primitives::{hex, Address, Signature, B256, U256};
 use alloy_provider::Provider;
+use alloy_rpc_types::Authorization;
 use alloy_signer::{
     k256::{elliptic_curve::sec1::ToEncodedPoint, SecretKey},
     Signer,
@@ -17,7 +17,7 @@ use foundry_cli::{opts::RpcOpts, utils, utils::LoadConfig};
 use foundry_common::{fs, sh_println, shell};
 use foundry_config::Config;
 use foundry_wallets::{RawWalletOpts, WalletOpts, WalletSigner};
-use rand::thread_rng;
+use rand_08::thread_rng;
 use serde_json::json;
 use std::path::Path;
 use yansi::Paint;
@@ -147,6 +147,9 @@ pub enum WalletSubcommands {
     #[command(visible_alias = "v")]
     Verify {
         /// The original message.
+        ///
+        /// Treats 0x-prefixed strings as hex encoded bytes.
+        /// Non 0x-prefixed strings are treated as raw input message.
         message: String,
 
         /// The signature to verify.
@@ -759,11 +762,17 @@ flag to set your key via:
         Ok(())
     }
 
-    /// Recovers an address from the specified message and signature
+    /// Recovers an address from the specified message and signature.
+    ///
+    /// Note: This attempts to decode the message as hex if it starts with 0x.
     fn recover_address_from_message(message: &str, signature: &Signature) -> Result<Address> {
+        let message = Self::hex_str_to_bytes(message)?;
         Ok(signature.recover_address_from_msg(message)?)
     }
 
+    /// Strips the 0x prefix from a hex string and decodes it to bytes.
+    ///
+    /// Treats the string as raw bytes if it doesn't start with 0x.
     fn hex_str_to_bytes(s: &str) -> Result<Vec<u8>> {
         Ok(match s.strip_prefix("0x") {
             Some(data) => hex::decode(data).wrap_err("Could not decode 0x-prefixed string.")?,

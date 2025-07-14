@@ -18,6 +18,7 @@ pub mod vm;
 /// ZKSync Era State implementation.
 pub mod state;
 
+use alloy_evm::eth::EthEvmContext;
 use alloy_network::TransactionBuilder;
 use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
 use alloy_zksync::{
@@ -26,7 +27,7 @@ use alloy_zksync::{
 };
 use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 use eyre::eyre;
-use revm::{Database, InnerEvmContext};
+use revm::{context::JournalTr, Database};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
@@ -280,7 +281,7 @@ pub fn get_immutable_slot_key(address: Address, slot_index: rU256) -> H256 {
 }
 
 /// Sets transaction nonce for a specific address.
-pub fn set_tx_nonce<DB>(address: Address, nonce: rU256, ecx: &mut InnerEvmContext<DB>)
+pub fn set_tx_nonce<DB>(address: Address, nonce: rU256, ecx: &mut EthEvmContext<DB>)
 where
     DB: Database,
     DB::Error: Debug,
@@ -289,40 +290,46 @@ where
     let (tx_nonce, _deploy_nonce) = decompose_full_nonce(nonce.to_u256());
 
     let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
-    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    ecx.journaled_state.load_account(nonce_addr).expect("account could not be loaded");
     let nonce_key = get_nonce_key(address);
-    ecx.touch(&nonce_addr);
+    ecx.journaled_state.touch(nonce_addr);
     // We make sure to keep the old deployment nonce
     let old_deploy_nonce = ecx
+        .journaled_state
         .sload(nonce_addr, nonce_key)
         .map(|v| decompose_full_nonce(v.to_u256()).1)
         .unwrap_or_default();
     let updated_nonce = nonces_to_full_nonce(tx_nonce, old_deploy_nonce);
-    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
+    ecx.journaled_state
+        .sstore(nonce_addr, nonce_key, updated_nonce.to_ru256())
+        .expect("failed storing value");
 }
 
 /// Increment transaction nonce for a specific address.
-pub fn increment_tx_nonce<DB>(address: Address, ecx: &mut InnerEvmContext<DB>)
+pub fn increment_tx_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>)
 where
     DB: Database,
     DB::Error: Debug,
 {
     let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
-    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    ecx.journaled_state.load_account(nonce_addr).expect("account could not be loaded");
     let nonce_key = get_nonce_key(address);
-    ecx.touch(&nonce_addr);
+    ecx.journaled_state.touch(nonce_addr);
 
     // We make sure to keep the old deployment nonce
     let (tx_nonce, deploy_nonce) = ecx
+        .journaled_state
         .sload(nonce_addr, nonce_key)
         .map(|v| decompose_full_nonce(v.to_u256()))
         .unwrap_or_default();
     let updated_nonce = nonces_to_full_nonce(tx_nonce.saturating_add(1u32.into()), deploy_nonce);
-    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
+    ecx.journaled_state
+        .sstore(nonce_addr, nonce_key, updated_nonce.to_ru256())
+        .expect("failed storing value");
 }
 
 /// Sets deployment nonce for a specific address.
-pub fn set_deployment_nonce<DB>(address: Address, nonce: rU256, ecx: &mut InnerEvmContext<DB>)
+pub fn set_deployment_nonce<DB>(address: Address, nonce: rU256, ecx: &mut EthEvmContext<DB>)
 where
     DB: Database,
     DB::Error: Debug,
@@ -331,16 +338,19 @@ where
     let (_tx_nonce, deploy_nonce) = decompose_full_nonce(nonce.to_u256());
 
     let nonce_addr = NONCE_HOLDER_ADDRESS.to_address();
-    ecx.load_account(nonce_addr).expect("account could not be loaded");
+    ecx.journaled_state.load_account(nonce_addr).expect("account could not be loaded");
     let nonce_key = get_nonce_key(address);
-    ecx.touch(&nonce_addr);
+    ecx.journaled_state.touch(nonce_addr);
     // We make sure to keep the old transaction nonce
     let old_tx_nonce = ecx
+        .journaled_state
         .sload(nonce_addr, nonce_key)
         .map(|v| decompose_full_nonce(v.to_u256()).0)
         .unwrap_or_default();
     let updated_nonce = nonces_to_full_nonce(old_tx_nonce, deploy_nonce);
-    ecx.sstore(nonce_addr, nonce_key, updated_nonce.to_ru256()).expect("failed storing value");
+    ecx.journaled_state
+        .sstore(nonce_addr, nonce_key, updated_nonce.to_ru256())
+        .expect("failed storing value");
 }
 
 #[cfg(test)]

@@ -6,9 +6,10 @@
 /// is usually collecting all the diffs - and applies them to database itself.
 use std::{collections::HashMap as sHashMap, fmt::Debug, sync::LazyLock};
 
+use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{map::HashMap, Address, U256 as rU256};
 use foundry_cheatcodes_common::record::RecordAccess;
-use revm::{primitives::Account, Database, EvmContext, InnerEvmContext};
+use revm::{context::JournalTr, state::Account, Database};
 use zksync_basic_types::{L2ChainId, H160, H256, U256};
 use zksync_types::{
     get_code_key, get_nonce_key, get_system_context_init_logs, h256_to_u256,
@@ -67,7 +68,7 @@ static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLo
         .collect()
 });
 pub struct ZKVMData<'a, DB: Database> {
-    ecx: &'a mut InnerEvmContext<DB>,
+    ecx: &'a mut EthEvmContext<DB>,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: sHashMap<StorageKey, StorageValue>,
     pub accesses: Option<&'a mut RecordAccess>,
@@ -94,7 +95,7 @@ where
     <DB as Database>::Error: Debug,
 {
     /// Create a new instance of [ZKEVMData].
-    pub fn new(ecx: &'a mut InnerEvmContext<DB>) -> Self {
+    pub fn new(ecx: &'a mut EthEvmContext<DB>) -> Self {
         // load all deployed contract bytecodes from the JournaledState as factory deps
         let mut factory_deps = ecx
             .journaled_state
@@ -105,7 +106,7 @@ where
                     None
                 } else {
                     account.info.code.as_ref().map(|code| {
-                        (H256::from(account.info.code_hash.0), code.bytecode().to_vec())
+                        (H256::from(account.info.code_hash.0), code.original_bytes().to_vec())
                     })
                 }
             })
@@ -124,7 +125,7 @@ where
     }
 
     /// Create a new instance of [ZKEVMData] with system contracts.
-    pub fn new_with_system_contracts(ecx: &'a mut EvmContext<DB>, chain_id: L2ChainId) -> Self {
+    pub fn new_with_system_contracts(ecx: &'a mut EthEvmContext<DB>, chain_id: L2ChainId) -> Self {
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let mut override_keys = HashMap::default();
@@ -143,16 +144,15 @@ where
             .iter()
             .map(|c| (c.deployed_contract_hash, c.deployed_contract.bytecode.clone()));
 
-        let state_to_factory_deps =
-            ecx.journaled_state.state.values().flat_map(|account| {
-                if account.info.is_empty_code_hash() {
-                    None
-                } else {
-                    account.info.code.as_ref().map(|code| {
-                        (H256::from(account.info.code_hash.0), code.bytecode().to_vec())
-                    })
-                }
-            });
+        let state_to_factory_deps = ecx.journaled_state.state.values().flat_map(|account| {
+            if account.info.is_empty_code_hash() {
+                None
+            } else {
+                account.info.code.as_ref().map(|code| {
+                    (H256::from(account.info.code_hash.0), code.original_bytes().to_vec())
+                })
+            }
+        });
 
         let empty_code = vec![0u8; 32];
         let empty_code_hash = hash_bytecode(&empty_code);
@@ -228,13 +228,13 @@ where
 
     /// Load an account into the journaled state.
     pub fn load_account(&mut self, address: Address) -> &mut Account {
-        self.ecx.load_account(address).expect("account could not be loaded").data
+        self.ecx.journaled_state.load_account(address).expect("account could not be loaded").data
     }
 
     /// Load an storage slot into the journaled state.
     /// The account must be already loaded else this function panics.
     pub fn sload(&mut self, address: Address, key: rU256) -> rU256 {
-        self.ecx.sload(address, key).unwrap_or_default().data
+        self.ecx.journaled_state.sload(address, key).unwrap_or_default().data
     }
 
     pub fn get_account_accesses(&mut self) -> Vec<AccountAccess> {
@@ -243,8 +243,8 @@ where
 
     fn read_db(&mut self, address: H160, idx: U256) -> H256 {
         let addr = address.to_address();
-        self.ecx.load_account(addr).expect("failed loading account");
-        self.ecx.sload(addr, idx.to_ru256()).expect("failed sload").to_h256()
+        self.ecx.journaled_state.load_account(addr).expect("failed loading account");
+        self.ecx.journaled_state.sload(addr, idx.to_ru256()).expect("failed sload").to_h256()
     }
 }
 
@@ -314,16 +314,19 @@ where
                 .values()
                 .find_map(|account| {
                     if account.info.code_hash == hash_b256 {
-                        return Some(account.info.code.clone().map(|code| code.bytecode().to_vec()));
+                        return Some(
+                            account.info.code.clone().map(|code| code.original_bytes().to_vec()),
+                        );
                     }
                     None
                 })
                 .unwrap_or_else(|| {
                     self.ecx
-                        .db
+                        .journaled_state
+                        .db()
                         .code_by_hash(hash_b256)
                         .ok()
-                        .map(|bytecode| bytecode.bytecode().to_vec())
+                        .map(|bytecode| bytecode.original_bytes().to_vec())
                 })
         })
     }

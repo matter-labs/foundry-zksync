@@ -2,7 +2,6 @@
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_provider::Provider;
-use forge::revm::primitives::SpecId;
 use foundry_common::provider::try_get_zksync_http_provider;
 use foundry_test_utils::{
     forgetest_async,
@@ -10,6 +9,7 @@ use foundry_test_utils::{
     Filter, ZkSyncNode,
 };
 use foundry_zksync_core::state::{get_nonce_storage, new_full_nonce};
+use revm::primitives::hardfork::SpecId;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_setup_fork_failure() {

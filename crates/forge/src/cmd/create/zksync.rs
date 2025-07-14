@@ -198,7 +198,7 @@ impl CreateArgs {
             let deployer = zk_signer.address();
             let provider = ProviderBuilder::<_, _, Zksync>::default()
                 .wallet(ZksyncWallet::new(zk_signer))
-                .on_provider(provider);
+                .connect_provider(provider);
             self.deploy_zk(
                 abi,
                 bin.object(),
@@ -439,7 +439,7 @@ where
     ) -> Result<ZkDeployer<P>, ContractDeploymentError> {
         // Encode the constructor args & concatenate with the bytecode if necessary
         if self.abi.constructor().is_none() && !params.is_empty() {
-            return Err(ContractDeploymentError::ConstructorError)
+            return Err(ContractDeploymentError::ConstructorError);
         }
 
         // Encode the constructor args & concatenate with the bytecode if necessary

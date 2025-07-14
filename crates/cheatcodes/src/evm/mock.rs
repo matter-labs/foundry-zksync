@@ -1,7 +1,7 @@
-use crate::{inspector::InnerEcx, Cheatcode, Cheatcodes, CheatsCtxt, Result, Vm::*};
+use crate::{Cheatcode, Cheatcodes, CheatsCtxt, Result, Vm::*};
 use alloy_primitives::{Address, Bytes, U256};
 use foundry_cheatcodes_common::mock::{MockCallDataContext, MockCallReturnData};
-use revm::{interpreter::InstructionResult, primitives::Bytecode};
+use revm::{bytecode::Bytecode, context::JournalTr, interpreter::InstructionResult};
 use std::collections::VecDeque;
 
 impl Cheatcode for clearMockedCallsCall {
@@ -15,7 +15,8 @@ impl Cheatcode for clearMockedCallsCall {
 impl Cheatcode for mockCall_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, returnData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        let _ = make_acc_non_empty(callee, ccx)?;
+
         mock_call(ccx.state, callee, data, None, returnData, InstructionResult::Return);
         Ok(Default::default())
     }
@@ -24,7 +25,7 @@ impl Cheatcode for mockCall_0Call {
 impl Cheatcode for mockCall_1Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, msgValue, data, returnData } = self;
-        ccx.ecx.load_account(*callee)?;
+        ccx.ecx.journaled_state.load_account(*callee)?;
         mock_call(ccx.state, callee, data, Some(msgValue), returnData, InstructionResult::Return);
         Ok(Default::default())
     }
@@ -33,7 +34,7 @@ impl Cheatcode for mockCall_1Call {
 impl Cheatcode for mockCall_2Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, returnData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        let _ = make_acc_non_empty(callee, ccx)?;
 
         mock_call(
             ccx.state,
@@ -50,7 +51,7 @@ impl Cheatcode for mockCall_2Call {
 impl Cheatcode for mockCall_3Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, msgValue, data, returnData } = self;
-        ccx.ecx.load_account(*callee)?;
+        ccx.ecx.journaled_state.load_account(*callee)?;
         mock_call(
             ccx.state,
             callee,
@@ -66,7 +67,7 @@ impl Cheatcode for mockCall_3Call {
 impl Cheatcode for mockCalls_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, returnData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        let _ = make_acc_non_empty(callee, ccx)?;
 
         mock_calls(ccx.state, callee, data, None, returnData, InstructionResult::Return);
         Ok(Default::default())
@@ -76,7 +77,7 @@ impl Cheatcode for mockCalls_0Call {
 impl Cheatcode for mockCalls_1Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, msgValue, data, returnData } = self;
-        ccx.ecx.load_account(*callee)?;
+        ccx.ecx.journaled_state.load_account(*callee)?;
         mock_calls(ccx.state, callee, data, Some(msgValue), returnData, InstructionResult::Return);
         Ok(Default::default())
     }
@@ -85,8 +86,8 @@ impl Cheatcode for mockCalls_1Call {
 impl Cheatcode for mockCallRevert_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, revertData } = self;
+        let _ = make_acc_non_empty(callee, ccx)?;
 
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
         mock_call(ccx.state, callee, data, None, revertData, InstructionResult::Revert);
         Ok(Default::default())
     }
@@ -95,7 +96,7 @@ impl Cheatcode for mockCallRevert_0Call {
 impl Cheatcode for mockCallRevert_1Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, msgValue, data, revertData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        let _ = make_acc_non_empty(callee, ccx)?;
 
         mock_call(ccx.state, callee, data, Some(msgValue), revertData, InstructionResult::Revert);
         Ok(Default::default())
@@ -105,7 +106,7 @@ impl Cheatcode for mockCallRevert_1Call {
 impl Cheatcode for mockCallRevert_2Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, data, revertData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        let _ = make_acc_non_empty(callee, ccx)?;
 
         mock_call(
             ccx.state,
@@ -122,7 +123,7 @@ impl Cheatcode for mockCallRevert_2Call {
 impl Cheatcode for mockCallRevert_3Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { callee, msgValue, data, revertData } = self;
-        let _ = make_acc_non_empty(callee, ccx.ecx)?;
+        let _ = make_acc_non_empty(callee, ccx)?;
 
         mock_call(
             ccx.state,
@@ -175,12 +176,14 @@ fn mock_calls(
 
 // Etches a single byte onto the account if it is empty to circumvent the `extcodesize`
 // check Solidity might perform.
-pub fn make_acc_non_empty(callee: &Address, ecx: InnerEcx) -> Result {
-    let acc = ecx.load_account(*callee)?;
+pub fn make_acc_non_empty(callee: &Address, ecx: &mut CheatsCtxt) -> Result {
+    let acc = ecx.journaled_state.load_account(*callee)?;
 
     let empty_bytecode = acc.info.code.as_ref().is_none_or(Bytecode::is_empty);
     if empty_bytecode {
-        let code = Bytecode::new_raw(Bytes::from_static(&foundry_zksync_core::EMPTY_CODE));
+        // TODO(zk): Is it OK to set empty ZKsync bytecode here?
+        pub const EMPTY_CODE_ZKSYNC: [u8; 32] = [0; 32]; // Empty code that is valid from ZKsync VM perspective.
+        let code = Bytecode::new_raw(Bytes::from_static(&EMPTY_CODE_ZKSYNC));
         ecx.journaled_state.set_code(*callee, code);
     }
 

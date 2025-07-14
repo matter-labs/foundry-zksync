@@ -8,7 +8,7 @@ use anvil_zksync_config::{
         DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
         DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
     },
-    types::{BoojumConfig, SystemContractsOptions},
+    types::SystemContractsOptions,
     BaseTokenConfig, TestNodeConfig,
 };
 use anvil_zksync_core::{
@@ -275,11 +275,11 @@ impl ZkSyncNode {
         let system_contracts = SystemContracts::from_options(
             SystemContractsOptions::BuiltInWithoutSecurity,
             None,
-            ProtocolVersionId::Version26,
-            false,
-            BoojumConfig::default(),
+            ProtocolVersionId::Version27,
+            true,
+            Default::default(),
         );
-        let storage_key_layout = StorageKeyLayout::ZkEra;
+        let storage_key_layout = StorageKeyLayout::Era;
 
         let (inner, storage, blockchain, time, fork, vm_runner) = InMemoryNodeInner::init(
             fork_client,

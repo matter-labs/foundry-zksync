@@ -1,9 +1,5 @@
-use crate::{
-    revm::primitives::EnvWithHandlerCfg, utils::apply_chain_and_block_specific_env_changes,
-};
 use alloy_consensus::Transaction;
 use alloy_network::{AnyNetwork, TransactionResponse};
-use alloy_primitives::U256;
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockTransactions;
 use alloy_serde::OtherFields;
@@ -27,8 +23,12 @@ use foundry_evm::{
     executors::{EvmError, TracingExecutor},
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
-    utils::{configure_tx_env, configure_zksync_tx_env},
+    utils::configure_tx_env,
+    Env,
 };
+use foundry_evm_core::env::AsEnvMut;
+
+use crate::utils::apply_chain_and_block_specific_env_changes;
 use zksync_types::Transaction as ZkTransaction;
 
 /// CLI arguments for `cast run`.
@@ -177,16 +177,16 @@ impl RunArgs {
             TracingExecutor::get_fork_material(&config, evm_opts).await?;
         let mut evm_version = self.evm_version;
 
-        env.cfg.disable_block_gas_limit = self.disable_block_gas_limit;
-        env.block.number = U256::from(tx_block_number);
+        env.evm_env.cfg_env.disable_block_gas_limit = self.disable_block_gas_limit;
+        env.evm_env.block_env.number = tx_block_number;
 
         if let Some(block) = &block {
-            env.block.timestamp = U256::from(block.header.timestamp);
-            env.block.coinbase = block.header.beneficiary;
-            env.block.difficulty = block.header.difficulty;
-            env.block.prevrandao = Some(block.header.mix_hash.unwrap_or_default());
-            env.block.basefee = U256::from(block.header.base_fee_per_gas.unwrap_or_default());
-            env.block.gas_limit = U256::from(block.header.gas_limit);
+            env.evm_env.block_env.timestamp = block.header.timestamp;
+            env.evm_env.block_env.beneficiary = block.header.beneficiary;
+            env.evm_env.block_env.difficulty = block.header.difficulty;
+            env.evm_env.block_env.prevrandao = Some(block.header.mix_hash.unwrap_or_default());
+            env.evm_env.block_env.basefee = block.header.base_fee_per_gas.unwrap_or_default();
+            env.evm_env.block_env.gas_limit = block.header.gas_limit;
 
             // TODO: we need a smarter way to map the block to the corresponding evm_version for
             // commonly used chains
@@ -196,7 +196,7 @@ impl RunArgs {
                     evm_version = Some(EvmVersion::Cancun);
                 }
             }
-            apply_chain_and_block_specific_env_changes::<AnyNetwork>(&mut env, block);
+            apply_chain_and_block_specific_env_changes::<AnyNetwork>(env.as_env_mut(), block);
         }
 
         let trace_mode = TraceMode::Call
@@ -216,9 +216,21 @@ impl RunArgs {
             create2_deployer,
             strategy,
         )?;
+        let mut env = Env::new_with_spec_id(
+            env.evm_env.cfg_env.clone(),
+            env.evm_env.block_env.clone(),
+            env.tx.clone(),
+            executor.spec_id(),
+        );
 
-        let mut env =
-            EnvWithHandlerCfg::new_with_spec_id(Box::new(env.clone()), executor.spec_id());
+        if self.zk_force {
+            // Set up fee parameters.
+            executor.strategy.runner.zksync_set_fork_env(
+                executor.strategy.context.as_mut(),
+                &config.get_rpc_url_or_localhost_http()?,
+                &env,
+            )?;
+        }
 
         // Set the state to the moment right before the transaction
         if !self.quick {
@@ -267,7 +279,7 @@ impl RunArgs {
                             other_fields,
                         );
                     } else {
-                        configure_tx_env(&mut env, &tx.inner);
+                        configure_tx_env(&mut env.as_env_mut(), &tx.inner);
                     }
 
                     if let Some(to) = Transaction::to(tx) {
@@ -276,7 +288,7 @@ impl RunArgs {
                             format!(
                                 "Failed to execute transaction: {:?} in block {}",
                                 tx.tx_hash(),
-                                env.block.number
+                                env.evm_env.block_env.number
                             )
                         })?;
                     } else {
@@ -290,7 +302,7 @@ impl RunArgs {
                                         format!(
                                             "Failed to deploy transaction: {:?} in block {}",
                                             tx.tx_hash(),
-                                            env.block.number
+                                            env.evm_env.block_env.number
                                         )
                                     })
                                 }
@@ -331,7 +343,7 @@ impl RunArgs {
                     other_fields,
                 );
             } else {
-                configure_tx_env(&mut env, &tx.inner);
+                configure_tx_env(&mut env.as_env_mut(), &tx.inner);
             }
 
             if let Some(to) = Transaction::to(&tx) {
@@ -383,5 +395,47 @@ impl figment::Provider for RunArgs {
         }
 
         Ok(Map::from([(Config::selected_profile(), map)]))
+    }
+}
+
+/// Configures the env for the given RPC transaction.
+/// Accounts for an impersonated transaction by resetting the `env.tx.caller` field to `tx.from`.
+pub fn configure_zksync_tx_env(
+    env: &mut Env,
+    outer_tx: &ZkTransaction,
+) -> foundry_zksync_core::ZkTransactionMetadata {
+    use alloy_primitives::TxKind;
+    use foundry_zksync_core::convert::{ConvertH160, ConvertU256};
+    use zksync_types::ExecuteTransactionCommon;
+
+    // Extract fields from the raw zkSync transaction format
+
+    // Set basic transaction fields
+    env.tx.caller = outer_tx.initiator_account().to_address();
+
+    env.tx.kind = TxKind::Call(
+        outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
+    );
+    env.tx.gas_limit = match &outer_tx.common_data {
+        ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
+        _ => outer_tx.gas_limit().as_u64(),
+    };
+    env.tx.nonce = outer_tx.nonce().expect("nonce not found in common_data").0.into();
+
+    env.tx.value = outer_tx.execute.value.to_ru256();
+
+    env.tx.data = outer_tx.execute.calldata.clone().into();
+    env.tx.gas_price = outer_tx.max_fee_per_gas().low_u128();
+
+    match &outer_tx.common_data {
+        // Set zkSync specific metadata
+        ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: Some(common_data.paymaster_params.clone()),
+        },
+        _ => foundry_zksync_core::ZkTransactionMetadata {
+            factory_deps: outer_tx.execute.factory_deps.clone(),
+            paymaster_data: None,
+        },
     }
 }

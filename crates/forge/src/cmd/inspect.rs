@@ -18,7 +18,7 @@ use foundry_compilers::{
     },
     solc::SolcLanguage,
 };
-use foundry_config::{self, Config};
+use foundry_config::Config;
 use regex::Regex;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, str::FromStr, sync::LazyLock};

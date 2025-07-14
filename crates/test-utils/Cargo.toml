@@ -35,6 +35,7 @@ rand.workspace = true
 snapbox = { version = "0.6", features = ["json", "regex", "term-svg"] }
 tokio.workspace = true
 tempfile.workspace = true
+ui_test = "0.29.2"
 httptest.workspace = true
 tower-http = { version = "0.6.2", features = ["cors"] }
 anyhow = "1.0"
@@ -48,8 +49,9 @@ anvil_zksync_api_server.workspace = true
 anvil_zksync_config.workspace = true
 anvil_zksync_l1_sidecar.workspace = true
 
-# See /Cargo.toml.
+## Pinned dependencies. See /Cargo.toml.
 idna_adapter.workspace = true
+zip-extract.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

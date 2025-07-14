@@ -4,6 +4,7 @@
 
 use alloy_consensus::TxEnvelope;
 use alloy_dyn_abi::{DynSolType, DynSolValue, FunctionExt};
+use alloy_ens::NameOrAddress;
 use alloy_json_abi::Function;
 use alloy_network::{AnyNetwork, AnyRpcTransaction};
 use alloy_primitives::{
@@ -28,12 +29,12 @@ use foundry_block_explorers::Client;
 use foundry_common::{
     abi::{encode_function_args, get_func},
     compile::etherscan_project,
-    ens::NameOrAddress,
     fmt::*,
     fs, get_pretty_tx_receipt_attr, shell, TransactionReceiptWithRevertReason,
 };
 use foundry_compilers::flatten::Flattener;
 use foundry_config::Chain;
+use foundry_evm_core::ic::decode_instructions;
 use futures::{future::Either, FutureExt, StreamExt};
 use rayon::prelude::*;
 use std::{
@@ -46,7 +47,6 @@ use std::{
     time::Duration,
 };
 use tokio::signal::ctrl_c;
-use utils::decode_instructions;
 
 use foundry_common::abi::encode_function_args_packed;
 pub use foundry_evm::*;
@@ -96,7 +96,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// # Ok(())
     /// # }
@@ -162,7 +162,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
 
         if let Some(func) = func {
             // decode args into tokens
-            decoded = match func.abi_decode_output(res.as_ref(), false) {
+            decoded = match func.abi_decode_output(res.as_ref()) {
                 Ok(decoded) => decoded,
                 Err(err) => {
                     // ensure the address is a contract
@@ -222,7 +222,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// );
     ///
     /// # async fn foo() -> eyre::Result<()> {
-    /// let provider = ProviderBuilder::<_,_, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;;
+    /// let provider = ProviderBuilder::<_,_, AnyNetwork>::default().connect("http://localhost:8545").await?;;
     /// let to = Address::from_str("0xB3C95ff08316fb2F2e3E52Ee82F8e7b605Aa1304")?;
     /// let greeting = greetingCall { i: U256::from(5) }.abi_encode();
     /// let bytes = Bytes::from_iter(greeting.iter());
@@ -283,7 +283,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// );
     ///
     /// # async fn foo() -> eyre::Result<()> {
-    /// let provider = ProviderBuilder::<_,_, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;;
+    /// let provider = ProviderBuilder::<_,_, AnyNetwork>::default().connect("http://localhost:8545").await?;;
     /// let from = Address::from_str("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")?;
     /// let to = Address::from_str("0xB3C95ff08316fb2F2e3E52Ee82F8e7b605Aa1304")?;
     /// let greeting = greetCall { greeting: "hello".to_string() }.abi_encode();
@@ -318,7 +318,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let res = cast.publish("0x1234".to_string()).await?;
     /// println!("{:?}", res);
@@ -347,7 +347,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let block = cast.block(5, true, None).await?;
     /// println!("{}", block);
@@ -503,7 +503,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
     /// let nonce = cast.nonce(addr, None).await?;
@@ -525,7 +525,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
     /// let slots = vec![FixedBytes::from_str("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")?];
@@ -558,7 +558,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
     /// let slots = vec![FixedBytes::from_str("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")?];
@@ -591,7 +591,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
     /// let implementation = cast.implementation(addr, false, None).await?;
@@ -640,7 +640,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
     /// let admin = cast.admin(addr, None).await?;
@@ -670,7 +670,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("7eD52863829AB99354F3a0503A622e82AcD5F7d3")?;
     /// let computed_address = cast.compute_address(addr, None).await?;
@@ -693,7 +693,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x00000000219ab540356cbb839cbe05303d7705fa")?;
     /// let code = cast.code(addr, None, false).await?;
@@ -729,7 +729,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x00000000219ab540356cbb839cbe05303d7705fa")?;
     /// let codesize = cast.codesize(addr, None).await?;
@@ -812,7 +812,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let tx_hash = "0xf8d1713ea15a81482958fb7ddf884baee8d3bcc478c5f2f604e008dc788ee4fc";
     /// let receipt = cast.receipt(tx_hash.to_string(), None, 1, None, false).await?;
@@ -873,7 +873,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let result = cast
     ///     .rpc("eth_getBalance", &["0xc94770007dda54cF92009BFF0dE90c06F603a09f", "latest"])
@@ -905,7 +905,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     /// let addr = Address::from_str("0x00000000006c3852cbEf3e08E8dF289169EdE581")?;
     /// let slot = B256::ZERO;
@@ -967,7 +967,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("http://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("http://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     ///
     /// let block_number = cast.convert_block_number(Some(BlockId::number(5))).await?;
@@ -1015,7 +1015,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// # async fn foo() -> eyre::Result<()> {
     /// let provider =
-    ///     ProviderBuilder::<_, _, AnyNetwork>::default().on_builtin("wss://localhost:8545").await?;
+    ///     ProviderBuilder::<_, _, AnyNetwork>::default().connect("wss://localhost:8545").await?;
     /// let cast = Cast::new(provider);
     ///
     /// let filter =
@@ -1102,8 +1102,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
             .balanceOf(owner)
             .block(block.unwrap_or_default())
             .call()
-            .await?
-            ._0)
+            .await?)
     }
 }
 

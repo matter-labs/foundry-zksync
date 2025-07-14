@@ -1,7 +1,7 @@
 //! Forge tests for zksync factory contracts.
 
-use forge::revm::primitives::SpecId;
 use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
+use revm::primitives::hardfork::SpecId;
 
 use crate::{
     config::TestConfig,

@@ -30,7 +30,7 @@ use foundry_zksync_core::{
     encode_create_params, hash_bytecode, ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
     ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
-use revm::primitives::{CreateScheme, Output};
+use revm::context::{result::Output, CreateScheme};
 
 use super::{get_context, ZksyncExecutorStrategyRunner};
 

@@ -6,13 +6,13 @@ use crate::{
     config::*,
     test_helpers::{run_zk_script_test, TEST_DATA_DEFAULT},
 };
-use forge::revm::primitives::SpecId;
 use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::{
     forgetest_async,
     util::{self},
     Filter, TestProject, ZkSyncNode,
 };
+use revm::primitives::hardfork::SpecId;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheat_roll_works() {

@@ -3,8 +3,7 @@
 use alloy_chains::NamedChain;
 use alloy_primitives::U256;
 use forge::{
-    executors::strategy::ExecutorStrategy, revm::primitives::SpecId, MultiContractRunner,
-    MultiContractRunnerBuilder,
+    executors::strategy::ExecutorStrategy, MultiContractRunner, MultiContractRunnerBuilder,
 };
 use foundry_cli::utils::{self, install_crypto_provider};
 use foundry_compilers::{
@@ -30,6 +29,7 @@ use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::DualCompiledContracts,
 };
+use revm::primitives::hardfork::SpecId;
 use semver::Version;
 use std::{
     env, fmt,

@@ -1,5 +1,5 @@
-use forge::revm::primitives::SpecId;
 use foundry_test_utils::{forgetest_async, util, Filter, TestCommand, TestProject};
+use revm::primitives::hardfork::SpecId;
 use semver::Version;
 
 use crate::{

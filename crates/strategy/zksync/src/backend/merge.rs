@@ -2,12 +2,13 @@ use std::collections::hash_map::Entry;
 
 use alloy_primitives::{map::HashMap, Address, U256};
 
+use foundry_evm::backend::JournaledState;
 use foundry_evm_core::backend::{strategy::EvmBackendMergeStrategy, Fork, ForkDB};
 use foundry_zksync_core::{
     convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
     KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
-use revm::{db::CacheDB, primitives::HashSet, DatabaseRef, JournaledState};
+use revm::{database::CacheDB, primitives::HashSet, DatabaseRef};
 use tracing::trace;
 
 pub(super) struct ZksyncBackendMerge;
@@ -43,12 +44,6 @@ impl ZksyncBackendMerge {
             );
         }
 
-        // need to mock empty journal entries in case the current checkpoint is higher than the
-        // existing journal entries
-        while active_journaled_state.journal.len() > target_fork.journaled_state.journal.len() {
-            target_fork.journaled_state.journal.push(Default::default());
-        }
-
         *active_journaled_state = target_fork.journaled_state.clone();
     }
 
@@ -61,12 +56,12 @@ impl ZksyncBackendMerge {
     ) {
         let merge_system_contract_entry =
             |fork_db: &mut ForkDB, system_contract: Address, slot: U256| {
-                let Some(acc) = active.accounts.get(&system_contract) else { return };
+                let Some(acc) = active.cache.accounts.get(&system_contract) else { return };
 
                 // port contract cache over
-                if let Some(code) = active.contracts.get(&acc.info.code_hash) {
+                if let Some(code) = active.cache.contracts.get(&acc.info.code_hash) {
                     trace!("merging contract cache");
-                    fork_db.contracts.insert(acc.info.code_hash, code.clone());
+                    fork_db.cache.contracts.insert(acc.info.code_hash, code.clone());
                 }
 
                 // prepare only the specified slot in account storage
@@ -77,7 +72,7 @@ impl ZksyncBackendMerge {
                 }
 
                 // port account storage over
-                match fork_db.accounts.entry(system_contract) {
+                match fork_db.cache.accounts.entry(system_contract) {
                     Entry::Vacant(vacant) => {
                         trace!("target account not present - inserting from active");
                         // if the fork_db doesn't have the target account
@@ -110,7 +105,7 @@ impl ZksyncBackendMerge {
             foundry_zksync_core::get_nonce_key(addr),
         );
 
-        if let Some(acc) = active.accounts.get(&addr) {
+        if let Some(acc) = active.cache.accounts.get(&addr) {
             merge_system_contract_entry(
                 fork_db,
                 KNOWN_CODES_STORAGE_ADDRESS.to_address(),

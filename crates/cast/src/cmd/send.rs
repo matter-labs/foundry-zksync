@@ -3,6 +3,7 @@ use crate::{
     zksync::ZkTransactionOpts,
     Cast,
 };
+use alloy_ens::NameOrAddress;
 use alloy_network::{AnyNetwork, EthereumWallet};
 use alloy_primitives::TxHash;
 use alloy_provider::{Provider, ProviderBuilder};
@@ -16,7 +17,6 @@ use foundry_cli::{
     utils,
     utils::LoadConfig,
 };
-use foundry_common::ens::NameOrAddress;
 use std::{path::PathBuf, str::FromStr};
 
 mod zksync;
@@ -199,7 +199,7 @@ impl SendTxArgs {
                     send_zk_transaction(zk_provider, builder, &eth, zk_tx, zk_code).await?;
 
                 let provider =
-                    ProviderBuilder::<_, _, AnyNetwork>::default().on_provider(&provider);
+                    ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(&provider);
 
                 handle_transaction_result(
                     &Cast::new(provider),
@@ -222,7 +222,7 @@ impl SendTxArgs {
                 let wallet = EthereumWallet::from(signer);
                 let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
                     .wallet(wallet)
-                    .on_provider(&provider);
+                    .connect_provider(&provider);
 
                 cast_send(provider, tx, cast_async, confirmations, timeout).await
             }

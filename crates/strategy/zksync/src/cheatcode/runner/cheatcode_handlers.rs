@@ -21,6 +21,7 @@ use foundry_cheatcodes::{
 use foundry_common::TransactionMaybeSigned;
 use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
+use foundry_evm_core::ContextExt;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{
     PaymasterParams, ZkPaymasterData, ZkTransactionMetadata, H256,
@@ -62,13 +63,11 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             }
             t if using_zk_vm && is::<rollCall>(t) => {
                 let &rollCall { newHeight } = cheatcode.as_any().downcast_ref().unwrap();
-                ccx.ecx.env.block.number = newHeight;
                 foundry_zksync_core::cheatcodes::roll(newHeight, ccx.ecx);
                 Ok(Default::default())
             }
             t if using_zk_vm && is::<warpCall>(t) => {
                 let &warpCall { newTimestamp } = cheatcode.as_any().downcast_ref().unwrap();
-                ccx.ecx.env.block.timestamp = newTimestamp;
                 foundry_zksync_core::cheatcodes::warp(newTimestamp, ccx.ecx);
                 Ok(Default::default())
             }
@@ -138,7 +137,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let mockCall_0Call { callee, data, returnData } =
                     cheatcode.as_any().downcast_ref().unwrap();
 
-                let _ = foundry_cheatcodes::make_acc_non_empty(callee, ccx.ecx)?;
+                let _ = make_acc_non_empty(callee, ccx)?;
                 foundry_zksync_core::cheatcodes::set_mocked_account(*callee, ccx.ecx, ccx.caller);
                 foundry_cheatcodes::mock_call(
                     ccx.state,
@@ -154,7 +153,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let mockCallRevert_0Call { callee, data, revertData } =
                     cheatcode.as_any().downcast_ref().unwrap();
 
-                let _ = make_acc_non_empty(callee, ccx.ecx)?;
+                let _ = make_acc_non_empty(callee, ccx)?;
                 foundry_zksync_core::cheatcodes::set_mocked_account(*callee, ccx.ecx, ccx.caller);
                 // not calling
                 foundry_cheatcodes::mock_call(
@@ -259,7 +258,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let ctx = get_context(ccx.state.strategy.context.as_mut());
 
                 // Re-implementation of `persist_caller` from `fork.rs`.
-                ccx.ecx.db.add_persistent_account(ccx.caller);
+                ccx.ecx.journaled_state.database.add_persistent_account(ccx.caller);
 
                 // Prepare storage.
                 self.select_fork_vm(ctx, ccx.ecx, *forkId);
@@ -272,13 +271,13 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     cheatcode.as_any().downcast_ref().unwrap();
 
                 // Re-implementation of `persist_caller` from `fork.rs`.
-                ccx.ecx.db.add_persistent_account(ccx.caller);
+                ccx.ecx.journaled_state.database.add_persistent_account(ccx.caller);
 
                 // Create fork.
                 let create_fork_cheatcode = createFork_0Call { urlOrAlias: urlOrAlias.clone() };
 
                 let encoded_fork_id = create_fork_cheatcode.dyn_apply(ccx, executor)?;
-                let fork_id = LocalForkId::abi_decode(&encoded_fork_id, true)?;
+                let fork_id = LocalForkId::abi_decode(&encoded_fork_id)?;
 
                 // Prepare storage.
                 {
@@ -298,13 +297,13 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     cheatcode.as_any().downcast_ref().unwrap();
 
                 // Re-implementation of `persist_caller` from `fork.rs`.
-                ccx.ecx.db.add_persistent_account(ccx.caller);
+                ccx.ecx.journaled_state.database.add_persistent_account(ccx.caller);
 
                 // Create fork.
                 let create_fork_cheatcode =
                     createFork_1Call { urlOrAlias: urlOrAlias.clone(), blockNumber: *blockNumber };
                 let encoded_fork_id = create_fork_cheatcode.dyn_apply(ccx, executor)?;
-                let fork_id = LocalForkId::abi_decode(&encoded_fork_id, true)?;
+                let fork_id = LocalForkId::abi_decode(&encoded_fork_id)?;
 
                 // Prepare storage.
                 {
@@ -324,13 +323,13 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     cheatcode.as_any().downcast_ref().unwrap();
 
                 // Re-implementation of `persist_caller` from `fork.rs`.
-                ccx.ecx.db.add_persistent_account(ccx.caller);
+                ccx.ecx.journaled_state.database.add_persistent_account(ccx.caller);
 
                 // Create fork.
                 let create_fork_cheatcode =
                     createFork_2Call { urlOrAlias: urlOrAlias.clone(), txHash: *txHash };
                 let encoded_fork_id = create_fork_cheatcode.dyn_apply(ccx, executor)?;
-                let fork_id = LocalForkId::abi_decode(&encoded_fork_id, true)?;
+                let fork_id = LocalForkId::abi_decode(&encoded_fork_id)?;
 
                 // Prepare storage.
                 {
@@ -392,10 +391,11 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     zk_env: get_context(ccx.state.strategy.context.as_mut()).zk_env.clone(),
                 };
 
-                ccx.ecx.db.transact_from_tx(
+                let (db, journal, env) = ccx.ecx.as_db_env_and_journal();
+                db.transact_from_tx(
                     &tx,
-                    *ccx.ecx.env.clone(),
-                    &mut ccx.ecx.journaled_state,
+                    env.to_owned(),
+                    journal,
                     &mut *executor.get_inspector(ccx.state),
                     Box::new(inspect_ctx),
                 )?;
@@ -409,7 +409,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 if ccx.state.broadcast.is_some() {
                     ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
-                        rpc: ccx.db.active_fork_url(),
+                        rpc: ccx.journaled_state.database.active_fork_url(),
                         transaction: { TransactionMaybeSigned::new(tx_with_fields) },
                     });
                 }

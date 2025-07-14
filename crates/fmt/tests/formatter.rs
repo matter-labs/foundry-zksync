@@ -241,3 +241,4 @@ test_directories! {
 }
 
 test_dir!(SortedImports, TestConfig::skip_compare_ast_eq());
+test_dir!(NonKeywords, TestConfig::skip_compare_ast_eq());

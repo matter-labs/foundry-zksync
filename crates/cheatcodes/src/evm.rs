@@ -1,7 +1,7 @@
 //! Implementations of [`Evm`](spec::Group::Evm) cheatcodes.
 
 use crate::{
-    inspector::{InnerEcx, RecordDebugStepInfo},
+    inspector::{Ecx, RecordDebugStepInfo},
     BroadcastableTransaction, Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Error, Result,
     Vm::*,
 };
@@ -14,11 +14,17 @@ use foundry_common::fs::{read_json_file, write_json_file};
 use foundry_evm_core::{
     backend::{DatabaseExt, RevertStateSnapshotAction},
     constants::{CALLER, CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, TEST_CONTRACT_ADDRESS},
+    ContextExt,
 };
 use foundry_evm_traces::StackSnapshotType;
 use itertools::Itertools;
 use rand::Rng;
-use revm::primitives::{Account, Bytecode, SpecId, KECCAK_EMPTY};
+use revm::{
+    bytecode::Bytecode,
+    context::{Block, JournalTr},
+    primitives::{hardfork::SpecId, KECCAK_EMPTY},
+    state::Account,
+};
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     fmt::Display,
@@ -33,8 +39,6 @@ pub(crate) mod mapping;
 pub(crate) mod mock;
 pub(crate) mod prank;
 
-// Note(zk): The RecordAccess struct is defined in the common crates.
-
 /// Records the `snapshotGas*` cheatcodes.
 #[derive(Clone, Debug)]
 pub struct GasRecord {
@@ -45,7 +49,7 @@ pub struct GasRecord {
     /// The total gas used in the gas snapshot.
     pub gas_used: u64,
     /// Depth at which the gas snapshot was taken.
-    pub depth: u64,
+    pub depth: usize,
 }
 
 /// Records `deal` cheatcodes
@@ -163,14 +167,14 @@ impl Cheatcode for loadCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, slot } = *self;
         ensure_not_precompile!(&target, ccx);
-        ccx.ecx.load_account(target)?;
-        let mut val = ccx.ecx.sload(target, slot.into())?;
+        ccx.ecx.journaled_state.load_account(target)?;
+        let mut val = ccx.ecx.journaled_state.sload(target, slot.into())?;
 
         if val.is_cold && val.data.is_zero() {
             if ccx.state.has_arbitrary_storage(&target) {
                 // If storage slot is untouched and load from a target with arbitrary storage,
                 // then set random value for current slot.
-                let rand_value = ccx.state.rng().gen();
+                let rand_value = ccx.state.rng().random();
                 ccx.state.arbitrary_storage.as_mut().unwrap().save(
                     ccx.ecx,
                     target,
@@ -182,7 +186,7 @@ impl Cheatcode for loadCall {
                 // If storage slot is untouched and load from a target that copies storage from
                 // a source address with arbitrary storage, then copy existing arbitrary value.
                 // If no arbitrary value generated yet, then the random one is saved and set.
-                let rand_value = ccx.state.rng().gen();
+                let rand_value = ccx.state.rng().random();
                 val.data = ccx.state.arbitrary_storage.as_mut().unwrap().copy(
                     ccx.ecx,
                     target,
@@ -214,9 +218,8 @@ impl Cheatcode for loadAllocsCall {
         };
 
         // Then, load the allocs into the database.
-        ccx.ecx
-            .db
-            .load_allocs(&allocs, &mut ccx.ecx.journaled_state)
+        let (db, journal, _) = ccx.ecx.as_db_env_and_journal();
+        db.load_allocs(&allocs, journal)
             .map(|()| Vec::default())
             .map_err(|e| fmt_err!("failed to load allocs: {e}"))
     }
@@ -226,14 +229,12 @@ impl Cheatcode for cloneAccountCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { source, target } = self;
 
-        let account = ccx.ecx.journaled_state.load_account(*source, &mut ccx.ecx.db)?;
-        ccx.ecx.db.clone_account(
-            &genesis_account(account.data),
-            target,
-            &mut ccx.ecx.journaled_state,
-        )?;
+        let (db, journal, _) = ccx.ecx.as_db_env_and_journal();
+        let account = journal.load_account(db, *source)?;
+        let genesis = &genesis_account(account.data);
+        db.clone_account(genesis, target, journal)?;
         // Cloned account should persist in forked envs.
-        ccx.ecx.db.add_persistent_account(*target);
+        ccx.ecx.journaled_state.database.add_persistent_account(*target);
         Ok(Default::default())
     }
 }
@@ -348,7 +349,7 @@ impl Cheatcode for chainIdCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newChainId } = self;
         ensure!(*newChainId <= U256::from(u64::MAX), "chain ID must be less than 2^64 - 1");
-        ccx.ecx.env.cfg.chain_id = newChainId.to();
+        ccx.ecx.cfg.chain_id = newChainId.to();
         Ok(Default::default())
     }
 }
@@ -356,7 +357,7 @@ impl Cheatcode for chainIdCall {
 impl Cheatcode for coinbaseCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newCoinbase } = self;
-        ccx.ecx.env.block.coinbase = *newCoinbase;
+        ccx.ecx.block.beneficiary = *newCoinbase;
         Ok(Default::default())
     }
 }
@@ -365,11 +366,11 @@ impl Cheatcode for difficultyCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newDifficulty } = self;
         ensure!(
-            ccx.ecx.spec_id() < SpecId::MERGE,
+            ccx.ecx.cfg.spec < SpecId::MERGE,
             "`difficulty` is not supported after the Paris hard fork, use `prevrandao` instead; \
              see EIP-4399: https://eips.ethereum.org/EIPS/eip-4399"
         );
-        ccx.ecx.env.block.difficulty = *newDifficulty;
+        ccx.ecx.block.difficulty = *newDifficulty;
         Ok(Default::default())
     }
 }
@@ -377,7 +378,8 @@ impl Cheatcode for difficultyCall {
 impl Cheatcode for feeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newBasefee } = self;
-        ccx.ecx.env.block.basefee = *newBasefee;
+        ensure!(*newBasefee <= U256::from(u64::MAX), "base fee must be less than 2^64 - 1");
+        ccx.ecx.block.basefee = newBasefee.saturating_to();
         Ok(Default::default())
     }
 }
@@ -386,11 +388,11 @@ impl Cheatcode for prevrandao_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newPrevrandao } = self;
         ensure!(
-            ccx.ecx.spec_id() >= SpecId::MERGE,
+            ccx.ecx.cfg.spec >= SpecId::MERGE,
             "`prevrandao` is not supported before the Paris hard fork, use `difficulty` instead; \
              see EIP-4399: https://eips.ethereum.org/EIPS/eip-4399"
         );
-        ccx.ecx.env.block.prevrandao = Some(*newPrevrandao);
+        ccx.ecx.block.prevrandao = Some(*newPrevrandao);
         Ok(Default::default())
     }
 }
@@ -399,11 +401,11 @@ impl Cheatcode for prevrandao_1Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newPrevrandao } = self;
         ensure!(
-            ccx.ecx.spec_id() >= SpecId::MERGE,
+            ccx.ecx.cfg.spec >= SpecId::MERGE,
             "`prevrandao` is not supported before the Paris hard fork, use `difficulty` instead; \
              see EIP-4399: https://eips.ethereum.org/EIPS/eip-4399"
         );
-        ccx.ecx.env.block.prevrandao = Some((*newPrevrandao).into());
+        ccx.ecx.block.prevrandao = Some((*newPrevrandao).into());
         Ok(Default::default())
     }
 }
@@ -412,11 +414,11 @@ impl Cheatcode for blobhashesCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { hashes } = self;
         ensure!(
-            ccx.ecx.spec_id() >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec >= SpecId::CANCUN,
             "`blobhashes` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
-        ccx.ecx.env.tx.blob_hashes.clone_from(hashes);
+        ccx.ecx.tx.blob_hashes.clone_from(hashes);
         Ok(Default::default())
     }
 }
@@ -425,18 +427,19 @@ impl Cheatcode for getBlobhashesCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {} = self;
         ensure!(
-            ccx.ecx.spec_id() >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec >= SpecId::CANCUN,
             "`getBlobhashes` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
-        Ok(ccx.ecx.env.tx.blob_hashes.clone().abi_encode())
+        Ok(ccx.ecx.tx.blob_hashes.clone().abi_encode())
     }
 }
 
 impl Cheatcode for rollCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newHeight } = self;
-        ccx.ecx.env.block.number = *newHeight;
+        ensure!(*newHeight <= U256::from(u64::MAX), "block height must be less than 2^64 - 1");
+        ccx.ecx.block.number = newHeight.saturating_to();
         Ok(Default::default())
     }
 }
@@ -444,14 +447,15 @@ impl Cheatcode for rollCall {
 impl Cheatcode for getBlockNumberCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {} = self;
-        Ok(ccx.ecx.env.block.number.abi_encode())
+        Ok(ccx.ecx.block.number.abi_encode())
     }
 }
 
 impl Cheatcode for txGasPriceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newGasPrice } = self;
-        ccx.ecx.env.tx.gas_price = *newGasPrice;
+        ensure!(*newGasPrice <= U256::from(u64::MAX), "gas price must be less than 2^64 - 1");
+        ccx.ecx.tx.gas_price = newGasPrice.saturating_to();
         Ok(Default::default())
     }
 }
@@ -459,7 +463,8 @@ impl Cheatcode for txGasPriceCall {
 impl Cheatcode for warpCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newTimestamp } = self;
-        ccx.ecx.env.block.timestamp = *newTimestamp;
+        ensure!(*newTimestamp <= U256::from(u64::MAX), "timestamp must be less than 2^64 - 1");
+        ccx.ecx.block.timestamp = newTimestamp.saturating_to();
         Ok(Default::default())
     }
 }
@@ -467,7 +472,7 @@ impl Cheatcode for warpCall {
 impl Cheatcode for getBlockTimestampCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {} = self;
-        Ok(ccx.ecx.env.block.timestamp.abi_encode())
+        Ok(ccx.ecx.block.timestamp.abi_encode())
     }
 }
 
@@ -475,14 +480,12 @@ impl Cheatcode for blobBaseFeeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newBlobBaseFee } = self;
         ensure!(
-            ccx.ecx.spec_id() >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec >= SpecId::CANCUN,
             "`blobBaseFee` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
-        ccx.ecx.env.block.set_blob_excess_gas_and_price(
-            (*newBlobBaseFee).to(),
-            ccx.ecx.spec_id() >= SpecId::PRAGUE,
-        );
+        let is_prague = ccx.ecx.cfg.spec >= SpecId::PRAGUE;
+        ccx.ecx.block.set_blob_excess_gas_and_price((*newBlobBaseFee).to(), is_prague);
         Ok(Default::default())
     }
 }
@@ -490,7 +493,7 @@ impl Cheatcode for blobBaseFeeCall {
 impl Cheatcode for getBlobBaseFeeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {} = self;
-        Ok(ccx.ecx.env.block.get_blob_excess_gas().unwrap_or(0).abi_encode())
+        Ok(ccx.ecx.block.blob_excess_gas().unwrap_or(0).abi_encode())
     }
 }
 
@@ -509,9 +512,8 @@ impl Cheatcode for dealCall {
 impl Cheatcode for etchCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { target, newRuntimeBytecode } = self;
-
-        ensure_not_precompile!(&target, ccx);
-        ccx.ecx.load_account(*target)?;
+        ensure_not_precompile!(target, ccx);
+        ccx.ecx.journaled_state.load_account(*target)?;
         let bytecode = Bytecode::new_raw_checked(Bytes::copy_from_slice(newRuntimeBytecode))
             .map_err(|e| fmt_err!("failed to create bytecode: {e}"))?;
         ccx.ecx.journaled_state.set_code(*target, bytecode);
@@ -567,7 +569,7 @@ impl Cheatcode for storeCall {
         ensure_not_precompile!(&target, ccx);
         // ensure the account is touched
         let _ = journaled_account(ccx.ecx, target)?;
-        ccx.ecx.sstore(target, slot.into(), value.into())?;
+        ccx.ecx.journaled_state.sstore(target, slot.into(), value.into())?;
         Ok(Default::default())
     }
 }
@@ -628,7 +630,7 @@ impl Cheatcode for coolSlotCall {
 impl Cheatcode for readCallersCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {} = self;
-        read_callers(ccx.state, &ccx.ecx.env.tx.caller, ccx.ecx.journaled_state.depth())
+        read_callers(ccx.state, &ccx.ecx.tx.caller, ccx.ecx.journaled_state.depth())
     }
 }
 
@@ -820,17 +822,18 @@ impl Cheatcode for broadcastRawTransactionCall {
         let tx = TxEnvelope::decode(&mut self.data.as_ref())
             .map_err(|err| fmt_err!("failed to decode RLP-encoded transaction: {err}"))?;
 
-        ccx.ecx.db.transact_from_tx(
+        let (db, journal, env) = ccx.ecx.as_db_env_and_journal();
+        db.transact_from_tx(
             &tx.clone().into(),
-            (*ccx.ecx.env).clone(),
-            &mut ccx.ecx.journaled_state,
+            env.to_owned(),
+            journal,
             &mut *executor.get_inspector(ccx.state),
             Box::new(()),
         )?;
 
         if ccx.state.broadcast.is_some() {
             ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
-                rpc: ccx.db.active_fork_url(),
+                rpc: ccx.ecx.journaled_state.database.active_fork_url(),
                 transaction: tx.try_into()?,
             });
         }
@@ -842,12 +845,13 @@ impl Cheatcode for broadcastRawTransactionCall {
 impl Cheatcode for setBlockhashCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { blockNumber, blockHash } = *self;
+        ensure!(blockNumber <= U256::from(u64::MAX), "blockNumber must be less than 2^64 - 1");
         ensure!(
-            blockNumber <= ccx.ecx.env.block.number,
+            blockNumber <= U256::from(ccx.ecx.block.number),
             "block number must be less than or equal to the current block number"
         );
 
-        ccx.ecx.db.set_blockhash(blockNumber, blockHash);
+        ccx.ecx.journaled_state.database.set_blockhash(blockNumber, blockHash);
 
         Ok(Default::default())
     }
@@ -856,7 +860,7 @@ impl Cheatcode for setBlockhashCall {
 impl Cheatcode for startDebugTraceRecordingCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let Some(tracer) = executor.tracing_inspector().and_then(|t| t.as_mut()) else {
-            return Err(Error::from("no tracer initiated, consider adding -vvv flag"))
+            return Err(Error::from("no tracer initiated, consider adding -vvv flag"));
         };
 
         let mut info = RecordDebugStepInfo {
@@ -887,11 +891,11 @@ impl Cheatcode for startDebugTraceRecordingCall {
 impl Cheatcode for stopAndReturnDebugTraceRecordingCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         let Some(tracer) = executor.tracing_inspector().and_then(|t| t.as_mut()) else {
-            return Err(Error::from("no tracer initiated, consider adding -vvv flag"))
+            return Err(Error::from("no tracer initiated, consider adding -vvv flag"));
         };
 
         let Some(record_info) = ccx.state.record_debug_steps_info else {
-            return Err(Error::from("nothing recorded"))
+            return Err(Error::from("nothing recorded"));
         };
 
         // Use the trace nodes to flatten the call trace
@@ -920,23 +924,22 @@ impl Cheatcode for stopAndReturnDebugTraceRecordingCall {
 }
 
 pub(super) fn get_nonce(ccx: &mut CheatsCtxt, address: &Address) -> Result {
-    let account = ccx.ecx.journaled_state.load_account(*address, &mut ccx.ecx.db)?;
+    let account = ccx.ecx.journaled_state.load_account(*address)?;
     Ok(account.info.nonce.abi_encode())
 }
 
 fn inner_snapshot_state(ccx: &mut CheatsCtxt) -> Result {
-    Ok(ccx.ecx.db.snapshot_state(&ccx.ecx.journaled_state, &ccx.ecx.env).abi_encode())
+    let (db, journal, mut env) = ccx.ecx.as_db_env_and_journal();
+    Ok(db.snapshot_state(journal, &mut env).abi_encode())
 }
 
 fn inner_revert_to_state(ccx: &mut CheatsCtxt, snapshot_id: U256) -> Result {
-    let result = if let Some(journaled_state) = ccx.ecx.db.revert_state(
-        snapshot_id,
-        &ccx.ecx.journaled_state,
-        &mut ccx.ecx.env,
-        RevertStateSnapshotAction::RevertKeep,
-    ) {
+    let (db, journal, mut env) = ccx.ecx.as_db_env_and_journal();
+    let result = if let Some(journaled_state) =
+        db.revert_state(snapshot_id, &*journal, &mut env, RevertStateSnapshotAction::RevertKeep)
+    {
         // we reset the evm's journaled_state to the state of the snapshot previous state
-        ccx.ecx.journaled_state = journaled_state;
+        ccx.ecx.journaled_state.inner = journaled_state;
         true
     } else {
         false
@@ -945,14 +948,13 @@ fn inner_revert_to_state(ccx: &mut CheatsCtxt, snapshot_id: U256) -> Result {
 }
 
 fn inner_revert_to_state_and_delete(ccx: &mut CheatsCtxt, snapshot_id: U256) -> Result {
-    let result = if let Some(journaled_state) = ccx.ecx.db.revert_state(
-        snapshot_id,
-        &ccx.ecx.journaled_state,
-        &mut ccx.ecx.env,
-        RevertStateSnapshotAction::RevertRemove,
-    ) {
+    let (db, journal, mut env) = ccx.ecx.as_db_env_and_journal();
+
+    let result = if let Some(journaled_state) =
+        db.revert_state(snapshot_id, &*journal, &mut env, RevertStateSnapshotAction::RevertRemove)
+    {
         // we reset the evm's journaled_state to the state of the snapshot previous state
-        ccx.ecx.journaled_state = journaled_state;
+        ccx.ecx.journaled_state.inner = journaled_state;
         true
     } else {
         false
@@ -961,12 +963,12 @@ fn inner_revert_to_state_and_delete(ccx: &mut CheatsCtxt, snapshot_id: U256) -> 
 }
 
 fn inner_delete_state_snapshot(ccx: &mut CheatsCtxt, snapshot_id: U256) -> Result {
-    let result = ccx.ecx.db.delete_state_snapshot(snapshot_id);
+    let result = ccx.ecx.journaled_state.database.delete_state_snapshot(snapshot_id);
     Ok(result.abi_encode())
 }
 
 fn inner_delete_state_snapshots(ccx: &mut CheatsCtxt) -> Result {
-    ccx.ecx.db.delete_state_snapshots();
+    ccx.ecx.journaled_state.database.delete_state_snapshots();
     Ok(Default::default())
 }
 
@@ -1109,7 +1111,7 @@ fn derive_snapshot_name(
 /// - If no caller modification is active:
 ///     - caller_mode will be equal to [CallerMode::None],
 ///     - `msg.sender` and `tx.origin` will be equal to the default sender address.
-fn read_callers(state: &Cheatcodes, default_sender: &Address, call_depth: u64) -> Result {
+fn read_callers(state: &Cheatcodes, default_sender: &Address, call_depth: usize) -> Result {
     let mut mode = CallerMode::None;
     let mut new_caller = default_sender;
     let mut new_origin = default_sender;
@@ -1133,9 +1135,9 @@ fn read_callers(state: &Cheatcodes, default_sender: &Address, call_depth: u64) -
 }
 
 /// Ensures the `Account` is loaded and touched.
-pub fn journaled_account<'a>(ecx: InnerEcx<'a, '_, '_>, addr: Address) -> Result<&'a mut Account> {
-    ecx.load_account(addr)?;
-    ecx.journaled_state.touch(&addr);
+pub fn journaled_account<'a>(ecx: Ecx<'a, '_, '_>, addr: Address) -> Result<&'a mut Account> {
+    ecx.journaled_state.load_account(addr)?;
+    ecx.journaled_state.touch(addr);
     Ok(ecx.journaled_state.state.get_mut(&addr).expect("account is loaded"))
 }
 
