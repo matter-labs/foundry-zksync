@@ -9,7 +9,12 @@ use alloy_signer_local::PrivateKeySigner;
 use alloy_sol_types::SolValue;
 use foundry_wallets::{multi_wallet::MultiWallet, WalletSigner};
 use parking_lot::Mutex;
-use revm::primitives::{Bytecode, SignedAuthorization, SpecId, KECCAK_EMPTY};
+use revm::{
+    bytecode::Bytecode,
+    context::JournalTr,
+    context_interface::transaction::SignedAuthorization,
+    primitives::{hardfork::SpecId, KECCAK_EMPTY},
+};
 use std::sync::Arc;
 
 impl Cheatcode for broadcast_0Call {
@@ -98,7 +103,7 @@ fn attach_delegation(
     let SignedDelegation { v, r, s, nonce, implementation } = delegation;
     // Set chain id to 0 if universal deployment is preferred.
     // See https://github.com/ethereum/EIPs/blob/master/EIPS/eip-7702.md#protection-from-malleability-cross-chain
-    let chain_id = if cross_chain { U256::from(0) } else { U256::from(ccx.ecx.env.cfg.chain_id) };
+    let chain_id = if cross_chain { U256::from(0) } else { U256::from(ccx.ecx.cfg.chain_id) };
 
     let auth = Authorization { address: *implementation, nonce: *nonce, chain_id };
     let signed_auth = SignedAuthorization::new_unchecked(
@@ -108,7 +113,7 @@ fn attach_delegation(
         U256::from_be_bytes(s.0),
     );
     write_delegation(ccx, signed_auth.clone())?;
-    ccx.state.active_delegation = Some(signed_auth);
+    ccx.state.add_delegation(signed_auth);
     Ok(Default::default())
 }
 
@@ -126,12 +131,16 @@ fn sign_delegation(
     let nonce = if let Some(nonce) = nonce {
         nonce
     } else {
-        let authority_acc =
-            ccx.ecx.journaled_state.load_account(signer.address(), &mut ccx.ecx.db)?;
-        // If we don't have a nonce then use next auth account nonce.
-        authority_acc.data.info.nonce + 1
+        let authority_acc = ccx.ecx.journaled_state.load_account(signer.address())?;
+        // Calculate next nonce considering existing active delegations
+        next_delegation_nonce(
+            &ccx.state.active_delegations,
+            signer.address(),
+            &ccx.state.broadcast,
+            authority_acc.data.info.nonce,
+        )
     };
-    let chain_id = if cross_chain { U256::from(0) } else { U256::from(ccx.ecx.env.cfg.chain_id) };
+    let chain_id = if cross_chain { U256::from(0) } else { U256::from(ccx.ecx.cfg.chain_id) };
 
     let auth = Authorization { address: implementation, nonce, chain_id };
     let sig = signer.sign_hash_sync(&auth.signature_hash())?;
@@ -139,7 +148,7 @@ fn sign_delegation(
     if attach {
         let signed_auth = SignedAuthorization::new_unchecked(auth, sig.v() as u8, sig.r(), sig.s());
         write_delegation(ccx, signed_auth.clone())?;
-        ccx.state.active_delegation = Some(signed_auth);
+        ccx.state.add_delegation(signed_auth);
     }
     Ok(SignedDelegation {
         v: sig.v() as u8,
@@ -151,12 +160,52 @@ fn sign_delegation(
     .abi_encode())
 }
 
+/// Returns the next valid nonce for a delegation, considering existing active delegations.
+fn next_delegation_nonce(
+    active_delegations: &[SignedAuthorization],
+    authority: Address,
+    broadcast: &Option<Broadcast>,
+    account_nonce: u64,
+) -> u64 {
+    match active_delegations
+        .iter()
+        .rfind(|auth| auth.recover_authority().is_ok_and(|recovered| recovered == authority))
+    {
+        Some(auth) => {
+            // Increment nonce of last recorded delegation.
+            auth.nonce + 1
+        }
+        None => {
+            // First time a delegation is added for this authority.
+            if let Some(broadcast) = broadcast {
+                // Increment nonce if authority is the sender of transaction.
+                if broadcast.new_origin == authority {
+                    return account_nonce + 1
+                }
+            }
+            // Return current nonce if authority is not the sender of transaction.
+            account_nonce
+        }
+    }
+}
+
 fn write_delegation(ccx: &mut CheatsCtxt, auth: SignedAuthorization) -> Result<()> {
     let authority = auth.recover_authority().map_err(|e| format!("{e}"))?;
-    let authority_acc = ccx.ecx.journaled_state.load_account(authority, &mut ccx.ecx.db)?;
+    let authority_acc = ccx.ecx.journaled_state.load_account(authority)?;
 
-    if authority_acc.data.info.nonce + 1 != auth.nonce {
-        return Err("invalid nonce".into());
+    let expected_nonce = next_delegation_nonce(
+        &ccx.state.active_delegations,
+        authority,
+        &ccx.state.broadcast,
+        authority_acc.data.info.nonce,
+    );
+
+    if expected_nonce != auth.nonce {
+        return Err(format!(
+            "invalid nonce for {authority:?}: expected {expected_nonce}, got {}",
+            auth.nonce
+        )
+        .into());
     }
 
     if auth.address.is_zero() {
@@ -174,7 +223,7 @@ impl Cheatcode for attachBlobCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { blob } = self;
         ensure!(
-            ccx.ecx.spec_id() >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec >= SpecId::CANCUN,
             "`attachBlob` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
@@ -233,7 +282,7 @@ pub struct Broadcast {
     /// Original `tx.origin`
     pub original_origin: Address,
     /// Depth of the broadcast
-    pub depth: u64,
+    pub depth: usize,
     /// Whether the prank stops by itself after the next call
     pub single_call: bool,
 }
@@ -282,7 +331,7 @@ impl Wallets {
 
     /// Locks inner Mutex and returns all signer addresses in the [MultiWallet].
     pub fn signers(&self) -> Result<Vec<Address>> {
-        Ok(self.inner.lock().multi_wallet.signers()?.keys().cloned().collect())
+        Ok(self.inner.lock().multi_wallet.signers()?.keys().copied().collect())
     }
 
     /// Number of signers in the [MultiWallet].
@@ -310,7 +359,7 @@ fn broadcast(ccx: &mut CheatsCtxt, new_origin: Option<&Address>, single_call: bo
     );
     ensure!(ccx.state.broadcast.is_none(), "a broadcast is active already");
 
-    let mut new_origin = new_origin.cloned();
+    let mut new_origin = new_origin.copied();
 
     if new_origin.is_none() {
         let mut wallets = ccx.state.wallets().inner.lock();
@@ -326,9 +375,9 @@ fn broadcast(ccx: &mut CheatsCtxt, new_origin: Option<&Address>, single_call: bo
     }
 
     let broadcast = Broadcast {
-        new_origin: new_origin.unwrap_or(ccx.ecx.env.tx.caller),
+        new_origin: new_origin.unwrap_or(ccx.ecx.tx.caller),
         original_caller: ccx.caller,
-        original_origin: ccx.ecx.env.tx.caller,
+        original_origin: ccx.ecx.tx.caller,
         depth,
         single_call,
     };

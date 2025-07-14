@@ -153,7 +153,6 @@ impl ProjectCompiler {
         self.dynamic_test_linking = preprocess;
         self
     }
-
     /// Compiles the project.
     pub fn compile<C: Compiler<CompilerContract = Contract>>(
         mut self,

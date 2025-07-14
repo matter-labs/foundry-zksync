@@ -10,7 +10,7 @@ use alloy_rpc_types::{
         filter::TraceFilter,
         geth::{GethDebugTracingCallOptions, GethDebugTracingOptions},
     },
-    BlockId, BlockNumberOrTag as BlockNumber, Filter, Index,
+    BlockId, BlockNumberOrTag as BlockNumber, BlockOverrides, Filter, Index,
 };
 use alloy_serde::WithOtherFields;
 use foundry_common::serde_helpers::{
@@ -144,14 +144,21 @@ pub enum EthRequest {
     #[serde(rename = "eth_sendTransaction", with = "sequence")]
     EthSendTransaction(Box<WithOtherFields<TransactionRequest>>),
 
+    #[serde(rename = "eth_sendTransactionSync", with = "sequence")]
+    EthSendTransactionSync(Box<WithOtherFields<TransactionRequest>>),
+
     #[serde(rename = "eth_sendRawTransaction", with = "sequence")]
     EthSendRawTransaction(Bytes),
+
+    #[serde(rename = "eth_sendRawTransactionSync", with = "sequence")]
+    EthSendRawTransactionSync(Bytes),
 
     #[serde(rename = "eth_call")]
     EthCall(
         WithOtherFields<TransactionRequest>,
         #[serde(default)] Option<BlockId>,
         #[serde(default)] Option<StateOverride>,
+        #[serde(default)] Option<Box<BlockOverrides>>,
     ),
 
     #[serde(rename = "eth_simulateV1")]
@@ -165,6 +172,7 @@ pub enum EthRequest {
         WithOtherFields<TransactionRequest>,
         #[serde(default)] Option<BlockId>,
         #[serde(default)] Option<StateOverride>,
+        #[serde(default)] Option<Box<BlockOverrides>>,
     ),
 
     #[serde(rename = "eth_getTransactionByHash", with = "sequence")]
@@ -359,8 +367,37 @@ pub enum EthRequest {
     SetRpcUrl(String),
 
     /// Modifies the balance of an account.
-    #[serde(rename = "anvil_setBalance", alias = "hardhat_setBalance")]
+    #[serde(
+        rename = "anvil_setBalance",
+        alias = "hardhat_setBalance",
+        alias = "tenderly_setBalance"
+    )]
     SetBalance(Address, #[serde(deserialize_with = "deserialize_number")] U256),
+
+    /// Increases the balance of an account.
+    #[serde(
+        rename = "anvil_addBalance",
+        alias = "hardhat_addBalance",
+        alias = "tenderly_addBalance"
+    )]
+    AddBalance(Address, #[serde(deserialize_with = "deserialize_number")] U256),
+
+    /// Modifies the ERC20 balance of an account.
+    #[serde(
+        rename = "anvil_dealERC20",
+        alias = "hardhat_dealERC20",
+        alias = "anvil_setERC20Balance"
+    )]
+    DealERC20(Address, Address, #[serde(deserialize_with = "deserialize_number")] U256),
+
+    /// Sets the ERC20 allowance for a spender
+    #[serde(rename = "anvil_setERC20Allowance")]
+    SetERC20Allowance(
+        Address,
+        Address,
+        Address,
+        #[serde(deserialize_with = "deserialize_number")] U256,
+    ),
 
     /// Sets the code of a contract
     #[serde(rename = "anvil_setCode", alias = "hardhat_setCode")]
@@ -641,7 +678,7 @@ pub enum EthRequest {
 
     /// Add an address to the [`DelegationCapability`] of the wallet
     ///
-    /// [`DelegationCapability`]: wallet::DelegationCapability  
+    /// [`DelegationCapability`]: wallet::DelegationCapability
     #[serde(rename = "anvil_addCapability", with = "sequence")]
     AnvilAddCapability(Address),
 

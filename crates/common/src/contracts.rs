@@ -1,6 +1,6 @@
 //! Commonly used contract types and functions.
 
-use crate::compile::PathOrContractInfo;
+use crate::{compile::PathOrContractInfo, strip_bytecode_placeholders};
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::{Event, Function, JsonAbi};
 use alloy_primitives::{hex, Address, Bytes, Selector, B256};
@@ -87,6 +87,16 @@ impl ContractData {
     pub fn deployed_bytecode(&self) -> Option<&Bytes> {
         self.deployed_bytecode.as_ref()?.bytes().filter(|b| !b.is_empty())
     }
+
+    /// Returns the bytecode without placeholders, if present.
+    pub fn bytecode_without_placeholders(&self) -> Option<Bytes> {
+        strip_bytecode_placeholders(self.bytecode.as_ref()?.object.as_ref()?)
+    }
+
+    /// Returns the deployed bytecode without placeholders, if present.
+    pub fn deployed_bytecode_without_placeholders(&self) -> Option<Bytes> {
+        strip_bytecode_placeholders(self.deployed_bytecode.as_ref()?.object.as_ref()?)
+    }
 }
 
 type ArtifactWithContractRef<'a> = (&'a ArtifactId, &'a ContractData);
@@ -149,7 +159,7 @@ impl ContractsByArtifact {
                         // Try to decode ctor args with contract abi.
                         if let Some(constructor) = contract.abi.constructor() {
                             let constructor_args = &code[deployed_bytecode.len()..];
-                            if constructor.abi_decode_input(constructor_args, false).is_ok() {
+                            if constructor.abi_decode_input(constructor_args).is_ok() {
                                 // If we can decode args with current abi then remove args from
                                 // code to compare.
                                 code = &code[..deployed_bytecode.len()]
@@ -280,7 +290,7 @@ impl ContractsByArtifact {
             eyre::bail!("{id} has more than one implementation.");
         }
 
-        Ok(contracts.first().cloned())
+        Ok(contracts.first().copied())
     }
 
     /// Finds abi for contract which has the same contract name or identifier as `id`.
