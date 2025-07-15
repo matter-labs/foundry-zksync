@@ -1,16 +1,16 @@
 use crate::{
-    build::LinkedBuildData,
-    sequence::{get_commit_hash, ScriptSequenceKind},
     ScriptArgs, ScriptConfig,
+    build::LinkedBuildData,
+    sequence::{ScriptSequenceKind, get_commit_hash},
 };
-use alloy_primitives::{hex, Address};
-use eyre::{eyre, Result};
+use alloy_primitives::{Address, hex};
+use eyre::{Result, eyre};
 use forge_script_sequence::{AdditionalContract, ScriptSequence};
-use forge_verify::{provider::VerificationProviderType, RetryArgs, VerifierArgs, VerifyArgs};
+use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs, provider::VerificationProviderType};
 use foundry_cli::opts::{EtherscanOpts, ProjectPathOpts};
 use foundry_common::ContractsByArtifact;
-use foundry_compilers::{artifacts::EvmVersion, info::ContractInfo, Project};
-use foundry_config::{zksync::ZKSYNC_ARTIFACTS_DIR, Chain, Config};
+use foundry_compilers::{Project, artifacts::EvmVersion, info::ContractInfo};
+use foundry_config::{Chain, Config, zksync::ZKSYNC_ARTIFACTS_DIR};
 use semver::Version;
 
 /// State after we have broadcasted the script.
@@ -185,7 +185,9 @@ impl VerifyBundle {
         evm_version: EvmVersion,
     ) -> Option<VerifyArgs> {
         if data.len() < 4 {
-            warn!("failed decoding verify input data, invalid data length, require minimum of 4 bytes");
+            warn!(
+                "failed decoding verify input data, invalid data length, require minimum of 4 bytes"
+            );
             return None;
         }
         let selector = hex::encode(&data[..4]);
@@ -209,10 +211,10 @@ impl VerifyBundle {
                 .ok()?
         };
 
-        let known_zksync_contracts = self.known_contracts.iter().filter(|(artifact, _)| {
-            let is_zksync_artifact = artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR);
-            is_zksync_artifact
-        });
+        let known_zksync_contracts = self
+            .known_contracts
+            .iter()
+            .filter(|(artifact, _)| artifact.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR));
         for (artifact, contract) in known_zksync_contracts {
             let Some(bytecode) = contract.bytecode() else { continue };
 
@@ -258,6 +260,7 @@ impl VerifyBundle {
                     show_standard_json_input: false,
                     guess_constructor_args: false,
                     compilation_profile: None, //TODO(zk): get compilation profile
+                    language: None,            // TODO(zk): vyper is not supported right now
                     zksync: self.zksync,
                 };
 

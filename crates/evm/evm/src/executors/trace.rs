@@ -20,6 +20,7 @@ pub struct TracingExecutor {
 }
 
 impl TracingExecutor {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         env: Env,
         fork: Option<CreateFork>,
@@ -28,6 +29,7 @@ impl TracingExecutor {
         odyssey: bool,
         create2_deployer: Address,
         state_overrides: Option<StateOverride>,
+        strategy: ExecutorStrategy,
     ) -> eyre::Result<Self> {
         let db = Backend::spawn(fork, strategy.runner.new_backend_strategy())?;
 

@@ -1,27 +1,26 @@
 use crate::{
+    VerifierArgs,
     provider::{VerificationContext, VerificationProvider},
     retry::RETRY_CHECK_ON_VERIFY,
     verify::{ContractLanguage, VerifyArgs, VerifyCheckArgs},
     zk_provider::CompilerVerificationContext,
-    VerifierArgs,
 };
 use alloy_json_abi::Function;
 use alloy_primitives::hex;
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionTrait;
-use eyre::{eyre, Context, OptionExt, Result};
+use eyre::{Context, OptionExt, Result, eyre};
 use foundry_block_explorers::{
+    Client, EtherscanApiVersion,
     errors::EtherscanError,
     utils::lookup_compiler_version,
     verify::{CodeFormat, VerifyContract},
-    Client, EtherscanApiVersion,
 };
 use foundry_cli::{
     opts::EtherscanOpts,
-    utils::{get_provider, read_constructor_args_file, LoadConfig},
+    utils::{LoadConfig, get_provider, read_constructor_args_file},
 };
 use foundry_common::{abi::encode_function_args, retry::RetryError};
-use foundry_compilers::{artifacts::BytecodeObject, Artifact};
 use foundry_config::Config;
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
 use regex::Regex;
@@ -337,7 +336,13 @@ impl EtherscanVerificationProvider {
             }
         };
 
-        let lang = args.detect_language(context);
+        let lang = match context {
+            CompilerVerificationContext::Solc(context) => args.detect_language(context),
+            CompilerVerificationContext::ZkSolc(_context) => {
+                // TODO(zk): Vyper is not supported right now
+                ContractLanguage::Solidity
+            }
+        };
 
         let mut compiler_version = context.compiler_version().clone();
         compiler_version.build = match RE_BUILD_COMMIT.captures(compiler_version.build.as_str()) {
@@ -382,7 +387,7 @@ impl EtherscanVerificationProvider {
 
         if code_format == CodeFormat::VyperJson {
             verify_args =
-                if args.num_of_optimizations.is_some() || context.config.optimizer == Some(true) {
+                if args.num_of_optimizations.is_some() || context.config().optimizer == Some(true) {
                     verify_args.optimized().runs(1)
                 } else {
                     verify_args.not_optimized().runs(0)
@@ -453,7 +458,9 @@ impl EtherscanVerificationProvider {
         } else if transaction.to() == Some(DEFAULT_CREATE2_DEPLOYER) {
             &transaction.inner.inner.input()[32..]
         } else {
-            eyre::bail!("Fetching of constructor arguments is not supported for contracts created by contracts")
+            eyre::bail!(
+                "Fetching of constructor arguments is not supported for contracts created by contracts"
+            )
         };
 
         let bytecode = context.get_target_bytecode()?;

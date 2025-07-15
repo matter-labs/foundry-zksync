@@ -1,36 +1,36 @@
 use crate::{
-    build::LinkedBuildData, progress::ScriptProgress, sequence::ScriptSequenceKind,
-    verify::BroadcastedState, ScriptArgs, ScriptConfig,
+    ScriptArgs, ScriptConfig, build::LinkedBuildData, progress::ScriptProgress,
+    sequence::ScriptSequenceKind, verify::BroadcastedState,
 };
 use alloy_chains::{Chain, NamedChain};
 use alloy_consensus::TxEnvelope;
-use alloy_eips::{eip2718::Encodable2718, BlockId};
+use alloy_eips::{BlockId, eip2718::Encodable2718};
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
 use alloy_primitives::{
+    Address, Bytes, TxHash,
     map::{AddressHashMap, AddressHashSet},
     utils::format_units,
-    Address, Address, Bytes, TxHash, TxHash,
 };
-use alloy_provider::{utils::Eip1559Estimation, Provider};
+use alloy_provider::{Provider, utils::Eip1559Estimation};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_zksync::network::{
-    transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType, Zksync,
+    Zksync, transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType,
 };
-use eyre::{bail, Context, Result};
+use eyre::{Context, Result, bail};
 use forge_verify::provider::VerificationProviderType;
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_batch_support, has_different_gas_calc};
 use foundry_common::{
+    TransactionMaybeSigned,
     provider::{
-        get_http_provider, try_get_http_provider, try_get_zksync_http_provider, RetryProvider,
+        RetryProvider, get_http_provider, try_get_http_provider, try_get_zksync_http_provider,
     },
-    provider::{get_http_provider, try_get_http_provider, RetryProvider},
-    shell, shell, TransactionMaybeSigned, TransactionMaybeSigned,
+    shell,
 };
 use foundry_config::Config;
 use foundry_zksync_core::convert::ConvertH160;
-use futures::{future::join_all, StreamExt};
+use futures::{StreamExt, future::join_all};
 use itertools::Itertools;
 use std::{cmp::Ordering, sync::Arc};
 

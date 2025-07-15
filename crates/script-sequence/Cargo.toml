@@ -17,7 +17,6 @@ workspace = true
 foundry-config.workspace = true
 foundry-common.workspace = true
 foundry-compilers = { workspace = true, features = ["full"] }
-foundry-zksync-core.workspace = true
 
 serde.workspace = true
 eyre.workspace = true

@@ -10,11 +10,8 @@ use proptest::prelude::Strategy;
 /// Given a function, it returns a strategy which generates valid calldata
 /// for that function's input types, following declared test fixtures.
 pub fn fuzz_calldata(
-    
     func: Function,
-   
     fuzz_fixtures: &FuzzFixtures,
-,
     no_zksync_reserved_addresses: bool,
 ) -> impl Strategy<Value = Bytes> + use<> {
     // We need to compose all the strategies generated for each parameter in all

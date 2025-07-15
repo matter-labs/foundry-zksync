@@ -106,7 +106,6 @@ soldeer-commands.workspace = true
 quick-junit = "0.5.1"
 
 # zk
-zksync_types.workspace = true
 zksync_telemetry.workspace = true
 
 [target.'cfg(unix)'.dependencies]

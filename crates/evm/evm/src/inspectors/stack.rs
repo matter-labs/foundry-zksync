@@ -1,6 +1,6 @@
 use super::{
     Cheatcodes, CheatsConfig, ChiselState, CustomPrintTracer, Fuzzer, LineCoverageCollector,
-    LogCollector, RevertDiagnostic, ScriptExecutionInspector, TracingInspector,
+    LogCollector, RevertDiagnostic, ScriptExecutionInspector,
 };
 use alloy_evm::{Evm, eth::EthEvmContext};
 use alloy_primitives::{
@@ -9,7 +9,7 @@ use alloy_primitives::{
 };
 use foundry_cheatcodes::{CheatcodesExecutor, Wallets};
 use foundry_evm_core::{
-    ContextExt, Env, InspectorExt,
+    ContextExt, Ecx, Env, InspectorExt,
     backend::{DatabaseExt, JournaledState},
     evm::new_evm_with_inspector,
 };

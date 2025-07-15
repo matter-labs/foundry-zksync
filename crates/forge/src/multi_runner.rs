@@ -18,18 +18,17 @@ use foundry_evm::{
     Env,
     backend::Backend,
     decode::RevertDecoder,
-    executors::{
-        strategy::{ExecutorStrategy, LinkOutput},
-        Executor, ExecutorBuilder,
-    },
+    executors::{Executor, ExecutorBuilder, strategy::ExecutorStrategy},
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
+use foundry_linking::{LinkOutput, Linker};
 use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
 use std::{
+    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
@@ -567,9 +566,8 @@ impl MultiContractRunnerBuilder {
 
                 config: self.config,
             },
-            strategy
+            strategy,
         })
-    }
     }
 }
 

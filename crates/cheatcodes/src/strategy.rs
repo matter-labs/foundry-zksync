@@ -6,12 +6,15 @@ use alloy_primitives::{Address, TxKind};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
 use revm::{
     context_interface::transaction::SignedAuthorization,
-    interpreter::{CallInputs, CallOutcome, CreateOutcome, Interpreter},
+    interpreter::{
+        CallInputs, CallOutcome, CreateOutcome, Gas, InstructionResult, Interpreter,
+        InterpreterResult,
+    },
 };
 
 use crate::{
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, DynCheatcode, Result,
+    CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
     inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit},
     script::Broadcast,
 };
@@ -97,7 +100,7 @@ pub trait CheatcodeInspectorStrategyRunner:
         ecx: Ecx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: &mut Option<SignedAuthorization>,
+        active_delegation: &mut Vec<SignedAuthorization>,
         active_blob_sidecar: &mut Option<BlobTransactionSidecar>,
     ) -> Option<CallOutcome>;
 
@@ -221,7 +224,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         ecx: Ecx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: &mut Option<SignedAuthorization>,
+        active_delegation: &mut Vec<SignedAuthorization>,
         active_blob_sidecar: &mut Option<BlobTransactionSidecar>,
     ) -> Option<CallOutcome> {
         let input = TransactionInput::new(call.input.bytes(ecx));
@@ -240,17 +243,17 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
             ..Default::default()
         };
 
-        let active_delegations = std::mem::take(&mut active_delegations);
+        let active_delegation = std::mem::take(active_delegation);
         // Set active blob sidecar, if any.
         if let Some(blob_sidecar) = active_blob_sidecar.take() {
             // Ensure blob and delegation are not set for the same tx.
-            if !active_delegations.is_empty() {
+            if !active_delegation.is_empty() {
                 let msg = "both delegation and blob are active; `attachBlob` and `attachDelegation` are not compatible";
                 return Some(CallOutcome {
                     result: InterpreterResult {
                         result: InstructionResult::Revert,
                         output: Error::encode(msg),
-                        gas,
+                        gas: Gas::new(call.gas_limit),
                     },
                     memory_offset: call.return_memory_offset.clone(),
                 });
@@ -259,8 +262,8 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         }
 
         // Apply active EIP-7702 delegations, if any.
-        if !active_delegations.is_empty() {
-            for auth in &active_delegations {
+        if !active_delegation.is_empty() {
+            for auth in &active_delegation {
                 let Ok(authority) = auth.recover_authority() else {
                     continue;
                 };
@@ -270,7 +273,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
                     account.info.nonce += 1;
                 }
             }
-            tx_req.authorization_list = Some(active_delegations);
+            tx_req.authorization_list = Some(active_delegation);
         }
 
         broadcastable_transactions.push_back(BroadcastableTransaction {

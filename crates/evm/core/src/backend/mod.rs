@@ -11,7 +11,8 @@ use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
-use alloy_primitives::{Address, B256, TxKind, U256, keccak256, uint};
+use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256, uint};
+use alloy_provider::Provider as _;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
 use foundry_common::{
@@ -32,7 +33,7 @@ use revm::{
 };
 use std::{
     any::Any,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
     time::{Duration, Instant},
 };

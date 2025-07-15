@@ -1156,7 +1156,7 @@ impl CastSubcommand {
             Self::Client { rpc: _ } => "client",
             Self::Code { block: _, who: _, disassemble: _, rpc: _ } => "code",
             Self::Codesize { block: _, who: _, rpc: _ } => "codesize",
-            Self::ComputeAddress { address: _, nonce: _, rpc: _ } => "compute-address",
+            Self::ComputeAddress { .. } => "compute-address",
             Self::Disassemble { bytecode: _ } => "disassemble",
             Self::Selectors { bytecode: _, resolve: _ } => "selectors",
             Self::FindBlock(_) => "find-block",
@@ -1209,6 +1209,7 @@ impl CastSubcommand {
             Self::DecodeTransaction { tx: _ } => "decode-transaction",
             Self::TxPool { command: _ } => "tx-pool",
             Self::DAEstimate(_) => "da-estimate",
+            Self::RecoverAuthority { .. } => "recover-authority",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()
     }

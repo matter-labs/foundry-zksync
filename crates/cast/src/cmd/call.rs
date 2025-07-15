@@ -1,8 +1,8 @@
 use crate::{
-    Cast,
+    Cast, ZkCast, ZkTransactionOpts,
     traces::TraceKind,
     tx::{CastTxBuilder, SenderKind},
-    zksync, Cast, ZkCast, ZkTransactionOpts,
+    zksync,
 };
 use alloy_ens::NameOrAddress;
 use alloy_primitives::{Address, Bytes, TxKind, U256};
@@ -390,15 +390,17 @@ impl CallArgs {
             // or `create` in case of deployment
             // as the original evm func would be the constructor
             let func = func.map(|func| zksync::convert_func(&tx, func)).transpose()?;
-            let zk_tx = zksync::convert_tx(tx, zk_tx, zkcode).await?;
+            let zk_tx = zksync::convert_tx(tx.clone(), zk_tx, zkcode).await?;
 
-            let cast = Cast::new(provider);
+            let cast = Cast::new(&provider);
             let zk_cast = ZkCast::new(utils::get_provider_zksync(&config)?, cast);
 
             zk_cast.call_zk(&zk_tx, func.as_ref(), block).await?
         } else {
-            Cast::new(provider).call(&tx, func.as_ref(), block, state_overrides).await?
-        }
+            Cast::new(&provider)
+                .call(&tx, func.as_ref(), block, state_overrides, block_overrides)
+                .await?
+        };
 
         if response == "0x"
             && let Some(contract_address) = tx.to.and_then(|tx_kind| tx_kind.into_to())

@@ -4,7 +4,7 @@ use crate::{
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
     Vm::{self, AccountAccess},
     evm::{
-        DealRecord, GasRecord, RecordAccess,
+        DealRecord, GasRecord,
         mapping::{self, MappingSlots},
         prank::Prank,
     },
@@ -23,11 +23,13 @@ use alloy_primitives::{
     Address, B256, Bytes, Log, TxKind, U256, hex,
     map::{AddressHashMap, HashMap, HashSet},
 };
-use alloy_rpc_types::{
-    AccessList,
-    request::{TransactionInput, TransactionRequest},
-};
+use alloy_rpc_types::AccessList;
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
+use foundry_cheatcodes_common::{
+    expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
+    mock::{MockCallDataContext, MockCallReturnData},
+    record::RecordAccess,
+};
 use foundry_common::{SELECTOR_LEN, TransactionMaybeSigned, evm::Breakpoints};
 use foundry_evm_core::{
     InspectorExt,
@@ -121,38 +123,6 @@ pub trait CheatcodesExecutor {
     ) {
         let mut inspector = self.get_inspector(ccx_state);
         inspector.trace_zksync(ecx, call_traces, false);
-
-        // We recreate the EvmContext here to satisfy the lifetime parameters as 'static, with
-        // regards to the inspector's lifetime.
-        // let mut ecx_inner = EthEvmContext {
-        //     inner: InnerEvmContext {
-        //         env,
-        //         journaled_state: std::mem::replace(
-        //             &mut ecx.journaled_state,
-        //             revm::JournaledState::new(Default::default(), Default::default()),
-        //         ),
-        //         error: std::mem::replace(&mut ecx.error, Ok(())),
-        //         l1_block_info: std::mem::take(&mut ecx.l1_block_info),
-        //         db: &mut ecx.db as &mut dyn DatabaseExt,
-        //     },
-        //     precompiles: Default::default(),
-        // };
-        // inspector.trace_zksync(env, &mut ecx_inner, call_traces, false);
-
-        // // re-apply the modified fields to the original ecx.
-        // let env = std::mem::take(&mut env);
-        // let journaled_state = std::mem::replace(
-        //     &mut ecx_inner.journaled_state,
-        //     revm::JournaledState::new(Default::default(), Default::default()),
-        // );
-        // let error = std::mem::replace(&mut ecx_inner.error, Ok(()));
-        // let l1_block_info = std::mem::take(&mut ecx_inner.l1_block_info);
-        // drop(ecx_inner);
-
-        // ecx.env = env;
-        // ecx.journaled_state = journaled_state;
-        // ecx.error = error;
-        // ecx.l1_block_info = l1_block_info;
     }
 }
 
@@ -542,7 +512,7 @@ impl Clone for Cheatcodes {
     fn clone(&self) -> Self {
         Self {
             block: self.block.clone(),
-            active_delegation: self.active_delegation.clone(),
+            active_delegations: self.active_delegations.clone(),
             active_blob_sidecar: self.active_blob_sidecar.clone(),
             gas_price: self.gas_price,
             labels: self.labels.clone(),
@@ -581,7 +551,6 @@ impl Clone for Cheatcodes {
             strategy: self.strategy.clone(),
             access_list: self.access_list.clone(),
             test_context: self.test_context.clone(),
-            rng: self.rng.clone(),
         }
     }
 }
@@ -950,9 +919,6 @@ impl Cheatcodes {
                         });
                     }
 
-                    let active_delegation = self.active_delegation.clone();
-                    let active_blob_sidecar = self.active_blob_sidecar.clone();
-
                     if let Some(outcome) =
                         self.strategy.runner.record_broadcastable_call_transactions(
                             self.strategy.context.as_mut(),
@@ -961,8 +927,8 @@ impl Cheatcodes {
                             ecx,
                             broadcast,
                             &mut self.broadcastable_transactions,
-                            self.active_delegation.take(),
-                            self.active_blob_sidecar.take(),
+                            &mut self.active_delegations,
+                            &mut self.active_blob_sidecar,
                         )
                     {
                         return Some(outcome);
@@ -1730,7 +1696,12 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
             }]);
         }
 
-        if let Some(result) = self.strategy.runner.zksync_try_create(self, ecx, &input, executor) {
+        if let Some(result) = self.strategy.runner.zksync_try_create(
+            self,
+            ecx,
+            &input,
+            &mut TransparentCheatcodesExecutor,
+        ) {
             self.strategy.runner.zksync_increment_nonce_after_broadcast(self, ecx, false);
             return Some(result);
         }

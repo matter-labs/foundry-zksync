@@ -266,7 +266,7 @@ alloy-sol-types = "1.2.1"
 
 alloy-chains = "0.2"
 alloy-rlp = "0.3"
-alloy-zksync = { version = "1.0.7-alpha.1" }
+alloy-zksync = { version = "1.0.11-alpha.1", git = "https://github.com/matter-labs/alloy-zksync", branch = "popzxc-1.0.0-alpha.2" }
 
 alloy-trie = "0.9"
 

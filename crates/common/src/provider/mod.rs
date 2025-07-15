@@ -315,6 +315,7 @@ impl ProviderBuilder {
             jwt,
             headers,
             is_local,
+            accept_invalid_certs,
         } = self;
         let url = url?;
 
@@ -325,6 +326,7 @@ impl ProviderBuilder {
             .with_timeout(timeout)
             .with_headers(headers)
             .with_jwt(jwt)
+            .accept_invalid_certs(accept_invalid_certs)
             .build();
         let client = ClientBuilder::default().layer(retry_layer).transport(transport, is_local);
 

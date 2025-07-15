@@ -1,34 +1,34 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::{
-    backend::DatabaseExt, constants::DEFAULT_CREATE2_DEPLOYER_CODEHASH, Env, InspectorExt,
+    Env, InspectorExt, backend::DatabaseExt, constants::DEFAULT_CREATE2_DEPLOYER_CODEHASH,
 };
 use alloy_consensus::constants::KECCAK_EMPTY;
 use alloy_evm::{
+    Evm, EvmEnv,
     eth::EthEvmContext,
     precompiles::{DynPrecompile, PrecompilesMap},
-    Evm, EvmEnv,
 };
 use alloy_primitives::{Address, Bytes, U256};
 use foundry_fork_db::DatabaseError;
 use revm::{
+    Context, ExecuteEvm, Journal,
     context::{
-        result::{EVMError, HaltReason, ResultAndState},
         BlockEnv, CfgEnv, ContextTr, CreateScheme, Evm as RevmEvm, JournalTr, LocalContext, TxEnv,
+        result::{EVMError, HaltReason, ResultAndState},
     },
     handler::{
-        instructions::EthInstructions, EthFrame, EthPrecompiles, FrameInitOrResult, FrameResult,
-        Handler, ItemOrResult, MainnetHandler,
+        EthFrame, EthPrecompiles, FrameInitOrResult, FrameResult, Handler, ItemOrResult,
+        MainnetHandler, instructions::EthInstructions,
     },
     inspector::InspectorHandler,
     interpreter::{
-        interpreter::EthInterpreter, return_ok, CallInput, CallInputs, CallOutcome, CallScheme,
-        CallValue, CreateInputs, CreateOutcome, FrameInput, Gas, InstructionResult,
-        InterpreterResult,
+        CallInput, CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome,
+        FrameInput, Gas, InstructionResult, InterpreterResult, interpreter::EthInterpreter,
+        return_ok,
     },
-    precompile::{secp256r1::P256VERIFY, PrecompileSpecId, Precompiles},
+    precompile::{PrecompileSpecId, Precompiles, secp256r1::P256VERIFY},
     primitives::hardfork::SpecId,
-    Context, ExecuteEvm, Journal,
 };
 
 pub fn new_evm_with_inspector<'i, 'db, I: InspectorExt + ?Sized>(
@@ -351,7 +351,6 @@ impl<I: InspectorExt> InspectorHandler for FoundryHandler<'_, I> {
 
         let ItemOrResult::Item(FrameInput::Create(inputs)) = &frame_or_result else {
             return Ok(frame_or_result);
-            return Ok(frame_or_result);
         };
 
         let CreateScheme::Create2 { salt } = inputs.scheme else { return Ok(frame_or_result) };
@@ -395,7 +394,7 @@ impl<I: InspectorExt> InspectorHandler for FoundryHandler<'_, I> {
                 },
                 memory_offset: 0..0,
             })));
-        } else if code_hash != DEFAULT_CREATE2_DEPLOYER_CODEHASH {
+        } else if code_hash != DEFAULT_CREATE2_DEPLOYER_CODEHASH && !zk_is_create2_deployer {
             return Ok(ItemOrResult::Result(FrameResult::Call(CallOutcome {
                 result: InterpreterResult {
                     result: InstructionResult::Revert,
