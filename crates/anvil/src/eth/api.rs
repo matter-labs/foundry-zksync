@@ -1,5 +1,9 @@
 use super::{
+<<<<<<< HEAD
     backend::mem::{BlockRequest, DatabaseRef, State},
+=======
+    backend::mem::{BlockRequest, DatabaseRef, State, state},
+>>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
     sign::build_typed_transaction,
 };
 use crate::{

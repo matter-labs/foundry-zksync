@@ -51,8 +51,13 @@ use revm::{
     context_interface::{CreateScheme, transaction::SignedAuthorization},
     handler::FrameResult,
     interpreter::{
+<<<<<<< HEAD
         CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome, FrameInput,
         Gas, Host, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
+=======
+        CallInputs, CallOutcome, CallScheme, CreateInputs, CreateOutcome, FrameInput, Gas, Host,
+        InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
+>>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
         interpreter_types::{Jumps, LoopControl, MemoryTr},
     },
     state::EvmStorageSlot,

@@ -5,7 +5,11 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
+<<<<<<< HEAD
     utils::{configure_tx_env, get_blob_base_fee_update_fraction_by_spec_id},
+=======
+    utils::{configure_tx_env, configure_tx_req_env, get_blob_base_fee_update_fraction_by_spec_id},
+>>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
 };
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
@@ -35,8 +39,12 @@ use std::{
     any::Any,
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
+<<<<<<< HEAD
     sync::Arc,
     time::{Duration, Instant},
+=======
+    time::Instant,
+>>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
 };
 use strategy::{BackendStrategy, BackendStrategyForkInfo};
 
