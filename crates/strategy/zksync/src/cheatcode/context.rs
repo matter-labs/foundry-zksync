@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, B256};
+use alloy_primitives::{Address, B256, Bytes, keccak256, map::HashMap};
 use alloy_sol_types::SolValue;
 use foundry_cheatcodes::strategy::CheatcodeInspectorStrategyContext;
 use foundry_compilers::info::ContractInfo;
@@ -8,7 +8,7 @@ use foundry_evm_core::constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH};
 use foundry_zksync_compilers::dual_compiled_contracts::{
     DualCompiledContract, DualCompiledContracts,
 };
-use foundry_zksync_core::{vm::ZkEnv, ZkPaymasterData, H256};
+use foundry_zksync_core::{H256, ZkPaymasterData, vm::ZkEnv};
 use revm::state::Bytecode;
 
 use super::types::ZkStartupMigration;
