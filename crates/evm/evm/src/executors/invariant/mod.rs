@@ -413,7 +413,7 @@ impl<'a> InvariantExecutor<'a> {
                 invariant_test.merge_coverage(call_result.line_coverage.clone());
                 // If running with edge coverage then merge edge count with the current history
                 // map and set new coverage in current run.
-                if edge_coverage_enabled {
+                if self.config.corpus_dir.is_some() {
                     let (new_coverage, is_edge) =
                         call_result.merge_edge_coverage(&mut self.history_map);
                     if new_coverage {
@@ -518,14 +518,15 @@ impl<'a> InvariantExecutor<'a> {
 
             // End current invariant test run.
             invariant_test.end_run(current_run, self.config.gas_report_samples as usize);
+
             if let Some(progress) = progress {
                 // If running with progress then increment completed runs.
                 progress.inc(1);
                 // Display metrics in progress bar.
-                if edge_coverage_enabled {
+                if self.config.corpus_dir.is_some() {
                     progress.set_message(format!("{}", &corpus_manager.metrics));
                 }
-            } else if edge_coverage_enabled
+            } else if self.config.corpus_dir.is_some()
                 && last_metrics_report.elapsed() > DURATION_BETWEEN_METRICS_REPORT
             {
                 // Display metrics inline if corpus dir set.
