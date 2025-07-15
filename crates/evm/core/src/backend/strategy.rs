@@ -1,11 +1,11 @@
 use std::{any::Any, fmt::Debug};
 
 use crate::{
-    backend::{update_state, JournaledState},
+    Env, InspectorExt,
+    backend::{JournaledState, update_state},
     env::AsEnvMut,
     evm::new_evm_with_inspector,
     utils::configure_tx_req_env,
-    Env, InspectorExt,
 };
 
 use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
@@ -14,8 +14,8 @@ use alloy_primitives::{Address, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
 use revm::{
-    context_interface::result::ResultAndState, database::CacheDB, primitives::HashSet,
-    DatabaseCommit, DatabaseRef,
+    DatabaseCommit, DatabaseRef, context_interface::result::ResultAndState, database::CacheDB,
+    primitives::HashSet,
 };
 use serde::{Deserialize, Serialize};
 

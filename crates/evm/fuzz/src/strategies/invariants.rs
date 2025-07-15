@@ -1,8 +1,8 @@
 use super::{fuzz_calldata, fuzz_param_from_state};
 use crate::{
-    invariant::{BasicTxDetails, CallDetails, FuzzRunIdentifiedContracts, SenderFilters},
-    strategies::{fuzz_calldata_from_state, fuzz_param, EvmFuzzState},
     FuzzFixtures,
+    invariant::{BasicTxDetails, CallDetails, FuzzRunIdentifiedContracts, SenderFilters},
+    strategies::{EvmFuzzState, fuzz_calldata_from_state, fuzz_param},
 };
 use alloy_json_abi::Function;
 use alloy_primitives::Address;

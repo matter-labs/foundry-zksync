@@ -3,7 +3,7 @@ use std::{collections::HashSet, path::PathBuf};
 use alloy_provider::Provider;
 use eyre::Result;
 use foundry_cli::utils::{self, LoadConfig};
-use foundry_common::{compile::ProjectCompiler, ContractsByArtifact};
+use foundry_common::{ContractsByArtifact, compile::ProjectCompiler};
 use foundry_compilers::solc::Solc;
 use foundry_config::SolcReq;
 use itertools::Itertools;
@@ -55,12 +55,16 @@ impl VerifyArgs {
                         "Ambiguous compiler versions found in cache: {}",
                         unique_versions.iter().join(", ")
                     );
-                    eyre::bail!("Compiler version has to be set in `foundry.toml`. If the project was not deployed with foundry, specify the version through `--compiler-version` flag.")
+                    eyre::bail!(
+                        "Compiler version has to be set in `foundry.toml`. If the project was not deployed with foundry, specify the version through `--compiler-version` flag."
+                    )
                 }
 
                 unique_versions.into_iter().next().unwrap().to_owned()
             } else {
-                eyre::bail!("If cache is disabled, compiler version must be either provided with `--compiler-version` option or set in foundry.toml")
+                eyre::bail!(
+                    "If cache is disabled, compiler version must be either provided with `--compiler-version` option or set in foundry.toml"
+                )
             };
 
             ZkVerificationContext::new(contract_path, contract.name.clone(), version, config)

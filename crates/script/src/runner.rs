@@ -9,8 +9,8 @@ use foundry_config::Config;
 use foundry_evm::{
     constants::CALLER,
     executors::{
-        strategy::{DeployLibKind, DeployLibResult},
         DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
+        strategy::{DeployLibKind, DeployLibResult},
     },
     opts::EvmOpts,
     revm::interpreter::{InstructionResult, return_ok},

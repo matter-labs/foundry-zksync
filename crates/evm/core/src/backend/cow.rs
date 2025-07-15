@@ -1,6 +1,6 @@
 //! A wrapper around `Backend` that is clone-on-write used for fuzzing.
 
-use super::{strategy::BackendStrategy, BackendError, ForkInfo};
+use super::{BackendError, ForkInfo, strategy::BackendStrategy};
 use crate::{
     AsEnvMut, Env, EnvMut, InspectorExt,
     backend::{

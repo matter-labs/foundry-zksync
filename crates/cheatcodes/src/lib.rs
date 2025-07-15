@@ -46,12 +46,12 @@ mod env;
 pub use env::set_execution_context;
 
 mod evm;
-pub use evm::{mock::mock_call, DealRecord};
+pub use evm::{DealRecord, mock::mock_call};
 
 mod fs;
 
 mod inspector;
-pub use inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx};
+pub use inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit};
 
 mod json;
 

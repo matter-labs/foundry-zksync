@@ -6,8 +6,8 @@ use std::{
 };
 
 use alloy_primitives::{
-    map::{HashMap, HashSet},
     Address, Bytes,
+    map::{HashMap, HashSet},
 };
 use foundry_compilers::error::SolcError;
 use serde::{Deserialize, Serialize};

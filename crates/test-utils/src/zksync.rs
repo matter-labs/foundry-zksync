@@ -1,5 +1,5 @@
 //! Contains in-memory implementation of anvil-zksync.
-use std::{future::Future, net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 
 use anvil_zksync_api_server::NodeServerBuilder;
 use anvil_zksync_common::cache::CacheConfig;

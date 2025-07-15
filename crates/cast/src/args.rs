@@ -25,7 +25,7 @@ use foundry_common::{
     shell, stdin,
 };
 use std::time::Instant;
-use zksync_telemetry::{get_telemetry, TelemetryProps};
+use zksync_telemetry::{TelemetryProps, get_telemetry};
 
 /// Run the `cast` command-line interface.
 pub fn run() -> Result<()> {

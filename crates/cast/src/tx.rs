@@ -159,9 +159,9 @@ impl<P: Provider<AnyNetwork>> CastTxBuilder<P, InitState> {
         let etherscan_api_version = config.get_etherscan_api_version(Some(chain));
         let etherscan_api_key = config.get_etherscan_api_key(Some(chain));
         // mark it as legacy if requested or the chain is legacy and no 7702 is provided.
-        let legacy = tx_opts.legacy ||
-            (chain.is_legacy() && tx_opts.auth.is_none()) ||
-            config.zksync.run_in_zk_mode();
+        let legacy = tx_opts.legacy
+            || (chain.is_legacy() && tx_opts.auth.is_none())
+            || config.zksync.run_in_zk_mode();
 
         if let Some(gas_limit) = tx_opts.gas_limit {
             tx.set_gas_limit(gas_limit.to());

@@ -4,7 +4,7 @@ use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::DualCompiledContracts,
 };
-use foundry_zksync_core::{vm::ZkEnv, ZkTransactionMetadata};
+use foundry_zksync_core::{ZkTransactionMetadata, vm::ZkEnv};
 
 /// Defines the context for [ZksyncExecutorStrategyRunner].
 #[derive(Debug, Default, Clone)]

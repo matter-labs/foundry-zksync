@@ -1,18 +1,18 @@
-use alloy_evm::{eth::EthEvmContext, EvmEnv};
+use alloy_evm::{EvmEnv, eth::EthEvmContext};
 use alloy_primitives::{hex, map::HashMap};
 use itertools::Itertools;
 use revm::{
+    Database, Journal,
     context::{CreateScheme, JournalTr, TransactTo, TxEnv},
     context_interface::result::ResultAndState,
     interpreter::{CallInputs, CallScheme, CallValue},
     primitives::{Address, B256, U256 as rU256},
-    Database, Journal,
 };
 use tracing::{debug, info};
 use zksync_basic_types::H256;
 use zksync_types::{
-    ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, CONTRACT_DEPLOYER_ADDRESS,
-    CREATE2_FACTORY_ADDRESS, U256,
+    CONTRACT_DEPLOYER_ADDRESS, CREATE2_FACTORY_ADDRESS, U256, ethabi, fee::Fee, l2::L2Tx,
+    transaction_request::PaymasterParams,
 };
 use zksync_vm_interface::Call;
 
@@ -23,7 +23,7 @@ use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256},
     vm::{
         db::ZKVMData,
-        inspect::{gas_params, inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult},
+        inspect::{ZKVMExecutionResult, ZKVMResult, gas_params, inspect, inspect_as_batch},
         tracers::cheatcode::{CallContext, CheatcodeTracerContext},
     },
 };

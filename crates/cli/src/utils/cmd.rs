@@ -234,7 +234,7 @@ pub fn has_different_gas_calc(chain_id: u64) -> bool {
 pub fn has_batch_support(chain_id: u64) -> bool {
     if let Some(chain) = Chain::from(chain_id).named() {
         if matches!(chain, NamedChain::ZkSync | NamedChain::ZkSyncTestnet) {
-            return false
+            return false;
         };
         return !chain.is_arbitrum();
     }

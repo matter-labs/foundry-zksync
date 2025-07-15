@@ -14,9 +14,8 @@ extern crate tracing;
 use crate::runner::ScriptRunner;
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{
-    hex,
+    Address, Bytes, Log, TxKind, U256, hex,
     map::{AddressHashMap, HashMap},
-    Address, Bytes, Log, TxKind, U256,
 };
 use alloy_signer::Signer;
 use broadcast::next_nonce;
@@ -32,25 +31,25 @@ use foundry_cli::{
     utils::{self, LoadConfig},
 };
 use foundry_common::{
+    CONTRACT_MAX_SIZE, ContractsByArtifact, SELECTOR_LEN,
     abi::{encode_function_args, get_func},
     evm::{Breakpoints, EvmArgs},
-    shell, ContractsByArtifact, CONTRACT_MAX_SIZE, SELECTOR_LEN,
+    shell,
 };
 use foundry_compilers::ArtifactId;
 use foundry_config::{
-    figment,
+    Config, figment,
     figment::{
-        value::{Dict, Map},
         Metadata, Profile, Provider,
+        value::{Dict, Map},
     },
-    Config,
 };
 use foundry_evm::{
     backend::Backend,
     executors::ExecutorBuilder,
     inspectors::{
-        cheatcodes::{BroadcastableTransactions, Wallets},
         CheatsConfig,
+        cheatcodes::{BroadcastableTransactions, Wallets},
     },
     opts::EvmOpts,
     traces::{TraceMode, Traces},

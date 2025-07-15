@@ -20,18 +20,18 @@ pub mod state;
 
 use alloy_evm::eth::EthEvmContext;
 use alloy_network::TransactionBuilder;
-use alloy_primitives::{address, hex, keccak256, Address, Bytes, U256 as rU256};
+use alloy_primitives::{Address, Bytes, U256 as rU256, address, hex, keccak256};
 use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
     provider::ZksyncProvider,
 };
 use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256};
 use eyre::eyre;
-use revm::{context::JournalTr, Database};
+use revm::{Database, context::JournalTr};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
-use zksync_types::{bytecode::BytecodeHash, Nonce, ProtocolVersionId};
+use zksync_types::{Nonce, ProtocolVersionId, bytecode::BytecodeHash};
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, deploy_nonce, encode_create_params, tx_nonce};
@@ -39,13 +39,13 @@ pub use vm::{balance, deploy_nonce, encode_create_params, tx_nonce};
 pub use vm::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use zksync_multivm::interface::{Call, CallType};
 pub use zksync_types::{
-    ethabi, transaction_request::PaymasterParams, ACCOUNT_CODE_STORAGE_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H256,
+    IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS,
+    NONCE_HOLDER_ADDRESS, ethabi, transaction_request::PaymasterParams,
 };
 use zksync_types::{
-    utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
     U256,
+    utils::{decompose_full_nonce, nonces_to_full_nonce, storage_key_for_eth_balance},
 };
 
 type Result<T> = std::result::Result<T, eyre::Report>;

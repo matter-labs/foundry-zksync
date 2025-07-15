@@ -1,8 +1,8 @@
 use std::any::Any;
 
-use alloy_primitives::{map::HashMap, Address, U256};
+use alloy_primitives::{Address, U256, map::HashMap};
 use foundry_evm::backend::strategy::BackendStrategyContext;
-use foundry_zksync_core::{vm::ZkEnv, PaymasterParams};
+use foundry_zksync_core::{PaymasterParams, vm::ZkEnv};
 use revm::primitives::HashSet;
 use zksync_types::H256;
 

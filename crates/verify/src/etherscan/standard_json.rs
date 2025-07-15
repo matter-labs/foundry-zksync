@@ -1,7 +1,6 @@
 use super::{EtherscanSourceProvider, EtherscanZksyncSourceProvider, VerifyArgs};
 use crate::{
-    zk_provider::ZkVerificationContext,
-    {provider::VerificationContext, verify::ContractLanguage},
+    provider::VerificationContext, verify::ContractLanguage, zk_provider::ZkVerificationContext,
 };
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;

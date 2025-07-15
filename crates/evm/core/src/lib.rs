@@ -11,9 +11,9 @@ use alloy_primitives::Address;
 use auto_impl::auto_impl;
 use backend::DatabaseExt;
 use revm::{
+    Inspector,
     inspector::NoOpInspector,
     interpreter::{CallInputs, CreateInputs},
-    Inspector,
 };
 use revm_inspectors::access_list::AccessListInspector;
 
