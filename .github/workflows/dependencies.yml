@@ -22,7 +22,7 @@ jobs:
             - uses: actions/checkout@v4
             - uses: dtolnay/rust-toolchain@nightly
               with:
-                  toolchain: nightly-2024-09-01
+                  toolchain: nightly-2025-03-19
 
             - name: cargo update
               # Remove first line that always just says "Updating crates.io index"
