@@ -107,9 +107,6 @@ quick-junit = "0.5.1"
 # zk
 zksync_telemetry.workspace = true
 
-[target.'cfg(unix)'.dependencies]
-tikv-jemallocator = { workspace = true, optional = true }
-
 [dev-dependencies]
 alloy-hardforks.workspace = true
 anvil.workspace = true

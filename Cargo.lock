@@ -4544,7 +4544,6 @@ dependencies = [
  "svm-rs",
  "tempfile",
  "thiserror 2.0.12",
- "tikv-jemallocator",
  "tokio",
  "toml_edit 0.22.27",
  "tower-http",
