@@ -74,7 +74,7 @@ impl ZksyncCheatcodeInspectorStrategyContext {
             ContractInfo::new("EmptyEVMBytecode"),
             DualCompiledContract {
                 zk_bytecode_hash,
-                zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+                zk_deployed_bytecode,
                 zk_factory_deps: Default::default(),
                 evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
                 evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone())

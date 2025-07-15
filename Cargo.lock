@@ -2753,7 +2753,6 @@ dependencies = [
  "regex",
  "revm",
  "rpassword",
- "rustls 0.23.29",
  "semver 1.0.26",
  "serde",
  "serde_json",
