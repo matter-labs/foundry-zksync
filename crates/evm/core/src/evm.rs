@@ -376,6 +376,7 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                 unreachable!("create2 override should be a call frame");
             };
 
+            // Decode address from output.
             let address = match call.instruction_result() {
                 return_ok!() => {
                     let bytes = call.output().as_ref();

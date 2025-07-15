@@ -299,6 +299,8 @@ impl RunArgs {
 
                     env.evm_env.cfg_env.disable_balance_check = true;
 
+                    env.evm_env.cfg_env.disable_balance_check = true;
+
                     if let Some(to) = Transaction::to(tx) {
                         trace!(tx=?tx.tx_hash(),?to, "executing previous call transaction");
                         executor.transact_with_env(env.clone()).wrap_err_with(|| {
