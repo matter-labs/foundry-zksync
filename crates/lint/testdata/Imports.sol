@@ -9,7 +9,7 @@ import {
     docSymbol2,
     docSymbolWrongTag, //~NOTE: unused imports should be removed
     eventSymbol,
-    overrideSymbol,
+    BaseContract,
     symbolNotUsed, //~NOTE: unused imports should be removed
     IContract,
     IContractNotUsed //~NOTE: unused imports should be removed
@@ -25,17 +25,6 @@ import {
 import {
     symbolNotUsed3 //~NOTE: unused imports should be removed
 } from "./auxiliary/ImportsFile.sol";
-
-// forge-lint: disable-next-item
-import {
-    symbolNotUsed2
-} from "File.sol";
-
-// in this case, disabling the following line doesn't do anything
-// forge-lint: disable-next-line
-import {
-    symbolNotUsed3 //~NOTE: unused imports should be removed
-} from "File.sol";
 
 import {
     CONSTANT_0,
@@ -77,7 +66,7 @@ contract UnusedImport is IContract, BaseContract {
     SomeFile2.Baz public myStruct2;
     symbol4 public myVar;
 
-    function foo(uint256 a, symbol5 b) public view override(overrideSymbol) returns (uint256) {
+    function foo(uint256 a, symbol5 b) public view override(BaseContract) returns (uint256) {
         uint256 c = Utils.calculate(a, b);
         emit eventSymbol.foo(c);
         return c;

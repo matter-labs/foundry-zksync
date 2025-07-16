@@ -16,7 +16,7 @@ use rustyline::{
 };
 use solar_parse::{
     Lexer,
-    interface::Session,
+    interface::{Session, SessionGlobals},
     token::{Token, TokenKind},
 };
 use std::{borrow::Cow, ops::Range, str::FromStr};
@@ -37,6 +37,7 @@ pub struct SolidityHelper {
 
     do_paint: bool,
     sess: Session,
+    globals: SessionGlobals,
 }
 
 impl Default for SolidityHelper {
@@ -52,6 +53,7 @@ impl SolidityHelper {
             errored: false,
             do_paint: yansi::is_enabled(),
             sess: Session::builder().with_silent_emitter(None).build(),
+            globals: SessionGlobals::default(),
         }
     }
 

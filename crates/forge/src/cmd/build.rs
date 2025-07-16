@@ -8,7 +8,7 @@ use foundry_cli::{
 };
 use foundry_common::{compile::ProjectCompiler, shell};
 use foundry_compilers::{
-    CompilationError, FileFilter, Project,
+    CompilationError, FileFilter, Project, ProjectCompileOutput,
     compilers::{Language, multi::MultiCompilerLanguage},
     solc::SolcLanguage,
     utils::source_files_iter,
@@ -73,7 +73,7 @@ pub struct BuildArgs {
 impl BuildArgs {
     // TODO(zk): We cannot return `ProjectCompileOutput` as there's currently no way to return
     // a common type from solc and zksolc branches.
-    pub fn run(self) -> Result<()> {
+    pub fn run(self) -> Result<ProjectCompileOutput> {
         let mut config = self.load_config()?;
 
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
@@ -159,9 +159,37 @@ impl BuildArgs {
             }
 
             // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
-            // solc output. This is safe currently as the output is simply dropped.
-            Ok(())
+            // solc output. For now, create a dummy ProjectCompileOutput.
+            // This is a temporary solution until ZKsync output types are unified.
+            use foundry_compilers::artifacts::CompilerOutput;
+            let dummy_output = ProjectCompileOutput::new(CompilerOutput::default(), vec![]);
+            Ok(dummy_output)
         }
+
+        let format_json = shell::is_json();
+        let compiler = ProjectCompiler::new()
+            .files(files)
+            .dynamic_test_linking(config.dynamic_test_linking)
+            .print_names(self.names)
+            .print_sizes(self.sizes)
+            .ignore_eip_3860(self.ignore_eip_3860)
+            .bail(!format_json);
+
+        let output = compiler.compile(&project)?;
+
+        // Cache project selectors.
+        cache_local_signatures(&output)?;
+
+        if format_json && !self.names && !self.sizes {
+            sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
+        }
+
+        // Only run the `SolidityLinter` if there are no compilation errors
+        if output.output().errors.iter().all(|e| !e.is_error()) {
+            self.lint(&project, &config)?;
+        }
+
+        Ok(output)
     }
 
     fn lint(&self, project: &Project, config: &Config) -> Result<()> {
