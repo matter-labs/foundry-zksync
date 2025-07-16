@@ -1,7 +1,6 @@
-use solar_ast::{Item, SourceUnit, visit::Visit as VisitAst};
+use solar_ast::{Item, SourceUnit, visit::Visit};
 use solar_interface::SourceMap;
 use solar_parse::ast::Span;
-use solar_sema::hir::{self, Visit as VisitHir};
 use std::{collections::HashMap, fmt, marker::PhantomData, ops::ControlFlow};
 
 /// An inline config item
@@ -21,7 +20,7 @@ pub enum InlineConfigItem {
 
 impl InlineConfigItem {
     /// Parse an inline config item from a string. Validates lint IDs against available lints.
-    pub fn parse(s: &str, lint_ids: &[&str]) -> Result<Self, InvalidInlineConfigItem> {
+    pub fn parse(s: &str, available_lints: &[&str]) -> Result<Self, InvalidInlineConfigItem> {
         let (disable, relevant) = s.split_once('(').unwrap_or((s, ""));
         let lints = if relevant.is_empty() || relevant == "all)" {
             vec!["all".to_string()]
@@ -38,7 +37,7 @@ impl InlineConfigItem {
             if id == "all" {
                 continue;
             }
-            for lint in lint_ids {
+            for lint in available_lints {
                 if *lint == id {
                     continue 'ids;
                 }
@@ -109,33 +108,10 @@ impl InlineConfig {
     /// # Panics
     ///
     /// Panics if `items` is not sorted in ascending order of [`Span`]s.
-    pub fn from_ast<'ast>(
+    pub fn new<'ast>(
         items: impl IntoIterator<Item = (Span, InlineConfigItem)>,
         ast: &'ast SourceUnit<'ast>,
         source_map: &SourceMap,
-    ) -> Self {
-        Self::build(items, source_map, |offset| NextItemFinderAst::new(offset).find(ast))
-    }
-
-    /// Build a new inline config with an iterator of inline config items and their locations in a
-    /// source file.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `items` is not sorted in ascending order of [`Span`]s.
-    pub fn from_hir<'hir>(
-        items: impl IntoIterator<Item = (Span, InlineConfigItem)>,
-        hir: &'hir hir::Hir<'hir>,
-        source_id: hir::SourceId,
-        source_map: &SourceMap,
-    ) -> Self {
-        Self::build(items, source_map, |offset| NextItemFinderHir::new(offset, hir).find(source_id))
-    }
-
-    fn build(
-        items: impl IntoIterator<Item = (Span, InlineConfigItem)>,
-        source_map: &SourceMap,
-        mut find_next_item: impl FnMut(usize) -> Option<Span>,
     ) -> Self {
         let mut disabled_ranges: HashMap<String, Vec<DisabledRange>> = HashMap::new();
         let mut disabled_blocks: HashMap<String, (usize, usize, usize)> = HashMap::new();
@@ -151,7 +127,7 @@ impl InlineConfig {
             let src = file.src.as_str();
             match item {
                 InlineConfigItem::DisableNextItem(lints) => {
-                    if let Some(next_item) = find_next_item(sp.hi().to_usize()) {
+                    if let Some(next_item) = NextItemFinder::new(sp.hi().to_usize()).find(ast) {
                         for lint in lints {
                             disabled_ranges.entry(lint).or_default().push(DisabledRange {
                                 start: next_item.lo().to_usize(),
@@ -159,7 +135,7 @@ impl InlineConfig {
                                 loose: false,
                             });
                         }
-                    }
+                    };
                 }
                 InlineConfigItem::DisableLine(lints) => {
                     let start = src[..comment_range.start].rfind('\n').map_or(0, |i| i);
@@ -252,13 +228,13 @@ impl InlineConfig {
 
 /// An AST visitor that finds the first `Item` that starts after a given offset.
 #[derive(Debug, Default)]
-struct NextItemFinderAst<'ast> {
+struct NextItemFinder<'ast> {
     /// The offset to search after.
     offset: usize,
     _pd: PhantomData<&'ast ()>,
 }
 
-impl<'ast> NextItemFinderAst<'ast> {
+impl<'ast> NextItemFinder<'ast> {
     fn new(offset: usize) -> Self {
         Self { offset, _pd: PhantomData }
     }
@@ -272,58 +248,13 @@ impl<'ast> NextItemFinderAst<'ast> {
     }
 }
 
-impl<'ast> VisitAst<'ast> for NextItemFinderAst<'ast> {
+impl<'ast> Visit<'ast> for NextItemFinder<'ast> {
     type BreakValue = Span;
 
     fn visit_item(&mut self, item: &'ast Item<'ast>) -> ControlFlow<Self::BreakValue> {
         // Check if this item starts after the offset.
         if item.span.lo().to_usize() > self.offset {
             return ControlFlow::Break(item.span);
-        }
-
-        // Otherwise, continue traversing inside this item.
-        self.walk_item(item)
-    }
-}
-
-/// A HIR visitor that finds the first `Item` that starts after a given offset.
-#[derive(Debug)]
-struct NextItemFinderHir<'hir> {
-    hir: &'hir hir::Hir<'hir>,
-    /// The offset to search after.
-    offset: usize,
-}
-
-impl<'hir> NextItemFinderHir<'hir> {
-    fn new(offset: usize, hir: &'hir hir::Hir<'hir>) -> Self {
-        Self { offset, hir }
-    }
-
-    /// Finds the next HIR item which a span that begins after the `offset`.
-    fn find(&mut self, id: hir::SourceId) -> Option<Span> {
-        match self.visit_nested_source(id) {
-            ControlFlow::Break(span) => Some(span),
-            ControlFlow::Continue(()) => None,
-        }
-    }
-}
-
-impl<'hir> VisitHir<'hir> for NextItemFinderHir<'hir> {
-    type BreakValue = Span;
-
-    fn hir(&self) -> &'hir hir::Hir<'hir> {
-        self.hir
-    }
-
-    fn visit_item(&mut self, item: hir::Item<'hir, 'hir>) -> ControlFlow<Self::BreakValue> {
-        // Check if this item starts after the offset.
-        if item.span().lo().to_usize() > self.offset {
-            return ControlFlow::Break(item.span());
-        }
-
-        // If the item is before the offset, skip traverse.
-        if item.span().hi().to_usize() < self.offset {
-            return ControlFlow::Continue(());
         }
 
         // Otherwise, continue traversing inside this item.
