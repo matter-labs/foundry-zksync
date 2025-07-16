@@ -1,8 +1,8 @@
 use super::{fuzz_calldata, fuzz_param_from_state};
 use crate::{
-    invariant::{BasicTxDetails, CallDetails, FuzzRunIdentifiedContracts, SenderFilters},
-    strategies::{fuzz_calldata_from_state, fuzz_param, EvmFuzzState},
     FuzzFixtures,
+    invariant::{BasicTxDetails, CallDetails, FuzzRunIdentifiedContracts, SenderFilters},
+    strategies::{EvmFuzzState, fuzz_calldata_from_state, fuzz_param},
 };
 use alloy_json_abi::Function;
 use alloy_primitives::Address;
@@ -88,7 +88,7 @@ fn select_random_sender(
     fuzz_state: &EvmFuzzState,
     senders: Rc<SenderFilters>,
     dictionary_weight: u32,
-) -> impl Strategy<Value = Address> {
+) -> impl Strategy<Value = Address> + use<> {
     let no_zksync_reserved_addresses = fuzz_state.dictionary_read().no_zksync_reserved_addresses();
     if !senders.targeted.is_empty() {
         any::<prop::sample::Index>().prop_map(move |index| *index.get(&senders.targeted)).boxed()
@@ -112,7 +112,7 @@ pub fn fuzz_contract_with_calldata(
     fuzz_fixtures: &FuzzFixtures,
     target: Address,
     func: Function,
-) -> impl Strategy<Value = CallDetails> {
+) -> impl Strategy<Value = CallDetails> + use<> {
     let no_zksync_reserved_addresses = fuzz_state.dictionary_read().no_zksync_reserved_addresses();
 
     // We need to compose all the strategies generated for each parameter in all possible

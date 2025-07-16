@@ -1,7 +1,7 @@
 //! Forge tests for constructor functionality with and without value.
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
-use foundry_test_utils::{forgetest_async, util, TestProject};
+use foundry_test_utils::{TestProject, forgetest_async, util};
 
 use crate::test_helpers::run_zk_script_test;
 use foundry_test_utils::Filter;

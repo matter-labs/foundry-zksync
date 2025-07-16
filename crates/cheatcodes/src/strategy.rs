@@ -6,14 +6,17 @@ use alloy_primitives::{Address, TxKind};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
 use revm::{
     context_interface::transaction::SignedAuthorization,
-    interpreter::{CallInputs, CallOutcome, CreateOutcome, Interpreter},
+    interpreter::{
+        CallInputs, CallOutcome, CreateOutcome, Gas, InstructionResult, Interpreter,
+        InterpreterResult,
+    },
 };
 
 use crate::{
-    inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx},
-    script::Broadcast,
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, DynCheatcode, Result,
+    CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
+    inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit},
+    script::Broadcast,
 };
 
 /// Represents the context for [CheatcodeInspectorStrategy].
@@ -97,9 +100,9 @@ pub trait CheatcodeInspectorStrategyRunner:
         ecx: Ecx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: Option<SignedAuthorization>,
-        active_blob_sidecar: Option<BlobTransactionSidecar>,
-    );
+        active_delegation: &mut Vec<SignedAuthorization>,
+        active_blob_sidecar: &mut Option<BlobTransactionSidecar>,
+    ) -> Option<CallOutcome>;
 
     fn post_initialize_interp(
         &self,
@@ -221,46 +224,56 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         ecx: Ecx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: Option<SignedAuthorization>,
-        active_blob_sidecar: Option<BlobTransactionSidecar>,
-    ) {
+        active_delegation: &mut Vec<SignedAuthorization>,
+        active_blob_sidecar: &mut Option<BlobTransactionSidecar>,
+    ) -> Option<CallOutcome> {
         let input = TransactionInput::new(call.input.bytes(ecx));
         let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx, call.gas_limit);
 
         let account = ecx.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
-        let nonce = account.info.nonce;
 
         let mut tx_req = TransactionRequest {
             from: Some(broadcast.new_origin),
             to: Some(TxKind::from(Some(call.target_address))),
             value: call.transfer_value(),
             input,
-            nonce: Some(nonce),
+            nonce: Some(account.info.nonce),
             chain_id: Some(ecx.cfg.chain_id),
             gas: if is_fixed_gas_limit { Some(call.gas_limit) } else { None },
             ..Default::default()
         };
 
-        match (active_delegation, active_blob_sidecar) {
-            (Some(_), Some(_)) => {
-                // Note(zk): We can't return a call outcome from here
-                return;
+        let active_delegation = std::mem::take(active_delegation);
+        // Set active blob sidecar, if any.
+        if let Some(blob_sidecar) = active_blob_sidecar.take() {
+            // Ensure blob and delegation are not set for the same tx.
+            if !active_delegation.is_empty() {
+                let msg = "both delegation and blob are active; `attachBlob` and `attachDelegation` are not compatible";
+                return Some(CallOutcome {
+                    result: InterpreterResult {
+                        result: InstructionResult::Revert,
+                        output: Error::encode(msg),
+                        gas: Gas::new(call.gas_limit),
+                    },
+                    memory_offset: call.return_memory_offset.clone(),
+                });
             }
-            (Some(auth_list), None) => {
-                tx_req.authorization_list = Some(vec![auth_list]);
-                tx_req.sidecar = None;
+            tx_req.set_blob_sidecar(blob_sidecar);
+        }
 
-                // Increment nonce to reflect the signed authorization.
-                account.info.nonce += 1;
+        // Apply active EIP-7702 delegations, if any.
+        if !active_delegation.is_empty() {
+            for auth in &active_delegation {
+                let Ok(authority) = auth.recover_authority() else {
+                    continue;
+                };
+                if authority == broadcast.new_origin {
+                    // Increment nonce of broadcasting account to reflect signed
+                    // authorization.
+                    account.info.nonce += 1;
+                }
             }
-            (None, Some(blob_sidecar)) => {
-                tx_req.set_blob_sidecar(blob_sidecar);
-                tx_req.authorization_list = None;
-            }
-            (None, None) => {
-                tx_req.sidecar = None;
-                tx_req.authorization_list = None;
-            }
+            tx_req.authorization_list = Some(active_delegation);
         }
 
         broadcastable_transactions.push_back(BroadcastableTransaction {
@@ -268,6 +281,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
             transaction: tx_req.into(),
         });
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
+        None
     }
 }
 

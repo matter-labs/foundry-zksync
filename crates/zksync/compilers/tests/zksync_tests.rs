@@ -7,8 +7,8 @@ use std::{
 
 use foundry_compilers_artifacts_solc::Remapping;
 use foundry_test_utils::foundry_compilers::{
-    buildinfo::BuildInfo, cache::CompilerCache, project_util::*, resolver::parse::SolData,
-    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig,
+    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig, buildinfo::BuildInfo,
+    cache::CompilerCache, project_util::*, resolver::parse::SolData,
 };
 
 use foundry_zksync_compilers::{
@@ -16,9 +16,9 @@ use foundry_zksync_compilers::{
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
+            ErrorType, WarningType, ZkSolc, ZkSolcCompiler, ZkSolcSettings,
             input::ZkSolcInput,
             settings::{BytecodeHash, SettingsMetadata},
-            ErrorType, WarningType, ZkSolc, ZkSolcCompiler, ZkSolcSettings,
         },
     },
 };
@@ -74,8 +74,8 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
                         "zksolc {version}: {n} artifact bytecode field should not be empty"
                     ))
                     .object()
-                    .bytes_len() >
-                    0,
+                    .bytes_len()
+                    > 0,
                 "zksolc {version}",
             );
         }
@@ -628,10 +628,12 @@ contract Util {}
 
     let compiled = project.compile().unwrap();
     assert!(compiled.has_compiler_errors());
-    assert!(compiled.output().errors.iter().any(|error| error
-        .formatted_message
-        .as_ref()
-        .is_some_and(|msg| msg.contains("File outside of allowed directories"))));
+    assert!(compiled.output().errors.iter().any(|error| {
+        error
+            .formatted_message
+            .as_ref()
+            .is_some_and(|msg| msg.contains("File outside of allowed directories"))
+    }));
 }
 
 #[test]

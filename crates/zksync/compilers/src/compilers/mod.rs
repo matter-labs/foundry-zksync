@@ -7,11 +7,11 @@ use std::path::{Path, PathBuf};
 use alloy_primitives::map::HashSet;
 use artifact_output::zk::ZkArtifactOutput;
 use foundry_compilers::{
+    Graph, Project,
     error::{Result, SolcError},
     resolver::parse::SolData,
-    Graph, Project,
 };
-use zksolc::{input::StandardJsonCompilerInput, ZkSolcCompiler, ZkSolcSettings};
+use zksolc::{ZkSolcCompiler, ZkSolcSettings, input::StandardJsonCompilerInput};
 
 /// zksolc specific standard_json_input to be used in verification
 // https://github.com/foundry-rs/compilers/blob/ff2a8d68a0d85d8f40c545a7a948e84d1bc2488e/crates/compilers/src/lib.rs#L165

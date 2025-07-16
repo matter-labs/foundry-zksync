@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, default, fmt::Debug, ops::Deref};
 
-use alloy_primitives::{hex, Address};
+use alloy_primitives::{Address, hex};
 use itertools::Itertools;
 use zksync_basic_types::{H160, U256};
 use zksync_multivm::{
@@ -12,12 +12,12 @@ use zksync_multivm::{
         aux_structures::{MemoryPage, Timestamp},
         opcodes::DecodedOpcode as ZkDecodedOpcode,
         tracing::{AfterExecutionData, BeforeExecutionData, VmLocalStateData},
-        vm_state::{self, code_page_candidate_from_base, PrimitiveValue},
+        vm_state::{self, PrimitiveValue, code_page_candidate_from_base},
         zkevm_opcode_defs::{
+            CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER, CALL_SYSTEM_ABI_REGISTERS, Condition,
+            DecodedOpcode as ZkDecodedOpcodeDef, FarCallABI, FarCallOpcode, FatPointer, Opcode,
+            OpcodeVariant, Operand, RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER, RetOpcode,
             decoding::{EncodingModeProduction, VmEncodingMode},
-            Condition, DecodedOpcode as ZkDecodedOpcodeDef, FarCallABI, FarCallOpcode, FatPointer,
-            Opcode, OpcodeVariant, Operand, RetOpcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
-            CALL_SYSTEM_ABI_REGISTERS, RET_IMPLICIT_RETURNDATA_PARAMS_REGISTER,
         },
     },
 };
@@ -545,11 +545,7 @@ impl ParsedFarCall {
     pub(crate) fn selector(&self) -> String {
         let calldata = self.calldata();
 
-        if calldata.len() < 4 {
-            String::from("")
-        } else {
-            hex::encode(&calldata[0..4])
-        }
+        if calldata.len() < 4 { String::from("") } else { hex::encode(&calldata[0..4]) }
     }
 
     /// Retrieves the calldata for the call, if any

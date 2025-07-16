@@ -1,8 +1,8 @@
 use alloy_json_abi::{EventParam, InternalType, JsonAbi, Param};
 use alloy_primitives::{hex, keccak256};
 use clap::Parser;
-use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Table};
-use eyre::{eyre, Result};
+use comfy_table::{Cell, Table, modifiers::UTF8_ROUND_CORNERS};
+use eyre::{Result, eyre};
 use foundry_cli::opts::{BuildOpts, CompilerOpts};
 use foundry_common::{
     compile::{PathOrContractInfo, ProjectCompiler},
@@ -10,11 +10,11 @@ use foundry_common::{
 };
 use foundry_compilers::{
     artifacts::{
+        StorageLayout,
         output_selection::{
             BytecodeOutputSelection, ContractOutputSelection, DeployedBytecodeOutputSelection,
             EvmOutputSelection, EwasmOutputSelection,
         },
-        StorageLayout,
     },
     solc::SolcLanguage,
 };
@@ -515,21 +515,21 @@ impl PartialEq<ContractOutputSelection> for ContractArtifactField {
         type Eos = EvmOutputSelection;
         matches!(
             (self, other),
-            (Self::Abi | Self::Events, Cos::Abi) |
-                (Self::Errors, Cos::Abi) |
-                (Self::Bytecode, Cos::Evm(Eos::ByteCode(_))) |
-                (Self::DeployedBytecode, Cos::Evm(Eos::DeployedByteCode(_))) |
-                (Self::Assembly | Self::AssemblyOptimized, Cos::Evm(Eos::Assembly)) |
-                (Self::LegacyAssembly, Cos::Evm(Eos::LegacyAssembly)) |
-                (Self::MethodIdentifiers, Cos::Evm(Eos::MethodIdentifiers)) |
-                (Self::GasEstimates, Cos::Evm(Eos::GasEstimates)) |
-                (Self::StorageLayout, Cos::StorageLayout) |
-                (Self::DevDoc, Cos::DevDoc) |
-                (Self::Ir, Cos::Ir) |
-                (Self::IrOptimized, Cos::IrOptimized) |
-                (Self::Metadata, Cos::Metadata) |
-                (Self::UserDoc, Cos::UserDoc) |
-                (Self::Ewasm, Cos::Ewasm(_))
+            (Self::Abi | Self::Events, Cos::Abi)
+                | (Self::Errors, Cos::Abi)
+                | (Self::Bytecode, Cos::Evm(Eos::ByteCode(_)))
+                | (Self::DeployedBytecode, Cos::Evm(Eos::DeployedByteCode(_)))
+                | (Self::Assembly | Self::AssemblyOptimized, Cos::Evm(Eos::Assembly))
+                | (Self::LegacyAssembly, Cos::Evm(Eos::LegacyAssembly))
+                | (Self::MethodIdentifiers, Cos::Evm(Eos::MethodIdentifiers))
+                | (Self::GasEstimates, Cos::Evm(Eos::GasEstimates))
+                | (Self::StorageLayout, Cos::StorageLayout)
+                | (Self::DevDoc, Cos::DevDoc)
+                | (Self::Ir, Cos::Ir)
+                | (Self::IrOptimized, Cos::IrOptimized)
+                | (Self::Metadata, Cos::Metadata)
+                | (Self::UserDoc, Cos::UserDoc)
+                | (Self::Ewasm, Cos::Ewasm(_))
         )
     }
 }
@@ -578,10 +578,10 @@ fn print_yul(yul: Option<&str>, strip_comments: bool) -> Result<()> {
 fn get_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<String> {
     let value = serde_json::to_value(obj)?;
     let mut value_ref = &value;
-    if let Some(key) = key {
-        if let Some(value2) = value.get(key) {
-            value_ref = value2;
-        }
+    if let Some(key) = key
+        && let Some(value2) = value.get(key)
+    {
+        value_ref = value2;
     }
     let s = match value_ref.as_str() {
         Some(s) => s.to_string(),
@@ -599,10 +599,12 @@ mod tests {
         for &field in ContractArtifactField::ALL {
             if field == ContractArtifactField::StandardJson {
                 let selection: Result<ContractOutputSelection, _> = field.try_into();
-                assert!(selection
-                    .unwrap_err()
-                    .to_string()
-                    .eq("StandardJson is not supported for ContractOutputSelection"));
+                assert!(
+                    selection
+                        .unwrap_err()
+                        .to_string()
+                        .eq("StandardJson is not supported for ContractOutputSelection")
+                );
             } else {
                 let selection: ContractOutputSelection = field.try_into().unwrap();
                 assert_eq!(field, selection);

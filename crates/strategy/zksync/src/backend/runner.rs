@@ -5,20 +5,21 @@ use alloy_primitives::{Address, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Ok, Result};
 use foundry_evm::{
-    backend::{
-        strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        update_state, Backend, DatabaseExt, JournaledState,
-    },
     Env, InspectorExt,
+    backend::{
+        Backend, DatabaseExt, JournaledState,
+        strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
+        update_state,
+    },
 };
 use foundry_evm_core::{
-    backend::{
-        strategy::{BackendStrategyForkInfo, BackendStrategyRunner, EvmBackendStrategyRunner},
-        BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
-    },
     AsEnvMut as _,
+    backend::{
+        BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
+        strategy::{BackendStrategyForkInfo, BackendStrategyRunner, EvmBackendStrategyRunner},
+    },
 };
-use revm::{context::result::ResultAndState, primitives::HashSet, DatabaseCommit};
+use revm::{DatabaseCommit, context::result::ResultAndState, primitives::HashSet};
 use serde::{Deserialize, Serialize};
 
 use crate::backend::{

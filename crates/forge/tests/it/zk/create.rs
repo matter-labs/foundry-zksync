@@ -1,7 +1,6 @@
 use foundry_test_utils::{
-    forgetest_async,
+    ZkSyncNode, forgetest_async,
     util::{self, OutputExt},
-    ZkSyncNode,
 };
 
 use crate::test_helpers::deploy_zk_contract;

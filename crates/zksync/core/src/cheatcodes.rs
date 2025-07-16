@@ -1,25 +1,26 @@
 use std::fmt::Debug;
 
 use alloy_evm::eth::EthEvmContext;
-use alloy_primitives::{hex, Bytes, B256};
+use alloy_primitives::{B256, Bytes, hex};
 use revm::{
+    Database,
     bytecode::Bytecode,
     context::JournalTr,
     primitives::{Address, U256 as rU256},
-    Database,
 };
 use tracing::info;
 use zksync_types::{
+    ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
     block::{pack_block_info, unpack_block_info},
     get_nonce_key,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
-    ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
-    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
 };
 
 use crate::{
+    EMPTY_CODE,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
-    hash_bytecode, EMPTY_CODE,
+    hash_bytecode,
 };
 
 /// Sets `block.timestamp`.

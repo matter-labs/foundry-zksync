@@ -1,13 +1,14 @@
-use zksync_basic_types::{AccountTreeId, L1BatchNumber, L2BlockNumber, L2ChainId, H160};
+use zksync_basic_types::{AccountTreeId, H160, L1BatchNumber, L2BlockNumber, L2ChainId};
 use zksync_contracts::BaseSystemContracts;
 use zksync_multivm::{
     interface::{L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode},
     vm_latest::{constants::BATCH_COMPUTATIONAL_GAS_LIMIT, utils::l2_blocks::load_last_l2_block},
 };
 use zksync_types::{
-    block::{unpack_block_info, L2BlockHasher},
+    SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION, StorageKey,
+    block::{L2BlockHasher, unpack_block_info},
     fee_model::PubdataIndependentBatchFeeModelInput,
-    h256_to_u256, StorageKey, SYSTEM_CONTEXT_ADDRESS, SYSTEM_CONTEXT_BLOCK_INFO_POSITION,
+    h256_to_u256,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr};
 
@@ -41,11 +42,7 @@ impl ZkEnv {
             self.fair_l2_gas_price,
             self.fair_pubdata_price.div_ceil(MAX_L2_GAS_PER_PUBDATA),
         );
-        if base_fee == 0 {
-            0
-        } else {
-            self.fair_pubdata_price.div_ceil(base_fee)
-        }
+        if base_fee == 0 { 0 } else { self.fair_pubdata_price.div_ceil(base_fee) }
     }
 }
 
