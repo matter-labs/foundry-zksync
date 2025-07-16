@@ -134,3 +134,9 @@ pub fn fix_l2_gas_limit(
 
     U256::min(gas_limit, U256::from(MAX_L2_GAS_LIMIT))
 }
+
+/// Attempts to detect if the provided bytecode is a ZKsync bytecode.
+pub fn is_zksync_bytecode(code: &[u8]) -> bool {
+    zksync_types::bytecode::BytecodeMarker::detect(code)
+        == zksync_types::bytecode::BytecodeMarker::EraVm
+}
