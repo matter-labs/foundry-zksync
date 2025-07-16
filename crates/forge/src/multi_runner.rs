@@ -9,7 +9,7 @@ use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{ContractsByArtifact, TestFunctionExt, get_contract_name, shell::verbosity};
 use foundry_compilers::{
-    Artifact, ArtifactId, ProjectCompileOutput,
+    ArtifactId, ProjectCompileOutput,
     artifacts::{Contract, Libraries},
     compilers::Compiler,
 };
@@ -18,17 +18,18 @@ use foundry_evm::{
     Env,
     backend::Backend,
     decode::RevertDecoder,
-    executors::{Executor, ExecutorBuilder, strategy::ExecutorStrategy},
+    executors::{
+        Executor, ExecutorBuilder,
+        strategy::{ExecutorStrategy, LinkOutput},
+    },
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
-use foundry_linking::{LinkOutput, Linker};
 use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
 use std::{
-    borrow::Borrow,
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
@@ -497,53 +498,28 @@ impl MultiContractRunnerBuilder {
             strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk_output);
         }
 
-        let contracts = output
-            .artifact_ids()
-            .map(|(id, v)| (id.with_stripped_file_prefixes(root), v))
-            .collect();
-        let linker = Linker::new(root, contracts);
-
-        // Build revert decoder from ABIs of all artifacts.
-        let abis = linker
-            .contracts
-            .iter()
-            .filter_map(|(_, contract)| contract.abi.as_ref().map(|abi| abi.borrow()));
-        let revert_decoder = RevertDecoder::new().with_abis(abis);
-
-        let LinkOutput { libraries, libs_to_deploy } = linker.link_with_nonce_or_address(
-            Default::default(),
+        let LinkOutput {
+            deployable_contracts,
+            revert_decoder,
+            linked_contracts: _,
+            known_contracts,
+            libs_to_deploy,
+            libraries,
+        } = strategy.runner.link(
+            strategy.context.as_mut(),
+            &self.config,
+            root,
+            output,
             LIBRARY_DEPLOYER,
-            0,
-            linker.contracts.keys(),
         )?;
 
-        let linked_contracts = linker.get_linked_artifacts(&libraries)?;
-
-        // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
-        let mut deployable_contracts = DeployableContracts::default();
-
-        for (id, contract) in linked_contracts.iter() {
-            let Some(abi) = &contract.abi else { continue };
-
-            // if it's a test, link it and add to deployable contracts
-            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true)
-                && abi.functions().any(|func| func.name.is_any_test())
-            {
-                let Some(bytecode) =
-                    contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
-                else {
-                    continue;
-                };
-
-                deployable_contracts
-                    .insert(id.clone(), TestContract { abi: abi.clone(), bytecode });
-            }
-        }
-
-        let known_contracts = ContractsByArtifact::new(linked_contracts);
+        let contracts = deployable_contracts
+            .into_iter()
+            .map(|(id, (abi, bytecode))| (id, TestContract { abi, bytecode }))
+            .collect();
 
         Ok(MultiContractRunner {
-            contracts: deployable_contracts,
+            contracts,
             revert_decoder,
             known_contracts,
             libs_to_deploy,

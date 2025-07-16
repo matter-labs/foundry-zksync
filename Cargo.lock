@@ -4509,7 +4509,6 @@ dependencies = [
  "foundry-debugger",
  "foundry-evm",
  "foundry-evm-core",
- "foundry-linking",
  "foundry-solang-parser",
  "foundry-test-utils",
  "foundry-wallets",

@@ -172,6 +172,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 let getCodeCall { artifactPath } = cheatcode.as_any().downcast_ref().unwrap();
 
                 let ctx = get_context(ccx.state.strategy.context.as_mut());
+
                 Ok(get_artifact_code(
                     &ctx.dual_compiled_contracts,
                     ctx.using_zk_vm,
