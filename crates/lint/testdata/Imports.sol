@@ -9,7 +9,7 @@ import {
     docSymbol2,
     docSymbolWrongTag, //~NOTE: unused imports should be removed
     eventSymbol,
-    BaseContract,
+    overrideSymbol,
     symbolNotUsed, //~NOTE: unused imports should be removed
     IContract,
     IContractNotUsed //~NOTE: unused imports should be removed
@@ -66,7 +66,7 @@ contract UnusedImport is IContract, BaseContract {
     SomeFile2.Baz public myStruct2;
     symbol4 public myVar;
 
-    function foo(uint256 a, symbol5 b) public view override(BaseContract) returns (uint256) {
+    function foo(uint256 a, symbol5 b) public view override(overrideSymbol) returns (uint256) {
         uint256 c = Utils.calculate(a, b);
         emit eventSymbol.foo(c);
         return c;
