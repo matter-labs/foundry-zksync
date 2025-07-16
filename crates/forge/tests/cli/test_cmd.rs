@@ -3910,27 +3910,27 @@ Compiler run successful!
 Ran 1 test for test/PrankBug.t.sol:PrankTest
 [PASS] test_Increment() ([GAS])
 Traces:
-  [..] PrankTest::setUp()
+  [137218] PrankTest::setUp()
     ├─ [0] VM::startPrank(0x0000000000000000000000000000000000000123)
     │   └─ ← [Return]
-    ├─ [..] → new Counter@0x6cdBd1b486b8FBD4140e8cd6daAED05bE13eD914
+    ├─ [96345] → new Counter@0x6cdBd1b486b8FBD4140e8cd6daAED05bE13eD914
     │   └─ ← [Return] 481 bytes of code
     ├─ [0] VM::stopPrank()
     │   └─ ← [Return]
     └─ ← [Stop]
 
-  [..] PrankTest::test_Increment()
+  [161909] PrankTest::test_Increment()
     ├─ [0] VM::startPrank(0x0000000000000000000000000000000000000123)
     │   └─ ← [Return]
-    ├─ [..] → new Counter@0xc4B957Cd61beB9b9afD76204b30683EDAaaB51Ec
+    ├─ [96345] → new Counter@0xc4B957Cd61beB9b9afD76204b30683EDAaaB51Ec
     │   └─ ← [Return] 481 bytes of code
     ├─ [0] VM::stopPrank()
     │   └─ ← [Return]
-    ├─ [..] Counter::increment()
+    ├─ [22418] Counter::increment()
     │   ├─  storage changes:
     │   │   @ 0: 0 → 1
     │   └─ ← [Stop]
-    ├─ [..] Counter::number() [staticcall]
+    ├─ [424] Counter::number() [staticcall]
     │   └─ ← [Return] 1
     ├─ [0] VM::assertEq(1, 1) [staticcall]
     │   └─ ← [Return]
