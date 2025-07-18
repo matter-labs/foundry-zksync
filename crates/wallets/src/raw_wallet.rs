@@ -1,4 +1,4 @@
-use crate::{PendingSigner, WalletSigner, utils};
+use crate::{utils, PendingSigner, WalletSigner};
 use clap::Parser;
 use eyre::Result;
 use serde::Serialize;

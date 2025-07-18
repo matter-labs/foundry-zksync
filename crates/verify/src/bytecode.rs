@@ -2,30 +2,30 @@
 use crate::{
     etherscan::EtherscanVerificationProvider,
     utils::{
-        BytecodeType, JsonResult, check_and_encode_args, check_explorer_args, configure_env_block,
-        maybe_predeploy_contract,
+        check_and_encode_args, check_explorer_args, configure_env_block, maybe_predeploy_contract,
+        BytecodeType, JsonResult,
     },
     verify::VerifierArgs,
 };
-use alloy_primitives::{Address, Bytes, TxKind, U256, hex};
+use alloy_primitives::{hex, Address, Bytes, TxKind, U256};
 use alloy_provider::{
-    Provider,
     ext::TraceApi,
     network::{AnyTxEnvelope, TransactionBuilder},
+    Provider,
 };
 use alloy_rpc_types::{
-    BlockId, BlockNumberOrTag, TransactionInput, TransactionRequest,
     trace::parity::{Action, CreateAction, CreateOutput, TraceOutput},
+    BlockId, BlockNumberOrTag, TransactionInput, TransactionRequest,
 };
 use clap::{Parser, ValueHint};
 use eyre::{Context, OptionExt, Result};
 use foundry_cli::{
     opts::EtherscanOpts,
-    utils::{self, LoadConfig, read_constructor_args_file},
+    utils::{self, read_constructor_args_file, LoadConfig},
 };
 use foundry_common::shell;
 use foundry_compilers::{artifacts::EvmVersion, info::ContractInfo};
-use foundry_config::{Config, figment, impl_figment_convert};
+use foundry_config::{figment, impl_figment_convert, Config};
 use foundry_evm::{constants::DEFAULT_CREATE2_DEPLOYER, utils::configure_tx_req_env};
 use foundry_evm_core::AsEnvMut;
 use revm::state::AccountInfo;

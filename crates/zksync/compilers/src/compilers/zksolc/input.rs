@@ -1,12 +1,12 @@
 //! zksolc input
 use super::{
-    ZkSettings,
     settings::ZkSolcSettings,
     types::{ErrorType, WarningType},
+    ZkSettings,
 };
 use foundry_compilers::{
     artifacts::{Remapping, Source, Sources},
-    compilers::{CompilerInput, solc::SolcLanguage},
+    compilers::{solc::SolcLanguage, CompilerInput},
     solc,
 };
 use foundry_compilers_artifacts_solc::serde_helpers::tuple_vec_map;

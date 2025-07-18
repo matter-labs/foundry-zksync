@@ -1,3 +1,4 @@
+cargo-features = ["edition2024"]
 [package]
 name = "forge-sol-macro-gen"
 description = "Contains types and methods for generating rust bindings using sol!"

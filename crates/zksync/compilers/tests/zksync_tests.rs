@@ -7,8 +7,8 @@ use std::{
 
 use foundry_compilers_artifacts_solc::Remapping;
 use foundry_test_utils::foundry_compilers::{
-    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig, buildinfo::BuildInfo,
-    cache::CompilerCache, project_util::*, resolver::parse::SolData,
+    buildinfo::BuildInfo, cache::CompilerCache, project_util::*, resolver::parse::SolData,
+    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig,
 };
 
 use foundry_zksync_compilers::{
@@ -16,9 +16,9 @@ use foundry_zksync_compilers::{
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
-            ErrorType, WarningType, ZkSolc, ZkSolcCompiler, ZkSolcSettings,
             input::ZkSolcInput,
             settings::{BytecodeHash, SettingsMetadata},
+            ErrorType, WarningType, ZkSolc, ZkSolcCompiler, ZkSolcSettings,
         },
     },
 };

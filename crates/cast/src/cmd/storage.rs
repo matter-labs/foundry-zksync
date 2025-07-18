@@ -1,11 +1,11 @@
-use crate::{Cast, opts::parse_slot};
+use crate::{opts::parse_slot, Cast};
 use alloy_ens::NameOrAddress;
 use alloy_network::AnyNetwork;
 use alloy_primitives::{Address, B256, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::BlockId;
 use clap::Parser;
-use comfy_table::{Cell, Table, modifiers::UTF8_ROUND_CORNERS};
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Table};
 use eyre::Result;
 use foundry_block_explorers::Client;
 use foundry_cli::{
@@ -15,21 +15,20 @@ use foundry_cli::{
 };
 use foundry_common::{
     abi::find_source,
-    compile::{ProjectCompiler, etherscan_project},
+    compile::{etherscan_project, ProjectCompiler},
     shell,
 };
 use foundry_compilers::{
-    Artifact, Project,
     artifacts::{ConfigurableContractArtifact, Contract, StorageLayout},
     compilers::{
-        Compiler,
         solc::{Solc, SolcCompiler},
+        Compiler,
     },
+    Artifact, Project,
 };
 use foundry_config::{
-    Config,
-    figment::{self, Metadata, Profile, value::Dict},
-    impl_figment_convert_cast,
+    figment::{self, value::Dict, Metadata, Profile},
+    impl_figment_convert_cast, Config,
 };
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -349,7 +348,11 @@ fn add_storage_layout_output<C: Compiler<CompilerContract = Contract>>(project: 
 }
 
 fn is_storage_layout_empty(storage_layout: &Option<StorageLayout>) -> bool {
-    if let Some(s) = storage_layout { s.storage.is_empty() } else { true }
+    if let Some(s) = storage_layout {
+        s.storage.is_empty()
+    } else {
+        true
+    }
 }
 
 #[cfg(test)]

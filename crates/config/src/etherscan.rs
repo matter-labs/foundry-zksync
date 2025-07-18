@@ -1,13 +1,13 @@
 //! Support for multiple Etherscan keys.
 
 use crate::{
+    resolve::{interpolate, UnresolvedEnvVarError, RE_PLACEHOLDER},
     Chain, Config, NamedChain,
-    resolve::{RE_PLACEHOLDER, UnresolvedEnvVarError, interpolate},
 };
 use figment::{
-    Error, Metadata, Profile, Provider,
     providers::Env,
     value::{Dict, Map},
+    Error, Metadata, Profile, Provider,
 };
 use foundry_block_explorers::EtherscanApiVersion;
 use heck::ToKebabCase;

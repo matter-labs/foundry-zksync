@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use alloy_primitives::{Address, Bytes, hex};
+use alloy_primitives::{hex, Address, Bytes};
 use clap::Parser;
 use foundry_config::zksync::ZkSyncConfig;
 use foundry_zksync_compilers::compilers::zksolc::{ErrorType, WarningType};

@@ -2,8 +2,8 @@ use eyre::Result;
 use foundry_block_explorers::verify::{CodeFormat, VerifyContract};
 
 use crate::{
-    VerifyArgs,
     zk_provider::{CompilerVerificationContext, ZkVerificationContext},
+    VerifyArgs,
 };
 
 use super::EtherscanVerificationProvider;

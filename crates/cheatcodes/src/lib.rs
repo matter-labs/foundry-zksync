@@ -20,13 +20,13 @@ use alloy_primitives::Address;
 use foundry_evm_core::backend::DatabaseExt;
 use spec::Status;
 
-pub use Vm::ForgeContext;
 pub use config::CheatsConfig;
 pub use error::{Error, ErrorKind, Result};
 pub use inspector::{
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
 };
 pub use spec::{CheatcodeDef, Vm};
+pub use Vm::ForgeContext;
 
 // Exposed for ZKsync usage.
 pub use evm::{journaled_account, mock::make_acc_non_empty};
@@ -46,12 +46,12 @@ mod env;
 pub use env::set_execution_context;
 
 mod evm;
-pub use evm::{DealRecord, mock::mock_call};
+pub use evm::{mock::mock_call, DealRecord};
 
 mod fs;
 
 mod inspector;
-pub use inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit};
+pub use inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx};
 
 mod json;
 

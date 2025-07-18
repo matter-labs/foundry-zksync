@@ -4,17 +4,17 @@ use foundry_evm_traces::{
     CallTraceArena, GethTraceBuilder, ParityTraceBuilder, TracingInspector, TracingInspectorConfig,
 };
 use foundry_zksync_core::{
-    Call,
     convert::{ConvertH160, ConvertU256},
+    Call,
 };
 use revm::{
-    Inspector,
     context::{ContextTr, CreateScheme},
     inspector::JournalExt,
     interpreter::{
         CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Gas,
         InstructionResult, Interpreter, InterpreterResult,
     },
+    Inspector,
 };
 
 /// A Wrapper around [TracingInspector] to allow adding zkEVM traces.

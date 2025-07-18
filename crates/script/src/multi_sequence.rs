@@ -1,6 +1,6 @@
 use eyre::{ContextCompat, Result, WrapErr};
 use forge_script_sequence::{
-    DRY_RUN_DIR, ScriptSequence, SensitiveScriptSequence, now, sig_to_file_name,
+    now, sig_to_file_name, ScriptSequence, SensitiveScriptSequence, DRY_RUN_DIR,
 };
 use foundry_common::{fs, sh_println, shell};
 use foundry_compilers::ArtifactId;

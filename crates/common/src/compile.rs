@@ -1,26 +1,26 @@
 //! Support for compiling [foundry_compilers::Project]
 
 use crate::{
-    TestFunctionExt,
     preprocessor::TestOptimizerPreprocessor,
-    reports::{ReportKind, report_kind},
+    reports::{report_kind, ReportKind},
     shell,
     term::SpinnerReporter,
+    TestFunctionExt,
 };
-use comfy_table::{Cell, Color, Table, modifiers::UTF8_ROUND_CORNERS};
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Color, Table};
 use eyre::Result;
 use foundry_block_explorers::contract::Metadata;
 use foundry_compilers::{
-    Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
-    artifacts::{BytecodeObject, Contract, Source, remappings::Remapping},
+    artifacts::{remappings::Remapping, BytecodeObject, Contract, Source},
     compilers::{
-        Compiler,
         solc::{Solc, SolcCompiler},
+        Compiler,
     },
     info::ContractInfo as CompilerContractInfo,
     project::Preprocessor,
     report::{BasicStdoutReporter, NoReporter, Report},
     solc::SolcSettings,
+    Artifact, Project, ProjectBuilder, ProjectCompileOutput, ProjectPathsConfig, SolcConfig,
 };
 use num_format::{Locale, ToFormattedString};
 

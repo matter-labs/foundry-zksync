@@ -1,10 +1,10 @@
-use foundry_test_utils::{Filter, TestCommand, TestProject, forgetest_async, util};
+use foundry_test_utils::{forgetest_async, util, Filter, TestCommand, TestProject};
 use revm::primitives::hardfork::SpecId;
 use semver::Version;
 
 use crate::{
     config::TestConfig,
-    test_helpers::{TEST_DATA_DEFAULT, deploy_zk_contract, run_zk_script_test},
+    test_helpers::{deploy_zk_contract, run_zk_script_test, TEST_DATA_DEFAULT},
 };
 
 const ZKSOLC_MIN_LINKING_VERSION: Version = Version::new(1, 5, 9);

@@ -1,25 +1,25 @@
 //! A wrapper around `Backend` that is clone-on-write used for fuzzing.
 
-use super::{BackendError, ForkInfo, strategy::BackendStrategy};
+use super::{strategy::BackendStrategy, BackendError, ForkInfo};
 use crate::{
-    AsEnvMut, Env, EnvMut, InspectorExt,
     backend::{
-        Backend, DatabaseExt, JournaledState, LocalForkId, RevertStateSnapshotAction,
-        diagnostic::RevertDiagnostic,
+        diagnostic::RevertDiagnostic, Backend, DatabaseExt, JournaledState, LocalForkId,
+        RevertStateSnapshotAction,
     },
     fork::{CreateFork, ForkId},
+    AsEnvMut, Env, EnvMut, InspectorExt,
 };
 use alloy_genesis::GenesisAccount;
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
 use foundry_fork_db::DatabaseError;
 use revm::{
-    Database, DatabaseCommit,
     bytecode::Bytecode,
     context_interface::result::ResultAndState,
     database::DatabaseRef,
-    primitives::{HashMap as Map, hardfork::SpecId},
+    primitives::{hardfork::SpecId, HashMap as Map},
     state::{Account, AccountInfo},
+    Database, DatabaseCommit,
 };
 use std::{any::Any, borrow::Cow, collections::BTreeMap};
 use tracing::instrument;

@@ -1,4 +1,4 @@
-use crate::{DebugNode, debugger::DebuggerContext};
+use crate::{debugger::DebuggerContext, DebugNode};
 use alloy_primitives::map::AddressMap;
 use foundry_common::fs::write_json_file;
 use foundry_compilers::{

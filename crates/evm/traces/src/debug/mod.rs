@@ -1,8 +1,8 @@
 mod sources;
 use crate::CallTraceNode;
 use alloy_dyn_abi::{
-    DynSolType, DynSolValue, Specifier,
     parser::{Parameters, Storage},
+    DynSolType, DynSolValue, Specifier,
 };
 use alloy_primitives::U256;
 use foundry_common::fmt::format_token;

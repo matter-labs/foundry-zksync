@@ -7,7 +7,7 @@ use itertools::Itertools;
 use solar_parse::interface::Session;
 use solar_sema::{
     hir::{CallArgs, ContractId, Expr, ExprKind, Hir, NamedArg, Stmt, StmtKind, TypeKind, Visit},
-    interface::{SourceMap, data_structures::Never, source_map::FileName},
+    interface::{data_structures::Never, source_map::FileName, SourceMap},
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},

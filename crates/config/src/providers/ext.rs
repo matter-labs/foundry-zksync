@@ -1,8 +1,8 @@
-use crate::{Config, utils};
+use crate::{utils, Config};
 use figment::{
-    Error, Figment, Metadata, Profile, Provider,
     providers::{Env, Format, Toml},
     value::{Dict, Map, Value},
+    Error, Figment, Metadata, Profile, Provider,
 };
 use foundry_compilers::ProjectPathsConfig;
 use heck::ToSnakeCase;
@@ -109,7 +109,11 @@ impl Provider for TomlFileProvider {
     }
 
     fn data(&self) -> Result<Map<Profile, Dict>, Error> {
-        if let Some(cache) = self.cache.as_ref() { cache.clone() } else { self.read() }
+        if let Some(cache) = self.cache.as_ref() {
+            cache.clone()
+        } else {
+            self.read()
+        }
     }
 }
 

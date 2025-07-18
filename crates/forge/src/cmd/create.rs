@@ -3,7 +3,7 @@ use alloy_chains::Chain;
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt, Specifier};
 use alloy_json_abi::{Constructor, JsonAbi};
 use alloy_network::{AnyNetwork, AnyTransactionReceipt, EthereumWallet, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, hex};
+use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{PendingTransactionError, Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -14,7 +14,7 @@ use eyre::{Context, Result};
 use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::{
     opts::{BuildOpts, EthereumOpts, EtherscanOpts, TransactionOpts},
-    utils::{self, LoadConfig, read_constructor_args_file, remove_contract},
+    utils::{self, read_constructor_args_file, remove_contract, LoadConfig},
 };
 use foundry_common::{
     compile::{self},
@@ -22,15 +22,15 @@ use foundry_common::{
     shell,
 };
 use foundry_compilers::{
-    ArtifactId, artifacts::BytecodeObject, info::ContractInfo, utils::canonicalize,
+    artifacts::BytecodeObject, info::ContractInfo, utils::canonicalize, ArtifactId,
 };
 use foundry_config::{
-    Config,
     figment::{
-        self, Metadata, Profile,
+        self,
         value::{Dict, Map},
+        Metadata, Profile,
     },
-    merge_impl_figment_convert,
+    merge_impl_figment_convert, Config,
 };
 use serde_json::json;
 use std::{borrow::Borrow, marker::PhantomData, path::PathBuf, sync::Arc, time::Duration};
@@ -422,7 +422,11 @@ impl CreateArgs {
         sh_println!("Starting contract verification...")?;
 
         let num_of_optimizations = if let Some(optimizer) = self.build.compiler.optimize {
-            if optimizer { Some(self.build.compiler.optimizer_runs.unwrap_or(200)) } else { None }
+            if optimizer {
+                Some(self.build.compiler.optimizer_runs.unwrap_or(200))
+            } else {
+                None
+            }
         } else {
             self.build.compiler.optimizer_runs
         };

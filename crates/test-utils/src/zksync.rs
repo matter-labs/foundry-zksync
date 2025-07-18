@@ -4,32 +4,32 @@ use std::{net::SocketAddr, pin::Pin, str::FromStr, sync::Arc};
 use anvil_zksync_api_server::NodeServerBuilder;
 use anvil_zksync_common::cache::CacheConfig;
 use anvil_zksync_config::{
-    BaseTokenConfig, TestNodeConfig,
     constants::{
         DEFAULT_ESTIMATE_GAS_PRICE_SCALE_FACTOR, DEFAULT_ESTIMATE_GAS_SCALE_FACTOR,
         DEFAULT_FAIR_PUBDATA_PRICE, DEFAULT_L1_GAS_PRICE, DEFAULT_L2_GAS_PRICE,
     },
     types::SystemContractsOptions,
+    BaseTokenConfig, TestNodeConfig,
 };
 use anvil_zksync_core::{
     filters::EthFilters,
     node::{
+        fork::{ForkClient, ForkConfig},
         BlockSealer, BlockSealerMode, ImpersonationManager, InMemoryNode, InMemoryNodeInner,
         NodeExecutor, StorageKeyLayout, TestNodeFeeInputProvider, TxPool,
-        fork::{ForkClient, ForkConfig},
     },
     system_contracts::SystemContracts,
 };
 use anvil_zksync_l1_sidecar::L1Sidecar;
 use httptest::{
-    Expectation, Server,
     matchers::{eq, json_decoded, request},
     responders::json_encoded,
+    Expectation, Server,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use tower_http::cors::AllowOrigin;
-use zksync_types::{DEFAULT_ERA_CHAIN_ID, H160, L2BlockNumber, ProtocolVersionId, U256};
+use zksync_types::{L2BlockNumber, ProtocolVersionId, DEFAULT_ERA_CHAIN_ID, H160, U256};
 
 /// List of legacy wallets (address, private key) that we seed with tokens at start.
 const LEGACY_RICH_WALLETS: [(&str, &str); 10] = [

@@ -1,12 +1,13 @@
 use crate::{Cheatcode, Cheatcodes, Result, Vm::*};
 use alloy_primitives::{
-    Address, B256, U256, keccak256,
+    keccak256,
     map::{AddressHashMap, B256HashMap},
+    Address, B256, U256,
 };
 use alloy_sol_types::SolValue;
 use revm::{
     bytecode::opcode,
-    interpreter::{Interpreter, interpreter_types::Jumps},
+    interpreter::{interpreter_types::Jumps, Interpreter},
 };
 
 /// Recorded mapping slots.

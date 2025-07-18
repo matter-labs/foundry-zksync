@@ -7,20 +7,20 @@
 // the concrete `Executor` type.
 
 use crate::{
-    Env,
     inspectors::{
-        Cheatcodes, InspectorData, InspectorStack, cheatcodes::BroadcastableTransactions,
+        cheatcodes::BroadcastableTransactions, Cheatcodes, InspectorData, InspectorStack,
     },
+    Env,
 };
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_primitives::{
-    Address, Bytes, Log, TxKind, U256, keccak256,
+    keccak256,
     map::{AddressHashMap, HashMap},
+    Address, Bytes, Log, TxKind, U256,
 };
-use alloy_sol_types::{SolCall, sol};
+use alloy_sol_types::{sol, SolCall};
 use foundry_evm_core::{
-    EvmEnv, InspectorExt,
     backend::{Backend, BackendError, BackendResult, CowBackend, DatabaseExt, GLOBAL_FAIL_SLOT},
     constants::{
         CALLER, CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH, DEFAULT_CREATE2_DEPLOYER,
@@ -28,6 +28,7 @@ use foundry_evm_core::{
     },
     decode::{RevertDecoder, SkipReason},
     utils::StateChangeset,
+    EvmEnv, InspectorExt,
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
@@ -39,7 +40,7 @@ use revm::{
         transaction::SignedAuthorization,
     },
     database::{DatabaseCommit, DatabaseRef},
-    interpreter::{InstructionResult, return_ok},
+    interpreter::{return_ok, InstructionResult},
     primitives::hardfork::SpecId,
 };
 use std::{
@@ -972,7 +973,11 @@ impl RawCallResult {
 
     /// Returns an `EvmError` if the call failed, otherwise returns `self`.
     pub fn into_result(self, rd: Option<&RevertDecoder>) -> Result<Self, EvmError> {
-        if self.exit_reason.is_ok() { Ok(self) } else { Err(self.into_evm_error(rd)) }
+        if self.exit_reason.is_ok() {
+            Ok(self)
+        } else {
+            Err(self.into_evm_error(rd))
+        }
     }
 
     /// Decodes the result of the call with the given function.

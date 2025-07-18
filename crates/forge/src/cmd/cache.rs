@@ -1,10 +1,10 @@
 use cache::Cache;
 use clap::{
-    Arg, Command, Parser, Subcommand,
     builder::{PossibleValuesParser, TypedValueParser},
+    Arg, Command, Parser, Subcommand,
 };
 use eyre::Result;
-use foundry_config::{Chain, Config, NamedChain, cache};
+use foundry_config::{cache, Chain, Config, NamedChain};
 use std::{ffi::OsStr, str::FromStr};
 use strum::VariantNames;
 

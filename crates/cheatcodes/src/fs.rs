@@ -5,7 +5,7 @@ use crate::{Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Result, Vm::*
 use alloy_dyn_abi::DynSolType;
 use alloy_json_abi::ContractObject;
 use alloy_network::AnyTransactionReceipt;
-use alloy_primitives::{Bytes, U256, hex, map::Entry};
+use alloy_primitives::{hex, map::Entry, Bytes, U256};
 use alloy_provider::network::ReceiptResponse;
 use alloy_sol_types::SolValue;
 use dialoguer::{Input, Password};
@@ -481,7 +481,11 @@ pub fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Resu
                             // Try filtering by profile as well
                             filtered.retain(|(id, _)| id.profile == running.profile);
 
-                            if filtered.len() == 1 { Some(filtered[0]) } else { None }
+                            if filtered.len() == 1 {
+                                Some(filtered[0])
+                            } else {
+                                None
+                            }
                         })
                         .ok_or_else(|| fmt_err!("multiple matching artifacts found"))
                 }

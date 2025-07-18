@@ -1,13 +1,13 @@
 //! The `forge verify-bytecode` command.
 
 use crate::{
-    RetryArgs,
     etherscan::EtherscanVerificationProvider,
     provider::{VerificationContext, VerificationProvider, VerificationProviderType},
     utils::is_host_only,
     zk_provider::CompilerVerificationContext,
+    RetryArgs,
 };
-use alloy_primitives::{Address, map::HashSet};
+use alloy_primitives::{map::HashSet, Address};
 use alloy_provider::Provider;
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::Result;
@@ -16,9 +16,9 @@ use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
     utils::{self, LoadConfig},
 };
-use foundry_common::{ContractsByArtifact, compile::ProjectCompiler};
+use foundry_common::{compile::ProjectCompiler, ContractsByArtifact};
 use foundry_compilers::{artifacts::EvmVersion, compilers::solc::Solc, info::ContractInfo};
-use foundry_config::{Config, SolcReq, figment, impl_figment_convert, impl_figment_convert_cast};
+use foundry_config::{figment, impl_figment_convert, impl_figment_convert_cast, Config, SolcReq};
 use itertools::Itertools;
 use reqwest::Url;
 use semver::BuildMetadata;

@@ -8,8 +8,9 @@
 use crate::runner::ScriptRunner;
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{
-    Address, Bytes, Log, TxKind, U256, hex,
+    hex,
     map::{AddressHashMap, HashMap},
+    Address, Bytes, Log, TxKind, U256,
 };
 use alloy_signer::Signer;
 use broadcast::next_nonce;
@@ -25,25 +26,25 @@ use foundry_cli::{
     utils::{self, LoadConfig},
 };
 use foundry_common::{
-    CONTRACT_MAX_SIZE, ContractsByArtifact, SELECTOR_LEN,
     abi::{encode_function_args, get_func},
     evm::{Breakpoints, EvmArgs},
-    sh_err, sh_println, sh_warn, shell,
+    sh_err, sh_println, sh_warn, shell, ContractsByArtifact, CONTRACT_MAX_SIZE, SELECTOR_LEN,
 };
 use foundry_compilers::ArtifactId;
 use foundry_config::{
-    Config, figment,
+    figment,
     figment::{
-        Metadata, Profile, Provider,
         value::{Dict, Map},
+        Metadata, Profile, Provider,
     },
+    Config,
 };
 use foundry_evm::{
     backend::Backend,
     executors::ExecutorBuilder,
     inspectors::{
-        CheatsConfig,
         cheatcodes::{BroadcastableTransactions, Wallets},
+        CheatsConfig,
     },
     opts::EvmOpts,
     traces::{TraceMode, Traces},

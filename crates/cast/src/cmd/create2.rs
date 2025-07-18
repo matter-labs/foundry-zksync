@@ -1,12 +1,12 @@
-use alloy_primitives::{Address, B256, U256, hex, keccak256};
+use alloy_primitives::{hex, keccak256, Address, B256, U256};
 use clap::Parser;
 use eyre::{Result, WrapErr};
-use rand::{RngCore, SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 use regex::RegexSetBuilder;
 use std::{
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
     time::Instant,
 };

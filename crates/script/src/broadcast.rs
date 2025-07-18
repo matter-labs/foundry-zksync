@@ -1,36 +1,35 @@
 use crate::{
-    ScriptArgs, ScriptConfig, build::LinkedBuildData, progress::ScriptProgress,
-    sequence::ScriptSequenceKind, verify::BroadcastedState,
+    build::LinkedBuildData, progress::ScriptProgress, sequence::ScriptSequenceKind,
+    verify::BroadcastedState, ScriptArgs, ScriptConfig,
 };
 use alloy_chains::{Chain, NamedChain};
 use alloy_consensus::TxEnvelope;
-use alloy_eips::{BlockId, eip2718::Encodable2718};
+use alloy_eips::{eip2718::Encodable2718, BlockId};
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
 use alloy_primitives::{
-    Address, Bytes, TxHash,
     map::{AddressHashMap, AddressHashSet},
     utils::format_units,
+    Address, Bytes, TxHash,
 };
-use alloy_provider::{Provider, utils::Eip1559Estimation};
+use alloy_provider::{utils::Eip1559Estimation, Provider};
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_zksync::network::{
-    Zksync, transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType,
+    transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType, Zksync,
 };
-use eyre::{Context, Result, bail};
+use eyre::{bail, Context, Result};
 use forge_verify::provider::VerificationProviderType;
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_batch_support, has_different_gas_calc};
 use foundry_common::{
-    TransactionMaybeSigned,
     provider::{
-        RetryProvider, get_http_provider, try_get_http_provider, try_get_zksync_http_provider,
+        get_http_provider, try_get_http_provider, try_get_zksync_http_provider, RetryProvider,
     },
-    sh_println, shell,
+    sh_println, shell, TransactionMaybeSigned,
 };
 use foundry_config::Config;
 use foundry_zksync_core::convert::ConvertH160;
-use futures::{StreamExt, future::join_all};
+use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{cmp::Ordering, sync::Arc};
 use tracing::{debug, warn};

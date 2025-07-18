@@ -1,17 +1,17 @@
 //! Mines transactions
 
-use crate::eth::pool::{Pool, transactions::PoolTransaction};
+use crate::eth::pool::{transactions::PoolTransaction, Pool};
 use alloy_primitives::TxHash;
 use futures::{
     channel::mpsc::Receiver,
     stream::{Fuse, StreamExt},
     task::AtomicWaker,
 };
-use parking_lot::{RawRwLock, RwLock, lock_api::RwLockWriteGuard};
+use parking_lot::{lock_api::RwLockWriteGuard, RawRwLock, RwLock};
 use std::{
     fmt,
     sync::Arc,
-    task::{Context, Poll, ready},
+    task::{ready, Context, Poll},
     time::Duration,
 };
 use tokio::time::{Interval, MissedTickBehavior};

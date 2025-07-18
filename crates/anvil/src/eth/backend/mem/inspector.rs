@@ -9,17 +9,17 @@ use foundry_evm::{
     decode::decode_console_logs,
     inspectors::{LogCollector, TracingInspector},
     traces::{
-        CallTraceDecoder, SparsedTraceArena, TracingInspectorConfig, render_trace_arena_inner,
+        render_trace_arena_inner, CallTraceDecoder, SparsedTraceArena, TracingInspectorConfig,
     },
 };
 use revm::{
-    Database, Inspector,
     context::ContextTr,
     inspector::JournalExt,
     interpreter::{
-        CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter,
-        interpreter::EthInterpreter,
+        interpreter::EthInterpreter, CallInputs, CallOutcome, CreateInputs, CreateOutcome,
+        Interpreter,
     },
+    Database, Inspector,
 };
 
 /// The [`revm::Inspector`] used when transacting in the evm

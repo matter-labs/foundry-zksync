@@ -4,12 +4,13 @@ use std::path::Path;
 
 use crate::{
     config::*,
-    test_helpers::{TEST_DATA_DEFAULT, run_zk_script_test},
+    test_helpers::{run_zk_script_test, TEST_DATA_DEFAULT},
 };
-use foundry_config::{Config, FsPermissions, fs_permissions::PathPermission};
+use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::{
-    Filter, TestProject, ZkSyncNode, forgetest_async,
+    forgetest_async,
     util::{self},
+    Filter, TestProject, ZkSyncNode,
 };
 use revm::primitives::hardfork::SpecId;
 

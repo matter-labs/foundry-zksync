@@ -1,9 +1,9 @@
 //! IPC handling
 
-use crate::{PubSubRpcHandler, error::RequestError, pubsub::PubSubConnection};
+use crate::{error::RequestError, pubsub::PubSubConnection, PubSubRpcHandler};
 use anvil_rpc::request::Request;
 use bytes::{BufMut, BytesMut};
-use futures::{Sink, Stream, StreamExt, ready};
+use futures::{ready, Sink, Stream, StreamExt};
 use interprocess::local_socket::{self as ls, tokio::prelude::*};
 use std::{
     io,

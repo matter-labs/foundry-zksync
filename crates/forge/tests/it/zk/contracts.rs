@@ -3,8 +3,8 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use foundry_config::fs_permissions::PathPermission;
 use foundry_test_utils::{
-    Filter,
     util::{self, OutputExt},
+    Filter,
 };
 use revm::primitives::hardfork::SpecId;
 

@@ -1,6 +1,6 @@
 //! Implementations of [`Environment`](spec::Group::Environment) cheatcodes.
 
-use crate::{Cheatcode, Cheatcodes, Error, Result, Vm::*, string};
+use crate::{string, Cheatcode, Cheatcodes, Error, Result, Vm::*};
 use alloy_dyn_abi::DynSolType;
 use alloy_sol_types::SolValue;
 use std::{env, sync::OnceLock};

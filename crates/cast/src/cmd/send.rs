@@ -1,7 +1,7 @@
 use crate::{
-    Cast,
     tx::{self, CastTxBuilder},
     zksync::ZkTransactionOpts,
+    Cast,
 };
 use alloy_ens::NameOrAddress;
 use alloy_network::{AnyNetwork, EthereumWallet};
@@ -11,7 +11,7 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use clap::Parser;
-use eyre::{Result, eyre};
+use eyre::{eyre, Result};
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
     utils,

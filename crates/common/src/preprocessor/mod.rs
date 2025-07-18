@@ -1,23 +1,24 @@
 use foundry_compilers::{
-    Compiler, Language, ProjectPathsConfig, apply_updates,
+    apply_updates,
     artifacts::SolcLanguage,
     error::Result,
     multi::{MultiCompiler, MultiCompilerInput, MultiCompilerLanguage},
     project::Preprocessor,
     solc::{SolcCompiler, SolcVersionedInput},
+    Compiler, Language, ProjectPathsConfig,
 };
 use solar_parse::{
     ast::Span,
     interface::{Session, SourceMap},
 };
-use solar_sema::{ParsingContext, thread_local::ThreadLocal};
+use solar_sema::{thread_local::ThreadLocal, ParsingContext};
 use std::{collections::HashSet, ops::Range, path::PathBuf};
 
 mod data;
 use data::{collect_preprocessor_data, create_deploy_helpers};
 
 mod deps;
-use deps::{PreprocessorDependencies, remove_bytecode_dependencies};
+use deps::{remove_bytecode_dependencies, PreprocessorDependencies};
 
 /// Returns the range of the given span in the source map.
 #[track_caller]

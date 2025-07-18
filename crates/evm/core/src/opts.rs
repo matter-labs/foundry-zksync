@@ -1,13 +1,13 @@
 use super::fork::environment;
 use crate::{
-    EvmEnv,
     constants::DEFAULT_CREATE2_DEPLOYER,
-    fork::{CreateFork, configure_env},
+    fork::{configure_env, CreateFork},
+    EvmEnv,
 };
 use alloy_primitives::{Address, B256, U256};
-use alloy_provider::{Provider, network::AnyRpcBlock};
+use alloy_provider::{network::AnyRpcBlock, Provider};
 use eyre::WrapErr;
-use foundry_common::{ALCHEMY_FREE_TIER_CUPS, provider::ProviderBuilder};
+use foundry_common::{provider::ProviderBuilder, ALCHEMY_FREE_TIER_CUPS};
 use foundry_config::{Chain, Config, GasLimit};
 use revm::context::{BlockEnv, TxEnv};
 use serde::{Deserialize, Serialize};

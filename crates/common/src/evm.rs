@@ -1,15 +1,16 @@
 //! CLI arguments for configuring the EVM settings.
 
-use alloy_primitives::{Address, B256, U256, map::HashMap};
+use alloy_primitives::{map::HashMap, Address, B256, U256};
 use clap::Parser;
 use eyre::ContextCompat;
 use foundry_config::{
-    Chain, Config,
     figment::{
-        self, Metadata, Profile, Provider,
+        self,
         error::Kind::InvalidType,
         value::{Dict, Map, Value},
+        Metadata, Profile, Provider,
     },
+    Chain, Config,
 };
 use serde::Serialize;
 

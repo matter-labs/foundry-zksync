@@ -1,13 +1,13 @@
-use crate::{PubSubRpcHandler, error::RequestError, pubsub::PubSubConnection};
+use crate::{error::RequestError, pubsub::PubSubConnection, PubSubRpcHandler};
 use anvil_rpc::request::Request;
 use axum::{
     extract::{
-        State, WebSocketUpgrade,
         ws::{Message, WebSocket},
+        State, WebSocketUpgrade,
     },
     response::Response,
 };
-use futures::{Sink, Stream, ready};
+use futures::{ready, Sink, Stream};
 use std::{
     pin::Pin,
     task::{Context, Poll},

@@ -3,13 +3,13 @@ use alloy_primitives::Address;
 use foundry_common::sh_err;
 use foundry_evm_core::backend::DatabaseError;
 use revm::{
-    Inspector,
     bytecode::opcode::ADDRESS,
     context::ContextTr,
     inspector::JournalExt,
     interpreter::{
-        InstructionResult, Interpreter, interpreter::EthInterpreter, interpreter_types::Jumps,
+        interpreter::EthInterpreter, interpreter_types::Jumps, InstructionResult, Interpreter,
     },
+    Inspector,
 };
 
 /// An inspector that enforces certain rules during script execution.

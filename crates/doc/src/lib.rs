@@ -21,7 +21,7 @@ mod helpers;
 
 mod parser;
 pub use parser::{
-    Comment, CommentTag, Comments, CommentsRef, ParseItem, ParseSource, Parser, error,
+    error, Comment, CommentTag, Comments, CommentsRef, ParseItem, ParseSource, Parser,
 };
 
 mod preprocessor;

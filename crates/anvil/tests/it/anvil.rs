@@ -5,7 +5,7 @@ use alloy_eips::BlockNumberOrTag;
 use alloy_hardforks::EthereumHardfork;
 use alloy_primitives::Address;
 use alloy_provider::Provider;
-use anvil::{NodeConfig, spawn};
+use anvil::{spawn, NodeConfig};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_can_change_mining_mode() {

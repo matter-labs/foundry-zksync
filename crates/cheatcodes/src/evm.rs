@@ -1,20 +1,20 @@
 //! Implementations of [`Evm`](spec::Group::Evm) cheatcodes.
 
 use crate::{
+    inspector::{Ecx, RecordDebugStepInfo},
     BroadcastableTransaction, Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Error, Result,
     Vm::*,
-    inspector::{Ecx, RecordDebugStepInfo},
 };
 use alloy_consensus::TxEnvelope;
 use alloy_genesis::{Genesis, GenesisAccount};
-use alloy_primitives::{Address, B256, Bytes, U256};
+use alloy_primitives::{Address, Bytes, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
 use foundry_evm_core::{
-    ContextExt,
     backend::{DatabaseExt, RevertStateSnapshotAction},
     constants::{CALLER, CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, TEST_CONTRACT_ADDRESS},
+    ContextExt,
 };
 use foundry_evm_traces::StackSnapshotType;
 use itertools::Itertools;
@@ -22,11 +22,11 @@ use rand::Rng;
 use revm::{
     bytecode::Bytecode,
     context::{Block, JournalTr},
-    primitives::{KECCAK_EMPTY, hardfork::SpecId},
+    primitives::{hardfork::SpecId, KECCAK_EMPTY},
     state::Account,
 };
 use std::{
-    collections::{BTreeMap, btree_map::Entry},
+    collections::{btree_map::Entry, BTreeMap},
     fmt::Display,
     path::Path,
 };

@@ -1,20 +1,21 @@
 use foundry_compilers::{
-    Project, ProjectBuilder, ProjectPathsConfig,
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
     solc::{CliSettings, Solc, SolcCompiler, SolcLanguage},
+    Project, ProjectBuilder, ProjectPathsConfig,
 };
 use foundry_zksync_compilers::{
     artifacts::output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
-            ErrorType, WarningType, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
-            ZkSettings, ZkSolc, ZkSolcCompiler, get_solc_version_info,
+            get_solc_version_info,
             settings::{
                 BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata,
                 ZkSolcSettings,
             },
+            ErrorType, WarningType, ZkSettings, ZkSolc, ZkSolcCompiler,
+            ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
         },
     },
 };

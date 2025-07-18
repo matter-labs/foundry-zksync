@@ -1,14 +1,14 @@
 use std::collections::hash_map::Entry;
 
-use alloy_primitives::{Address, U256, map::HashMap};
+use alloy_primitives::{map::HashMap, Address, U256};
 
 use foundry_evm::backend::JournaledState;
-use foundry_evm_core::backend::{Fork, ForkDB, strategy::EvmBackendMergeStrategy};
+use foundry_evm_core::backend::{strategy::EvmBackendMergeStrategy, Fork, ForkDB};
 use foundry_zksync_core::{
-    ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS, KNOWN_CODES_STORAGE_ADDRESS,
-    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, convert::ConvertH160,
+    convert::ConvertH160, ACCOUNT_CODE_STORAGE_ADDRESS, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
 };
-use revm::{DatabaseRef, database::CacheDB, primitives::HashSet};
+use revm::{database::CacheDB, primitives::HashSet, DatabaseRef};
 use tracing::trace;
 
 pub(super) struct ZksyncBackendMerge;

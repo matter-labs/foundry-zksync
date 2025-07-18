@@ -1,34 +1,33 @@
 //! tests for custom anvil endpoints
 
 use crate::{
-    abi::{self, BUSD, Greeter, Multicall},
+    abi::{self, Greeter, Multicall, BUSD},
     fork::fork_config,
     utils::http_provider_with_signer,
 };
 use alloy_consensus::{SignableTransaction, TxEip1559};
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::{EthereumWallet, TransactionBuilder, TxSignerSync};
-use alloy_primitives::{Address, Bytes, TxKind, U256, address, fixed_bytes, utils::Unit};
-use alloy_provider::{Provider, ext::TxPoolApi};
+use alloy_primitives::{address, fixed_bytes, utils::Unit, Address, Bytes, TxKind, U256};
+use alloy_provider::{ext::TxPoolApi, Provider};
 use alloy_rpc_types::{
-    BlockId, BlockNumberOrTag, TransactionRequest,
     anvil::{
         ForkedNetwork, Forking, Metadata, MineOptions, NodeEnvironment, NodeForkConfig, NodeInfo,
     },
+    BlockId, BlockNumberOrTag, TransactionRequest,
 };
 use alloy_serde::WithOtherFields;
 use anvil::{
-    NodeConfig,
     eth::{
         api::CLIENT_VERSION,
         backend::mem::{EXECUTOR, P256_DELEGATION_CONTRACT, P256_DELEGATION_RUNTIME_CODE},
     },
-    spawn,
+    spawn, NodeConfig,
 };
 use anvil_core::{
     eth::{
-        EthRequest,
         wallet::{Capabilities, DelegationCapability, WalletCapabilities},
+        EthRequest,
     },
     types::{ReorgOptions, TransactionData},
 };

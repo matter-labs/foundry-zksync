@@ -1,31 +1,31 @@
 //! Forge test runner for multiple contracts.
 
 use crate::{
-    ContractRunner, TestFilter, progress::TestsProgress, result::SuiteResult,
-    runner::LIBRARY_DEPLOYER,
+    progress::TestsProgress, result::SuiteResult, runner::LIBRARY_DEPLOYER, ContractRunner,
+    TestFilter,
 };
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{ContractsByArtifact, TestFunctionExt, get_contract_name, shell::verbosity};
+use foundry_common::{get_contract_name, shell::verbosity, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    ArtifactId, ProjectCompileOutput,
     artifacts::{Contract, Libraries},
     compilers::Compiler,
+    ArtifactId, ProjectCompileOutput,
 };
 use foundry_config::{Config, InlineConfig};
 use foundry_evm::{
-    Env,
     backend::Backend,
     decode::RevertDecoder,
     executors::{
-        Executor, ExecutorBuilder,
         strategy::{ExecutorStrategy, LinkOutput},
+        Executor, ExecutorBuilder,
     },
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
+    Env,
 };
 use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
@@ -33,7 +33,7 @@ use std::{
     collections::BTreeMap,
     fmt::Debug,
     path::Path,
-    sync::{Arc, mpsc},
+    sync::{mpsc, Arc},
     time::Instant,
 };
 

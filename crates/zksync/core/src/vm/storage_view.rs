@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use alloy_primitives::{Address, U256};
 use zksync_types::{
-    ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256, StorageKey, StorageValue,
-    utils::storage_key_for_eth_balance,
+    utils::storage_key_for_eth_balance, StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
+    H160, H256,
 };
 use zksync_vm_interface::storage::{ReadStorage, WriteStorage};
 

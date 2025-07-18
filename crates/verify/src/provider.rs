@@ -10,11 +10,11 @@ use async_trait::async_trait;
 use eyre::{OptionExt, Result};
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
-    Graph, Project,
-    artifacts::{Metadata, Source, output_selection::OutputSelection},
+    artifacts::{output_selection::OutputSelection, Metadata, Source},
     compilers::{multi::MultiCompilerParsedSource, solc::SolcCompiler},
     multi::MultiCompilerSettings,
     solc::Solc,
+    Graph, Project,
 };
 use foundry_config::Config;
 use semver::Version;

@@ -18,8 +18,8 @@ use std::{
     collections::BTreeMap,
     pin::Pin,
     sync::{
-        Arc,
         atomic::{AtomicBool, Ordering},
+        Arc,
     },
 };
 use tokio::time::{Duration, Interval};

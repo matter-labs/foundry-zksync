@@ -4,17 +4,17 @@ use std::{
 };
 
 use alloy_primitives::{
-    Address, B256,
     hex::FromHex,
     map::{HashMap, HashSet},
+    Address, B256,
 };
 use foundry_compilers::{
-    Artifact, ArtifactId, ProjectCompileOutput,
     artifacts::{
         BytecodeObject, CompactBytecode, CompactContractBytecode, CompactContractBytecodeCow,
         CompactDeployedBytecode, Libraries,
     },
     contracts::ArtifactContracts,
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_zksync_compilers::{
     compilers::{
@@ -23,7 +23,7 @@ use foundry_zksync_compilers::{
     },
     link::{self as zk_link, MissingLibrary},
 };
-use foundry_zksync_core::{H256, hash_bytecode};
+use foundry_zksync_core::{hash_bytecode, H256};
 use semver::Version;
 
 use crate::{LinkOutput, Linker, LinkerError};

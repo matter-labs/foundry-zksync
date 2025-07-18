@@ -1,43 +1,44 @@
 use super::{install, test::filter::ProjectPathsAwareFilter, watch::WatchArgs};
 use crate::{
-    MultiContractRunner, MultiContractRunnerBuilder, TestFilter,
     decode::decode_console_logs,
     gas_report::GasReport,
     multi_runner::matches_contract,
     result::{SuiteResult, TestOutcome, TestStatus},
     traces::{
-        CallTraceDecoderBuilder, InternalTraceMode, TraceKind,
         debug::{ContractSources, DebugTraceIdentifier},
         decode_trace_arena, folded_stack_trace,
         identifier::SignaturesIdentifier,
+        CallTraceDecoderBuilder, InternalTraceMode, TraceKind,
     },
+    MultiContractRunner, MultiContractRunnerBuilder, TestFilter,
 };
 use alloy_primitives::U256;
 use chrono::Utc;
 use clap::{Parser, ValueHint};
-use eyre::{Context, OptionExt, Result, bail};
+use eyre::{bail, Context, OptionExt, Result};
 use foundry_block_explorers::EtherscanApiVersion;
 use foundry_cli::{
     opts::{BuildOpts, GlobalArgs},
     utils::{self, LoadConfig},
 };
-use foundry_common::{TestFunctionExt, compile::ProjectCompiler, evm::EvmArgs, fs, shell};
+use foundry_common::{compile::ProjectCompiler, evm::EvmArgs, fs, shell, TestFunctionExt};
 use foundry_compilers::{
-    ProjectCompileOutput,
     artifacts::output_selection::OutputSelection,
     compilers::{
-        Language,
         multi::{MultiCompiler, MultiCompilerLanguage},
+        Language,
     },
     utils::source_files_iter,
+    ProjectCompileOutput,
 };
 use foundry_config::{
-    Config, figment,
+    figment,
     figment::{
-        Metadata, Profile, Provider,
         value::{Dict, Map},
+        Metadata, Profile, Provider,
     },
     filter::GlobMatcher,
+    Config,
 };
 use foundry_debugger::Debugger;
 use foundry_evm::traces::identifier::TraceIdentifiers;
@@ -47,7 +48,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Write,
     path::PathBuf,
-    sync::{Arc, mpsc::channel},
+    sync::{mpsc::channel, Arc},
     time::{Duration, Instant},
 };
 use yansi::Paint;
@@ -57,7 +58,7 @@ mod summary;
 use crate::{result::TestKind, traces::render_trace_arena_inner};
 pub use filter::FilterArgs;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
-use summary::{TestSummaryReport, format_invariant_metrics_table};
+use summary::{format_invariant_metrics_table, TestSummaryReport};
 
 // Loads project's figment and merges the build cli arguments into it
 foundry_config::merge_impl_figment_convert!(TestArgs, build, evm);

@@ -3,9 +3,9 @@ use alloy_primitives::{Address, Bytes, ChainId, TxHash};
 use clap::{Parser, ValueHint};
 use eyre::Result;
 use foundry_block_explorers::{
-    Client,
     contract::{ContractCreationData, ContractMetadata, Metadata},
     errors::EtherscanError,
+    Client,
 };
 use foundry_cli::{
     opts::EtherscanOpts,
@@ -13,13 +13,13 @@ use foundry_cli::{
 };
 use foundry_common::{compile::ProjectCompiler, fs};
 use foundry_compilers::{
-    ProjectCompileOutput, ProjectPathsConfig,
     artifacts::{
-        ConfigurableContractArtifact, Settings, StorageLayout,
         output_selection::ContractOutputSelection,
         remappings::{RelativeRemapping, Remapping},
+        ConfigurableContractArtifact, Settings, StorageLayout,
     },
     compilers::solc::Solc,
+    ProjectCompileOutput, ProjectPathsConfig,
 };
 use foundry_config::{Chain, Config};
 use std::{

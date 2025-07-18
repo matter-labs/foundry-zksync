@@ -4,18 +4,18 @@ use crate::{
 };
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::{EthereumWallet, TransactionBuilder, TransactionResponse};
-use alloy_primitives::{Address, Bytes, FixedBytes, U256, address, hex, map::B256HashSet};
+use alloy_primitives::{address, hex, map::B256HashSet, Address, Bytes, FixedBytes, U256};
 use alloy_provider::{Provider, WsConnect};
 use alloy_rpc_types::{
+    state::{AccountOverride, EvmOverrides, StateOverride, StateOverridesBuilder},
     AccessList, AccessListItem, BlockId, BlockNumberOrTag, BlockOverrides, BlockTransactions,
     TransactionRequest,
-    state::{AccountOverride, EvmOverrides, StateOverride, StateOverridesBuilder},
 };
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolValue;
-use anvil::{NodeConfig, spawn};
+use anvil::{spawn, NodeConfig};
 use eyre::Ok;
-use futures::{FutureExt, StreamExt, future::join_all};
+use futures::{future::join_all, FutureExt, StreamExt};
 use std::{str::FromStr, time::Duration};
 use tokio::time::timeout;
 

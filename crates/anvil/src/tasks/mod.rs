@@ -2,7 +2,7 @@
 
 #![allow(rustdoc::private_doc_tests)]
 
-use crate::{EthApi, shutdown::Shutdown, tasks::block_listener::BlockListener};
+use crate::{shutdown::Shutdown, tasks::block_listener::BlockListener, EthApi};
 use alloy_network::{AnyHeader, AnyNetwork};
 use alloy_primitives::B256;
 use alloy_provider::Provider;
@@ -52,7 +52,7 @@ impl TaskManager {
     /// ```
     /// use alloy_network::Ethereum;
     /// use alloy_provider::RootProvider;
-    /// use anvil::{NodeConfig, spawn};
+    /// use anvil::{spawn, NodeConfig};
     ///
     /// # async fn t() {
     /// let endpoint = "http://....";
@@ -110,7 +110,7 @@ impl TaskManager {
     /// ```
     /// use alloy_network::Ethereum;
     /// use alloy_provider::RootProvider;
-    /// use anvil::{NodeConfig, spawn};
+    /// use anvil::{spawn, NodeConfig};
     ///
     /// # async fn t() {
     /// let (api, handle) = spawn(NodeConfig::default().with_eth_rpc_url(Some("http://...."))).await;

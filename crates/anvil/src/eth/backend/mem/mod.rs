@@ -2,7 +2,6 @@
 
 use self::state::trie_storage;
 use crate::{
-    ForkChoice, NodeConfig, PrecompileFactory,
     config::PruneStateHistoryConfig,
     eth::{
         backend::{
@@ -17,7 +16,7 @@ use crate::{
                 storage::MinedTransactionReceipt,
             },
             notifications::{NewBlockNotification, NewBlockNotifications},
-            time::{TimeManager, utc_from_secs},
+            time::{utc_from_secs, TimeManager},
             validate::TransactionValidator,
         },
         error::{BlockchainError, ErrDetail, InvalidTransactionError},
@@ -31,28 +30,26 @@ use crate::{
         inspector::AnvilInspector,
         storage::{BlockchainStorage, InMemoryBlockStates, MinedBlockOutcome},
     },
+    ForkChoice, NodeConfig, PrecompileFactory,
 };
 use alloy_chains::NamedChain;
 use alloy_consensus::{
-    Account, BlockHeader, EnvKzgSettings, Header, Receipt, ReceiptWithBloom, Signed,
-    Transaction as TransactionTrait, TxEnvelope,
     proofs::{calculate_receipt_root, calculate_transaction_root},
     transaction::Recovered,
+    Account, BlockHeader, EnvKzgSettings, Header, Receipt, ReceiptWithBloom, Signed,
+    Transaction as TransactionTrait, TxEnvelope,
 };
 use alloy_eips::{eip1559::BaseFeeParams, eip7840::BlobParams};
-use alloy_evm::{Database, Evm, eth::EthEvmContext, precompiles::PrecompilesMap};
+use alloy_evm::{eth::EthEvmContext, precompiles::PrecompilesMap, Database, Evm};
 use alloy_network::{
     AnyHeader, AnyRpcBlock, AnyRpcHeader, AnyRpcTransaction, AnyTxEnvelope, AnyTxType,
     EthereumWallet, UnknownTxEnvelope, UnknownTypedTransaction,
 };
 use alloy_primitives::{
-    Address, B256, Bytes, TxHash, TxKind, U64, U256, address, hex, keccak256, logs_bloom,
-    map::HashMap, utils::Unit,
+    address, hex, keccak256, logs_bloom, map::HashMap, utils::Unit, Address, Bytes, TxHash, TxKind,
+    B256, U256, U64,
 };
 use alloy_rpc_types::{
-    AccessList, Block as AlloyBlock, BlockId, BlockNumberOrTag as BlockNumber, BlockTransactions,
-    EIP1186AccountProofResponse as AccountProof, EIP1186StorageProof as StorageProof, Filter,
-    Header as AlloyHeader, Index, Log, Transaction, TransactionReceipt,
     anvil::Forking,
     request::TransactionRequest,
     serde_helpers::JsonStorageKey,
@@ -66,24 +63,27 @@ use alloy_rpc_types::{
         },
         parity::LocalizedTransactionTrace,
     },
+    AccessList, Block as AlloyBlock, BlockId, BlockNumberOrTag as BlockNumber, BlockTransactions,
+    EIP1186AccountProofResponse as AccountProof, EIP1186StorageProof as StorageProof, Filter,
+    Header as AlloyHeader, Index, Log, Transaction, TransactionReceipt,
 };
 use alloy_serde::{OtherFields, WithOtherFields};
 use alloy_signer::Signature;
 use alloy_signer_local::PrivateKeySigner;
-use alloy_trie::{HashBuilder, Nibbles, proof::ProofRetainer};
+use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles};
 use anvil_core::eth::{
     block::{Block, BlockInfo},
     transaction::{
-        DepositReceipt, MaybeImpersonatedTransaction, PendingTransaction, ReceiptResponse,
-        TransactionInfo, TypedReceipt, TypedTransaction, has_optimism_fields,
-        transaction_request_to_typed,
+        has_optimism_fields, transaction_request_to_typed, DepositReceipt,
+        MaybeImpersonatedTransaction, PendingTransaction, ReceiptResponse, TransactionInfo,
+        TypedReceipt, TypedTransaction,
     },
     wallet::{Capabilities, DelegationCapability, WalletCapabilities},
 };
 use anvil_rpc::error::RpcError;
 use chrono::Datelike;
 use eyre::{Context, Result};
-use flate2::{Compression, read::GzDecoder, write::GzEncoder};
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use foundry_evm::{
     backend::{DatabaseError, DatabaseResult, RevertStateSnapshotAction},
     constants::DEFAULT_CREATE2_DEPLOYER_RUNTIME_CODE,
@@ -92,14 +92,13 @@ use foundry_evm::{
     traces::TracingInspectorConfig,
 };
 use foundry_evm_core::either_evm::EitherEvm;
-use futures::channel::mpsc::{UnboundedSender, unbounded};
+use futures::channel::mpsc::{unbounded, UnboundedSender};
 use op_alloy_consensus::DEPOSIT_TX_TYPE_ID;
 use op_revm::{
-    OpContext, OpHaltReason, OpTransaction, transaction::deposit::DepositTransactionParts,
+    transaction::deposit::DepositTransactionParts, OpContext, OpHaltReason, OpTransaction,
 };
 use parking_lot::{Mutex, RwLock};
 use revm::{
-    DatabaseCommit, Inspector,
     context::{Block as RevmBlock, BlockEnv, TxEnv},
     context_interface::{
         block::BlobExcessGasAndPrice,
@@ -108,8 +107,9 @@ use revm::{
     database::{CacheDB, DatabaseRef, WrapDatabaseRef},
     interpreter::InstructionResult,
     precompile::secp256r1::P256VERIFY,
-    primitives::{KECCAK_EMPTY, hardfork::SpecId},
+    primitives::{hardfork::SpecId, KECCAK_EMPTY},
     state::AccountInfo,
+    DatabaseCommit, Inspector,
 };
 use revm_inspectors::transfer::TransferInspector;
 use std::{
@@ -120,7 +120,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use storage::{Blockchain, DEFAULT_HISTORY_LIMIT, MinedTransaction};
+use storage::{Blockchain, MinedTransaction, DEFAULT_HISTORY_LIMIT};
 use tokio::sync::RwLock as AsyncRwLock;
 
 use super::executor::new_evm_with_inspector_ref;

@@ -1,12 +1,12 @@
 use crate::{
-    Cast, SimpleCast,
     opts::{Cast as CastArgs, CastSubcommand, ToBaseArgs},
     traces::identifier::SignaturesIdentifier,
+    Cast, SimpleCast,
 };
 use alloy_dyn_abi::{DynSolValue, ErrorExt, EventExt};
 use alloy_eips::eip7702::SignedAuthorization;
-use alloy_ens::{ProviderEnsExt, namehash};
-use alloy_primitives::{Address, B256, eip191_hash_message, hex, keccak256};
+use alloy_ens::{namehash, ProviderEnsExt};
+use alloy_primitives::{eip191_hash_message, hex, keccak256, Address, B256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, BlockNumberOrTag::Latest};
 use clap::{CommandFactory, Parser};
@@ -18,14 +18,14 @@ use foundry_common::{
     fmt::{format_tokens, format_tokens_raw, format_uint_exp},
     fs,
     selectors::{
-        ParsedSignatures, SelectorImportData, SelectorKind, decode_calldata, decode_event_topic,
-        decode_function_selector, decode_selectors, import_selectors, parse_signatures,
-        pretty_calldata,
+        decode_calldata, decode_event_topic, decode_function_selector, decode_selectors,
+        import_selectors, parse_signatures, pretty_calldata, ParsedSignatures, SelectorImportData,
+        SelectorKind,
     },
     shell, stdin,
 };
 use std::time::Instant;
-use zksync_telemetry::{TelemetryProps, get_telemetry};
+use zksync_telemetry::{get_telemetry, TelemetryProps};
 
 /// Run the `cast` command-line interface.
 pub fn run() -> Result<()> {

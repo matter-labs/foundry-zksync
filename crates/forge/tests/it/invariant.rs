@@ -3,7 +3,7 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::U256;
 use forge::fuzz::CounterExample;
-use foundry_test_utils::{Filter, forgetest_init, str};
+use foundry_test_utils::{forgetest_init, str, Filter};
 use std::collections::BTreeMap;
 
 macro_rules! get_counterexample {

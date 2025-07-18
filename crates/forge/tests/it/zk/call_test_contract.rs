@@ -15,7 +15,7 @@ async fn test_zk_can_invoke_test_contract() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore] // TODO: right now, immutables are not migrated, see
-// `ZksyncCheatcodeInspectorStrategyRunner::select_zk_vm`.
+          // `ZksyncCheatcodeInspectorStrategyRunner::select_zk_vm`.
 async fn test_zk_can_invoke_test_contract_with_immutables() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
     let filter = Filter::new("test_getImmutable", "CallAnyMethodTest", ".*");

@@ -5,30 +5,30 @@ use alloy_consensus::Account;
 use alloy_eips::eip2930::AccessListResult;
 use alloy_network::{AnyRpcBlock, AnyRpcTransaction, BlockResponse, TransactionResponse};
 use alloy_primitives::{
-    Address, B256, Bytes, StorageValue, U256,
     map::{FbHashMap, HashMap},
+    Address, Bytes, StorageValue, B256, U256,
 };
 use alloy_provider::{
-    Provider,
     ext::{DebugApi, TraceApi},
+    Provider,
 };
 use alloy_rpc_types::{
-    BlockId, BlockNumberOrTag as BlockNumber, BlockTransactions, EIP1186AccountProofResponse,
-    FeeHistory, Filter, Log,
     request::TransactionRequest,
     simulate::{SimulatePayload, SimulatedBlock},
     trace::{
         geth::{GethDebugTracingOptions, GethTrace},
         parity::LocalizedTransactionTrace as Trace,
     },
+    BlockId, BlockNumberOrTag as BlockNumber, BlockTransactions, EIP1186AccountProofResponse,
+    FeeHistory, Filter, Log,
 };
 use alloy_serde::WithOtherFields;
 use alloy_transport::TransportError;
-use anvil_core::eth::transaction::{ReceiptResponse, convert_to_anvil_receipt};
+use anvil_core::eth::transaction::{convert_to_anvil_receipt, ReceiptResponse};
 use foundry_common::provider::{ProviderBuilder, RetryProvider};
 use parking_lot::{
-    RawRwLock, RwLock,
     lock_api::{RwLockReadGuard, RwLockWriteGuard},
+    RawRwLock, RwLock,
 };
 use revm::context_interface::block::BlobExcessGasAndPrice;
 use std::{sync::Arc, time::Duration};

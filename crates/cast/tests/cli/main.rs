@@ -3,7 +3,7 @@
 use alloy_chains::NamedChain;
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::{TransactionBuilder, TransactionResponse};
-use alloy_primitives::{B256, Bytes, address, b256};
+use alloy_primitives::{address, b256, Bytes, B256};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::{BlockNumberOrTag, Index, TransactionRequest};
 use anvil::NodeConfig;
@@ -3556,10 +3556,8 @@ contract ComplexContract {
         .stdout_lossy();
 
     // Should return 5 (0x5 in hex)
-    assert!(
-        length_output
-            .contains("0x0000000000000000000000000000000000000000000000000000000000000005")
-    );
+    assert!(length_output
+        .contains("0x0000000000000000000000000000000000000000000000000000000000000005"));
 });
 
 casttest!(recover_authority, |_prj, cmd| {

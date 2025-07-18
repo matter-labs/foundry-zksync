@@ -1,3 +1,4 @@
+cargo-features = ["edition2024"]
 [package]
 name = "anvil"
 description = "Local ethereum node"
@@ -123,8 +124,8 @@ mimalloc = ["foundry-cli/mimalloc"]
 tracy-allocator = ["foundry-cli/tracy-allocator"]
 cli = ["tokio/full", "cmd"]
 cmd = [
-    "clap",
-    "clap_complete",
+    "dep:clap",
+    "dep:clap_complete",
     "dep:fdlimit",
     "dep:ctrlc",
     "anvil-server/clap",

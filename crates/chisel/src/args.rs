@@ -10,13 +10,13 @@ use foundry_cli::{
 };
 use foundry_common::fs;
 use foundry_config::{
-    Config,
     figment::{
-        Metadata, Profile, Provider,
         value::{Dict, Map},
+        Metadata, Profile, Provider,
     },
+    Config,
 };
-use rustyline::{Editor, config::Configurer, error::ReadlineError};
+use rustyline::{config::Configurer, error::ReadlineError, Editor};
 use std::path::PathBuf;
 use tracing::debug;
 use yansi::Paint;

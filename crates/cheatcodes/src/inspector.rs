@@ -1,12 +1,10 @@
 //! Cheatcode EVM inspector.
 
 use crate::{
-    CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
-    Vm::{self, AccountAccess},
     evm::{
-        DealRecord, GasRecord,
         mapping::{self, MappingSlots},
         prank::Prank,
+        DealRecord, GasRecord,
     },
     script::{Broadcast, Wallets},
     strategy::CheatcodeInspectorStrategy,
@@ -16,12 +14,15 @@ use crate::{
         revert_handlers,
     },
     utils::IgnoredTraces,
+    CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
+    Vm::{self, AccountAccess},
 };
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{
-    Address, B256, Bytes, Log, TxKind, U256, hex,
+    hex,
     map::{AddressHashMap, HashMap, HashSet},
+    Address, Bytes, Log, TxKind, B256, U256,
 };
 use alloy_rpc_types::{AccessList, TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
@@ -30,13 +31,13 @@ use foundry_cheatcodes_common::{
     mock::{MockCallDataContext, MockCallReturnData},
     record::RecordAccess,
 };
-use foundry_common::{SELECTOR_LEN, TransactionMaybeSigned, evm::Breakpoints};
+use foundry_common::{evm::Breakpoints, TransactionMaybeSigned, SELECTOR_LEN};
 use foundry_evm_core::{
-    InspectorExt,
     abi::Vm::stopExpectSafeMemoryCall,
     backend::{DatabaseError, DatabaseExt, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
-    evm::{FoundryEvm, new_evm_with_existing_context},
+    evm::{new_evm_with_existing_context, FoundryEvm},
+    InspectorExt,
 };
 use foundry_evm_traces::TracingInspectorConfig;
 use foundry_wallets::multi_wallet::MultiWallet;
@@ -45,17 +46,17 @@ use itertools::Itertools;
 use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
 use revm::{
-    Inspector, Journal,
     bytecode::opcode as op,
-    context::{BlockEnv, JournalTr, LocalContext, TransactionType, result::EVMError},
-    context_interface::{CreateScheme, transaction::SignedAuthorization},
+    context::{result::EVMError, BlockEnv, JournalTr, LocalContext, TransactionType},
+    context_interface::{transaction::SignedAuthorization, CreateScheme},
     handler::FrameResult,
     interpreter::{
+        interpreter_types::{Jumps, MemoryTr},
         CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome, FrameInput,
         Gas, Host, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
-        interpreter_types::{Jumps, MemoryTr},
     },
     state::EvmStorageSlot,
+    Inspector, Journal,
 };
 use serde_json::Value;
 use std::{
@@ -1765,7 +1766,11 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
                         },
                     };
 
-                    if count != expected.count { Some((expected, count)) } else { None }
+                    if count != expected.count {
+                        Some((expected, count))
+                    } else {
+                        None
+                    }
                 })
                 .collect::<Vec<_>>();
 

@@ -5,15 +5,15 @@ use crate::{
     gas_report::GasReport,
 };
 use alloy_primitives::{
-    Address, Log,
     map::{AddressHashMap, HashMap},
+    Address, Log,
 };
 use eyre::Report;
 use foundry_common::{evm::Breakpoints, get_contract_name, get_file_name, shell};
 use foundry_evm::{
     coverage::HitMaps,
     decode::SkipReason,
-    executors::{RawCallResult, invariant::InvariantMetrics},
+    executors::{invariant::InvariantMetrics, RawCallResult},
     fuzz::{CounterExample, FuzzCase, FuzzFixtures, FuzzTestResult},
     traces::{CallTraceArena, CallTraceDecoder, TraceKind, Traces},
 };

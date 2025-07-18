@@ -1,35 +1,35 @@
 //! Foundry's main executor backend abstraction and implementation.
 
 use crate::{
-    AsEnvMut, Env, EnvMut, InspectorExt,
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
     utils::configure_tx_env,
+    AsEnvMut, Env, EnvMut, InspectorExt,
 };
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
-use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256, map::HashMap, uint};
+use alloy_primitives::{keccak256, map::HashMap, uint, Address, Bytes, TxKind, B256, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
 use foundry_common::{
-    SYSTEM_TRANSACTION_TYPE, is_known_system_sender, provider::try_get_zksync_http_provider,
+    is_known_system_sender, provider::try_get_zksync_http_provider, SYSTEM_TRANSACTION_TYPE,
 };
-pub use foundry_fork_db::{BlockchainDb, SharedBackend, cache::BlockchainDbMeta};
+pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
 use itertools::Itertools;
 use revm::{
-    Database, DatabaseCommit, JournalEntry,
     bytecode::Bytecode,
     context::JournalInner,
     context_interface::{block::BlobExcessGasAndPrice, result::ResultAndState},
     database::{CacheDB, DatabaseRef},
     inspector::NoOpInspector,
     precompile::{PrecompileSpecId, Precompiles},
-    primitives::{HashMap as Map, KECCAK_EMPTY, Log, hardfork::SpecId},
+    primitives::{hardfork::SpecId, HashMap as Map, Log, KECCAK_EMPTY},
     state::{Account, AccountInfo, EvmState, EvmStorageSlot},
+    Database, DatabaseCommit, JournalEntry,
 };
 use std::{
     any::Any,
@@ -1447,7 +1447,11 @@ impl DatabaseExt for Backend {
             }
             eyre::bail!("Requested fork `{}` does not exit", id)
         }
-        if let Some(id) = self.active_fork_id() { Ok(id) } else { eyre::bail!("No fork active") }
+        if let Some(id) = self.active_fork_id() {
+            Ok(id)
+        } else {
+            eyre::bail!("No fork active")
+        }
     }
 
     fn ensure_fork_id(&self, id: LocalForkId) -> eyre::Result<&ForkId> {
@@ -2114,7 +2118,7 @@ fn apply_state_changeset(
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend::{Backend, strategy::BackendStrategy},
+        backend::{strategy::BackendStrategy, Backend},
         fork::CreateFork,
         opts::EvmOpts,
     };
@@ -2125,8 +2129,8 @@ mod tests {
     use foundry_config::{Config, NamedChain};
     use foundry_fork_db::cache::{BlockchainDb, BlockchainDbMeta};
     use foundry_test_utils::{
-        MockServer, RpcRequest,
         httptest::{self, matchers, responders},
+        MockServer, RpcRequest,
     };
     // use foundry_zksync_core::EMPTY_CODE;
     use revm::database::{Database, DatabaseRef};

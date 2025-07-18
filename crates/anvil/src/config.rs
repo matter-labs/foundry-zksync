@@ -1,5 +1,4 @@
 use crate::{
-    EthereumHardfork, FeeManager, PrecompileFactory,
     eth::{
         backend::{
             db::{Db, SerializableState},
@@ -12,27 +11,28 @@ use crate::{
         fees::{INITIAL_BASE_FEE, INITIAL_GAS_PRICE},
         pool::transactions::{PoolTransaction, TransactionOrder},
     },
-    hardfork::{ChainHardfork, ethereum_hardfork_from_block_tag, spec_id_from_ethereum_hardfork},
+    hardfork::{ethereum_hardfork_from_block_tag, spec_id_from_ethereum_hardfork, ChainHardfork},
     mem::{self, in_memory_db::MemDb},
+    EthereumHardfork, FeeManager, PrecompileFactory,
 };
 use alloy_consensus::BlockHeader;
 use alloy_genesis::Genesis;
 use alloy_network::{AnyNetwork, TransactionResponse};
 use alloy_op_hardforks::OpHardfork;
-use alloy_primitives::{BlockNumber, TxHash, U256, hex, map::HashMap, utils::Unit};
+use alloy_primitives::{hex, map::HashMap, utils::Unit, BlockNumber, TxHash, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{Block, BlockNumberOrTag};
 use alloy_signer::Signer;
 use alloy_signer_local::{
-    MnemonicBuilder, PrivateKeySigner,
     coins_bip39::{English, Mnemonic},
+    MnemonicBuilder, PrivateKeySigner,
 };
 use alloy_transport::TransportError;
 use anvil_server::ServerConfig;
 use eyre::{Context, Result};
 use foundry_common::{
-    ALCHEMY_FREE_TIER_CUPS, NON_ARCHIVE_NODE_WARNING, REQUEST_TIMEOUT,
     provider::{ProviderBuilder, RetryProvider},
+    ALCHEMY_FREE_TIER_CUPS, NON_ARCHIVE_NODE_WARNING, REQUEST_TIMEOUT,
 };
 use foundry_config::Config;
 use foundry_evm::{
@@ -50,7 +50,7 @@ use revm::{
     context_interface::block::BlobExcessGasAndPrice,
     primitives::hardfork::SpecId,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::{
     fmt::Write as FmtWrite,
     fs::File,

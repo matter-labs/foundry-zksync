@@ -2,10 +2,10 @@
 
 use alloy_dyn_abi::{DynSolType, DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Error, Event, Function, Param};
-use alloy_primitives::{Address, LogData, hex};
+use alloy_primitives::{hex, Address, LogData};
 use eyre::{Context, ContextCompat, Result};
 use foundry_block_explorers::{
-    Client, EtherscanApiVersion, contract::ContractMetadata, errors::EtherscanError,
+    contract::ContractMetadata, errors::EtherscanError, Client, EtherscanApiVersion,
 };
 use foundry_config::Chain;
 use std::pin::Pin;

@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, Bytes, U256};
-use zksync_types::{H256, StorageKey};
+use zksync_types::{StorageKey, H256};
 
 use crate::{convert::ConvertH160, is_system_address};
 

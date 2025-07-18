@@ -149,7 +149,7 @@ pub fn format_token_raw(value: &DynSolValue) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{U256, address};
+    use alloy_primitives::{address, U256};
 
     #[test]
     fn parse_hex_uint() {

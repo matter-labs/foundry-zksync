@@ -1,24 +1,24 @@
 use crate::{
-    VerifierArgs,
     provider::{VerificationContext, VerificationProvider},
     retry::RETRY_CHECK_ON_VERIFY,
     verify::{ContractLanguage, VerifyArgs, VerifyCheckArgs},
     zk_provider::CompilerVerificationContext,
+    VerifierArgs,
 };
 use alloy_json_abi::Function;
 use alloy_primitives::hex;
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionTrait;
-use eyre::{Context, OptionExt, Result, eyre};
+use eyre::{eyre, Context, OptionExt, Result};
 use foundry_block_explorers::{
-    Client, EtherscanApiVersion,
     errors::EtherscanError,
     utils::lookup_compiler_version,
     verify::{CodeFormat, VerifyContract},
+    Client, EtherscanApiVersion,
 };
 use foundry_cli::{
     opts::EtherscanOpts,
-    utils::{LoadConfig, get_provider, read_constructor_args_file},
+    utils::{get_provider, read_constructor_args_file, LoadConfig},
 };
 use foundry_common::{abi::encode_function_args, retry::RetryError};
 use foundry_config::Config;

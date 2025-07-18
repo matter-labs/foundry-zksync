@@ -10,8 +10,8 @@ extern crate tracing;
 
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_primitives::{
-    Address, Bytes, Log,
     map::{AddressHashMap, HashMap},
+    Address, Bytes, Log,
 };
 use foundry_common::{calc, contracts::ContractsByAddress, evm::Breakpoints};
 use foundry_evm_coverage::HitMaps;

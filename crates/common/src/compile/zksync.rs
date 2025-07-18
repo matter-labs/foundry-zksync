@@ -3,18 +3,18 @@ use std::{collections::BTreeMap, io::IsTerminal};
 use comfy_table::Color;
 use eyre::Result;
 use foundry_compilers::{
-    Project, ProjectCompileOutput,
     artifacts::Source,
     report::{BasicStdoutReporter, NoReporter, Report},
+    Project, ProjectCompileOutput,
 };
 use foundry_zksync_compilers::compilers::{
     artifact_output::zk::ZkArtifactOutput,
-    zksolc::{ZKSOLC_UNSUPPORTED_VERSIONS, ZkSolc, ZkSolcCompiler},
+    zksolc::{ZkSolc, ZkSolcCompiler, ZKSOLC_UNSUPPORTED_VERSIONS},
 };
 
-use crate::{TestFunctionExt, reports::report_kind, shell, term::SpinnerReporter};
+use crate::{reports::report_kind, shell, term::SpinnerReporter, TestFunctionExt};
 
-use super::{ContractInfo, ProjectCompiler, SizeReport, contract_size};
+use super::{contract_size, ContractInfo, ProjectCompiler, SizeReport};
 
 // https://docs.zksync.io/build/developer-reference/ethereum-differences/contract-deployment#contract-size-limit-and-format-of-bytecode-hash
 pub(super) const ZKSYNC_CONTRACT_SIZE_LIMIT: usize = 450999;

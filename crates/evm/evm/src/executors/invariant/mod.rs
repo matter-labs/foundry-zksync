@@ -2,9 +2,9 @@ use crate::{
     executors::{Executor, RawCallResult},
     inspectors::Fuzzer,
 };
-use alloy_primitives::{Address, Bytes, FixedBytes, Selector, U256, map::HashMap};
-use alloy_sol_types::{SolCall, sol};
-use eyre::{ContextCompat, Result, eyre};
+use alloy_primitives::{map::HashMap, Address, Bytes, FixedBytes, Selector, U256};
+use alloy_sol_types::{sol, SolCall};
+use eyre::{eyre, ContextCompat, Result};
 use foundry_common::contracts::{ContractsByAddress, ContractsByArtifact};
 use foundry_config::InvariantConfig;
 use foundry_evm_core::{
@@ -14,12 +14,12 @@ use foundry_evm_core::{
     precompiles::PRECOMPILES,
 };
 use foundry_evm_fuzz::{
-    FuzzCase, FuzzFixtures, FuzzedCases,
     invariant::{
         ArtifactFilters, BasicTxDetails, FuzzRunIdentifiedContracts, InvariantContract,
         RandomCallGenerator, SenderFilters, TargetedContract, TargetedContracts,
     },
-    strategies::{EvmFuzzState, invariant_strat, override_call_strat},
+    strategies::{invariant_strat, override_call_strat, EvmFuzzState},
+    FuzzCase, FuzzFixtures, FuzzedCases,
 };
 use foundry_evm_traces::{CallTraceArena, SparsedTraceArena};
 use indicatif::ProgressBar;
@@ -30,7 +30,7 @@ use revm::state::Account;
 use shrink::shrink_sequence;
 use std::{
     cell::RefCell,
-    collections::{HashMap as Map, btree_map::Entry},
+    collections::{btree_map::Entry, HashMap as Map},
     sync::Arc,
 };
 
@@ -49,7 +49,7 @@ use serde::{Deserialize, Serialize};
 mod corpus;
 
 mod shrink;
-use crate::executors::{EvmError, FuzzTestTimer, invariant::corpus::TxCorpusManager};
+use crate::executors::{invariant::corpus::TxCorpusManager, EvmError, FuzzTestTimer};
 pub use shrink::check_sequence;
 
 sol! {

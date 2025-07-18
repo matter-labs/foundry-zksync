@@ -1,3 +1,4 @@
+cargo-features = ["edition2024"]
 [package]
 name = "foundry-config"
 description = "Foundry configuration"

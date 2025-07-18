@@ -10,11 +10,11 @@ use foundry_config::Config;
 use foundry_evm::{
     constants::CALLER,
     executors::{
-        DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
         strategy::{DeployLibKind, DeployLibResult},
+        DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
     },
     opts::EvmOpts,
-    revm::interpreter::{InstructionResult, return_ok},
+    revm::interpreter::{return_ok, InstructionResult},
     traces::{TraceKind, Traces},
 };
 use std::collections::VecDeque;

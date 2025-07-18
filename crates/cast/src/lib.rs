@@ -9,16 +9,17 @@ use alloy_ens::NameOrAddress;
 use alloy_json_abi::Function;
 use alloy_network::{AnyNetwork, AnyRpcTransaction};
 use alloy_primitives::{
-    Address, B256, I256, Keccak256, Selector, TxHash, TxKind, U64, U256, hex,
-    utils::{ParseUnits, Unit, keccak256},
+    hex,
+    utils::{keccak256, ParseUnits, Unit},
+    Address, Keccak256, Selector, TxHash, TxKind, B256, I256, U256, U64,
 };
 use alloy_provider::{
-    PendingTransactionBuilder, Provider,
     network::eip2718::{Decodable2718, Encodable2718},
+    PendingTransactionBuilder, Provider,
 };
 use alloy_rlp::Decodable;
 use alloy_rpc_types::{
-    BlockId, BlockNumberOrTag, BlockOverrides, Filter, TransactionRequest, state::StateOverride,
+    state::StateOverride, BlockId, BlockNumberOrTag, BlockOverrides, Filter, TransactionRequest,
 };
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::sol;
@@ -27,16 +28,15 @@ use chrono::DateTime;
 use eyre::{Context, ContextCompat, OptionExt, Result};
 use foundry_block_explorers::Client;
 use foundry_common::{
-    TransactionReceiptWithRevertReason,
     abi::{encode_function_args, get_func},
     compile::etherscan_project,
     fmt::*,
-    fs, get_pretty_tx_receipt_attr, shell,
+    fs, get_pretty_tx_receipt_attr, shell, TransactionReceiptWithRevertReason,
 };
 use foundry_compilers::flatten::Flattener;
 use foundry_config::Chain;
 use foundry_evm_core::ic::decode_instructions;
-use futures::{FutureExt, StreamExt, future::Either};
+use futures::{future::Either, FutureExt, StreamExt};
 use op_alloy_consensus::OpTxEnvelope;
 use rayon::prelude::*;
 use std::{
@@ -93,7 +93,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -319,7 +319,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -348,7 +348,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -504,7 +504,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     /// use std::str::FromStr;
     ///
@@ -592,7 +592,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     /// use std::str::FromStr;
     ///
@@ -641,7 +641,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     /// use std::str::FromStr;
     ///
@@ -671,7 +671,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::{Address, U256};
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     /// use std::str::FromStr;
     ///
@@ -694,7 +694,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     /// use std::str::FromStr;
     ///
@@ -730,7 +730,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     /// use std::str::FromStr;
     ///
@@ -753,7 +753,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -817,7 +817,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -878,7 +878,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -909,7 +909,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::{Address, B256};
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     /// use std::str::FromStr;
     ///
@@ -970,7 +970,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::fixed_bytes;
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use alloy_rpc_types::{BlockId, BlockNumberOrTag};
     /// use cast::Cast;
     /// use std::{convert::TryFrom, str::FromStr};
@@ -1017,7 +1017,7 @@ impl<P: Provider<AnyNetwork>> Cast<P> {
     ///
     /// ```
     /// use alloy_primitives::Address;
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use alloy_rpc_types::Filter;
     /// use alloy_transport::BoxTransport;
     /// use cast::Cast;

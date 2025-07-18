@@ -1,8 +1,8 @@
 use super::JournaledState;
 use crate::Env;
 use alloy_primitives::{
-    B256, U256,
     map::{AddressHashMap, HashMap},
+    B256, U256,
 };
 use revm::state::AccountInfo;
 use serde::{Deserialize, Serialize};

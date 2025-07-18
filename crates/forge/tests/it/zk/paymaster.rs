@@ -1,8 +1,9 @@
 //! Forge tests for zksync contracts.
 
 use foundry_test_utils::{
-    TestProject, ZkSyncNode, forgetest_async,
+    forgetest_async,
     util::{self, OutputExt},
+    TestProject, ZkSyncNode,
 };
 
 use crate::test_helpers::run_zk_script_test;

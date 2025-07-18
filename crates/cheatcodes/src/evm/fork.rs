@@ -1,6 +1,6 @@
 use crate::{
-    Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, DatabaseExt, Result, Vm::*,
-    json::json_value_to_token,
+    json::json_value_to_token, Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, DatabaseExt,
+    Result, Vm::*,
 };
 use alloy_dyn_abi::DynSolValue;
 use alloy_primitives::{B256, U256};
@@ -8,7 +8,7 @@ use alloy_provider::Provider;
 use alloy_rpc_types::Filter;
 use alloy_sol_types::SolValue;
 use foundry_common::provider::ProviderBuilder;
-use foundry_evm_core::{AsEnvMut, ContextExt, fork::CreateFork};
+use foundry_evm_core::{fork::CreateFork, AsEnvMut, ContextExt};
 
 impl Cheatcode for activeForkCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {

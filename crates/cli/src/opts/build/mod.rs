@@ -1,5 +1,5 @@
 use clap::Parser;
-use foundry_compilers::artifacts::{EvmVersion, output_selection::ContractOutputSelection};
+use foundry_compilers::artifacts::{output_selection::ContractOutputSelection, EvmVersion};
 use serde::Serialize;
 
 mod core;

@@ -3,11 +3,11 @@
 use std::{borrow::Borrow, collections::BTreeMap, path::Path};
 
 use alloy_json_abi::JsonAbi;
-use alloy_primitives::{Address, B256, Bytes, TxKind, U256};
+use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
 use eyre::Context;
 use foundry_common::{ContractsByArtifact, TestFunctionExt, TransactionMaybeSigned};
 use foundry_compilers::{
-    Artifact, ArtifactId, ProjectCompileOutput, artifacts::Libraries, contracts::ArtifactContracts,
+    artifacts::Libraries, contracts::ArtifactContracts, Artifact, ArtifactId, ProjectCompileOutput,
 };
 use foundry_evm_core::decode::RevertDecoder;
 use foundry_linking::{Linker, LinkerError};

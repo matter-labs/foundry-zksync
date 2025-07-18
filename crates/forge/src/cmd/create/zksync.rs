@@ -10,12 +10,12 @@ use super::{ContractDeploymentError, ContractFactory, CreateArgs, DeploymentTxFa
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::JsonAbi;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, hex};
+use alloy_primitives::{hex, Address, Bytes};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_signer::Signer;
 use alloy_zksync::{
     network::{
-        Zksync, transaction_request::TransactionRequest, unsigned_tx::eip712::PaymasterParams,
+        transaction_request::TransactionRequest, unsigned_tx::eip712::PaymasterParams, Zksync,
     },
     wallet::ZksyncWallet,
 };
@@ -25,10 +25,10 @@ use forge_verify::VerifyArgs;
 use foundry_cli::{
     opts::EtherscanOpts,
     utils,
-    utils::{LoadConfig, read_constructor_args_file, remove_zk_contract},
+    utils::{read_constructor_args_file, remove_zk_contract, LoadConfig},
 };
 use foundry_common::{compile::ProjectCompiler, shell};
-use foundry_compilers::{ArtifactId, Project, artifacts::BytecodeObject, utils::canonicalize};
+use foundry_compilers::{artifacts::BytecodeObject, utils::canonicalize, ArtifactId, Project};
 use foundry_zksync_compilers::compilers::artifact_output::zk::ZkContractArtifact;
 use foundry_zksync_core::convert::ConvertH160;
 use serde_json::json;

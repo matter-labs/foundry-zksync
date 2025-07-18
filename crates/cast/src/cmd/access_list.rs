@@ -1,6 +1,6 @@
 use crate::{
-    Cast,
     tx::{CastTxBuilder, SenderKind},
+    Cast,
 };
 use alloy_ens::NameOrAddress;
 use alloy_rpc_types::BlockId;

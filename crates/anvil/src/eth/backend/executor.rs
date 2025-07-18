@@ -1,5 +1,4 @@
 use crate::{
-    PrecompileFactory,
     eth::{
         backend::{
             db::Db, env::Env, mem::op_haltreason_to_instruction_result,
@@ -10,14 +9,15 @@ use crate::{
     },
     inject_precompiles,
     mem::inspector::AnvilInspector,
+    PrecompileFactory,
 };
 use alloy_consensus::{
-    Receipt, ReceiptWithBloom, constants::EMPTY_WITHDRAWALS, proofs::calculate_receipt_root,
+    constants::EMPTY_WITHDRAWALS, proofs::calculate_receipt_root, Receipt, ReceiptWithBloom,
 };
 use alloy_eips::{eip7685::EMPTY_REQUESTS_HASH, eip7840::BlobParams};
-use alloy_evm::{EthEvm, Evm, eth::EthEvmContext, precompiles::PrecompilesMap};
+use alloy_evm::{eth::EthEvmContext, precompiles::PrecompilesMap, EthEvm, Evm};
 use alloy_op_evm::OpEvm;
-use alloy_primitives::{B256, Bloom, BloomInput, Log};
+use alloy_primitives::{Bloom, BloomInput, Log, B256};
 use anvil_core::eth::{
     block::{Block, BlockInfo, PartialHeader},
     transaction::{
@@ -26,16 +26,16 @@ use anvil_core::eth::{
 };
 use foundry_evm::{backend::DatabaseError, traces::CallTraceNode};
 use foundry_evm_core::either_evm::EitherEvm;
-use op_revm::{L1BlockInfo, OpContext, precompiles::OpPrecompiles};
+use op_revm::{precompiles::OpPrecompiles, L1BlockInfo, OpContext};
 use revm::{
-    Database, DatabaseRef, Inspector, Journal,
     context::{Block as RevmBlock, BlockEnv, CfgEnv, Evm as RevmEvm, JournalTr, LocalContext},
     context_interface::result::{EVMError, ExecutionResult, Output},
     database::WrapDatabaseRef,
-    handler::{EthPrecompiles, instructions::EthInstructions},
+    handler::{instructions::EthInstructions, EthPrecompiles},
     interpreter::InstructionResult,
-    precompile::{PrecompileSpecId, Precompiles, secp256r1::P256VERIFY},
+    precompile::{secp256r1::P256VERIFY, PrecompileSpecId, Precompiles},
     primitives::hardfork::SpecId,
+    Database, DatabaseRef, Inspector, Journal,
 };
 use std::sync::Arc;
 

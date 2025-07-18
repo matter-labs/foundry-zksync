@@ -5,19 +5,19 @@ use alloy_primitives::map::HashMap;
 use std::{fmt::Debug, path::PathBuf};
 
 mod contract_inheritance;
-pub use contract_inheritance::{CONTRACT_INHERITANCE_ID, ContractInheritance};
+pub use contract_inheritance::{ContractInheritance, CONTRACT_INHERITANCE_ID};
 
 mod inheritdoc;
-pub use inheritdoc::{INHERITDOC_ID, Inheritdoc};
+pub use inheritdoc::{Inheritdoc, INHERITDOC_ID};
 
 mod infer_hyperlinks;
-pub use infer_hyperlinks::{INFER_INLINE_HYPERLINKS_ID, InferInlineHyperlinks};
+pub use infer_hyperlinks::{InferInlineHyperlinks, INFER_INLINE_HYPERLINKS_ID};
 
 mod git_source;
-pub use git_source::{GIT_SOURCE_ID, GitSource};
+pub use git_source::{GitSource, GIT_SOURCE_ID};
 
 mod deployments;
-pub use deployments::{DEPLOYMENTS_ID, Deployment, Deployments};
+pub use deployments::{Deployment, Deployments, DEPLOYMENTS_ID};
 
 /// The preprocessor id.
 #[derive(Debug, PartialEq, Eq, Hash)]

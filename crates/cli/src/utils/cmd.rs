@@ -1,27 +1,26 @@
 use alloy_json_abi::JsonAbi;
-use alloy_primitives::{Address, Bytes, map::HashMap};
+use alloy_primitives::{map::HashMap, Address, Bytes};
 use eyre::{Result, WrapErr};
 use foundry_common::{
-    ContractsByArtifact, TestFunctionExt, compile::ProjectCompiler, fs, selectors::SelectorKind,
-    shell,
+    compile::ProjectCompiler, fs, selectors::SelectorKind, shell, ContractsByArtifact,
+    TestFunctionExt,
 };
 use foundry_compilers::{
-    Artifact, ArtifactId, ProjectCompileOutput,
     artifacts::{CompactBytecode, Settings},
     cache::{CacheEntry, CompilerCache},
     utils::read_json_file,
+    Artifact, ArtifactId, ProjectCompileOutput,
 };
-use foundry_config::{Chain, Config, NamedChain, error::ExtractConfigError, figment::Figment};
+use foundry_config::{error::ExtractConfigError, figment::Figment, Chain, Config, NamedChain};
 use foundry_debugger::Debugger;
 use foundry_evm::{
     executors::{DeployResult, EvmError, RawCallResult},
     opts::EvmOpts,
     traces::{
-        CallTraceDecoder, CallTraceDecoderBuilder, TraceKind, Traces,
         debug::{ContractSources, DebugTraceIdentifier},
         decode_trace_arena,
         identifier::{SignaturesCache, SignaturesIdentifier, TraceIdentifiers},
-        render_trace_arena_inner,
+        render_trace_arena_inner, CallTraceDecoder, CallTraceDecoderBuilder, TraceKind, Traces,
     },
 };
 use foundry_zksync_compilers::compilers::{

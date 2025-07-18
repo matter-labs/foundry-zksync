@@ -1,14 +1,14 @@
 use alloy_primitives::hex;
 use clap::Parser;
-use comfy_table::{Table, modifiers::UTF8_ROUND_CORNERS};
+use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Table};
 use eyre::Result;
 use foundry_cli::{
     opts::{BuildOpts, CompilerOpts, ProjectPathOpts},
-    utils::{FoundryPathExt, cache_local_signatures},
+    utils::{cache_local_signatures, FoundryPathExt},
 };
 use foundry_common::{
-    compile::{PathOrContractInfo, ProjectCompiler, compile_target},
-    selectors::{SelectorImportData, import_selectors},
+    compile::{compile_target, PathOrContractInfo, ProjectCompiler},
+    selectors::{import_selectors, SelectorImportData},
 };
 use foundry_compilers::{artifacts::output_selection::ContractOutputSelection, info::ContractInfo};
 use std::fs::canonicalize;

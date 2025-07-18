@@ -4,18 +4,18 @@ use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::FunctionExt;
 use alloy_json_abi::Function;
 use alloy_network::{AnyNetwork, NetworkWallet, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, Signature, TxKind, U256, hex};
+use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolCall;
 use alloy_zksync::network::{
-    Zksync,
     transaction_request::TransactionRequest as ZkTransactionRequest,
     tx_envelope::TxEnvelope,
-    unsigned_tx::{TypedTransaction, eip712::PaymasterParams},
+    unsigned_tx::{eip712::PaymasterParams, TypedTransaction},
+    Zksync,
 };
-use clap::{Parser, command};
+use clap::{command, Parser};
 use eyre::{Context, Result};
 use foundry_cli::utils;
 use foundry_common::{
@@ -131,7 +131,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
+    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {

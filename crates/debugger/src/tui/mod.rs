@@ -3,17 +3,17 @@
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event},
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use eyre::Result;
 use ratatui::{
-    Terminal,
     backend::{Backend, CrosstermBackend},
+    Terminal,
 };
 use std::{
     io,
     ops::ControlFlow,
-    sync::{Arc, mpsc},
+    sync::{mpsc, Arc},
     thread,
     time::{Duration, Instant},
 };

@@ -1,7 +1,7 @@
-use crate::{Config, DEPRECATIONS, Warning};
+use crate::{Config, Warning, DEPRECATIONS};
 use figment::{
-    Error, Figment, Metadata, Profile, Provider,
     value::{Dict, Map, Value},
+    Error, Figment, Metadata, Profile, Provider,
 };
 use std::collections::BTreeMap;
 

@@ -36,4 +36,4 @@ pub use foundry_common::traits::TestFilter;
 pub use foundry_evm::*;
 
 mod lockfile;
-pub use lockfile::{DepIdentifier, DepMap, FOUNDRY_LOCK, Lockfile};
+pub use lockfile::{DepIdentifier, DepMap, Lockfile, FOUNDRY_LOCK};

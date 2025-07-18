@@ -3,7 +3,7 @@
 use crate::{init_tracing, utils::connect_pubsub};
 use alloy_primitives::U256;
 use alloy_provider::Provider;
-use anvil::{NodeConfig, spawn};
+use anvil::{spawn, NodeConfig};
 use futures::StreamExt;
 use tempfile::TempDir;
 

@@ -5,7 +5,7 @@ use crate::{
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
 use foundry_compilers::{
-    artifacts::{Source, StandardJsonCompilerInput, vyper::VyperInput},
+    artifacts::{vyper::VyperInput, Source, StandardJsonCompilerInput},
     solc::SolcLanguage,
 };
 use std::path::Path;

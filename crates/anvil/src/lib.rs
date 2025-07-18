@@ -5,12 +5,12 @@
 
 use crate::{
     eth::{
-        EthApi,
         backend::{info::StorageInfo, mem},
         fees::{FeeHistoryService, FeeManager},
         miner::{Miner, MiningMode},
         pool::Pool,
         sign::{DevSigner, Signer as EthSigner},
+        EthApi,
     },
     filter::Filters,
     logging::{LoggingManager, NodeLogLayer},
@@ -45,7 +45,7 @@ mod service;
 
 mod config;
 pub use config::{
-    AccountGenerator, CHAIN_ID, DEFAULT_GAS_LIMIT, ForkChoice, NodeConfig, VERSION_MESSAGE,
+    AccountGenerator, ForkChoice, NodeConfig, CHAIN_ID, DEFAULT_GAS_LIMIT, VERSION_MESSAGE,
 };
 
 mod hardfork;
@@ -54,7 +54,7 @@ pub use alloy_hardforks::EthereumHardfork;
 pub mod eth;
 /// Evm related abstractions
 mod evm;
-pub use evm::{PrecompileFactory, inject_precompiles};
+pub use evm::{inject_precompiles, PrecompileFactory};
 
 /// support for polling filters
 pub mod filter;

@@ -1,6 +1,6 @@
 use super::{
-    InvariantFailures, InvariantFuzzError, InvariantMetrics, InvariantTest, InvariantTestRun,
     call_after_invariant_function, call_invariant_function, error::FailedInvariantCaseData,
+    InvariantFailures, InvariantFuzzError, InvariantMetrics, InvariantTest, InvariantTestRun,
 };
 use crate::executors::{Executor, RawCallResult};
 use alloy_dyn_abi::JsonAbiExt;
@@ -9,8 +9,8 @@ use foundry_config::InvariantConfig;
 use foundry_evm_core::utils::StateChangeset;
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_fuzz::{
-    FuzzedCases,
     invariant::{BasicTxDetails, FuzzRunIdentifiedContracts, InvariantContract},
+    FuzzedCases,
 };
 use revm_inspectors::tracing::CallTraceArena;
 use std::{borrow::Cow, collections::HashMap};

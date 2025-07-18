@@ -1,4 +1,4 @@
-use foundry_test_utils::util::{RemoteProject, setup_forge_remote};
+use foundry_test_utils::util::{setup_forge_remote, RemoteProject};
 
 #[test]
 fn can_generate_solmate_docs() {

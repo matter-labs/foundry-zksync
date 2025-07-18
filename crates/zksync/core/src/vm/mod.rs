@@ -8,15 +8,15 @@ mod storage_recorder;
 mod storage_view;
 mod tracers;
 
-use alloy_primitives::{Address, address};
+use alloy_primitives::{address, Address};
 pub use env::ZkEnv;
 pub use farcall::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use inspect::{
-    ZKVMExecutionResult, ZKVMResult, batch_factory_dependencies, inspect, inspect_as_batch,
+    batch_factory_dependencies, inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult,
 };
 pub use runner::{
-    ZkCreateInputs, balance, call, code_hash, create, deploy_nonce, encode_create_params, transact,
-    tx_nonce,
+    balance, call, code_hash, create, deploy_nonce, encode_create_params, transact, tx_nonce,
+    ZkCreateInputs,
 };
 pub use storage_recorder::{AccountAccess, AccountAccessKind, StorageAccess};
 pub use tracers::cheatcode::CheatcodeTracerContext;

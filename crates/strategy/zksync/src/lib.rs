@@ -12,6 +12,6 @@ mod executor;
 pub use backend::ZksyncBackendStrategyRunner;
 pub use cheatcode::ZksyncCheatcodeInspectorStrategyRunner;
 pub use executor::{
-    ZksyncExecutorStrategyBuilder, ZksyncExecutorStrategyRunner,
-    try_get_zksync_transaction_metadata,
+    try_get_zksync_transaction_metadata, ZksyncExecutorStrategyBuilder,
+    ZksyncExecutorStrategyRunner,
 };

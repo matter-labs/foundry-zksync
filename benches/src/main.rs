@@ -1,10 +1,9 @@
 use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_bench::{
-    BENCHMARK_REPOS, FOUNDRY_VERSIONS, RUNS, RepoConfig, get_forge_version,
-    get_forge_version_details,
+    get_forge_version, get_forge_version_details,
     results::{BenchmarkResults, HyperfineResult},
-    switch_foundry_version,
+    switch_foundry_version, RepoConfig, BENCHMARK_REPOS, FOUNDRY_VERSIONS, RUNS,
 };
 use foundry_common::sh_println;
 use rayon::prelude::*;

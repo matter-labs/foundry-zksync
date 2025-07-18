@@ -11,15 +11,15 @@ use crate::{
     session_source::SessionSource,
 };
 use alloy_json_abi::{InternalType, JsonAbi};
-use alloy_primitives::{Address, hex};
+use alloy_primitives::{hex, Address};
 use forge_fmt::FormatterConfig;
 use foundry_config::RpcEndpointUrl;
 use foundry_evm::{
     decode::decode_console_logs,
     traces::{
-        CallTraceDecoder, CallTraceDecoderBuilder, TraceKind, decode_trace_arena,
+        decode_trace_arena,
         identifier::{SignaturesIdentifier, TraceIdentifiers},
-        render_trace_arena,
+        render_trace_arena, CallTraceDecoder, CallTraceDecoderBuilder, TraceKind,
     },
 };
 use regex::Regex;

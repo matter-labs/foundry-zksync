@@ -1,7 +1,7 @@
 //! Contains various tests for checking forge commands related to verifying contracts on Etherscan
 //! and ZkSync explorer.
 
-use crate::utils::{self, EnvExternalities, network_private_key};
+use crate::utils::{self, network_private_key, EnvExternalities};
 use alloy_chains::NamedChain;
 use foundry_common::retry::Retry;
 use foundry_test_utils::{

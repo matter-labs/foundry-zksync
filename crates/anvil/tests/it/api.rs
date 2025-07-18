@@ -7,16 +7,17 @@ use crate::{
 use alloy_consensus::{SignableTransaction, Transaction, TxEip1559};
 use alloy_network::{EthereumWallet, TransactionBuilder, TxSignerSync};
 use alloy_primitives::{
-    Address, B256, ChainId, U256, bytes,
+    bytes,
     map::{AddressHashMap, B256HashMap, HashMap},
+    Address, ChainId, B256, U256,
 };
 use alloy_provider::Provider;
 use alloy_rpc_types::{
-    BlockId, BlockNumberOrTag, BlockTransactions, request::TransactionRequest,
-    state::AccountOverride,
+    request::TransactionRequest, state::AccountOverride, BlockId, BlockNumberOrTag,
+    BlockTransactions,
 };
 use alloy_serde::WithOtherFields;
-use anvil::{CHAIN_ID, EthereumHardfork, NodeConfig, eth::api::CLIENT_VERSION, spawn};
+use anvil::{eth::api::CLIENT_VERSION, spawn, EthereumHardfork, NodeConfig, CHAIN_ID};
 use futures::join;
 use std::time::Duration;
 

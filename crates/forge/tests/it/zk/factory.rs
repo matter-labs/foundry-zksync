@@ -1,11 +1,11 @@
 //! Forge tests for zksync factory contracts.
 
-use foundry_test_utils::{Filter, TestProject, forgetest_async, util};
+use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
 use revm::primitives::hardfork::SpecId;
 
 use crate::{
     config::TestConfig,
-    test_helpers::{TEST_DATA_DEFAULT, run_zk_script_test},
+    test_helpers::{run_zk_script_test, TEST_DATA_DEFAULT},
 };
 
 #[tokio::test(flavor = "multi_thread")]

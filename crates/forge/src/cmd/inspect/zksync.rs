@@ -3,7 +3,7 @@ use foundry_common::compile::ProjectCompiler;
 use foundry_config::Config;
 use std::path::PathBuf;
 
-use super::{ContractArtifactField, print_json_str};
+use super::{print_json_str, ContractArtifactField};
 
 pub fn check_command_for_field(field: &ContractArtifactField) -> Result<bool> {
     // NOTE(zk): Fields that should have specific behavior for zksolc
@@ -87,7 +87,11 @@ pub fn inspect(
                     .iter()
                     .find_map(
                         |(id, artifact)| {
-                            if id.profile == "default" { Some(*artifact) } else { None }
+                            if id.profile == "default" {
+                                Some(*artifact)
+                            } else {
+                                None
+                            }
                         },
                     )
                     .unwrap_or(target_artifact);

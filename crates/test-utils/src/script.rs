@@ -1,8 +1,8 @@
-use crate::{TestCommand, init_tracing, util::lossy_string};
-use alloy_primitives::{Address, address};
+use crate::{init_tracing, util::lossy_string, TestCommand};
+use alloy_primitives::{address, Address};
 use alloy_provider::Provider;
 use eyre::Result;
-use foundry_common::provider::{RetryProvider, get_http_provider};
+use foundry_common::provider::{get_http_provider, RetryProvider};
 use std::{
     collections::BTreeMap,
     fs,

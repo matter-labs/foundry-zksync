@@ -1,12 +1,11 @@
 use super::{
     backend::{
         db::MaybeFullDatabase,
-        mem::{BlockRequest, State, state},
+        mem::{state, BlockRequest, State},
     },
     sign::build_typed_transaction,
 };
 use crate::{
-    ClientFork, LoggingManager, Miner, MiningMode, StorageInfo,
     eth::{
         backend::{
             self,
@@ -22,37 +21,36 @@ use crate::{
         macros::node_info,
         miner::FixedBlockTimeMiner,
         pool::{
-            Pool,
             transactions::{
-                PoolTransaction, TransactionOrder, TransactionPriority, TxMarker, to_marker,
+                to_marker, PoolTransaction, TransactionOrder, TransactionPriority, TxMarker,
             },
+            Pool,
         },
         sign::{self, Signer},
     },
     filter::{EthFilter, Filters, LogsFilter},
     mem::transaction_build,
+    ClientFork, LoggingManager, Miner, MiningMode, StorageInfo,
 };
 use alloy_consensus::{
+    transaction::{eip4844::TxEip4844Variant, Recovered},
     Account,
-    transaction::{Recovered, eip4844::TxEip4844Variant},
 };
 use alloy_dyn_abi::TypedData;
 use alloy_eips::eip2718::Encodable2718;
 use alloy_network::{
-    AnyRpcBlock, AnyRpcTransaction, BlockResponse, Ethereum, NetworkWallet, TransactionBuilder,
-    TransactionResponse, eip2718::Decodable2718,
+    eip2718::Decodable2718, AnyRpcBlock, AnyRpcTransaction, BlockResponse, Ethereum, NetworkWallet,
+    TransactionBuilder, TransactionResponse,
 };
 use alloy_primitives::{
-    Address, B64, B256, Bytes, Signature, TxHash, TxKind, U64, U256,
     map::{HashMap, HashSet},
+    Address, Bytes, Signature, TxHash, TxKind, B256, B64, U256, U64,
 };
 use alloy_provider::utils::{
-    EIP1559_FEE_ESTIMATION_PAST_BLOCKS, EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE,
-    eip1559_default_estimator,
+    eip1559_default_estimator, EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
+    EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE,
 };
 use alloy_rpc_types::{
-    AccessList, AccessListResult, BlockId, BlockNumberOrTag as BlockNumber, BlockTransactions,
-    EIP1186AccountProofResponse, FeeHistory, Filter, FilteredParams, Index, Log, Work,
     anvil::{
         ForkedNetwork, Forking, Metadata, MineOptions, NodeEnvironment, NodeForkConfig, NodeInfo,
     },
@@ -65,19 +63,21 @@ use alloy_rpc_types::{
         parity::LocalizedTransactionTrace,
     },
     txpool::{TxpoolContent, TxpoolInspect, TxpoolInspectSummary, TxpoolStatus},
+    AccessList, AccessListResult, BlockId, BlockNumberOrTag as BlockNumber, BlockTransactions,
+    EIP1186AccountProofResponse, FeeHistory, Filter, FilteredParams, Index, Log, Work,
 };
 use alloy_serde::WithOtherFields;
-use alloy_sol_types::{SolCall, SolValue, sol};
+use alloy_sol_types::{sol, SolCall, SolValue};
 use alloy_transport::TransportErrorKind;
 use anvil_core::{
     eth::{
-        EthRequest,
         block::BlockInfo,
         transaction::{
-            PendingTransaction, ReceiptResponse, TypedTransaction, TypedTransactionRequest,
-            transaction_request_to_typed,
+            transaction_request_to_typed, PendingTransaction, ReceiptResponse, TypedTransaction,
+            TypedTransactionRequest,
         },
         wallet::{WalletCapabilities, WalletError},
+        EthRequest,
     },
     types::{ReorgOptions, TransactionData},
 };
@@ -85,8 +85,8 @@ use anvil_rpc::{error::RpcError, response::ResponseResult};
 use foundry_common::provider::ProviderBuilder;
 use foundry_evm::{backend::DatabaseError, decode::RevertDecoder};
 use futures::{
-    StreamExt,
     channel::{mpsc::Receiver, oneshot},
+    StreamExt,
 };
 use parking_lot::RwLock;
 use revm::{
@@ -94,11 +94,11 @@ use revm::{
     context::BlockEnv,
     context_interface::{block::BlobExcessGasAndPrice, result::Output},
     database::{CacheDB, DatabaseRef},
-    interpreter::{InstructionResult, return_ok, return_revert},
+    interpreter::{return_ok, return_revert, InstructionResult},
     primitives::eip7702::PER_EMPTY_ACCOUNT_COST,
 };
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 
 /// The client version: `anvil/v{major}.{minor}.{patch}`
 pub const CLIENT_VERSION: &str = concat!("anvil/v", env!("CARGO_PKG_VERSION"));
@@ -3394,7 +3394,11 @@ fn required_marker(provided_nonce: u64, on_chain_nonce: u64, from: Address) -> V
         return Vec::new();
     }
     let prev_nonce = provided_nonce.saturating_sub(1);
-    if on_chain_nonce <= prev_nonce { vec![to_marker(prev_nonce, from)] } else { Vec::new() }
+    if on_chain_nonce <= prev_nonce {
+        vec![to_marker(prev_nonce, from)]
+    } else {
+        Vec::new()
+    }
 }
 
 fn convert_transact_out(out: &Option<Output>) -> Bytes {

@@ -1,14 +1,14 @@
-use super::{JsonResult, NestedValue, ScriptResult, runner::ScriptRunner};
+use super::{runner::ScriptRunner, JsonResult, NestedValue, ScriptResult};
 use crate::{
-    ScriptArgs, ScriptConfig,
     build::{CompiledState, LinkedBuildData},
     simulate::PreSimulationState,
+    ScriptArgs, ScriptConfig,
 };
 use alloy_dyn_abi::FunctionExt;
 use alloy_json_abi::{Function, InternalType, JsonAbi};
 use alloy_primitives::{
-    Address, Bytes,
     map::{HashMap, HashSet},
+    Address, Bytes,
 };
 use alloy_provider::Provider;
 use alloy_rpc_types::TransactionInput;
@@ -16,10 +16,9 @@ use eyre::{OptionExt, Result};
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
 use foundry_common::{
-    ContractsByArtifact,
     fmt::{format_token, format_token_raw},
     provider::get_http_provider,
-    sh_err, sh_println, sh_warn,
+    sh_err, sh_println, sh_warn, ContractsByArtifact,
 };
 use foundry_config::NamedChain;
 use foundry_debugger::Debugger;
@@ -27,9 +26,9 @@ use foundry_evm::{
     decode::decode_console_logs,
     inspectors::cheatcodes::BroadcastableTransactions,
     traces::{
-        CallTraceDecoder, CallTraceDecoderBuilder, TraceKind, decode_trace_arena,
+        decode_trace_arena,
         identifier::{SignaturesIdentifier, TraceIdentifiers},
-        render_trace_arena,
+        render_trace_arena, CallTraceDecoder, CallTraceDecoderBuilder, TraceKind,
     },
 };
 use futures::future::join_all;

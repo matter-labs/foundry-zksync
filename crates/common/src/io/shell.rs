@@ -10,11 +10,11 @@ use eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt,
-    io::{IsTerminal, prelude::*},
+    io::{prelude::*, IsTerminal},
     ops::DerefMut,
     sync::{
-        Mutex, OnceLock, PoisonError,
         atomic::{AtomicBool, Ordering},
+        Mutex, OnceLock, PoisonError,
     },
 };
 

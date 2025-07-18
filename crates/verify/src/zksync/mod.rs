@@ -1,12 +1,12 @@
-use super::{VerifyArgs, VerifyCheckArgs, provider::VerificationProvider};
+use super::{provider::VerificationProvider, VerifyArgs, VerifyCheckArgs};
 use crate::zk_provider::{CompilerVerificationContext, ZkVerificationContext};
 use alloy_json_abi::Function;
 use alloy_primitives::hex;
-use eyre::{Result, eyre};
+use eyre::{eyre, Result};
 use foundry_cli::opts::EtherscanOpts;
 use foundry_common::{abi::encode_function_args, retry::Retry};
 use foundry_zksync_compilers::compilers::zksolc::{
-    ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS, input::StandardJsonCompilerInput,
+    input::StandardJsonCompilerInput, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
 };
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};

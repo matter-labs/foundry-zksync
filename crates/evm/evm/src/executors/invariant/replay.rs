@@ -4,15 +4,15 @@ use super::{
 };
 use crate::executors::Executor;
 use alloy_dyn_abi::JsonAbiExt;
-use alloy_primitives::{Log, U256, map::HashMap};
+use alloy_primitives::{map::HashMap, Log, U256};
 use eyre::Result;
 use foundry_common::{ContractsByAddress, ContractsByArtifact};
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_fuzz::{
-    BaseCounterExample,
     invariant::{BasicTxDetails, InvariantContract},
+    BaseCounterExample,
 };
-use foundry_evm_traces::{TraceKind, TraceMode, Traces, load_contracts};
+use foundry_evm_traces::{load_contracts, TraceKind, TraceMode, Traces};
 use indicatif::ProgressBar;
 use parking_lot::RwLock;
 use proptest::test_runner::TestError;

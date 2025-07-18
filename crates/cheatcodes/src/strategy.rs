@@ -10,10 +10,10 @@ use revm::{
 };
 
 use crate::{
+    inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx},
+    script::Broadcast,
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
     CheatsConfig, CheatsCtxt, DynCheatcode, Result,
-    inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit},
-    script::Broadcast,
 };
 
 /// Represents the context for [CheatcodeInspectorStrategy].

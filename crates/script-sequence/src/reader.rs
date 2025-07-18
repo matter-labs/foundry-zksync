@@ -1,6 +1,6 @@
 use crate::{ScriptSequence, TransactionWithMetadata};
 use alloy_network::AnyTransactionReceipt;
-use eyre::{Result, bail};
+use eyre::{bail, Result};
 use foundry_common::fs;
 use revm_inspectors::tracing::types::CallKind;
 use std::path::{Component, Path, PathBuf};

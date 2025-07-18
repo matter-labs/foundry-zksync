@@ -1,3 +1,4 @@
+cargo-features = ["edition2024"]
 [package]
 name = "forge"
 description = "Fast and flexible Ethereum testing framework"

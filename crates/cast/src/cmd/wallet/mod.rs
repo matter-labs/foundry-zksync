@@ -1,12 +1,12 @@
 use alloy_chains::Chain;
 use alloy_dyn_abi::TypedData;
-use alloy_primitives::{Address, B256, Signature, U256, hex};
+use alloy_primitives::{hex, Address, Signature, B256, U256};
 use alloy_provider::Provider;
 use alloy_rpc_types::Authorization;
 use alloy_signer::Signer;
 use alloy_signer_local::{
-    MnemonicBuilder, PrivateKeySigner,
     coins_bip39::{English, Entropy, Mnemonic},
+    MnemonicBuilder, PrivateKeySigner,
 };
 use clap::Parser;
 use eyre::{Context, Result};

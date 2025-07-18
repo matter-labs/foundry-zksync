@@ -1,6 +1,6 @@
 use crate::executors::{
-    Executor,
     invariant::{InvariantTest, InvariantTestRun},
+    Executor,
 };
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_primitives::U256;

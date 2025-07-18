@@ -1,14 +1,14 @@
 //! Implementations of [`Crypto`](spec::Group::Crypto) Cheatcodes.
 
 use crate::{Cheatcode, Cheatcodes, Result, Vm::*};
-use alloy_primitives::{Address, B256, U256, keccak256};
+use alloy_primitives::{keccak256, Address, B256, U256};
 use alloy_signer::{Signer, SignerSync};
 use alloy_signer_local::{
-    LocalSigner, MnemonicBuilder, PrivateKeySigner,
     coins_bip39::{
         ChineseSimplified, ChineseTraditional, Czech, English, French, Italian, Japanese, Korean,
         Portuguese, Spanish, Wordlist,
     },
+    LocalSigner, MnemonicBuilder, PrivateKeySigner,
 };
 use alloy_sol_types::SolValue;
 use k256::{
@@ -16,7 +16,7 @@ use k256::{
     elliptic_curve::{bigint::ArrayEncoding, sec1::ToEncodedPoint},
 };
 use p256::ecdsa::{
-    Signature as P256Signature, SigningKey as P256SigningKey, signature::hazmat::PrehashSigner,
+    signature::hazmat::PrehashSigner, Signature as P256Signature, SigningKey as P256SigningKey,
 };
 
 /// The BIP32 default derivation path prefix.
@@ -392,7 +392,7 @@ fn derive_wallets<W: Wordlist>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy_primitives::{FixedBytes, hex::FromHex};
+    use alloy_primitives::{hex::FromHex, FixedBytes};
     use p256::ecdsa::signature::hazmat::PrehashVerifier;
 
     #[test]

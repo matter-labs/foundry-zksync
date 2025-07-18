@@ -4,8 +4,9 @@ use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use alloy_provider::Provider;
 use foundry_common::provider::try_get_zksync_http_provider;
 use foundry_test_utils::{
-    Filter, ZkSyncNode, forgetest_async,
+    forgetest_async,
     util::{self},
+    Filter, ZkSyncNode,
 };
 use foundry_zksync_core::state::{get_nonce_storage, new_full_nonce};
 use revm::primitives::hardfork::SpecId;

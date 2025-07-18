@@ -7,15 +7,14 @@ use alloy_eips::BlockId;
 use alloy_hardforks::EthereumHardfork;
 use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{
-    Address, Bytes, U256,
     hex::{self, FromHex},
+    Address, Bytes, U256,
 };
 use alloy_provider::{
-    Provider,
     ext::{DebugApi, TraceApi},
+    Provider,
 };
 use alloy_rpc_types::{
-    TransactionRequest,
     state::StateOverride,
     trace::{
         filter::{TraceFilter, TraceFilterMode},
@@ -25,10 +24,11 @@ use alloy_rpc_types::{
         },
         parity::{Action, LocalizedTransactionTrace},
     },
+    TransactionRequest,
 };
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::sol;
-use anvil::{NodeConfig, spawn};
+use anvil::{spawn, NodeConfig};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_get_transfer_parity_traces() {

@@ -2,25 +2,24 @@ use super::{
     Cheatcodes, CheatsConfig, ChiselState, CustomPrintTracer, Fuzzer, LogCollector,
     RevertDiagnostic, ScriptExecutionInspector,
 };
-use alloy_evm::{Evm, eth::EthEvmContext};
+use alloy_evm::{eth::EthEvmContext, Evm};
 use alloy_primitives::{
-    Address, Bytes, Log, TxKind, U256,
     map::{AddressHashMap, HashMap},
+    Address, Bytes, Log, TxKind, U256,
 };
 use foundry_cheatcodes::{CheatcodesExecutor, Wallets};
 use foundry_evm_core::{
-    ContextExt, Ecx, Env, InspectorExt,
     backend::{DatabaseExt, JournaledState},
     evm::new_evm_with_inspector,
+    ContextExt, Ecx, Env, InspectorExt,
 };
 use foundry_evm_coverage::{HitMaps, LineCoverageCollector};
 use foundry_evm_traces::{SparsedTraceArena, TraceMode};
 use foundry_zksync_inspectors::TraceCollector;
 use revm::{
-    Inspector,
     context::{
-        BlockEnv,
         result::{ExecutionResult, Output},
+        BlockEnv,
     },
     context_interface::CreateScheme,
     interpreter::{
@@ -28,6 +27,7 @@ use revm::{
         Interpreter, InterpreterResult,
     },
     state::{Account, AccountStatus},
+    Inspector,
 };
 use revm_inspectors::edge_cov::EdgeCovInspector;
 use std::{

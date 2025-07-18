@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use crate::{config::*, repros::test_repro, test_helpers::TEST_DATA_DEFAULT};
 use alloy_primitives::Address;
-use foundry_config::{Config, FsPermissions, fs_permissions::PathPermission};
+use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
 use foundry_test_utils::Filter;
 
 // zk-specific repros configuration

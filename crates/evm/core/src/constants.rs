@@ -1,4 +1,4 @@
-use alloy_primitives::{Address, B256, address, b256, hex};
+use alloy_primitives::{address, b256, hex, Address, B256};
 
 /// The cheatcode handler address.
 ///

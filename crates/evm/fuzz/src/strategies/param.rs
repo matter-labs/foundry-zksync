@@ -2,7 +2,7 @@ use super::state::EvmFuzzState;
 use alloy_dyn_abi::{DynSolType, DynSolValue};
 use alloy_primitives::{Address, B256, I256, U256};
 use proptest::prelude::*;
-use rand::{SeedableRng, rngs::StdRng};
+use rand::{rngs::StdRng, SeedableRng};
 
 /// The max length of arrays we fuzz for is 256.
 const MAX_ARRAY_LEN: usize = 256;
@@ -251,8 +251,8 @@ pub fn fuzz_param_from_state(
 #[cfg(test)]
 mod tests {
     use crate::{
+        strategies::{fuzz_calldata, fuzz_calldata_from_state, EvmFuzzState},
         FuzzFixtures,
-        strategies::{EvmFuzzState, fuzz_calldata, fuzz_calldata_from_state},
     };
     use foundry_common::abi::get_func;
     use foundry_config::FuzzDictionaryConfig;

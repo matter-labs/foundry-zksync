@@ -1,18 +1,18 @@
 use crate::{
-    CallTrace, CallTraceArena, CallTraceNode, DecodedCallData,
     debug::DebugTraceIdentifier,
     identifier::{IdentifiedAddress, LocalTraceIdentifier, SignaturesIdentifier, TraceIdentifier},
+    CallTrace, CallTraceArena, CallTraceNode, DecodedCallData,
 };
 use alloy_dyn_abi::{DecodedEvent, DynSolValue, EventExt, FunctionExt, JsonAbiExt};
 use alloy_json_abi::{Error, Event, Function, JsonAbi};
 use alloy_primitives::{
-    Address, B256, LogData, Selector,
-    map::{HashMap, HashSet, hash_map::Entry},
+    map::{hash_map::Entry, HashMap, HashSet},
+    Address, LogData, Selector, B256,
 };
 use foundry_cheatcodes_spec::Vm;
 use foundry_common::{
-    ContractsByArtifact, SELECTOR_LEN, abi::get_indexed_event, fmt::format_token,
-    get_contract_name, selectors::SelectorKind,
+    abi::get_indexed_event, fmt::format_token, get_contract_name, selectors::SelectorKind,
+    ContractsByArtifact, SELECTOR_LEN,
 };
 use foundry_config::zksync::ZKSYNC_ARTIFACTS_DIR;
 use foundry_evm_core::{

@@ -2,13 +2,13 @@ use clap::{Parser, ValueHint};
 use eyre::Result;
 use foundry_compilers::artifacts::remappings::Remapping;
 use foundry_config::{
-    Config, figment,
+    figment,
     figment::{
-        Metadata, Profile, Provider,
         error::Kind::InvalidType,
         value::{Dict, Map, Value},
+        Metadata, Profile, Provider,
     },
-    find_project_root, remappings_from_env_var,
+    find_project_root, remappings_from_env_var, Config,
 };
 use serde::Serialize;
 use std::path::PathBuf;

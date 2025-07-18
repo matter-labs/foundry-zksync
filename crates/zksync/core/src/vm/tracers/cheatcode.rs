@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use alloy_primitives::{Address, Bytes, FixedBytes, U256 as rU256, hex, map::HashMap};
+use alloy_primitives::{hex, map::HashMap, Address, Bytes, FixedBytes, U256 as rU256};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
@@ -18,27 +18,29 @@ use zksync_multivm::{
     zk_evm_latest::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},
         zkevm_opcode_defs::{
-            CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER, FarCallOpcode, FatPointer, Opcode,
+            FarCallOpcode, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
         },
     },
 };
 use zksync_types::{
-    BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS, StorageValue, U256, ethabi, get_code_key, get_nonce_key,
+    ethabi, get_code_key, get_nonce_key, StorageValue, BOOTLOADER_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, H160, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS, U256,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
-    EMPTY_CODE, ZkPaymasterData, compute_create_address, compute_create2_address,
+    compute_create2_address, compute_create_address,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
     hash_bytecode,
-    state::{FullNonce, parse_full_nonce},
+    state::{parse_full_nonce, FullNonce},
     vm::{
-        HARDHAT_CONSOLE_ADDRESS, ZkEnv,
         farcall::{CallAction, CallDepth, CallExecutionStatus, FarCallHandler, TxExecutionStatus},
         storage_recorder::CallType,
         storage_view::StorageViewRecorder,
+        ZkEnv, HARDHAT_CONSOLE_ADDRESS,
     },
+    ZkPaymasterData, EMPTY_CODE,
 };
 
 /// Selector for retrieving account version.

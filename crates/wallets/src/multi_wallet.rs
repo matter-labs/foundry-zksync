@@ -2,7 +2,7 @@ use crate::{
     utils,
     wallet_signer::{PendingSigner, WalletSigner},
 };
-use alloy_primitives::{Address, map::AddressHashMap};
+use alloy_primitives::{map::AddressHashMap, Address};
 use alloy_signer::Signer;
 use clap::Parser;
 use derive_builder::Builder;

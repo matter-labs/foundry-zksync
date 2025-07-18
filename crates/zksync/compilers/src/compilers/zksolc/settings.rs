@@ -1,13 +1,12 @@
 //! zksolc settings
 use crate::artifacts::output_selection::OutputSelection as ZkOutputSelection;
 use foundry_compilers::{
-    CompilerSettingsRestrictions,
     artifacts::{
-        EvmVersion, Libraries, Remapping, output_selection::OutputSelection, serde_helpers,
+        output_selection::OutputSelection, serde_helpers, EvmVersion, Libraries, Remapping,
     },
     compilers::CompilerSettings,
     error::Result,
-    solc,
+    solc, CompilerSettingsRestrictions,
 };
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -19,8 +18,8 @@ use std::{
 };
 
 use super::{
-    ZkSolc,
     types::{ErrorType, WarningType},
+    ZkSolc,
 };
 ///
 /// The Solidity compiler codegen.

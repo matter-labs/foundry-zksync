@@ -1,6 +1,6 @@
 //! Commonly used constants.
 
-use alloy_primitives::{Address, address};
+use alloy_primitives::{address, Address};
 use std::time::Duration;
 
 /// The dev chain-id, inherited from hardhat

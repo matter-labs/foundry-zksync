@@ -6,11 +6,11 @@ use std::{
 };
 
 use foundry_compilers::{
-    Artifact, ArtifactId, ProjectCompileOutput, ProjectPathsConfig, info::ContractInfo,
-    solc::SolcLanguage,
+    info::ContractInfo, solc::SolcLanguage, Artifact, ArtifactId, ProjectCompileOutput,
+    ProjectPathsConfig,
 };
 
-use alloy_primitives::{B256, keccak256};
+use alloy_primitives::{keccak256, B256};
 use foundry_compilers_artifacts_solc::Offsets;
 use tracing::debug;
 use zksync_types::H256;

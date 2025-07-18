@@ -3,23 +3,23 @@ use std::path::Path;
 use eyre::{Context, Result};
 use foundry_block_explorers::verify::CodeFormat;
 use foundry_compilers::{
-    AggregatedCompilerOutput, Compiler,
     artifacts::{Source, Sources},
     buildinfo::RawBuildInfo,
     solc::{CliSettings, Solc, SolcCompiler, SolcLanguage},
+    AggregatedCompilerOutput, Compiler,
 };
 use foundry_zksync_compilers::compilers::zksolc::{
-    ZkSolc, ZkSolcCompiler,
     input::{ZkSolcInput, ZkSolcVersionedInput},
+    ZkSolc, ZkSolcCompiler,
 };
 
 use crate::{
-    VerifyArgs,
     etherscan::zksync::EtherscanZksyncSourceProvider,
     zk_provider::{ZkVerificationContext, ZkVersion},
+    VerifyArgs,
 };
 
-use super::{EtherscanFlattenedSource, strip_build_meta};
+use super::{strip_build_meta, EtherscanFlattenedSource};
 
 impl EtherscanZksyncSourceProvider for EtherscanFlattenedSource {
     fn zksync_source(

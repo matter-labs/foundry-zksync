@@ -1,5 +1,5 @@
 use crate::backend::LocalForkId;
-use alloy_primitives::{Address, map::AddressHashMap};
+use alloy_primitives::{map::AddressHashMap, Address};
 use itertools::Itertools;
 
 /// Represents possible diagnostic cases on revert

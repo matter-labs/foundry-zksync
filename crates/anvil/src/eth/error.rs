@@ -1,7 +1,7 @@
 //! Aggregated error type for this module
 
 use crate::eth::pool::transactions::PoolTransaction;
-use alloy_primitives::{B256, Bytes, SignatureError};
+use alloy_primitives::{Bytes, SignatureError, B256};
 use alloy_rpc_types::BlockNumberOrTag;
 use alloy_signer::Error as SignerError;
 use alloy_transport::TransportError;
@@ -107,7 +107,9 @@ pub enum BlockchainError {
     ExcessBlobGasNotSet,
     #[error("{0}")]
     Message(String),
-    #[error("Transaction {hash} was added to the mempool but wasn't confirmed within {duration:?}")]
+    #[error(
+        "Transaction {hash} was added to the mempool but wasn't confirmed within {duration:?}"
+    )]
     TransactionConfirmationTimeout {
         /// Hash of the transaction that timed out
         hash: B256,

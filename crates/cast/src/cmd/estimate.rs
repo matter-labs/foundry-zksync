@@ -1,6 +1,6 @@
 use crate::{
-    ZkTransactionOpts,
     tx::{CastTxBuilder, SenderKind},
+    ZkTransactionOpts,
 };
 use alloy_ens::NameOrAddress;
 use alloy_primitives::U256;
@@ -10,7 +10,7 @@ use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
-    utils::{self, LoadConfig, parse_ether_value},
+    utils::{self, parse_ether_value, LoadConfig},
 };
 use std::str::FromStr;
 

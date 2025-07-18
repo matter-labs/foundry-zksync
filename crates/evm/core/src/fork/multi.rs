@@ -10,21 +10,21 @@ use alloy_primitives::map::HashMap;
 use alloy_provider::network::BlockResponse;
 use foundry_common::provider::{ProviderBuilder, RetryProvider};
 use foundry_config::Config;
-use foundry_fork_db::{BackendHandler, BlockchainDb, SharedBackend, cache::BlockchainDbMeta};
+use foundry_fork_db::{cache::BlockchainDbMeta, BackendHandler, BlockchainDb, SharedBackend};
 use futures::{
-    FutureExt, StreamExt,
-    channel::mpsc::{Receiver, Sender, channel},
+    channel::mpsc::{channel, Receiver, Sender},
     stream::{Fuse, Stream},
     task::{Context, Poll},
+    FutureExt, StreamExt,
 };
 use revm::context::BlockEnv;
 use std::{
     fmt::{self, Write},
     pin::Pin,
     sync::{
-        Arc,
         atomic::AtomicUsize,
-        mpsc::{Sender as OneshotSender, channel as oneshot_channel},
+        mpsc::{channel as oneshot_channel, Sender as OneshotSender},
+        Arc,
     },
     time::Duration,
 };

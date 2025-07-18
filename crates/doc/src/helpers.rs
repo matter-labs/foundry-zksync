@@ -1,4 +1,4 @@
-use toml::{Value, value::Table};
+use toml::{value::Table, Value};
 
 /// Merge original toml table with the override.
 pub(crate) fn merge_toml_table(table: &mut Table, override_table: Table) {

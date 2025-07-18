@@ -1,35 +1,36 @@
 //! The Forge test runner.
 
 use crate::{
-    MultiContractRunner, TestFilter,
-    fuzz::{BaseCounterExample, invariant::BasicTxDetails},
-    multi_runner::{TestContract, TestRunnerConfig, is_matching_test},
-    progress::{TestsProgress, start_fuzz_progress},
+    fuzz::{invariant::BasicTxDetails, BaseCounterExample},
+    multi_runner::{is_matching_test, TestContract, TestRunnerConfig},
+    progress::{start_fuzz_progress, TestsProgress},
     result::{SuiteResult, TestResult, TestSetup},
+    MultiContractRunner, TestFilter,
 };
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_primitives::{Address, Bytes, U256, address, map::HashMap};
+use alloy_primitives::{address, map::HashMap, Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{TestFunctionExt, TestFunctionKind, contracts::ContractsByAddress};
+use foundry_common::{contracts::ContractsByAddress, TestFunctionExt, TestFunctionKind};
 use foundry_compilers::utils::canonicalized;
 use foundry_config::{Config, InvariantConfig};
 use foundry_evm::{
     constants::CALLER,
     decode::RevertDecoder,
     executors::{
-        CallResult, EvmError, Executor, ITest, RawCallResult,
         fuzz::FuzzedExecutor,
         invariant::{
-            InvariantExecutor, InvariantFuzzError, check_sequence, replay_error, replay_run,
+            check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
         },
         strategy::DeployLibKind,
+        CallResult, EvmError, Executor, ITest, RawCallResult,
     },
     fuzz::{
-        CounterExample, FuzzFixtures, fixture_name,
+        fixture_name,
         invariant::{CallDetails, InvariantContract},
+        CounterExample, FuzzFixtures,
     },
-    traces::{TraceKind, TraceMode, load_contracts},
+    traces::{load_contracts, TraceKind, TraceMode},
 };
 use itertools::Itertools;
 use proptest::test_runner::{

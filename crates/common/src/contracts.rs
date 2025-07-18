@@ -3,15 +3,15 @@
 use crate::{compile::PathOrContractInfo, strip_bytecode_placeholders};
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::{Event, Function, JsonAbi};
-use alloy_primitives::{Address, B256, Bytes, Selector, hex};
+use alloy_primitives::{hex, Address, Bytes, Selector, B256};
 use eyre::{OptionExt, Result};
 use foundry_compilers::{
-    ArtifactId, Project, ProjectCompileOutput,
     artifacts::{
         BytecodeObject, CompactBytecode, CompactContractBytecode, CompactDeployedBytecode,
         ConfigurableContractArtifact, ContractBytecodeSome, Offsets,
     },
     utils::canonicalized,
+    ArtifactId, Project, ProjectCompileOutput,
 };
 use std::{
     collections::BTreeMap,

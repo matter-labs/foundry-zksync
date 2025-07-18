@@ -1,6 +1,6 @@
 use crate::{
+    strategies::{fuzz_param_from_state, fuzz_param_with_fixtures, EvmFuzzState},
     FuzzFixtures,
-    strategies::{EvmFuzzState, fuzz_param_from_state, fuzz_param_with_fixtures},
 };
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::Function;
@@ -67,10 +67,10 @@ pub fn fuzz_calldata_from_state(
 
 #[cfg(test)]
 mod tests {
-    use crate::{FuzzFixtures, strategies::fuzz_calldata};
+    use crate::{strategies::fuzz_calldata, FuzzFixtures};
     use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
     use alloy_json_abi::Function;
-    use alloy_primitives::{Address, map::HashMap};
+    use alloy_primitives::{map::HashMap, Address};
     use proptest::prelude::Strategy;
 
     #[test]

@@ -1,7 +1,7 @@
-use crate::{Comments, error::ParserResult};
+use crate::{error::ParserResult, Comments};
 use forge_fmt::{
-    Comments as FmtComments, Formatter, FormatterConfig, InlineConfig, Visitor,
-    solang_ext::SafeUnwrap,
+    solang_ext::SafeUnwrap, Comments as FmtComments, Formatter, FormatterConfig, InlineConfig,
+    Visitor,
 };
 use solang_parser::pt::{
     ContractDefinition, ContractTy, EnumDefinition, ErrorDefinition, EventDefinition,

@@ -1,5 +1,5 @@
 use clap::{Parser, ValueHint};
-use eyre::{Result, eyre};
+use eyre::{eyre, Result};
 use forge_lint::{
     linter::Linter,
     sol::{SolLint, SolLintError, SolidityLinter},

@@ -1,7 +1,6 @@
 use crate::{eth::subscription::SubscriptionId, types::ReorgOptions};
-use alloy_primitives::{Address, B64, B256, Bytes, TxHash, U256};
+use alloy_primitives::{Address, Bytes, TxHash, B256, B64, U256};
 use alloy_rpc_types::{
-    BlockId, BlockNumberOrTag as BlockNumber, BlockOverrides, Filter, Index,
     anvil::{Forking, MineOptions},
     pubsub::{Params as SubscriptionParams, SubscriptionKind},
     request::TransactionRequest,
@@ -11,6 +10,7 @@ use alloy_rpc_types::{
         filter::TraceFilter,
         geth::{GethDebugTracingCallOptions, GethDebugTracingOptions},
     },
+    BlockId, BlockNumberOrTag as BlockNumber, BlockOverrides, Filter, Index,
 };
 use alloy_serde::WithOtherFields;
 use foundry_common::serde_helpers::{
@@ -331,7 +331,11 @@ pub enum EthRequest {
     SetAutomine(bool),
 
     /// Sets the mining behavior to interval with the given interval (seconds)
-    #[serde(rename = "anvil_setIntervalMining", alias = "evm_setIntervalMining", with = "sequence")]
+    #[serde(
+        rename = "anvil_setIntervalMining",
+        alias = "evm_setIntervalMining",
+        with = "sequence"
+    )]
     SetIntervalMining(u64),
 
     /// Gets the current mining behavior
@@ -339,7 +343,11 @@ pub enum EthRequest {
     GetIntervalMining(()),
 
     /// Removes transactions from the pool
-    #[serde(rename = "anvil_dropTransaction", alias = "hardhat_dropTransaction", with = "sequence")]
+    #[serde(
+        rename = "anvil_dropTransaction",
+        alias = "hardhat_dropTransaction",
+        with = "sequence"
+    )]
     DropTransaction(B256),
 
     /// Removes transactions from the pool
