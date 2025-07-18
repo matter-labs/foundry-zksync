@@ -38,6 +38,7 @@ use std::{
     time::{Duration, Instant},
 };
 use strategy::{BackendStrategy, BackendStrategyForkInfo};
+use tracing::{instrument, trace, warn};
 
 mod diagnostic;
 pub use diagnostic::RevertDiagnostic;
@@ -935,8 +936,8 @@ impl Backend {
         for tx in full_block.inner.transactions.txns() {
             // System transactions such as on L2s don't contain any pricing info so we skip them
             // otherwise this would cause reverts
-            if is_known_system_sender(tx.inner().inner.signer()) ||
-                tx.ty() == SYSTEM_TRANSACTION_TYPE
+            if is_known_system_sender(tx.inner().inner.signer())
+                || tx.ty() == SYSTEM_TRANSACTION_TYPE
             {
                 trace!(tx=?tx.tx_hash(), "skipping system transaction");
                 continue;
@@ -1013,12 +1014,11 @@ impl DatabaseExt for Backend {
             // Check if an error occurred either during or before the snapshot.
             // DSTest contracts don't have snapshot functionality, so this slot is enough to check
             // for failure here.
-            if let Some(account) = current_state.state.get(&CHEATCODE_ADDRESS) {
-                if let Some(slot) = account.storage.get(&GLOBAL_FAIL_SLOT) {
-                    if !slot.present_value.is_zero() {
-                        self.set_state_snapshot_failure(true);
-                    }
-                }
+            if let Some(account) = current_state.state.get(&CHEATCODE_ADDRESS)
+                && let Some(slot) = account.storage.get(&GLOBAL_FAIL_SLOT)
+                && !slot.present_value.is_zero()
+            {
+                self.set_state_snapshot_failure(true);
             }
 
             // merge additional logs
@@ -1100,6 +1100,7 @@ impl DatabaseExt for Backend {
             &mut env.as_env_mut(),
             &mut self.inner.new_journaled_state(),
         )?;
+
         Ok(id)
     }
 
@@ -1347,10 +1348,18 @@ impl DatabaseExt for Backend {
         let (fork_block, block) =
             self.get_block_number_and_block_for_transaction(id, transaction)?;
 
-        // roll the fork to the transaction's block or latest if it's pending
+        // roll the fork to the transaction's parent block or latest if it's pending, because we
+        // need to fork off the parent block's state for tx level forking and then replay the txs
+        // before the tx in that block to get the state at the tx
         self.roll_fork(Some(id), fork_block, env, journaled_state)?;
 
+        // we need to update the env to the block
         update_env_block(env, &block);
+
+        // after we forked at the fork block we need to properly update the block env to the block
+        // env of the tx's block
+        let _ =
+            self.forks.update_block_env(self.inner.ensure_fork_id(id).cloned()?, env.block.clone());
 
         let env = env.to_owned();
 
@@ -1738,10 +1747,10 @@ pub struct Fork {
 impl Fork {
     /// Returns true if the account is a contract
     pub fn is_contract(&self, acc: Address) -> bool {
-        if let Ok(Some(acc)) = self.db.basic_ref(acc) {
-            if acc.code_hash != KECCAK_EMPTY {
-                return true;
-            }
+        if let Ok(Some(acc)) = self.db.basic_ref(acc)
+            && acc.code_hash != KECCAK_EMPTY
+        {
+            return true;
         }
         is_contract_in_state(&self.journaled_state, acc)
     }

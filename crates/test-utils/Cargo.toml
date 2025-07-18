@@ -1,3 +1,5 @@
+cargo-features = ["edition2024"]
+
 [package]
 name = "foundry-test-utils"
 description = "Foundry testing utilities"

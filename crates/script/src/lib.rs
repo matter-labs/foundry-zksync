@@ -5,12 +5,6 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-#[macro_use]
-extern crate foundry_common;
-
-#[macro_use]
-extern crate tracing;
-
 use crate::runner::ScriptRunner;
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{
@@ -34,7 +28,7 @@ use foundry_cli::{
 use foundry_common::{
     abi::{encode_function_args, get_func},
     evm::{Breakpoints, EvmArgs},
-    shell, ContractsByArtifact, CONTRACT_MAX_SIZE, SELECTOR_LEN,
+    sh_err, sh_println, sh_warn, shell, ContractsByArtifact, CONTRACT_MAX_SIZE, SELECTOR_LEN,
 };
 use foundry_compilers::ArtifactId;
 use foundry_config::{
@@ -59,6 +53,7 @@ use foundry_wallets::MultiWalletOpts;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
 use serde::Serialize;
 use std::path::PathBuf;
+use tracing::trace;
 
 mod broadcast;
 mod build;
@@ -134,7 +129,7 @@ pub struct ScriptArgs {
     #[arg(long, short, default_value = "130")]
     pub gas_estimate_multiplier: u64,
 
-    /// Send via `eth_sendTransaction` using the `--from` argument or `$ETH_FROM` as sender
+    /// Send via `eth_sendTransaction` using the `--sender` argument or `$ETH_FROM` as sender
     #[arg(
         long,
         conflicts_with_all = &["private_key", "private_keys", "froms", "ledger", "trezor", "aws"],
@@ -179,6 +174,10 @@ pub struct ScriptArgs {
     /// For more info on the contract size limit, see EIP-170: <https://eips.ethereum.org/EIPS/eip-170>
     #[arg(long)]
     pub non_interactive: bool,
+
+    /// Disables the contract size limit during script execution.
+    #[arg(long)]
+    pub disable_code_size_limit: bool,
 
     /// The Etherscan (or equivalent) API key
     #[arg(long, env = "ETHERSCAN_API_KEY", value_name = "KEY")]
@@ -322,7 +321,9 @@ impl ScriptArgs {
                     bundled.sequence.show_transactions()?;
                 }
 
-                sh_println!("\nSIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more.")?;
+                sh_println!(
+                    "\nSIMULATION COMPLETE. To broadcast these transactions, add --broadcast and wallet configuration(s) to the previous command. See forge script --help for more."
+                )?;
             }
             return Ok(());
         }
@@ -407,6 +408,10 @@ impl ScriptArgs {
         create2_deployer: Address,
     ) -> Result<()> {
         //TODO: zk mode contract size check
+        // If disable-code-size-limit flag is enabled then skip the size check
+        if self.disable_code_size_limit {
+            return Ok(());
+        }
 
         // (name, &init, &deployed)[]
         let mut bytecodes: Vec<(String, &[u8], &[u8])> = vec![];
@@ -477,9 +482,9 @@ impl ScriptArgs {
         }
 
         // Only prompt if we're broadcasting and we've not disabled interactivity.
-        if prompt_user &&
-            !self.non_interactive &&
-            !Confirm::new().with_prompt("Do you wish to continue?".to_string()).interact()?
+        if prompt_user
+            && !self.non_interactive
+            && !Confirm::new().with_prompt("Do you wish to continue?".to_string()).interact()?
         {
             eyre::bail!("User canceled the script.");
         }
@@ -738,6 +743,18 @@ mod tests {
     }
 
     #[test]
+    fn can_disable_code_size_limit() {
+        let args =
+            ScriptArgs::parse_from(["foundry-cli", "Contract.sol", "--disable-code-size-limit"]);
+        assert!(args.disable_code_size_limit);
+
+        let result = ScriptResult::default();
+        let contracts = ContractsByArtifact::default();
+        let create = Address::ZERO;
+        assert!(args.check_contract_sizes(&result, &contracts, create).is_ok());
+    }
+
+    #[test]
     fn can_parse_verifier_url() {
         let args = ScriptArgs::parse_from([
             "foundry-cli",
@@ -830,7 +847,9 @@ mod tests {
 
         assert!(err.downcast::<UnresolvedEnvVarError>().is_ok());
 
-        std::env::set_var("_CAN_EXTRACT_RPC_ALIAS", "123456");
+        unsafe {
+            std::env::set_var("_CAN_EXTRACT_RPC_ALIAS", "123456");
+        }
         let (config, evm_opts) = args.load_config_and_evm_opts().unwrap();
         assert_eq!(config.eth_rpc_url, Some("polygonMumbai".to_string()));
         assert_eq!(
@@ -870,8 +889,12 @@ mod tests {
 
         assert!(err.downcast::<UnresolvedEnvVarError>().is_ok());
 
-        std::env::set_var("_EXTRACT_RPC_ALIAS", "123456");
-        std::env::set_var("_POLYSCAN_API_KEY", "polygonkey");
+        unsafe {
+            std::env::set_var("_EXTRACT_RPC_ALIAS", "123456");
+        }
+        unsafe {
+            std::env::set_var("_POLYSCAN_API_KEY", "polygonkey");
+        }
         let (config, evm_opts) = args.load_config_and_evm_opts().unwrap();
         assert_eq!(config.eth_rpc_url, Some("mumbai".to_string()));
         assert_eq!(
@@ -913,8 +936,12 @@ mod tests {
 
         assert!(err.downcast::<UnresolvedEnvVarError>().is_ok());
 
-        std::env::set_var("_SOLE_EXTRACT_RPC_ALIAS", "123456");
-        std::env::set_var("_SOLE_POLYSCAN_API_KEY", "polygonkey");
+        unsafe {
+            std::env::set_var("_SOLE_EXTRACT_RPC_ALIAS", "123456");
+        }
+        unsafe {
+            std::env::set_var("_SOLE_POLYSCAN_API_KEY", "polygonkey");
+        }
         let (config, evm_opts) = args.load_config_and_evm_opts().unwrap();
         assert_eq!(
             evm_opts.fork_url,

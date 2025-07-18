@@ -46,11 +46,11 @@ fn fuzz_param_inner(
     mut fuzz_fixtures: Option<(&[DynSolValue], &str)>,
     no_zksync_reserved_addresses: bool,
 ) -> BoxedStrategy<DynSolValue> {
-    if let Some((fixtures, name)) = fuzz_fixtures {
-        if !fixtures.iter().all(|f| f.matches(param)) {
-            error!("fixtures for {name:?} do not match type {param}");
-            fuzz_fixtures = None;
-        }
+    if let Some((fixtures, name)) = fuzz_fixtures
+        && !fixtures.iter().all(|f| f.matches(param))
+    {
+        error!("fixtures for {name:?} do not match type {param}");
+        fuzz_fixtures = None;
     }
     let fuzz_fixtures = fuzz_fixtures.map(|(f, _)| f);
 
@@ -157,9 +157,7 @@ pub fn fuzz_param_from_state(
                     let mut fuzzed_addr = Address::from_word(value);
                     if !deployed_libs.contains(&fuzzed_addr) {
                         if no_zksync_reserved_addresses {
-                            DynSolValue::Address(foundry_zksync_core::to_safe_address(fuzzed_addr))
-                        } else {
-                            DynSolValue::Address(fuzzed_addr)
+                            fuzzed_addr = foundry_zksync_core::to_safe_address(fuzzed_addr);
                         }
                     } else {
                         let mut rng = StdRng::seed_from_u64(0x1337); // use deterministic rng
@@ -175,9 +173,8 @@ pub fn fuzz_param_from_state(
                                 break;
                             }
                         }
-
-                        DynSolValue::Address(fuzzed_addr)
                     }
+                    DynSolValue::Address(fuzzed_addr)
                 })
                 .boxed()
         }
@@ -268,7 +265,7 @@ mod tests {
         let db = CacheDB::new(EmptyDB::default());
         let state = EvmFuzzState::new(&db, FuzzDictionaryConfig::default(), &[], false);
         let strategy = proptest::prop_oneof![
-            60 => fuzz_calldata(func.clone(), &FuzzFixtures::default(), false),
+            60 => fuzz_calldata(func.clone(), FuzzFixtures::default(), false),
             40 => fuzz_calldata_from_state(func, &state),
         ];
         let cfg = proptest::test_runner::Config { failure_persistence: None, ..Default::default() };

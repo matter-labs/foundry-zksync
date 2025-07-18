@@ -55,12 +55,16 @@ impl VerifyArgs {
                         "Ambiguous compiler versions found in cache: {}",
                         unique_versions.iter().join(", ")
                     );
-                    eyre::bail!("Compiler version has to be set in `foundry.toml`. If the project was not deployed with foundry, specify the version through `--compiler-version` flag.")
+                    eyre::bail!(
+                        "Compiler version has to be set in `foundry.toml`. If the project was not deployed with foundry, specify the version through `--compiler-version` flag."
+                    )
                 }
 
                 unique_versions.into_iter().next().unwrap().to_owned()
             } else {
-                eyre::bail!("If cache is disabled, compiler version must be either provided with `--compiler-version` option or set in foundry.toml")
+                eyre::bail!(
+                    "If cache is disabled, compiler version must be either provided with `--compiler-version` option or set in foundry.toml"
+                )
             };
 
             ZkVerificationContext::new(contract_path, contract.name.clone(), version, config)

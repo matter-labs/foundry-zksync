@@ -515,21 +515,21 @@ impl PartialEq<ContractOutputSelection> for ContractArtifactField {
         type Eos = EvmOutputSelection;
         matches!(
             (self, other),
-            (Self::Abi | Self::Events, Cos::Abi) |
-                (Self::Errors, Cos::Abi) |
-                (Self::Bytecode, Cos::Evm(Eos::ByteCode(_))) |
-                (Self::DeployedBytecode, Cos::Evm(Eos::DeployedByteCode(_))) |
-                (Self::Assembly | Self::AssemblyOptimized, Cos::Evm(Eos::Assembly)) |
-                (Self::LegacyAssembly, Cos::Evm(Eos::LegacyAssembly)) |
-                (Self::MethodIdentifiers, Cos::Evm(Eos::MethodIdentifiers)) |
-                (Self::GasEstimates, Cos::Evm(Eos::GasEstimates)) |
-                (Self::StorageLayout, Cos::StorageLayout) |
-                (Self::DevDoc, Cos::DevDoc) |
-                (Self::Ir, Cos::Ir) |
-                (Self::IrOptimized, Cos::IrOptimized) |
-                (Self::Metadata, Cos::Metadata) |
-                (Self::UserDoc, Cos::UserDoc) |
-                (Self::Ewasm, Cos::Ewasm(_))
+            (Self::Abi | Self::Events, Cos::Abi)
+                | (Self::Errors, Cos::Abi)
+                | (Self::Bytecode, Cos::Evm(Eos::ByteCode(_)))
+                | (Self::DeployedBytecode, Cos::Evm(Eos::DeployedByteCode(_)))
+                | (Self::Assembly | Self::AssemblyOptimized, Cos::Evm(Eos::Assembly))
+                | (Self::LegacyAssembly, Cos::Evm(Eos::LegacyAssembly))
+                | (Self::MethodIdentifiers, Cos::Evm(Eos::MethodIdentifiers))
+                | (Self::GasEstimates, Cos::Evm(Eos::GasEstimates))
+                | (Self::StorageLayout, Cos::StorageLayout)
+                | (Self::DevDoc, Cos::DevDoc)
+                | (Self::Ir, Cos::Ir)
+                | (Self::IrOptimized, Cos::IrOptimized)
+                | (Self::Metadata, Cos::Metadata)
+                | (Self::UserDoc, Cos::UserDoc)
+                | (Self::Ewasm, Cos::Ewasm(_))
         )
     }
 }
@@ -578,10 +578,10 @@ fn print_yul(yul: Option<&str>, strip_comments: bool) -> Result<()> {
 fn get_json_str(obj: &impl serde::Serialize, key: Option<&str>) -> Result<String> {
     let value = serde_json::to_value(obj)?;
     let mut value_ref = &value;
-    if let Some(key) = key {
-        if let Some(value2) = value.get(key) {
-            value_ref = value2;
-        }
+    if let Some(key) = key
+        && let Some(value2) = value.get(key)
+    {
+        value_ref = value2;
     }
     let s = match value_ref.as_str() {
         Some(s) => s.to_string(),

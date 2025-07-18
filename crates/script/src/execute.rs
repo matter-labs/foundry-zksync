@@ -18,7 +18,7 @@ use foundry_cli::utils::{ensure_clean_constructor, needs_setup};
 use foundry_common::{
     fmt::{format_token, format_token_raw},
     provider::get_http_provider,
-    ContractsByArtifact,
+    sh_err, sh_println, sh_warn, ContractsByArtifact,
 };
 use foundry_config::NamedChain;
 use foundry_debugger::Debugger;
@@ -34,6 +34,7 @@ use foundry_evm::{
 use futures::future::join_all;
 use itertools::Itertools;
 use std::path::Path;
+use tracing::warn;
 use yansi::Paint;
 
 /// State after linking, contains the linked build data along with library addresses and optional
@@ -187,15 +188,17 @@ impl PreExecutionState {
 
         if let Some(txs) = transactions {
             // If the user passed a `--sender` don't check anything.
-            if self.build_data.predeploy_libraries.libraries_count() > 0 &&
-                self.args.evm.sender.is_none()
+            if self.build_data.predeploy_libraries.libraries_count() > 0
+                && self.args.evm.sender.is_none()
             {
                 for tx in txs {
                     if tx.transaction.to().is_none() {
                         let sender = tx.transaction.from().expect("no sender");
                         if let Some(ns) = new_sender {
                             if sender != ns {
-                                sh_warn!("You have more than one deployer who could predeploy libraries. Using `--sender` instead.")?;
+                                sh_warn!(
+                                    "You have more than one deployer who could predeploy libraries. Using `--sender` instead."
+                                )?;
                                 return Ok(None);
                             }
                         } else if sender != self.script_config.evm_opts.sender {

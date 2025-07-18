@@ -95,7 +95,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
                 "override read value",
             );
 
-            return value
+            return value;
         }
 
         tracing::trace!(

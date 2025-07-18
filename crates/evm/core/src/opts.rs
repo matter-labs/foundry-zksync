@@ -12,6 +12,7 @@ use foundry_config::{Chain, Config, GasLimit};
 use revm::context::{BlockEnv, TxEnv};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write;
+use tracing::trace;
 use url::Url;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -136,10 +137,10 @@ impl EvmOpts {
         .await
         .wrap_err_with(|| {
             let mut msg = "could not instantiate forked environment".to_string();
-            if let Ok(url) = Url::parse(fork_url) {
-                if let Some(provider) = url.host() {
-                    write!(msg, " with provider {provider}").unwrap();
-                }
+            if let Ok(url) = Url::parse(fork_url)
+                && let Some(provider) = url.host()
+            {
+                write!(msg, " with provider {provider}").unwrap();
             }
             msg
         })
@@ -220,7 +221,7 @@ impl EvmOpts {
         if self.no_rpc_rate_limit {
             u64::MAX
         } else if let Some(cups) = self.compute_units_per_second {
-            return cups;
+            cups
         } else {
             ALCHEMY_FREE_TIER_CUPS
         }

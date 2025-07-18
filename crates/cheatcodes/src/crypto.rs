@@ -261,7 +261,9 @@ fn sign_with_wallet(
     } else if signers.len() == 1 {
         *signers.keys().next().unwrap()
     } else {
-        bail!("could not determine signer, there are multiple signers available use vm.sign(signer, digest) to specify one");
+        bail!(
+            "could not determine signer, there are multiple signers available use vm.sign(signer, digest) to specify one"
+        );
     };
 
     let wallet = signers
@@ -421,7 +423,10 @@ mod tests {
         )
         .unwrap();
         let result = sign_p256(&pk, &digest);
-        assert_eq!(result.err().unwrap().to_string(), "private key must be less than the NistP256 curve order (115792089210356248762697446949407573529996955224135760342422259061068512044369)");
+        assert_eq!(
+            result.err().unwrap().to_string(),
+            "private key must be less than the NistP256 curve order (115792089210356248762697446949407573529996955224135760342422259061068512044369)"
+        );
     }
 
     #[test]

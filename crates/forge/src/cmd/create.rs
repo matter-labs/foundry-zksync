@@ -145,7 +145,10 @@ impl CreateArgs {
                         })
                         .collect::<Vec<String>>()
                         .join("\n");
-                    eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                    eyre::bail!(
+                        "Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}",
+                        link_refs
+                    )
                 }
             };
 
@@ -260,6 +263,7 @@ impl CreateArgs {
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
             zksync: self.build.compiler.zk.enabled(),
+            language: None,
         };
 
         // Check config for Etherscan API Keys to avoid preflight check failing if no
@@ -379,7 +383,9 @@ impl CreateArgs {
                 )?;
                 sh_println!("ABI: {}\n", serde_json::to_string_pretty(&abi)?)?;
 
-                sh_warn!("To broadcast this transaction, add --broadcast to the previous command. See forge create --help for more.")?;
+                sh_warn!(
+                    "To broadcast this transaction, add --broadcast to the previous command. See forge create --help for more."
+                )?;
             } else {
                 let output = json!({
                     "contract": self.contract.name,
@@ -452,6 +458,7 @@ impl CreateArgs {
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
             zksync: self.build.compiler.zk.enabled(),
+            language: None,
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await
@@ -483,7 +490,7 @@ impl CreateArgs {
             tracing::warn!(
                 given = actual_params,
                 expected = expected_params,
-               "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
+                "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
             );
         }
 

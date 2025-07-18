@@ -29,9 +29,11 @@ pub struct InvariantFuzzTestResult {
     /// Additional traces used for gas report construction.
     pub gas_report_traces: Vec<Vec<CallTraceArena>>,
     /// The coverage info collected during the invariant test runs.
-    pub coverage: Option<HitMaps>,
+    pub line_coverage: Option<HitMaps>,
     /// Fuzzed selectors metrics collected during the invariant test runs.
     pub metrics: HashMap<String, InvariantMetrics>,
+    /// NUmber of failed replays from persisted corpus.
+    pub failed_corpus_replays: usize,
 }
 
 /// Enriched results of an invariant run check.
@@ -61,10 +63,10 @@ pub(crate) fn assert_invariants(
 ) -> Result<Option<RawCallResult>> {
     let mut inner_sequence = vec![];
 
-    if let Some(fuzzer) = &executor.inspector().fuzzer {
-        if let Some(call_generator) = &fuzzer.call_generator {
-            inner_sequence.extend(call_generator.last_sequence.read().iter().cloned());
-        }
+    if let Some(fuzzer) = &executor.inspector().fuzzer
+        && let Some(call_generator) = &fuzzer.call_generator
+    {
+        inner_sequence.extend(call_generator.last_sequence.read().iter().cloned());
     }
 
     let (call_result, success) = call_invariant_function(

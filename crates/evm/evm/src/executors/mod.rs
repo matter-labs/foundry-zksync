@@ -15,6 +15,7 @@ use crate::{
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
 use alloy_primitives::{
+    keccak256,
     map::{AddressHashMap, HashMap},
     Address, Bytes, Log, TxKind, U256,
 };
@@ -275,6 +276,36 @@ impl Executor {
     /// Returns the nonce of an account.
     pub fn get_nonce(&self, address: Address) -> BackendResult<u64> {
         Ok(self.backend().basic_ref(address)?.map(|acc| acc.nonce).unwrap_or_default())
+    }
+
+    /// Set the code of an account.
+    pub fn set_code(&mut self, address: Address, code: Bytecode) -> BackendResult<()> {
+        let mut account = self.backend().basic_ref(address)?.unwrap_or_default();
+        account.code_hash = keccak256(code.original_byte_slice());
+        account.code = Some(code);
+        self.backend_mut().insert_account_info(address, account);
+        Ok(())
+    }
+
+    /// Set the storage of an account.
+    pub fn set_storage(
+        &mut self,
+        address: Address,
+        storage: HashMap<U256, U256>,
+    ) -> BackendResult<()> {
+        self.backend_mut().replace_account_storage(address, storage)?;
+        Ok(())
+    }
+
+    /// Set a storage slot of an account.
+    pub fn set_storage_slot(
+        &mut self,
+        address: Address,
+        slot: U256,
+        value: U256,
+    ) -> BackendResult<()> {
+        self.backend_mut().insert_account_storage(address, slot, value)?;
+        Ok(())
     }
 
     /// Returns `true` if the account has no code.
@@ -651,17 +682,16 @@ impl Executor {
         }
 
         // Check the global failure slot.
-        if let Some(acc) = state_changeset.get(&CHEATCODE_ADDRESS) {
-            if let Some(failed_slot) = acc.storage.get(&GLOBAL_FAIL_SLOT) {
-                if !failed_slot.present_value().is_zero() {
-                    return false;
-                }
-            }
+        if let Some(acc) = state_changeset.get(&CHEATCODE_ADDRESS)
+            && let Some(failed_slot) = acc.storage.get(&GLOBAL_FAIL_SLOT)
+            && !failed_slot.present_value().is_zero()
+        {
+            return false;
         }
-        if let Ok(failed_slot) = self.backend().storage_ref(CHEATCODE_ADDRESS, GLOBAL_FAIL_SLOT) {
-            if !failed_slot.is_zero() {
-                return false;
-            }
+        if let Ok(failed_slot) = self.backend().storage_ref(CHEATCODE_ADDRESS, GLOBAL_FAIL_SLOT)
+            && !failed_slot.is_zero()
+        {
+            return false;
         }
 
         if !self.legacy_assertions {
@@ -864,8 +894,10 @@ pub struct RawCallResult {
     pub labels: AddressHashMap<String>,
     /// The traces of the call
     pub traces: Option<SparsedTraceArena>,
-    /// The coverage info collected during the call
-    pub coverage: Option<HitMaps>,
+    /// The line coverage info collected during the call
+    pub line_coverage: Option<HitMaps>,
+    /// The edge coverage info collected during the call
+    pub edge_coverage: Option<Vec<u8>>,
     /// Scripted transactions generated from this call
     pub transactions: Option<BroadcastableTransactions>,
     /// The changeset of the state.
@@ -878,6 +910,7 @@ pub struct RawCallResult {
     pub out: Option<Output>,
     /// The chisel state
     pub chisel_state: Option<(Vec<U256>, Vec<u8>, InstructionResult)>,
+    pub reverter: Option<Address>,
 }
 
 impl Default for RawCallResult {
@@ -893,13 +926,15 @@ impl Default for RawCallResult {
             logs: Vec::new(),
             labels: HashMap::default(),
             traces: None,
-            coverage: None,
+            line_coverage: None,
+            edge_coverage: None,
             transactions: None,
             state_changeset: HashMap::default(),
             env: Env::default(),
             cheatcodes: Default::default(),
             out: None,
             chisel_state: None,
+            reverter: None,
         }
     }
 }
@@ -966,6 +1001,43 @@ impl RawCallResult {
     pub fn transactions(&self) -> Option<&BroadcastableTransactions> {
         self.cheatcodes.as_ref().map(|c| &c.broadcastable_transactions)
     }
+
+    /// Update provided history map with edge coverage info collected during this call.
+    /// Uses AFL binning algo <https://github.com/h0mbre/Lucid/blob/3026e7323c52b30b3cf12563954ac1eaa9c6981e/src/coverage.rs#L57-L85>
+    pub fn merge_edge_coverage(&mut self, history_map: &mut [u8]) -> bool {
+        let mut new_coverage = false;
+        if let Some(x) = &mut self.edge_coverage {
+            // Iterate over the current map and the history map together and update
+            // the history map, if we discover some new coverage, report true
+            for (curr, hist) in std::iter::zip(x, history_map) {
+                // If we got a hitcount of at least 1
+                if *curr > 0 {
+                    // Convert hitcount into bucket count
+                    let bucket = match *curr {
+                        0 => 0,
+                        1 => 1,
+                        2 => 2,
+                        3 => 4,
+                        4..=7 => 8,
+                        8..=15 => 16,
+                        16..=31 => 32,
+                        32..=127 => 64,
+                        128..=255 => 128,
+                    };
+
+                    // If the old record for this edge pair is lower, update
+                    if *hist < bucket {
+                        *hist = bucket;
+                        new_coverage = true;
+                    }
+
+                    // Zero out the current map for next iteration.
+                    *curr = 0;
+                }
+            }
+        }
+        new_coverage
+    }
 }
 
 /// The result of a call.
@@ -1025,8 +1097,16 @@ fn convert_executed_result(
         _ => Bytes::new(),
     };
 
-    let InspectorData { logs, labels, traces, coverage, cheatcodes, chisel_state } =
-        inspector.collect();
+    let InspectorData {
+        logs,
+        labels,
+        traces,
+        line_coverage,
+        edge_coverage,
+        cheatcodes,
+        chisel_state,
+        reverter,
+    } = inspector.collect();
 
     let transactions = cheatcodes
         .as_ref()
@@ -1044,13 +1124,15 @@ fn convert_executed_result(
         logs,
         labels,
         traces,
-        coverage,
+        line_coverage,
+        edge_coverage,
         transactions,
         state_changeset,
         env,
         cheatcodes,
         out,
         chisel_state,
+        reverter,
     })
 }
 

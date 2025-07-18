@@ -51,13 +51,19 @@ impl ProjectCompiler {
             let zksolc_min_supported_version = ZkSolc::zksolc_minimum_supported_version();
             let zksolc_latest_supported_version = ZkSolc::zksolc_latest_supported_version();
             if ZKSOLC_UNSUPPORTED_VERSIONS.contains(zksolc_current_version) {
-                sh_warn!("Compiling with zksolc v{zksolc_current_version} which is not supported and may lead to unexpected errors. Specifying an unsupported version is deprecated and will return an error in future versions of foundry-zksync.")?;
+                sh_warn!(
+                    "Compiling with zksolc v{zksolc_current_version} which is not supported and may lead to unexpected errors. Specifying an unsupported version is deprecated and will return an error in future versions of foundry-zksync."
+                )?;
             }
             if zksolc_current_version < &zksolc_min_supported_version {
-                sh_warn!("Compiling with zksolc v{zksolc_current_version} which is not supported and may lead to unexpected errors. Specifying an unsupported version is deprecated and will return an error in future versions of foundry-zksync. Minimum version supported is v{zksolc_min_supported_version}")?;
+                sh_warn!(
+                    "Compiling with zksolc v{zksolc_current_version} which is not supported and may lead to unexpected errors. Specifying an unsupported version is deprecated and will return an error in future versions of foundry-zksync. Minimum version supported is v{zksolc_min_supported_version}"
+                )?;
             }
             if zksolc_current_version > &zksolc_latest_supported_version {
-                sh_warn!("Compiling with zksolc v{zksolc_current_version} which is still not supported and may lead to unexpected errors. Specifying an unsupported version is deprecated and will return an error in future versions of foundry-zksync. Latest version supported is v{zksolc_latest_supported_version}")?;
+                sh_warn!(
+                    "Compiling with zksolc v{zksolc_current_version} which is still not supported and may lead to unexpected errors. Specifying an unsupported version is deprecated and will return an error in future versions of foundry-zksync. Latest version supported is v{zksolc_latest_supported_version}"
+                )?;
             }
             Report::new(SpinnerReporter::spawn_with(format!(
                 "Using zksolc-{zksolc_current_version}"
@@ -184,8 +190,8 @@ impl ProjectCompiler {
                     .as_ref()
                     .map(|abi| {
                         abi.functions().any(|f| {
-                            f.test_function_kind().is_known() ||
-                                matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
+                            f.test_function_kind().is_known()
+                                || matches!(f.name.as_str(), "IS_TEST" | "IS_SCRIPT")
                         })
                     })
                     .unwrap_or(false);

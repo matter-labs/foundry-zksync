@@ -268,20 +268,20 @@ impl CompilerSettings for ZkSolcSettings {
             ..
         } = self;
 
-        *via_ir == other.settings.via_ir &&
-            *remappings == other.settings.remappings &&
-            *evm_version == other.settings.evm_version &&
-            *output_selection == other.settings.output_selection &&
-            *optimizer == other.settings.optimizer &&
-            *metadata == other.settings.metadata &&
-            *libraries == other.settings.libraries &&
-            *enable_eravm_extensions == other.settings.enable_eravm_extensions &&
-            *llvm_options == other.settings.llvm_options &&
-            *force_evmla == other.settings.force_evmla &&
-            *codegen == other.settings.codegen &&
-            *suppressed_warnings == other.settings.suppressed_warnings &&
-            *suppressed_errors == other.settings.suppressed_errors &&
-            self.zksolc_version == other.zksolc_version
+        *via_ir == other.settings.via_ir
+            && *remappings == other.settings.remappings
+            && *evm_version == other.settings.evm_version
+            && *output_selection == other.settings.output_selection
+            && *optimizer == other.settings.optimizer
+            && *metadata == other.settings.metadata
+            && *libraries == other.settings.libraries
+            && *enable_eravm_extensions == other.settings.enable_eravm_extensions
+            && *llvm_options == other.settings.llvm_options
+            && *force_evmla == other.settings.force_evmla
+            && *codegen == other.settings.codegen
+            && *suppressed_warnings == other.settings.suppressed_warnings
+            && *suppressed_errors == other.settings.suppressed_errors
+            && self.zksolc_version == other.zksolc_version
     }
 
     fn with_remappings(mut self, remappings: &[Remapping]) -> Self {
@@ -407,13 +407,13 @@ pub struct OptimizerDetails {
 impl OptimizerDetails {
     /// Returns true if no settings are set.
     pub fn is_empty(&self) -> bool {
-        self.peephole.is_none() &&
-            self.inliner.is_none() &&
-            self.jumpdest_remover.is_none() &&
-            self.order_literals.is_none() &&
-            self.deduplicate.is_none() &&
-            self.cse.is_none() &&
-            self.constant_optimizer.is_none()
+        self.peephole.is_none()
+            && self.inliner.is_none()
+            && self.jumpdest_remover.is_none()
+            && self.order_literals.is_none()
+            && self.deduplicate.is_none()
+            && self.cse.is_none()
+            && self.constant_optimizer.is_none()
     }
 }
 

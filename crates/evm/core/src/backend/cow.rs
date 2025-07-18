@@ -22,6 +22,7 @@ use revm::{
     Database, DatabaseCommit,
 };
 use std::{any::Any, borrow::Cow, collections::BTreeMap};
+use tracing::instrument;
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///

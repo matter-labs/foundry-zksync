@@ -380,7 +380,7 @@ fn deploy_code(
     )?;
 
     if !outcome.result.result.is_ok() {
-        return Err(crate::Error::from(outcome.result.output))
+        return Err(crate::Error::from(outcome.result.output));
     }
 
     let address = outcome.address.ok_or_else(|| fmt_err!("contract creation failed"))?;
@@ -438,23 +438,22 @@ pub fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Resu
                     // name might be in the form of "Counter.0.8.23"
                     let id_name = id.name.split('.').next().unwrap();
 
-                    if let Some(path) = &file {
-                        if !id.source.ends_with(path) {
-                            return false;
-                        }
+                    if let Some(path) = &file
+                        && !id.source.ends_with(path)
+                    {
+                        return false;
                     }
-                    if let Some(name) = contract_name {
-                        if id_name != name {
-                            return false;
-                        }
+                    if let Some(name) = contract_name
+                        && id_name != name
+                    {
+                        return false;
                     }
-                    if let Some(ref version) = version {
-                        if id.version.minor != version.minor ||
-                            id.version.major != version.major ||
-                            id.version.patch != version.patch
-                        {
-                            return false;
-                        }
+                    if let Some(ref version) = version
+                        && (id.version.minor != version.minor
+                            || id.version.major != version.major
+                            || id.version.patch != version.patch)
+                    {
+                        return false;
                     }
                     true
                 })
@@ -476,7 +475,7 @@ pub fn get_artifact_code(state: &Cheatcodes, path: &str, deployed: bool) -> Resu
 
                             // Return artifact if only one matched
                             if filtered.len() == 1 {
-                                return Some(filtered[0])
+                                return Some(filtered[0]);
                             }
 
                             // Try filtering by profile as well

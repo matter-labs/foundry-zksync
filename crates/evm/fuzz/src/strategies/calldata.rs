@@ -11,7 +11,7 @@ use proptest::prelude::Strategy;
 /// for that function's input types, following declared test fixtures.
 pub fn fuzz_calldata(
     func: Function,
-    fuzz_fixtures: &FuzzFixtures,
+    fuzz_fixtures: FuzzFixtures,
     no_zksync_reserved_addresses: bool,
 ) -> impl Strategy<Value = Bytes> {
     // We need to compose all the strategies generated for each parameter in all
@@ -45,7 +45,7 @@ pub fn fuzz_calldata(
 pub fn fuzz_calldata_from_state(
     func: Function,
     state: &EvmFuzzState,
-) -> impl Strategy<Value = Bytes> {
+) -> impl Strategy<Value = Bytes> + use<> {
     let strats = func
         .inputs
         .iter()
@@ -85,7 +85,7 @@ mod tests {
         );
 
         let expected = function.abi_encode_input(&[address_fixture]).unwrap();
-        let strategy = fuzz_calldata(function, &FuzzFixtures::new(fixtures), false);
+        let strategy = fuzz_calldata(function, FuzzFixtures::new(fixtures), false);
         let _ = strategy.prop_map(move |fuzzed| {
             assert_eq!(expected, fuzzed);
         });

@@ -1,3 +1,4 @@
+cargo-features = ["edition2024"]
 [package]
 name = "foundry-evm-abi"
 description = "Solidity ABI-related utilities and `sol!` definitions"

@@ -96,7 +96,10 @@ impl CreateArgs {
                     .into_iter()
                     .collect::<Vec<String>>()
                     .join("\n");
-                eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                eyre::bail!(
+                    "Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}",
+                    link_refs
+                )
             }
         };
 
@@ -357,6 +360,7 @@ impl CreateArgs {
             guess_constructor_args: false,
             compilation_profile: None, //TODO(zk): provide comp profile
             zksync: self.build.compiler.zk.enabled(),
+            language: None,
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await

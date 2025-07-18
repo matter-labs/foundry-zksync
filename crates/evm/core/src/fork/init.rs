@@ -6,6 +6,7 @@ use alloy_rpc_types::BlockNumberOrTag;
 use eyre::WrapErr;
 use foundry_common::NON_ARCHIVE_NODE_WARNING;
 use revm::context::{BlockEnv, CfgEnv, TxEnv};
+use tracing::error;
 
 /// Initializes a REVM block environment based on a forked
 /// ethereum provider.

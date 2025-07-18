@@ -211,9 +211,9 @@ impl AccountAccesses {
             }
             AccountAccessKind::Call => {
                 if let Some((depth, call_addr)) = self.skip_next_call.take() {
-                    if depth == new_depth &&
-                        call_addr.accessor == accessor &&
-                        call_addr.account == account
+                    if depth == new_depth
+                        && call_addr.accessor == accessor
+                        && call_addr.account == account
                     {
                         self.call_skip_tracker.push(true);
                         return;

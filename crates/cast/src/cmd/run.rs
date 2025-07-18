@@ -1,6 +1,10 @@
 use alloy_consensus::Transaction;
 use alloy_network::{AnyNetwork, TransactionResponse};
-use alloy_provider::Provider;
+use alloy_primitives::{
+    map::{HashMap, HashSet},
+    Address, Bytes,
+};
+use alloy_provider::{Provider, RootProvider};
 use alloy_rpc_types::BlockTransactions;
 use alloy_serde::OtherFields;
 use clap::Parser;
@@ -22,7 +26,7 @@ use foundry_config::{
 use foundry_evm::{
     executors::{EvmError, TracingExecutor},
     opts::EvmOpts,
-    traces::{InternalTraceMode, TraceMode},
+    traces::{InternalTraceMode, TraceMode, Traces},
     utils::configure_tx_env,
     Env,
 };
@@ -54,6 +58,10 @@ pub struct RunArgs {
     /// May result in different results than the live execution!
     #[arg(long)]
     quick: bool,
+
+    /// Disables the labels in the traces.
+    #[arg(long, default_value_t = false)]
+    disable_labels: bool,
 
     /// Label addresses in the trace.
     ///
@@ -141,8 +149,8 @@ impl RunArgs {
             .ok_or_else(|| eyre::eyre!("tx not found: {:?}", tx_hash))?;
 
         // check if the tx is a system transaction
-        if is_known_system_sender(tx.from()) ||
-            tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
+        if is_known_system_sender(tx.from())
+            || tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
         {
             return Err(eyre::eyre!(
                 "{:?} is a system transaction.\nReplaying system transactions is currently not supported.",
@@ -193,7 +201,7 @@ impl RunArgs {
             if evm_version.is_none() {
                 // if the block has the excess_blob_gas field, we assume it's a Cancun block
                 if block.header.excess_blob_gas.is_some() {
-                    evm_version = Some(EvmVersion::Cancun);
+                    evm_version = Some(EvmVersion::Prague);
                 }
             }
             apply_chain_and_block_specific_env_changes::<AnyNetwork>(env.as_env_mut(), block);
@@ -215,6 +223,7 @@ impl RunArgs {
             odyssey,
             create2_deployer,
             strategy,
+            None,
         )?;
         let mut env = Env::new_with_spec_id(
             env.evm_env.cfg_env.clone(),
@@ -250,8 +259,8 @@ impl RunArgs {
                     // System transactions such as on L2s don't contain any pricing info so
                     // we skip them otherwise this would cause
                     // reverts
-                    if is_known_system_sender(tx.from()) ||
-                        tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
+                    if is_known_system_sender(tx.from())
+                        || tx.transaction_type() == Some(SYSTEM_TRANSACTION_TYPE)
                     {
                         pb.set_position((index + 1) as u64);
                         continue;
@@ -304,7 +313,7 @@ impl RunArgs {
                                             tx.tx_hash(),
                                             env.evm_env.block_env.number
                                         )
-                                    })
+                                    });
                                 }
                             }
                         }
@@ -355,19 +364,63 @@ impl RunArgs {
             }
         };
 
+        let contracts_bytecode = fetch_contracts_bytecode_from_trace(&provider, &result).await?;
         handle_traces(
             result,
             &config,
             chain,
+            &contracts_bytecode,
             self.label,
             self.with_local_artifacts,
             self.debug,
             self.decode_internal,
+            self.disable_labels,
         )
         .await?;
 
         Ok(())
     }
+}
+
+pub async fn fetch_contracts_bytecode_from_trace(
+    provider: &RootProvider<AnyNetwork>,
+    result: &TraceResult,
+) -> Result<HashMap<Address, Bytes>> {
+    let mut contracts_bytecode = HashMap::default();
+    if let Some(ref traces) = result.traces {
+        let addresses = gather_trace_addresses(traces);
+        let results = futures::future::join_all(addresses.into_iter().map(async |a| {
+            (
+                a,
+                provider.get_code_at(a).await.unwrap_or_else(|e| {
+                    sh_warn!("Failed to fetch code for {a:?}: {e:?}").ok();
+                    Bytes::new()
+                }),
+            )
+        }))
+        .await;
+        for (address, code) in results {
+            if !code.is_empty() {
+                contracts_bytecode.insert(address, code);
+            }
+        }
+    }
+    Ok(contracts_bytecode)
+}
+
+fn gather_trace_addresses(traces: &Traces) -> HashSet<Address> {
+    let mut addresses = HashSet::default();
+    for (_, trace) in traces {
+        for node in trace.arena.nodes() {
+            if !node.trace.address.is_zero() {
+                addresses.insert(node.trace.address);
+            }
+            if !node.trace.caller.is_zero() {
+                addresses.insert(node.trace.caller);
+            }
+        }
+    }
+    addresses
 }
 
 impl figment::Provider for RunArgs {

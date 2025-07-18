@@ -6,7 +6,6 @@ use bytes::{BufMut, BytesMut};
 use futures::{ready, Sink, Stream, StreamExt};
 use interprocess::local_socket::{self as ls, tokio::prelude::*};
 use std::{
-    future::Future,
     io,
     pin::Pin,
     task::{Context, Poll},
@@ -159,7 +158,7 @@ impl tokio_util::codec::Decoder for JsonRpcCodec {
                 return match String::from_utf8(bts.as_ref().to_vec()) {
                     Ok(val) => Ok(Some(val)),
                     Err(_) => Ok(None),
-                }
+                };
             }
         }
         Ok(None)

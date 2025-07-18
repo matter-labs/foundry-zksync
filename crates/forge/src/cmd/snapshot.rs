@@ -156,15 +156,15 @@ struct GasSnapshotConfig {
 
 impl GasSnapshotConfig {
     fn is_in_gas_range(&self, gas_used: u64) -> bool {
-        if let Some(min) = self.min {
-            if gas_used < min {
-                return false
-            }
+        if let Some(min) = self.min
+            && gas_used < min
+        {
+            return false;
         }
-        if let Some(max) = self.max {
-            if gas_used > max {
-                return false
-            }
+        if let Some(max) = self.max
+            && gas_used > max
+        {
+            return false;
         }
         true
     }
@@ -242,6 +242,7 @@ impl FromStr for GasSnapshotEntry {
                                         calls: calls.as_str().parse().unwrap(),
                                         reverts: reverts.as_str().parse().unwrap(),
                                         metrics: HashMap::default(),
+                                        failed_corpus_replays: 0,
                                     },
                                 })
                         }
@@ -488,7 +489,8 @@ mod tests {
                     runs: 256,
                     calls: 100,
                     reverts: 200,
-                    metrics: HashMap::default()
+                    metrics: HashMap::default(),
+                    failed_corpus_replays: 0,
                 }
             }
         );
@@ -507,7 +509,8 @@ mod tests {
                     runs: 256,
                     calls: 3840,
                     reverts: 2388,
-                    metrics: HashMap::default()
+                    metrics: HashMap::default(),
+                    failed_corpus_replays: 0,
                 }
             }
         );

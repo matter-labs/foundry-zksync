@@ -582,11 +582,11 @@ impl TestArgs {
             decoder.clear_addresses();
 
             // We identify addresses if we're going to print *any* trace or gas report.
-            let identify_addresses = verbosity >= 3 ||
-                self.gas_report ||
-                self.debug ||
-                self.flamegraph ||
-                self.flamechart;
+            let identify_addresses = verbosity >= 3
+                || self.gas_report
+                || self.debug
+                || self.flamegraph
+                || self.flamechart;
 
             // Print suite header.
             if !silent {
@@ -609,10 +609,10 @@ impl TestArgs {
                     sh_println!("{}", result.short_result(name))?;
 
                     // Display invariant metrics if invariant kind.
-                    if let TestKind::Invariant { metrics, .. } = &result.kind {
-                        if !metrics.is_empty() {
-                            let _ = sh_println!("\n{}\n", format_invariant_metrics_table(metrics));
-                        }
+                    if let TestKind::Invariant { metrics, .. } = &result.kind
+                        && !metrics.is_empty()
+                    {
+                        let _ = sh_println!("\n{}\n", format_invariant_metrics_table(metrics));
                     }
 
                     // We only display logs at level 2 and above
@@ -944,12 +944,12 @@ fn persist_run_failures(config: &Config, outcome: &TestOutcome) {
         let mut filter = String::new();
         let mut failures = outcome.failures().peekable();
         while let Some((test_name, _)) = failures.next() {
-            if test_name.is_any_test() {
-                if let Some(test_match) = test_name.split("(").next() {
-                    filter.push_str(test_match);
-                    if failures.peek().is_some() {
-                        filter.push('|');
-                    }
+            if test_name.is_any_test()
+                && let Some(test_match) = test_name.split("(").next()
+            {
+                filter.push_str(test_match);
+                if failures.peek().is_some() {
+                    filter.push('|');
                 }
             }
         }

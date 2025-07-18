@@ -302,7 +302,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         ecx_inner: Ecx<'_, '_, '_>,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: Option<SignedAuthorization>,
+        active_delegations: Vec<SignedAuthorization>,
         active_blob_sidecar: Option<BlobTransactionSidecar>,
     ) {
         let ctx_zk = get_context(ctx);
@@ -315,7 +315,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 ecx_inner,
                 broadcast,
                 broadcastable_transactions,
-                active_delegation,
+                active_delegations,
                 active_blob_sidecar,
             );
         }
@@ -374,20 +374,20 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             ..Default::default()
         };
 
-        match (active_delegation, active_blob_sidecar) {
-            (Some(_), Some(_)) => {
+        match (!active_delegations.is_empty(), active_blob_sidecar) {
+            (true, Some(_)) => {
                 // Note(zk): We can't return a call outcome from here
                 return;
             }
-            (Some(auth_list), None) => {
-                tx_req.authorization_list = Some(vec![auth_list]);
+            (true, None) => {
+                tx_req.authorization_list = Some(active_delegations);
                 tx_req.sidecar = None;
             }
-            (None, Some(blob_sidecar)) => {
+            (false, Some(blob_sidecar)) => {
                 tx_req.set_blob_sidecar(blob_sidecar);
                 tx_req.authorization_list = None;
             }
-            (None, None) => {
+            (false, None) => {
                 tx_req.sidecar = None;
                 tx_req.authorization_list = None;
             }
@@ -1059,7 +1059,11 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 data.journaled_state.sload(nonce_account, nonce_key).unwrap_or_default();
             let (tx_nonce, deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
             if !deployment_nonce.is_zero() {
-                warn!(?address, ?deployment_nonce, "discarding ZKsync deployment nonce for EVM context, might cause inconsistencies");
+                warn!(
+                    ?address,
+                    ?deployment_nonce,
+                    "discarding ZKsync deployment nonce for EVM context, might cause inconsistencies"
+                );
             }
             let nonce = tx_nonce.as_u64();
 

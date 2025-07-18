@@ -12,6 +12,7 @@ use futures::StreamExt;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use parking_lot::RwLock;
 use std::{fmt::Write, sync::Arc, time::Duration};
+use tracing::{trace, warn};
 use yansi::Paint;
 
 /// State of [ProgressBar]s displayed for the given [ScriptSequence].
@@ -134,7 +135,7 @@ impl SequenceProgressState {
     }
 }
 
-/// Clonable wrapper around [SequenceProgressState].
+/// Cloneable wrapper around [SequenceProgressState].
 #[derive(Debug, Clone)]
 pub struct SequenceProgress {
     pub inner: Arc<RwLock<SequenceProgressState>>,

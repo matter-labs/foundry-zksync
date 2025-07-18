@@ -232,7 +232,7 @@ Private Keys
             let _ = write!(s, "\n({idx}) 0x{hex}");
         }
 
-        if let Some(ref gen) = self.account_generator {
+        if let Some(generator) = &self.account_generator {
             let _ = write!(
                 s,
                 r#"
@@ -242,8 +242,8 @@ Wallet
 Mnemonic:          {}
 Derivation path:   {}
 "#,
-                gen.phrase,
-                gen.get_derivation_path()
+                generator.phrase,
+                generator.get_derivation_path()
             );
         }
 
@@ -365,9 +365,9 @@ Genesis Number
             private_keys.push(format!("0x{}", hex::encode(wallet.credential().to_bytes())));
         }
 
-        if let Some(ref gen) = self.account_generator {
-            let phrase = gen.get_phrase().to_string();
-            let derivation_path = gen.get_derivation_path().to_string();
+        if let Some(generator) = &self.account_generator {
+            let phrase = generator.get_phrase().to_string();
+            let derivation_path = generator.get_derivation_path().to_string();
 
             wallet_description.insert("derivation_path".to_string(), derivation_path);
             wallet_description.insert("mnemonic".to_string(), phrase);
@@ -429,8 +429,10 @@ impl NodeConfig {
 impl Default for NodeConfig {
     fn default() -> Self {
         // generate some random wallets
-        let genesis_accounts =
-            AccountGenerator::new(10).phrase(DEFAULT_MNEMONIC).gen().expect("Invalid mnemonic.");
+        let genesis_accounts = AccountGenerator::new(10)
+            .phrase(DEFAULT_MNEMONIC)
+            .generate()
+            .expect("Invalid mnemonic.");
         Self {
             chain_id: None,
             gas_limit: None,
@@ -719,7 +721,7 @@ impl NodeConfig {
     /// Sets both the genesis accounts and the signer accounts
     /// so that `genesis_accounts == accounts`
     pub fn with_account_generator(mut self, generator: AccountGenerator) -> eyre::Result<Self> {
-        let accounts = generator.gen()?;
+        let accounts = generator.generate()?;
         self.account_generator = Some(generator);
         Ok(self.with_signer_accounts(accounts.clone()).with_genesis_accounts(accounts))
     }
@@ -1278,11 +1280,11 @@ latest block number: {latest_block}"
         }
 
         // use remote gas price
-        if self.gas_price.is_none() {
-            if let Ok(gas_price) = provider.get_gas_price().await {
-                self.gas_price = Some(gas_price);
-                fees.set_gas_price(gas_price);
-            }
+        if self.gas_price.is_none()
+            && let Ok(gas_price) = provider.get_gas_price().await
+        {
+            self.gas_price = Some(gas_price);
+            fees.set_gas_price(gas_price);
         }
 
         let block_hash = block.header.hash;
@@ -1315,11 +1317,12 @@ latest block number: {latest_block}"
 
         // This will spawn the background thread that will use the provider to fetch
         // blockchain data from the other client
-        let backend = SharedBackend::spawn_backend_thread(
+        let backend = SharedBackend::spawn_backend(
             Arc::clone(&provider),
             block_chain_db.clone(),
             Some(fork_block_number.into()),
-        );
+        )
+        .await;
 
         let config = ClientForkConfig {
             eth_rpc_url,
@@ -1551,7 +1554,7 @@ impl AccountGenerator {
 }
 
 impl AccountGenerator {
-    pub fn gen(&self) -> eyre::Result<Vec<PrivateKeySigner>> {
+    pub fn generate(&self) -> eyre::Result<Vec<PrivateKeySigner>> {
         let builder = MnemonicBuilder::<English>::default().phrase(self.phrase.as_str());
 
         // use the derivation path
@@ -1590,10 +1593,10 @@ async fn find_latest_fork_block<P: Provider<AnyNetwork>>(
     // walk back from the head of the chain, but at most 2 blocks, which should be more than enough
     // leeway
     for _ in 0..2 {
-        if let Some(block) = provider.get_block(num.into()).await? {
-            if !block.header.hash.is_zero() {
-                break;
-            }
+        if let Some(block) = provider.get_block(num.into()).await?
+            && !block.header.hash.is_zero()
+        {
+            break;
         }
         // block not actually finalized, so we try the block before
         num = num.saturating_sub(1)

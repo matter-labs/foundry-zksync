@@ -18,6 +18,7 @@ use revm::{
     DatabaseCommit, DatabaseRef,
 };
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 pub struct BackendStrategyForkInfo<'a> {
     pub active_fork: Option<&'a Fork>,

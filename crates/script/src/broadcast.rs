@@ -2,7 +2,7 @@ use crate::{
     build::LinkedBuildData, progress::ScriptProgress, sequence::ScriptSequenceKind,
     verify::BroadcastedState, ScriptArgs, ScriptConfig,
 };
-use alloy_chains::Chain;
+use alloy_chains::{Chain, NamedChain};
 use alloy_consensus::TxEnvelope;
 use alloy_eips::{eip2718::Encodable2718, BlockId};
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};
@@ -25,13 +25,14 @@ use foundry_common::{
     provider::{
         get_http_provider, try_get_http_provider, try_get_zksync_http_provider, RetryProvider,
     },
-    shell, TransactionMaybeSigned,
+    sh_println, shell, TransactionMaybeSigned,
 };
 use foundry_config::Config;
 use foundry_zksync_core::convert::ConvertH160;
 use futures::{future::join_all, StreamExt};
 use itertools::Itertools;
 use std::{cmp::Ordering, sync::Arc};
+use tracing::{debug, warn};
 
 pub async fn estimate_gas<P: Provider<AnyNetwork>>(
     tx: &mut WithOtherFields<TransactionRequest>,
@@ -43,9 +44,9 @@ pub async fn estimate_gas<P: Provider<AnyNetwork>>(
     tx.gas = None;
 
     tx.set_gas_limit(
-        provider.estimate_gas(tx.clone()).await.wrap_err("Failed to estimate gas for tx")? *
-            estimate_multiplier /
-            100,
+        provider.estimate_gas(tx.clone()).await.wrap_err("Failed to estimate gas for tx")?
+            * estimate_multiplier
+            / 100,
     );
     Ok(())
 }
@@ -89,13 +90,19 @@ pub async fn send_transaction(
                 let nonce = provider.get_transaction_count(from).await?;
                 match nonce.cmp(&tx_nonce) {
                     Ordering::Greater => {
-                        bail!("EOA nonce changed unexpectedly while sending transactions. Expected {tx_nonce} got {nonce} from provider.")
+                        bail!(
+                            "EOA nonce changed unexpectedly while sending transactions. Expected {tx_nonce} got {nonce} from provider."
+                        )
                     }
                     Ordering::Less => {
                         if attempt == 4 {
-                            bail!("After 5 attempts, provider nonce ({nonce}) is still behind expected nonce ({tx_nonce}).")
+                            bail!(
+                                "After 5 attempts, provider nonce ({nonce}) is still behind expected nonce ({tx_nonce})."
+                            )
                         }
-                        warn!("Expected nonce ({tx_nonce}) is ahead of provider nonce ({nonce}). Retrying in 1 second...");
+                        warn!(
+                            "Expected nonce ({tx_nonce}) is ahead of provider nonce ({nonce}). Retrying in 1 second..."
+                        );
                         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
                     }
                     Ordering::Equal => {
@@ -432,10 +439,10 @@ impl BundledState {
                 // their order otherwise.
                 // Or if the chain does not support batched transactions (eg. Arbitrum).
                 // Or if we need to invoke eth_estimateGas before sending transactions.
-                let sequential_broadcast = estimate_via_rpc ||
-                    self.args.slow ||
-                    required_addresses.len() != 1 ||
-                    !has_batch_support(sequence.chain);
+                let sequential_broadcast = estimate_via_rpc
+                    || self.args.slow
+                    || required_addresses.len() != 1
+                    || !has_batch_support(sequence.chain);
 
                 // We send transactions and wait for receipts in batches.
                 let batch_size = if sequential_broadcast { 1 } else { self.args.batch_size };
@@ -507,9 +514,14 @@ impl BundledState {
             let avg_gas_price = format_units(total_gas_price / sequence.receipts.len() as u64, 9)
                 .unwrap_or_else(|_| "N/A".to_string());
 
+            let token_symbol = NamedChain::try_from(sequence.chain)
+                .unwrap_or_default()
+                .native_currency_symbol()
+                .unwrap_or("ETH");
             seq_progress.inner.write().set_status(&format!(
-                "Total Paid: {} ETH ({} gas * avg {} gwei)\n",
+                "Total Paid: {} {} ({} gas * avg {} gwei)\n",
                 paid.trim_end_matches('0'),
+                token_symbol,
                 total_gas,
                 avg_gas_price.trim_end_matches('0').trim_end_matches('.')
             ));
@@ -531,8 +543,9 @@ impl BundledState {
 
     pub fn verify_preflight_check(&self) -> Result<()> {
         for sequence in self.sequence.sequences() {
-            if self.args.verifier.verifier == VerificationProviderType::Etherscan &&
-                self.script_config
+            if self.args.verifier.verifier == VerificationProviderType::Etherscan
+                && self
+                    .script_config
                     .config
                     .get_etherscan_api_key(Some(sequence.chain.into()))
                     .is_none()

@@ -9,7 +9,7 @@ use foundry_test_utils::{
     foundry_compilers::PathStyle,
     rpc::next_etherscan_api_key,
     snapbox::IntoData,
-    util::{pretty_err, read_string, OutputExt, TestCommand},
+    util::{read_string, OutputExt, TestCommand},
 };
 use semver::Version;
 use similar_asserts::assert_eq;
@@ -70,7 +70,7 @@ Display options:
           - 4 (-vvvv): Print execution traces for all tests, and setup traces for failing tests.
           - 5 (-vvvvv): Print execution and setup traces for all tests, including storage changes.
 
-Find more information in the book: http://book.getfoundry.sh/reference/forge/forge.html
+Find more information in the book: https://getfoundry.sh/forge/overview
 
 "#]]);
 });
@@ -1209,6 +1209,11 @@ Compiler run successful!
 forgetest!(can_build_after_failure, |prj, cmd| {
     prj.insert_ds_test();
 
+    // Disable linting during build to avoid linting output interfering with test assertions
+    prj.update_config(|config| {
+        config.lint.lint_on_build = false;
+    });
+
     prj.add_source(
         "ATest.t.sol",
         r#"
@@ -1499,7 +1504,7 @@ Installing forge-5980-test in [..] (url: Some("https://github.com/evalir/forge-5
         prj.update_config(|config| {
             config.remappings = vec![
                 Remapping::from_str("forge-5980-test/=lib/forge-5980-test/src/").unwrap().into(),
-                // explicit remapping for sub-dependendy seems necessary for some reason
+                // explicit remapping for sub-dependency seems necessary for some reason
                 Remapping::from_str(
                     "forge-5980-test-dep/=lib/forge-5980-test/lib/forge-5980-test-dep/src/",
                 )
@@ -3154,58 +3159,6 @@ Bindings have been generated to [..]
 "#]]);
 });
 
-// checks missing dependencies are auto installed
-forgetest_init!(can_install_missing_deps_test, |prj, cmd| {
-    prj.clear();
-
-    // wipe forge-std
-    let forge_std_dir = prj.root().join("lib/forge-std");
-    pretty_err(&forge_std_dir, fs::remove_dir_all(&forge_std_dir));
-
-    cmd.arg("test").assert_success().stdout_eq(str![[r#"
-Missing dependencies found. Installing now...
-
-[UPDATING_DEPENDENCIES]
-[COMPILING_FILES] with [SOLC_VERSION]
-[SOLC_VERSION] [ELAPSED]
-Compiler run successful!
-
-Ran 2 tests for test/Counter.t.sol:CounterTest
-[PASS] testFuzz_SetNumber(uint256) (runs: 256, [AVG_GAS])
-[PASS] test_Increment() ([GAS])
-Suite result: ok. 2 passed; 0 failed; 0 skipped; [ELAPSED]
-
-Ran 1 test suite [ELAPSED]: 2 tests passed, 0 failed, 0 skipped (2 total tests)
-
-"#]]);
-});
-
-// checks missing dependencies are auto installed
-forgetest_init!(can_install_missing_deps_build, |prj, cmd| {
-    prj.clear();
-
-    // wipe forge-std
-    let forge_std_dir = prj.root().join("lib/forge-std");
-    pretty_err(&forge_std_dir, fs::remove_dir_all(&forge_std_dir));
-
-    // Build the project
-    cmd.arg("build").assert_success().stdout_eq(str![[r#"
-Missing dependencies found. Installing now...
-
-[UPDATING_DEPENDENCIES]
-[COMPILING_FILES] with [SOLC_VERSION]
-[SOLC_VERSION] [ELAPSED]
-Compiler run successful!
-
-"#]]);
-
-    // Expect compilation to be skipped as no files have changed
-    cmd.forge_fuse().arg("build").assert_success().stdout_eq(str![[r#"
-No files changed, compilation skipped
-
-"#]]);
-});
-
 // checks that extra output works
 forgetest_init!(can_build_skip_contracts, |prj, cmd| {
     prj.clear();
@@ -3674,7 +3627,7 @@ forgetest_init!(can_inspect_standard_json, |prj, cmd| {
         ]
       }
     },
-    "evmVersion": "cancun",
+    "evmVersion": "prague",
     "viaIR": false,
     "libraries": {}
   }
@@ -3882,4 +3835,23 @@ Compiler run successful!
 Generating bindings for 1 contracts
 Bindings have been generated to [..]"#
     ]]);
+});
+
+// forge bind e2e
+forgetest_init!(can_bind_e2e, |prj, cmd| {
+    cmd.args(["bind"]).assert_success().stdout_eq(str![[r#"No files changed, compilation skipped
+Generating bindings for 2 contracts
+Bindings have been generated to [..]"#]]);
+
+    let bindings_path = prj.root().join("out/bindings");
+
+    assert!(bindings_path.exists(), "Bindings directory should exist");
+    let out = Command::new("cargo")
+        .arg("build")
+        .current_dir(&bindings_path)
+        .output()
+        .expect("Failed to run cargo build");
+    // RUn `cargo build`
+
+    assert!(out.status.success(), "Cargo build should succeed");
 });

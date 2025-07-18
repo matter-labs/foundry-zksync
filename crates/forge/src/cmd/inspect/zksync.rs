@@ -61,7 +61,9 @@ pub fn inspect(
                 .collect::<Vec<_>>();
 
             if possible_targets.is_empty() {
-                eyre::bail!("Could not find artifact linked to source `{target_path:?}` in the compiled artifacts");
+                eyre::bail!(
+                    "Could not find artifact linked to source `{target_path:?}` in the compiled artifacts"
+                );
             }
 
             let (target_id, target_artifact) = possible_targets[0].clone();
@@ -71,10 +73,12 @@ pub fn inspect(
                 // If all artifact_ids in `possible_targets` have the same name (without ".",
                 // indicates additional compiler profiles), it means that there are
                 // multiple contracts in the same file.
-                if !target_id.name.contains(".") &&
-                    possible_targets.iter().any(|(id, _)| id.name != target_id.name)
+                if !target_id.name.contains(".")
+                    && possible_targets.iter().any(|(id, _)| id.name != target_id.name)
                 {
-                    eyre::bail!("Multiple contracts found in the same file, please specify the target <path>:<contract> or <contract>");
+                    eyre::bail!(
+                        "Multiple contracts found in the same file, please specify the target <path>:<contract> or <contract>"
+                    );
                 }
 
                 // Otherwise, we're dealing with additional compiler profiles wherein `id.source` is

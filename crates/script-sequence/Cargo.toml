@@ -1,3 +1,4 @@
+cargo-features = ["edition2024"]
 [package]
 name = "forge-script-sequence"
 description = "Script sequence types"
@@ -17,7 +18,6 @@ workspace = true
 foundry-config.workspace = true
 foundry-common.workspace = true
 foundry-compilers = { workspace = true, features = ["full"] }
-foundry-zksync-core.workspace = true
 
 serde.workspace = true
 eyre.workspace = true

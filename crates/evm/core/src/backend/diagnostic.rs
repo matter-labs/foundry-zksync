@@ -41,7 +41,9 @@ impl RevertDiagnostic {
                 if *persistent {
                     format!("Contract {contract_label} does not exist")
                 } else {
-                    format!("Contract {contract_label} does not exist and is not marked as persistent, see `vm.makePersistent()`")
+                    format!(
+                        "Contract {contract_label} does not exist and is not marked as persistent, see `vm.makePersistent()`"
+                    )
                 }
             }
         }

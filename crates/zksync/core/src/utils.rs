@@ -49,13 +49,15 @@ pub const MAX_L2_GAS_LIMIT: u64 = ((u32::MAX >> 1) as u64) * 2;
 /// - Err: Contains an error message indicating that the RPC URL was not provided.
 pub fn get_rpc_url(rpc_url: &Option<String>) -> eyre::Result<String> {
     match rpc_url {
-            Some(url) => {
-                let rpc_url = get_url_with_port(url)
-                    .ok_or_else(|| eyre::Report::msg("Invalid RPC_URL"))?;
-                Ok(rpc_url)
-            },
-            None => Err(eyre::Report::msg("RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '")),
+        Some(url) => {
+            let rpc_url =
+                get_url_with_port(url).ok_or_else(|| eyre::Report::msg("Invalid RPC_URL"))?;
+            Ok(rpc_url)
         }
+        None => Err(eyre::Report::msg(
+            "RPC URL was not provided. Try using --rpc-url flag or environment variable 'ETH_RPC_URL= '",
+        )),
+    }
 }
 
 /// Parses a URL string and attaches a default port if one is not specified.

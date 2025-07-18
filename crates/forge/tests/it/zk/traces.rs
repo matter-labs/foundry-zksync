@@ -283,7 +283,7 @@ fn assert_execution_trace(
                         expected: "<entry>".to_string(),
                         actual: "<none>".to_string(),
                         path: vec![idx],
-                    })
+                    });
                 }
             };
             if let Some(kind) = expected_node.kind {

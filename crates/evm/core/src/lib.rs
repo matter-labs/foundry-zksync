@@ -17,9 +17,6 @@ use revm::{
 };
 use revm_inspectors::access_list::AccessListInspector;
 
-#[macro_use]
-extern crate tracing;
-
 pub mod abi {
     pub use foundry_cheatcodes_spec::Vm;
     pub use foundry_evm_abi::*;
@@ -35,7 +32,6 @@ pub mod either_evm;
 pub mod evm;
 pub mod fork;
 pub mod ic;
-pub mod opcodes;
 pub mod opts;
 pub mod precompiles;
 pub mod state_snapshot;

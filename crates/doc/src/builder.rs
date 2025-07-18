@@ -106,7 +106,7 @@ impl DocBuilder {
 
         if sources.is_empty() {
             sh_println!("No sources detected at {}", self.sources.display())?;
-            return Ok(())
+            return Ok(());
         }
 
         let library_sources = self
@@ -349,10 +349,19 @@ impl DocBuilder {
             .unwrap()
             .insert(String::from("title"), self.config.title.clone().into());
         if let Some(ref repo) = self.config.repository {
+            // Create the full repository URL.
+            let git_repo_url = if let Some(path) = &self.config.path {
+                // If path is specified, append it to the repository URL.
+                format!("{}/{}", repo.trim_end_matches('/'), path.trim_start_matches('/'))
+            } else {
+                // If no path specified, use repository URL as-is.
+                repo.clone()
+            };
+
             book["output"].as_table_mut().unwrap()["html"]
                 .as_table_mut()
                 .unwrap()
-                .insert(String::from("git-repository-url"), repo.clone().into());
+                .insert(String::from("git-repository-url"), git_repo_url.into());
         }
 
         // Attempt to find the user provided book path
@@ -385,7 +394,7 @@ impl DocBuilder {
         depth: usize,
     ) -> eyre::Result<()> {
         if files.is_empty() {
-            return Ok(())
+            return Ok(());
         }
 
         if let Some(path) = base_path {
@@ -450,12 +459,12 @@ impl DocBuilder {
                 self.write_summary_section(summary, &files, Some(&path), depth + 1)?;
             }
         }
-        if !readme.is_empty() {
-            if let Some(path) = base_path {
-                let path = self.out_dir().join(Self::SRC).join(path);
-                fs::create_dir_all(&path)?;
-                fs::write(path.join(Self::README), readme.finish())?;
-            }
+        if !readme.is_empty()
+            && let Some(path) = base_path
+        {
+            let path = self.out_dir().join(Self::SRC).join(path);
+            fs::create_dir_all(&path)?;
+            fs::write(path.join(Self::README), readme.finish())?;
         }
         Ok(())
     }
