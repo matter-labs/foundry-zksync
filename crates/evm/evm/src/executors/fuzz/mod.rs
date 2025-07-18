@@ -1,18 +1,18 @@
 use crate::executors::{Executor, FuzzTestTimer, RawCallResult};
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::Function;
-use alloy_primitives::{map::HashMap, Address, Bytes, Log, U256};
+use alloy_primitives::{Address, Bytes, Log, U256, map::HashMap};
 use eyre::Result;
 use foundry_common::evm::Breakpoints;
 use foundry_config::FuzzConfig;
 use foundry_evm_core::{
-    constants::{MAGIC_ASSUME, TEST_TIMEOUT},
+    constants::{CHEATCODE_ADDRESS, MAGIC_ASSUME, TEST_TIMEOUT},
     decode::{RevertDecoder, SkipReason},
 };
 use foundry_evm_coverage::HitMaps;
 use foundry_evm_fuzz::{
-    strategies::{fuzz_calldata, fuzz_calldata_from_state, EvmFuzzState},
     BaseCounterExample, CounterExample, FuzzCase, FuzzError, FuzzFixtures, FuzzTestResult,
+    strategies::{EvmFuzzState, fuzz_calldata, fuzz_calldata_from_state},
 };
 use foundry_evm_traces::SparsedTraceArena;
 use indicatif::ProgressBar;
@@ -92,7 +92,7 @@ impl FuzzedExecutor {
         let no_zksync_reserved_addresses = state.dictionary_read().no_zksync_reserved_addresses();
         let dictionary_weight = self.config.dictionary.dictionary_weight.min(100);
         let strategy = proptest::prop_oneof![
-            100 - dictionary_weight => fuzz_calldata(func.clone(), fuzz_fixtures, no_zksync_reserved_addresses),
+            100 - dictionary_weight => fuzz_calldata(func.clone(), fuzz_fixtures.clone(), no_zksync_reserved_addresses),
             dictionary_weight => fuzz_calldata_from_state(func.clone(), &state),
         ];
         // We want to collect at least one trace which will be displayed to user.
@@ -182,7 +182,7 @@ impl FuzzedExecutor {
             traces: last_run_traces,
             breakpoints: last_run_breakpoints,
             gas_report_traces: traces.into_iter().map(|a| a.arena).collect(),
-            coverage: fuzz_result.coverage,
+            line_coverage: fuzz_result.coverage,
             deprecated_cheatcodes: fuzz_result.deprecated_cheatcodes,
         };
 
@@ -220,11 +220,11 @@ impl FuzzedExecutor {
             }
         }
 
-        if let Some(reason) = &result.reason {
-            if let Some(reason) = SkipReason::decode_self(reason) {
-                result.skipped = true;
-                result.reason = reason.0;
-            }
+        if let Some(reason) = &result.reason
+            && let Some(reason) = SkipReason::decode_self(reason)
+        {
+            result.skipped = true;
+            result.reason = reason.0;
         }
 
         state.log_stats();
@@ -246,7 +246,7 @@ impl FuzzedExecutor {
 
         // Handle `vm.assume`.
         if call.result.as_ref() == MAGIC_ASSUME {
-            return Err(TestCaseError::reject(FuzzError::AssumeReject))
+            return Err(TestCaseError::reject(FuzzError::AssumeReject));
         }
 
         let (breakpoints, deprecated_cheatcodes) =
@@ -254,12 +254,23 @@ impl FuzzedExecutor {
                 (cheats.breakpoints.clone(), cheats.deprecated.clone())
             });
 
-        let success = self.executor.is_raw_call_mut_success(address, &mut call, false);
+        // Consider call success if test should not fail on reverts and reverter is not the
+        // cheatcode or test address.
+        let success = if !self.config.fail_on_revert
+            && call
+                .reverter
+                .is_some_and(|reverter| reverter != address && reverter != CHEATCODE_ADDRESS)
+        {
+            true
+        } else {
+            self.executor.is_raw_call_mut_success(address, &mut call, false)
+        };
+
         if success {
             Ok(FuzzOutcome::Case(CaseOutcome {
                 case: FuzzCase { calldata, gas: call.gas_used, stipend: call.stipend },
                 traces: call.traces,
-                coverage: call.coverage,
+                coverage: call.line_coverage,
                 breakpoints,
                 logs: call.logs,
                 deprecated_cheatcodes,

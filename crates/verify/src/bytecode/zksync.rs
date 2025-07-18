@@ -1,17 +1,17 @@
 use crate::{
+    VerifyBytecodeArgs,
     etherscan::EtherscanVerificationProvider,
     types::VerificationType,
     utils::{BytecodeType, JsonResult},
-    VerifyBytecodeArgs,
 };
 use alloy_primitives::Address;
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, BlockNumberOrTag};
 use eyre::{OptionExt, Result};
-use foundry_block_explorers::{errors::EtherscanError, Response, ResponseData};
+use foundry_block_explorers::{Response, ResponseData, errors::EtherscanError};
 use foundry_cli::utils::{self, LoadConfig};
 use foundry_common::{compile::ProjectCompiler, shell};
-use foundry_compilers::artifacts::{serde_helpers, EvmVersion};
+use foundry_compilers::artifacts::{EvmVersion, serde_helpers};
 use foundry_zksync_compilers::compilers::zksolc::settings::{
     BytecodeHash, Codegen, Optimizer, ZkSettings,
 };

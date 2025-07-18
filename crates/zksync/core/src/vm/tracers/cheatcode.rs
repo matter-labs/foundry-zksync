@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use alloy_primitives::{hex, map::HashMap, Address, Bytes, FixedBytes, U256 as rU256};
+use alloy_primitives::{Address, Bytes, FixedBytes, U256 as rU256, hex, map::HashMap};
 use foundry_cheatcodes_common::{
     expect::ExpectedCallTracker,
     mock::{MockCallDataContext, MockCallReturnData},
@@ -18,29 +18,27 @@ use zksync_multivm::{
     zk_evm_latest::{
         tracing::{AfterDecodingData, AfterExecutionData, BeforeExecutionData, VmLocalStateData},
         zkevm_opcode_defs::{
-            FarCallOpcode, FatPointer, Opcode, CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER,
+            CALL_IMPLICIT_CALLDATA_FAT_PTR_REGISTER, FarCallOpcode, FatPointer, Opcode,
         },
     },
 };
 use zksync_types::{
-    ethabi, get_code_key, get_nonce_key, StorageValue, BOOTLOADER_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS, H160, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
-    SYSTEM_CONTEXT_ADDRESS, U256,
+    BOOTLOADER_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, H160, H256, IMMUTABLE_SIMULATOR_STORAGE_ADDRESS,
+    SYSTEM_CONTEXT_ADDRESS, StorageValue, U256, ethabi, get_code_key, get_nonce_key,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
-    compute_create2_address, compute_create_address,
+    EMPTY_CODE, ZkPaymasterData, compute_create_address, compute_create2_address,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertU256},
     hash_bytecode,
-    state::{parse_full_nonce, FullNonce},
+    state::{FullNonce, parse_full_nonce},
     vm::{
+        HARDHAT_CONSOLE_ADDRESS, ZkEnv,
         farcall::{CallAction, CallDepth, CallExecutionStatus, FarCallHandler, TxExecutionStatus},
         storage_recorder::CallType,
         storage_view::StorageViewRecorder,
-        ZkEnv, HARDHAT_CONSOLE_ADDRESS,
     },
-    ZkPaymasterData, EMPTY_CODE,
 };
 
 /// Selector for retrieving account version.
@@ -199,9 +197,9 @@ impl CheatcodeTracer {
 
         let contract_code = storage.borrow_mut().read_value(&get_code_key(&target.to_h160()));
 
-        !ignored_known_addresses.contains(&target) &&
-            (contract_code == hash_bytecode(&EMPTY_CODE) ||
-                contract_code == StorageValue::zero())
+        !ignored_known_addresses.contains(&target)
+            && (contract_code == hash_bytecode(&EMPTY_CODE)
+                || contract_code == StorageValue::zero())
     }
 }
 
@@ -281,9 +279,9 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     let value = U256::from(current.context_u128_value);
                     let to = current.code_address;
 
-                    let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS &&
-                        (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) ||
-                            calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
+                    let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS
+                        && (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE)
+                            || calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
                     {
                         let mut params = ethabi::decode(
                             &[
@@ -353,8 +351,9 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                 // We skip recording the base call for `expectCall` cheatcode that initiated this
                 // transaction. The initial call is recorded in revm when it was
                 // made, and before being dispatched to zkEVM.
-                let is_base_call = current.code_address.to_address() == self.call_context.contract &&
-                    self.call_context
+                let is_base_call = current.code_address.to_address() == self.call_context.contract
+                    && self
+                        .call_context
                         .input
                         .as_ref()
                         .map(|input| input.0.as_ref() == calldata.as_slice())
@@ -398,8 +397,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     None => mocks
                         .iter_mut()
                         .find(|(mock, _)| {
-                            calldata.get(..mock.calldata.len()) == Some(&mock.calldata[..]) &&
-                                mock.value.is_none_or(|value| value == call_value)
+                            calldata.get(..mock.calldata.len()) == Some(&mock.calldata[..])
+                                && mock.value.is_none_or(|value| value == call_value)
                         })
                         .map(|(_, v)| v),
                 } {
@@ -445,8 +444,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.get_current_stack();
 
-            if current.code_address == CONTRACT_DEPLOYER_ADDRESS &&
-                calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
+            if current.code_address == CONTRACT_DEPLOYER_ADDRESS
+                && calldata.starts_with(&SELECTOR_ACCOUNT_VERSION)
             {
                 let address = H256::from_slice(&calldata[4..36]).to_h160().to_address();
                 if self.call_context.tx_caller == address {
@@ -464,8 +463,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
 
-            if current.msg_sender == BOOTLOADER_ADDRESS &&
-                calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION)
+            if current.msg_sender == BOOTLOADER_ADDRESS
+                && calldata.starts_with(&SELECTOR_EXECUTE_TRANSACTION)
             {
                 self.farcall_handler.set_action(
                     CallDepth::next(),
@@ -497,8 +496,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
 
-            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
-                calldata.starts_with(&SELECTOR_BASE_FEE)
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS
+                && calldata.starts_with(&SELECTOR_BASE_FEE)
             {
                 self.farcall_handler
                     .set_immediate_return(self.call_context.block_basefee.to_be_bytes_vec());
@@ -510,8 +509,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
             let current = state.vm_local_state.callstack.current;
 
-            if current.code_address == SYSTEM_CONTEXT_ADDRESS &&
-                calldata.starts_with(&SELECTOR_BLOCK_HASH)
+            if current.code_address == SYSTEM_CONTEXT_ADDRESS
+                && calldata.starts_with(&SELECTOR_BLOCK_HASH)
             {
                 let block_number = U256::from(&calldata[4..36]);
                 let block_hash = self
@@ -529,8 +528,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
             if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
                 let current = state.vm_local_state.callstack.current;
 
-                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS &&
-                    calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
+                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS
+                    && calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
                 {
                     let mut params = ethabi::decode(
                         &[

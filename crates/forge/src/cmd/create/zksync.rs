@@ -10,12 +10,12 @@ use super::{ContractDeploymentError, ContractFactory, CreateArgs, DeploymentTxFa
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::JsonAbi;
 use alloy_network::{Network, ReceiptResponse, TransactionBuilder};
-use alloy_primitives::{hex, Address, Bytes};
+use alloy_primitives::{Address, Bytes, hex};
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_signer::Signer;
 use alloy_zksync::{
     network::{
-        transaction_request::TransactionRequest, unsigned_tx::eip712::PaymasterParams, Zksync,
+        Zksync, transaction_request::TransactionRequest, unsigned_tx::eip712::PaymasterParams,
     },
     wallet::ZksyncWallet,
 };
@@ -25,10 +25,10 @@ use forge_verify::VerifyArgs;
 use foundry_cli::{
     opts::EtherscanOpts,
     utils,
-    utils::{read_constructor_args_file, remove_zk_contract, LoadConfig},
+    utils::{LoadConfig, read_constructor_args_file, remove_zk_contract},
 };
 use foundry_common::{compile::ProjectCompiler, shell};
-use foundry_compilers::{artifacts::BytecodeObject, utils::canonicalize, ArtifactId, Project};
+use foundry_compilers::{ArtifactId, Project, artifacts::BytecodeObject, utils::canonicalize};
 use foundry_zksync_compilers::compilers::artifact_output::zk::ZkContractArtifact;
 use foundry_zksync_core::convert::ConvertH160;
 use serde_json::json;
@@ -96,7 +96,10 @@ impl CreateArgs {
                     .into_iter()
                     .collect::<Vec<String>>()
                     .join("\n");
-                eyre::bail!("Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}", link_refs)
+                eyre::bail!(
+                    "Dynamic linking not supported in `create` command - deploy the following library contracts first, then provide the address to link at compile time\n{}",
+                    link_refs
+                )
             }
         };
 
@@ -357,6 +360,7 @@ impl CreateArgs {
             guess_constructor_args: false,
             compilation_profile: None, //TODO(zk): provide comp profile
             zksync: self.build.compiler.zk.enabled(),
+            language: None,
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await

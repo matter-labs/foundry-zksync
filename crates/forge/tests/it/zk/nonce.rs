@@ -1,8 +1,8 @@
 use crate::{
     config::TestConfig,
-    test_helpers::{run_zk_script_test, TEST_DATA_DEFAULT},
+    test_helpers::{TEST_DATA_DEFAULT, run_zk_script_test},
 };
-use foundry_test_utils::{forgetest_async, util, Filter, TestProject};
+use foundry_test_utils::{Filter, TestProject, forgetest_async, util};
 use revm::primitives::hardfork::SpecId;
 
 forgetest_async!(setup_block_on_script_test, |prj, cmd| {

@@ -11,14 +11,11 @@ use alloy_primitives::Address;
 use auto_impl::auto_impl;
 use backend::DatabaseExt;
 use revm::{
+    Inspector,
     inspector::NoOpInspector,
     interpreter::{CallInputs, CreateInputs},
-    Inspector,
 };
 use revm_inspectors::access_list::AccessListInspector;
-
-#[macro_use]
-extern crate tracing;
 
 pub mod abi {
     pub use foundry_cheatcodes_spec::Vm;
@@ -35,7 +32,6 @@ pub mod either_evm;
 pub mod evm;
 pub mod fork;
 pub mod ic;
-pub mod opcodes;
 pub mod opts;
 pub mod precompiles;
 pub mod state_snapshot;

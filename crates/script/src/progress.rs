@@ -1,8 +1,8 @@
-use crate::receipts::{check_tx_status, format_receipt, TxStatus};
+use crate::receipts::{TxStatus, check_tx_status, format_receipt};
 use alloy_chains::Chain;
 use alloy_primitives::{
-    map::{B256HashMap, HashMap},
     B256,
+    map::{B256HashMap, HashMap},
 };
 use eyre::Result;
 use forge_script_sequence::ScriptSequence;
@@ -12,6 +12,7 @@ use futures::StreamExt;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use parking_lot::RwLock;
 use std::{fmt::Write, sync::Arc, time::Duration};
+use tracing::{trace, warn};
 use yansi::Paint;
 
 /// State of [ProgressBar]s displayed for the given [ScriptSequence].
@@ -134,7 +135,7 @@ impl SequenceProgressState {
     }
 }
 
-/// Clonable wrapper around [SequenceProgressState].
+/// Cloneable wrapper around [SequenceProgressState].
 #[derive(Debug, Clone)]
 pub struct SequenceProgress {
     pub inner: Arc<RwLock<SequenceProgressState>>,

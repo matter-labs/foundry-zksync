@@ -1,15 +1,15 @@
 //! foundry-compilers trait implementations for zksolc
 use self::input::{ZkSolcInput, ZkSolcVersionedInput};
-use crate::artifacts::{contract::Contract, error::Error, CompilerOutput as ZkCompilerOutput};
+use crate::artifacts::{CompilerOutput as ZkCompilerOutput, contract::Contract, error::Error};
 use alloy_json_abi::JsonAbi;
 use foundry_compilers::{
+    CompilationError, Compiler, CompilerContract, CompilerOutput, CompilerVersion,
     error::{Result, SolcError},
     resolver::parse::SolData,
     solc::SolcCompiler,
-    CompilationError, Compiler, CompilerContract, CompilerOutput, CompilerVersion,
 };
 use foundry_compilers_artifacts_solc::{
-    error::SourceLocation, BytecodeObject, Severity, SolcLanguage,
+    BytecodeObject, Severity, SolcLanguage, error::SourceLocation,
 };
 
 use itertools::Itertools;
@@ -23,7 +23,7 @@ use std::{
 };
 
 use std::{
-    fs::{self, create_dir_all, set_permissions, File},
+    fs::{self, File, create_dir_all, set_permissions},
     io::Write,
 };
 use tracing::{debug, instrument, trace};
@@ -67,18 +67,10 @@ impl CompilerContract for Contract {
         self.abi.as_ref()
     }
     fn bin_ref(&self) -> Option<&BytecodeObject> {
-        if let Some(ref eravm) = self.eravm {
-            eravm.bytecode_ref()
-        } else {
-            None
-        }
+        if let Some(ref eravm) = self.eravm { eravm.bytecode_ref() } else { None }
     }
     fn bin_runtime_ref(&self) -> Option<&BytecodeObject> {
-        if let Some(ref eravm) = self.eravm {
-            eravm.bytecode_ref()
-        } else {
-            None
-        }
+        if let Some(ref eravm) = self.eravm { eravm.bytecode_ref() } else { None }
     }
 }
 
@@ -621,11 +613,7 @@ fn map_io_err(zksolc_path: &Path) -> impl FnOnce(std::io::Error) -> SolcError + 
 }
 
 fn compile_output(output: Output) -> Result<Vec<u8>> {
-    if output.status.success() {
-        Ok(output.stdout)
-    } else {
-        Err(SolcError::solc_output(&output))
-    }
+    if output.status.success() { Ok(output.stdout) } else { Err(SolcError::solc_output(&output)) }
 }
 
 fn version_from_output(output: Output) -> Result<Version> {

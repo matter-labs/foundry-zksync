@@ -1,17 +1,18 @@
 use crate::{
-    build::LinkedBuildData,
-    sequence::{get_commit_hash, ScriptSequenceKind},
     ScriptArgs, ScriptConfig,
+    build::LinkedBuildData,
+    sequence::{ScriptSequenceKind, get_commit_hash},
 };
-use alloy_primitives::{hex, Address};
-use eyre::{eyre, Result};
+use alloy_primitives::{Address, hex};
+use eyre::{Result, eyre};
 use forge_script_sequence::{AdditionalContract, ScriptSequence};
-use forge_verify::{provider::VerificationProviderType, RetryArgs, VerifierArgs, VerifyArgs};
+use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs, provider::VerificationProviderType};
 use foundry_cli::opts::{EtherscanOpts, ProjectPathOpts};
-use foundry_common::ContractsByArtifact;
-use foundry_compilers::{artifacts::EvmVersion, info::ContractInfo, Project};
-use foundry_config::{zksync::ZKSYNC_ARTIFACTS_DIR, Chain, Config};
+use foundry_common::{ContractsByArtifact, sh_err, sh_println, sh_warn};
+use foundry_compilers::{Project, artifacts::EvmVersion, info::ContractInfo};
+use foundry_config::{Chain, Config, zksync::ZKSYNC_ARTIFACTS_DIR};
 use semver::Version;
+use tracing::{trace, warn};
 
 /// State after we have broadcasted the script.
 /// It is assumed that at this point [BroadcastedState::sequence] contains receipts for all
@@ -166,6 +167,7 @@ impl VerifyBundle {
                     guess_constructor_args: false,
                     compilation_profile: Some(artifact.profile.to_string()),
                     zksync: self.zksync,
+                    language: None,
                 };
 
                 return Some(verify);
@@ -184,7 +186,9 @@ impl VerifyBundle {
         evm_version: EvmVersion,
     ) -> Option<VerifyArgs> {
         if data.len() < 4 {
-            warn!("failed decoding verify input data, invalid data length, require minimum of 4 bytes");
+            warn!(
+                "failed decoding verify input data, invalid data length, require minimum of 4 bytes"
+            );
             return None;
         }
         let selector = hex::encode(&data[..4]);
@@ -258,6 +262,7 @@ impl VerifyBundle {
                     guess_constructor_args: false,
                     compilation_profile: None, //TODO(zk): get compilation profile
                     zksync: self.zksync,
+                    language: None,
                 };
 
                 return Some(verify);
@@ -358,7 +363,9 @@ async fn verify_contracts(
         }
 
         if num_of_successful_verifications < num_verifications {
-            return Err(eyre!("Not all ({num_of_successful_verifications} / {num_verifications}) contracts were verified!"));
+            return Err(eyre!(
+                "Not all ({num_of_successful_verifications} / {num_verifications}) contracts were verified!"
+            ));
         }
 
         sh_println!("All ({num_verifications}) contracts were verified!")?;

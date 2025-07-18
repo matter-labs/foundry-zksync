@@ -67,9 +67,9 @@ pub(super) fn get_artifact_code(
                         }
                     }
                     if let Some(ref version) = version {
-                        if id.version.minor != version.minor ||
-                            id.version.major != version.major ||
-                            id.version.patch != version.patch
+                        if id.version.minor != version.minor
+                            || id.version.major != version.major
+                            || id.version.patch != version.patch
                         {
                             return false;
                         }

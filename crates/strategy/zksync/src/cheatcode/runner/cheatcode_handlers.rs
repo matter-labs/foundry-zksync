@@ -7,16 +7,17 @@ use alloy_sol_types::SolValue;
 use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
 use eyre::Context;
 use foundry_cheatcodes::{
-    make_acc_non_empty, BroadcastableTransaction, CheatcodesExecutor, CheatsCtxt, DealRecord,
-    DynCheatcode, Error, Result,
+    BroadcastableTransaction, CheatcodesExecutor, CheatsCtxt, DealRecord, DynCheatcode, Error,
+    Result,
     Vm::{
         broadcastRawTransactionCall, createFork_0Call, createFork_1Call, createFork_2Call,
         createSelectFork_0Call, createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall,
-        getCodeCall, getNonce_0Call, mockCallRevert_0Call, mockCall_0Call, resetNonceCall,
+        getCodeCall, getNonce_0Call, mockCall_0Call, mockCallRevert_0Call, resetNonceCall,
         rollCall, selectForkCall, setNonceCall, setNonceUnsafeCall, warpCall,
         zkGetDeploymentNonceCall, zkGetTransactionNonceCall, zkRegisterContractCall,
         zkUseFactoryDepCall, zkUsePaymasterCall, zkVmCall, zkVmSkipCall,
     },
+    make_acc_non_empty,
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_compilers::info::ContractInfo;
@@ -24,8 +25,8 @@ use foundry_evm::backend::LocalForkId;
 use foundry_evm_core::ContextExt;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{
-    PaymasterParams, ZkPaymasterData, ZkTransactionMetadata, H256,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+    H256, PaymasterParams, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkPaymasterData,
+    ZkTransactionMetadata,
 };
 use revm::interpreter::InstructionResult;
 use tracing::{info, warn};
@@ -33,8 +34,8 @@ use tracing::{info, warn};
 use crate::{
     backend::ZksyncInspectContext,
     cheatcode::{
-        runner::{get_context, utils::get_artifact_code, WithOtherFields},
         ZksyncCheatcodeInspectorStrategyRunner,
+        runner::{WithOtherFields, get_context, utils::get_artifact_code},
     },
 };
 
@@ -238,8 +239,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 if let Some((existing, _)) =
                     ctx.dual_compiled_contracts.iter().find(|(_, contract)| {
-                        contract.evm_bytecode_hash == new_contract.evm_bytecode_hash &&
-                            contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
+                        contract.evm_bytecode_hash == new_contract.evm_bytecode_hash
+                            && contract.zk_bytecode_hash == new_contract.zk_bytecode_hash
                     })
                 {
                     warn!(
@@ -379,7 +380,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     Some(meta) => (
                         meta.factory_deps.into_iter().map(|b| b.to_vec()).collect::<Vec<_>>(),
                         meta.paymaster_params.map(|params| PaymasterParams {
-                            paymaster: zksync_types::H160::from(params.paymaster.0 .0),
+                            paymaster: zksync_types::H160::from(params.paymaster.0.0),
                             paymaster_input: params.paymaster_input.to_vec(),
                         }),
                     ),

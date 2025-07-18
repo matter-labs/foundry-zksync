@@ -3,12 +3,12 @@
 pub mod runtime_transport;
 
 use crate::{
-    provider::runtime_transport::RuntimeTransportBuilder, ALCHEMY_FREE_TIER_CUPS, REQUEST_TIMEOUT,
+    ALCHEMY_FREE_TIER_CUPS, REQUEST_TIMEOUT, provider::runtime_transport::RuntimeTransportBuilder,
 };
 use alloy_provider::{
+    Identity, ProviderBuilder as AlloyProviderBuilder, RootProvider,
     fillers::{ChainIdFiller, FillProvider, GasFiller, JoinFill, NonceFiller, WalletFiller},
     network::{AnyNetwork, EthereumWallet},
-    Identity, ProviderBuilder as AlloyProviderBuilder, RootProvider,
 };
 use alloy_rpc_client::ClientBuilder;
 use alloy_transport::{layers::RetryBackoffLayer, utils::guess_local_url};
@@ -103,6 +103,8 @@ pub struct ProviderBuilder {
     jwt: Option<String>,
     headers: Vec<String>,
     is_local: bool,
+    /// Whether to accept invalid certificates.
+    accept_invalid_certs: bool,
 }
 
 impl ProviderBuilder {
@@ -152,6 +154,7 @@ impl ProviderBuilder {
             jwt: None,
             headers: vec![],
             is_local,
+            accept_invalid_certs: false,
         }
     }
 
@@ -249,6 +252,12 @@ impl ProviderBuilder {
         self
     }
 
+    /// Sets whether to accept invalid certificates.
+    pub fn accept_invalid_certs(mut self, accept_invalid_certs: bool) -> Self {
+        self.accept_invalid_certs = accept_invalid_certs;
+        self
+    }
+
     /// Constructs the `RetryProvider` taking all configs into account.
     pub fn build(self) -> Result<RetryProvider> {
         let Self {
@@ -261,6 +270,7 @@ impl ProviderBuilder {
             jwt,
             headers,
             is_local,
+            accept_invalid_certs,
         } = self;
         let url = url?;
 
@@ -271,6 +281,7 @@ impl ProviderBuilder {
             .with_timeout(timeout)
             .with_headers(headers)
             .with_jwt(jwt)
+            .accept_invalid_certs(accept_invalid_certs)
             .build();
         let client = ClientBuilder::default().layer(retry_layer).transport(transport, is_local);
 
@@ -304,6 +315,7 @@ impl ProviderBuilder {
             jwt,
             headers,
             is_local,
+            accept_invalid_certs: _,
         } = self;
         let url = url?;
 
@@ -344,6 +356,7 @@ impl ProviderBuilder {
             jwt,
             headers,
             is_local,
+            accept_invalid_certs,
         } = self;
         let url = url?;
 
@@ -354,6 +367,7 @@ impl ProviderBuilder {
             .with_timeout(timeout)
             .with_headers(headers)
             .with_jwt(jwt)
+            .accept_invalid_certs(accept_invalid_certs)
             .build();
 
         let client = ClientBuilder::default().layer(retry_layer).transport(transport, is_local);

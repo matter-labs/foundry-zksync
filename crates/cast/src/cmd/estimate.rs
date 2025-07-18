@@ -1,6 +1,6 @@
 use crate::{
-    tx::{CastTxBuilder, SenderKind},
     ZkTransactionOpts,
+    tx::{CastTxBuilder, SenderKind},
 };
 use alloy_ens::NameOrAddress;
 use alloy_primitives::U256;
@@ -10,7 +10,7 @@ use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{EthereumOpts, TransactionOpts},
-    utils::{self, parse_ether_value, LoadConfig},
+    utils::{self, LoadConfig, parse_ether_value},
 };
 use std::str::FromStr;
 
@@ -34,6 +34,12 @@ pub struct EstimateArgs {
     /// Can also be the tags earliest, finalized, safe, latest, or pending.
     #[arg(long, short = 'B')]
     block: Option<BlockId>,
+
+    /// Calculate the cost of a transaction using the network gas price.
+    ///
+    /// If not specified the amount of gas will be estimated.
+    #[arg(long)]
+    cost: bool,
 
     #[command(subcommand)]
     command: Option<EstimateSubcommands>,
@@ -79,7 +85,8 @@ pub enum EstimateSubcommands {
 
 impl EstimateArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, mut tx, block, eth, command, zk_tx, zk_force } = self;
+        let Self { to, mut sig, mut args, mut tx, block, cost, eth, command, zk_tx, zk_force } =
+            self;
 
         let config = eth.load_config()?;
         let provider = utils::get_provider(&config)?;
@@ -119,8 +126,15 @@ impl EstimateArgs {
         } else {
             provider.estimate_gas(tx).block(block.unwrap_or_default()).await?
         };
+        if cost {
+            let gas_price_wei = provider.get_gas_price().await?;
+            let cost = gas_price_wei * gas as u128;
+            let cost_eth = cost as f64 / 1e18;
+            sh_println!("{cost_eth}")?;
+        } else {
+            sh_println!("{gas}")?;
+        }
 
-        sh_println!("{gas}")?;
         Ok(())
     }
 }
