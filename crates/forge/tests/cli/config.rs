@@ -1138,6 +1138,7 @@ corpus_min_size = 0
 failure_persist_dir = "cache/invariant"
 show_metrics = true
 show_solidity = false
+show_edge_coverage = false
 no_zksync_reserved_addresses = false
 
 [labels]
@@ -1254,6 +1255,7 @@ exclude = []
     "show_metrics": true,
     "timeout": null,
     "show_solidity": false,
+    "show_edge_coverage": false,
     "no_zksync_reserved_addresses": false
   },
   "ffi": false,
