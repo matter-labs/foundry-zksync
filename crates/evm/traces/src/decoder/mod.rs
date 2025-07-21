@@ -14,6 +14,7 @@ use foundry_common::{
     ContractsByArtifact, SELECTOR_LEN, abi::get_indexed_event, fmt::format_token,
     get_contract_name, selectors::SelectorKind,
 };
+use foundry_config::zksync::ZKSYNC_ARTIFACTS_DIR;
 use foundry_evm_core::{
     abi::console,
     constants::{
@@ -154,6 +155,9 @@ pub struct CallTraceDecoder {
 
     /// Disable showing of labels.
     pub disable_labels: bool,
+
+    /// Addresses that are contracts on the ZkVm
+    pub zk_contracts: HashSet<Address>,
 }
 
 impl CallTraceDecoder {
@@ -211,6 +215,8 @@ impl CallTraceDecoder {
             debug_identifier: None,
 
             disable_labels: false,
+
+            zk_contracts: Default::default(),
         }
     }
 
@@ -288,7 +294,7 @@ impl CallTraceDecoder {
         }
 
         trace!(target: "evm::traces", len=addrs.len(), "collecting address identities");
-        for IdentifiedAddress { address, label, contract, abi, artifact_id: _ } in addrs {
+        for IdentifiedAddress { address, label, contract, abi, artifact_id } in addrs {
             let _span = trace_span!(target: "evm::traces", "identity", ?contract, ?label).entered();
 
             if let Some(contract) = contract {
@@ -301,6 +307,12 @@ impl CallTraceDecoder {
 
             if let Some(abi) = abi {
                 self.collect_abi(&abi, Some(address));
+            }
+
+            if let Some(artifact_id) = artifact_id {
+                if artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR) {
+                    self.zk_contracts.insert(address);
+                }
             }
         }
     }

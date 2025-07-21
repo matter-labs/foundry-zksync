@@ -301,9 +301,9 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         ecx_inner: Ecx<'_, '_, '_>,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: &mut Vec<SignedAuthorization>,
-        active_blob_sidecar: &mut Option<BlobTransactionSidecar>,
-    ) -> Option<CallOutcome> {
+        active_delegations: Vec<SignedAuthorization>,
+        active_blob_sidecar: Option<BlobTransactionSidecar>,
+    ) {
         let ctx_zk = get_context(ctx);
 
         if !ctx_zk.using_zk_vm {
@@ -314,7 +314,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 ecx_inner,
                 broadcast,
                 broadcastable_transactions,
-                active_delegation,
+                active_delegations,
                 active_blob_sidecar,
             );
         }
@@ -362,7 +362,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         };
         let zk_tx = ZkTransactionMetadata::new(factory_deps, paymaster_params);
 
-        let tx_req = TransactionRequest {
+        let mut tx_req = TransactionRequest {
             from: Some(broadcast.new_origin),
             to: Some(TxKind::from(Some(call.target_address))),
             value: call.transfer_value(),
@@ -373,32 +373,23 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             ..Default::default()
         };
 
-        // TODO(zk): 4844 and 7702 are not supported in ZKsync.
-        let active_delegation = std::mem::take(active_delegation);
-        if active_blob_sidecar.take().is_some() {
-            // 4844 transactions are not supported in ZKsync right now.
-            let msg = "ZKsync does not support 4844 blobs";
-            return Some(CallOutcome {
-                result: InterpreterResult {
-                    result: InstructionResult::Revert,
-                    output: foundry_cheatcodes::Error::encode(msg),
-                    gas: Gas::new(call.gas_limit),
-                },
-                memory_offset: call.return_memory_offset.clone(),
-            });
-        }
-
-        if !active_delegation.is_empty() {
-            // 7702 transactions are not supported in ZKsync right now.
-            let msg = "ZKsync does not support 7702 delegations";
-            return Some(CallOutcome {
-                result: InterpreterResult {
-                    result: InstructionResult::Revert,
-                    output: foundry_cheatcodes::Error::encode(msg),
-                    gas: Gas::new(call.gas_limit),
-                },
-                memory_offset: call.return_memory_offset.clone(),
-            });
+        match (!active_delegations.is_empty(), active_blob_sidecar) {
+            (true, Some(_)) => {
+                // Note(zk): We can't return a call outcome from here
+                return;
+            }
+            (true, None) => {
+                tx_req.authorization_list = Some(active_delegations);
+                tx_req.sidecar = None;
+            }
+            (false, Some(blob_sidecar)) => {
+                tx_req.sidecar = Some(blob_sidecar);
+                tx_req.authorization_list = None;
+            }
+            (false, None) => {
+                tx_req.sidecar = None;
+                tx_req.authorization_list = None;
+            }
         }
         let mut tx = WithOtherFields::new(tx_req);
 
@@ -412,8 +403,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             transaction: TransactionMaybeSigned::Unsigned(tx),
         });
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
-
-        None
     }
 
     fn post_initialize_interp(
@@ -663,15 +652,15 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(foundry_evm::decode::decode_console_log).for_each(
                     |decoded_log| {
-                        executor.console_log(
-                            &mut CheatsCtxt {
-                                state,
-                                ecx,
-                                gas_limit: input.gas_limit(),
-                                caller: input.caller(),
-                            },
-                            &decoded_log,
-                        );
+                    executor.console_log(
+                        &mut CheatsCtxt {
+                            state,
+                            ecx,
+                            gas_limit: input.gas_limit(),
+                            caller: input.caller(),
+                        },
+                        &decoded_log,
+                    );
                     },
                 );
 
@@ -844,15 +833,15 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(foundry_evm::decode::decode_console_log).for_each(
                     |decoded_log| {
-                        executor.console_log(
-                            &mut CheatsCtxt {
-                                state,
-                                ecx,
-                                gas_limit: call.gas_limit,
-                                caller: call.caller,
-                            },
-                            &decoded_log,
-                        );
+                    executor.console_log(
+                        &mut CheatsCtxt {
+                            state,
+                            ecx,
+                            gas_limit: call.gas_limit,
+                            caller: call.caller,
+                        },
+                        &decoded_log,
+                    );
                     },
                 );
 
