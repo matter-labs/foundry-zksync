@@ -79,7 +79,7 @@ docker-build-prepare: ## Prepare the Docker build environment.
 
 .PHONY: test-unit
 test-unit: ## Run unit tests.
-	cargo nextest run -E 'kind(test) & !test(/\b(issue|ext_integration)/)'
+	cargo nextest run --no-fail-fast -E 'kind(test) & !test(/\b(issue|ext_integration)/)'
 
 .PHONY: test-doc
 test-doc: ## Run doc tests.
