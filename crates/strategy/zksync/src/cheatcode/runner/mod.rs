@@ -652,15 +652,15 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(foundry_evm::decode::decode_console_log).for_each(
                     |decoded_log| {
-                    executor.console_log(
-                        &mut CheatsCtxt {
-                            state,
-                            ecx,
-                            gas_limit: input.gas_limit(),
-                            caller: input.caller(),
-                        },
-                        &decoded_log,
-                    );
+                        executor.console_log(
+                            &mut CheatsCtxt {
+                                state,
+                                ecx,
+                                gas_limit: input.gas_limit(),
+                                caller: input.caller(),
+                            },
+                            &decoded_log,
+                        );
                     },
                 );
 
@@ -833,15 +833,15 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(foundry_evm::decode::decode_console_log).for_each(
                     |decoded_log| {
-                    executor.console_log(
-                        &mut CheatsCtxt {
-                            state,
-                            ecx,
-                            gas_limit: call.gas_limit,
-                            caller: call.caller,
-                        },
-                        &decoded_log,
-                    );
+                        executor.console_log(
+                            &mut CheatsCtxt {
+                                state,
+                                ecx,
+                                gas_limit: call.gas_limit,
+                                caller: call.caller,
+                            },
+                            &decoded_log,
+                        );
                     },
                 );
 
