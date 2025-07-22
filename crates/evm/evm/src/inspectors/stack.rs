@@ -990,11 +990,26 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
             self.top_level_frame_start(ecx);
         }
 
+        // NOTE(zk): This change is needed for supporting create is called with the current
+        // inspector. A similar change is already present on upstream for call, but not for
+        // create (probably as it's not required). We need this so the correct executor is
+        // passed in during create so we can record the logs. See: https://github.com/matter-labs/foundry-zksync/pull/558
         call_inspectors!(
             #[ret]
-            [&mut self.tracer, &mut self.line_coverage, &mut self.cheatcodes],
+            [&mut self.tracer, &mut self.line_coverage],
             |inspector| inspector.create(ecx, create).map(Some),
         );
+
+        ecx.journaled_state.depth += self.in_inner_context as usize;
+        if let Some(cheatcodes) = self.cheatcodes.as_deref_mut() {
+            if let Some(output) = cheatcodes.create_with_executor(ecx, create, self.inner) {
+                if output.result.result != InstructionResult::Continue {
+                    ecx.journaled_state.depth -= self.in_inner_context as usize;
+                    return Some(output);
+                }
+            }
+        }
+        ecx.journaled_state.depth -= self.in_inner_context as usize;
 
         if !matches!(create.scheme, CreateScheme::Create2 { .. })
             && self.enable_isolation
