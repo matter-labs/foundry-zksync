@@ -47,7 +47,7 @@ impl<'a> LocalTraceIdentifier<'a> {
         runtime_code: &[u8],
         creation_code: &[u8],
     ) -> Option<(&'a ArtifactId, &'a JsonAbi)> {
-        let len = creation_code.len();
+        let len = runtime_code.len();
 
         let mut min_score = f64::MAX;
         let mut min_score_id = None;
