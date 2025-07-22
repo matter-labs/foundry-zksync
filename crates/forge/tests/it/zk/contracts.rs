@@ -3,8 +3,8 @@
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
 use foundry_config::fs_permissions::PathPermission;
 use foundry_test_utils::{
-    util::{self, OutputExt},
     Filter,
+    util::{self, OutputExt},
 };
 use revm::primitives::hardfork::SpecId;
 
@@ -23,8 +23,11 @@ async fn test_zk_contract_can_call_function() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_persisted_contracts_after_fork() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
-    let filter =
-        Filter::new("testZkContractsPersistedDeployedContractNoArgs|testZkContractsPersistedDeployedContractArgs", "ZkContractsTest", ".*");
+    let filter = Filter::new(
+        "testZkContractsPersistedDeployedContractNoArgs|testZkContractsPersistedDeployedContractArgs",
+        "ZkContractsTest",
+        ".*",
+    );
 
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }
@@ -32,7 +35,11 @@ async fn test_zk_contract_persisted_contracts_after_fork() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_contract_deployment() {
     let runner = TEST_DATA_DEFAULT.runner_zksync();
-    let filter = Filter::new("testZkContractsInlineDeployedContractNoArgs|testZkContractsInlineDeployedContractComplexArgs", "ZkContractsTest", ".*");
+    let filter = Filter::new(
+        "testZkContractsInlineDeployedContractNoArgs|testZkContractsInlineDeployedContractComplexArgs",
+        "ZkContractsTest",
+        ".*",
+    );
 
     TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).run().await;
 }

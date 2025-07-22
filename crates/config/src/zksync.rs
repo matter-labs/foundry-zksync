@@ -1,21 +1,20 @@
 use foundry_compilers::{
+    Project, ProjectBuilder, ProjectPathsConfig,
     artifacts::{EvmVersion, Libraries, Severity},
     error::SolcError,
     solc::{CliSettings, Solc, SolcCompiler, SolcLanguage},
-    Project, ProjectBuilder, ProjectPathsConfig,
 };
 use foundry_zksync_compilers::{
     artifacts::output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
-            get_solc_version_info,
+            ErrorType, WarningType, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
+            ZkSettings, ZkSolc, ZkSolcCompiler, get_solc_version_info,
             settings::{
                 BytecodeHash, Codegen, Optimizer, OptimizerDetails, SettingsMetadata,
                 ZkSolcSettings,
             },
-            ErrorType, WarningType, ZkSettings, ZkSolc, ZkSolcCompiler,
-            ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
         },
     },
 };
@@ -287,7 +286,10 @@ fn config_solc_compiler(config: &Config) -> Result<SolcCompiler, SolcError> {
             }
             SolcReq::Local(path) => {
                 if !path.is_file() {
-                    return Err(SolcError::msg(format!("`solc` {} does not exist", path.display())));
+                    return Err(SolcError::msg(format!(
+                        "`solc` {} does not exist",
+                        path.display()
+                    )));
                 }
                 let version = get_solc_version_info(path)?.version;
                 Solc::new_with_version(

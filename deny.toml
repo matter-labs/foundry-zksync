@@ -94,7 +94,7 @@ exceptions = [
     { allow = ["CDLA-Permissive-2.0"], name = "webpki-root-certs" },
     { allow = ["CDLA-Permissive-2.0"], name = "webpki-roots" },
 ]
-#copyleft = "deny"
+# copyleft = "deny"
 
 # See note in unicode-ident's readme!
 [[licenses.clarify]]
@@ -122,6 +122,7 @@ unknown-git = "deny"
 allow-git = [
     "https://github.com/foundry-rs/foundry",
     "https://github.com/alloy-rs/alloy",
+    "https://github.com/foundry-rs/compilers",
     "https://github.com/foundry-rs/foundry-fork-db",
     "https://github.com/nbaztec/zksync-telemetry",
     "https://github.com/nbaztec/anvil-zksync",

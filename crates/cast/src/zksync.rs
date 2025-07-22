@@ -4,18 +4,18 @@ use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::FunctionExt;
 use alloy_json_abi::Function;
 use alloy_network::{AnyNetwork, NetworkWallet, TransactionBuilder};
-use alloy_primitives::{hex, Address, Bytes, Signature, TxKind, U256};
+use alloy_primitives::{Address, Bytes, Signature, TxKind, U256, hex};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolCall;
 use alloy_zksync::network::{
+    Zksync,
     transaction_request::TransactionRequest as ZkTransactionRequest,
     tx_envelope::TxEnvelope,
-    unsigned_tx::{eip712::PaymasterParams, TypedTransaction},
-    Zksync,
+    unsigned_tx::{TypedTransaction, eip712::PaymasterParams},
 };
-use clap::{command, Parser};
+use clap::{Parser, command};
 use eyre::{Context, Result};
 use foundry_cli::utils;
 use foundry_common::{
@@ -56,10 +56,10 @@ fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
 
 impl ZkTransactionOpts {
     pub fn has_zksync_args(&self) -> bool {
-        self.paymaster_address.is_some() ||
-            self.custom_signature.is_some() ||
-            !self.factory_deps.is_empty() ||
-            self.gas_per_pubdata.is_some()
+        self.paymaster_address.is_some()
+            || self.custom_signature.is_some()
+            || !self.factory_deps.is_empty()
+            || self.gas_per_pubdata.is_some()
     }
 
     /// Builds a base ZkSync transaction request from the common parameters
@@ -131,7 +131,7 @@ where
     /// # Example
     ///
     /// ```
-    /// use alloy_provider::{network::AnyNetwork, ProviderBuilder, RootProvider};
+    /// use alloy_provider::{ProviderBuilder, RootProvider, network::AnyNetwork};
     /// use cast::Cast;
     ///
     /// # async fn foo() -> eyre::Result<()> {
@@ -231,12 +231,14 @@ impl NetworkWallet<Zksync> for NoopWallet {
         tx: TypedTransaction,
     ) -> alloy_signer::Result<TxEnvelope> {
         match tx {
-            TypedTransaction::Native(_) => {
-                Err(alloy_signer::Error::other("NoopWallet should only be used for zksync eip712 transactions with custom signature"))
-            }
+            TypedTransaction::Native(_) => Err(alloy_signer::Error::other(
+                "NoopWallet should only be used for zksync eip712 transactions with custom signature",
+            )),
             TypedTransaction::Eip712(t) => {
                 if t.eip712_meta.as_ref().map(|m| m.custom_signature.as_ref()).is_none() {
-                    Err(alloy_signer::Error::other("NoopWallet should only be used for zksync eip712 transactions with custom signature"))
+                    Err(alloy_signer::Error::other(
+                        "NoopWallet should only be used for zksync eip712 transactions with custom signature",
+                    ))
                 } else {
                     let sig = Signature::try_from([0_u8; 65].as_slice()).unwrap();
                     Ok(TxEnvelope::Eip712(t.into_signed(sig)))

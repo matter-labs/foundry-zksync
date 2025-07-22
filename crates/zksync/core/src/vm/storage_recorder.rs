@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, Bytes, U256};
-use zksync_types::{StorageKey, H256};
+use zksync_types::{H256, StorageKey};
 
 use crate::{convert::ConvertH160, is_system_address};
 
@@ -211,9 +211,9 @@ impl AccountAccesses {
             }
             AccountAccessKind::Call => {
                 if let Some((depth, call_addr)) = self.skip_next_call.take() {
-                    if depth == new_depth &&
-                        call_addr.accessor == accessor &&
-                        call_addr.account == account
+                    if depth == new_depth
+                        && call_addr.accessor == accessor
+                        && call_addr.account == account
                     {
                         self.call_skip_tracker.push(true);
                         return;

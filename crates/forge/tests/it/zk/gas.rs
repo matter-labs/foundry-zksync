@@ -1,6 +1,6 @@
-use foundry_test_utils::{forgetest_async, util, TestProject};
+use foundry_test_utils::{TestProject, forgetest_async, util};
 
-use foundry_test_utils::{util::OutputExt, ZkSyncNode};
+use foundry_test_utils::{ZkSyncNode, util::OutputExt};
 
 forgetest_async!(zk_script_execution_with_gas_price_specified_by_user, |prj, cmd| {
     // Setup

@@ -2,8 +2,8 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use alloy_primitives::{Address, U256};
 use zksync_types::{
-    utils::storage_key_for_eth_balance, StorageKey, StorageValue, ACCOUNT_CODE_STORAGE_ADDRESS,
-    H160, H256,
+    ACCOUNT_CODE_STORAGE_ADDRESS, H160, H256, StorageKey, StorageValue,
+    utils::storage_key_for_eth_balance,
 };
 use zksync_vm_interface::storage::{ReadStorage, WriteStorage};
 
@@ -95,7 +95,7 @@ impl<S: ReadStorage + fmt::Debug> ReadStorage for StorageView<S> {
                 "override read value",
             );
 
-            return value
+            return value;
         }
 
         tracing::trace!(

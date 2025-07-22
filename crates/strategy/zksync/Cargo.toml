@@ -29,7 +29,6 @@ foundry-zksync-compilers.workspace = true
 
 alloy-primitives.workspace = true
 alloy-rpc-types.workspace = true
-alloy-network.workspace = true
 alloy-eips.workspace = true
 zksync_types.workspace = true
 

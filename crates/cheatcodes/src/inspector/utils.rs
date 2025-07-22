@@ -1,7 +1,7 @@
 use super::Ecx;
 use crate::inspector::Cheatcodes;
 use alloy_primitives::{Address, Bytes, U256};
-use revm::interpreter::{CreateInputs, CreateScheme, EOFCreateInputs, EOFCreateKind};
+use revm::interpreter::{CreateInputs, CreateScheme};
 
 /// Common behaviour of legacy and EOF create inputs.
 pub trait CommonCreateInput {
@@ -13,7 +13,6 @@ pub trait CommonCreateInput {
     fn set_caller(&mut self, caller: Address);
     fn log_debug(&self, cheatcode: &mut Cheatcodes, scheme: &CreateScheme);
     fn allow_cheatcodes(&self, cheatcodes: &mut Cheatcodes, ecx: Ecx) -> Address;
-    fn computed_created_address(&self) -> Option<Address>;
 }
 
 impl CommonCreateInput for &mut CreateInputs {
@@ -54,12 +53,9 @@ impl CommonCreateInput for &mut CreateInputs {
         cheatcodes.allow_cheatcodes_on_create(ecx, self.caller, created_address);
         created_address
     }
-    fn computed_created_address(&self) -> Option<Address> {
-        None
-    }
 }
 
-impl CommonCreateInput for &mut EOFCreateInputs {
+impl CommonCreateInput for &CreateInputs {
     fn caller(&self) -> Address {
         self.caller
     }
@@ -70,28 +66,32 @@ impl CommonCreateInput for &mut EOFCreateInputs {
         self.value
     }
     fn init_code(&self) -> Bytes {
-        match &self.kind {
-            EOFCreateKind::Tx { initdata } => initdata.clone(),
-            EOFCreateKind::Opcode { initcode, .. } => initcode.raw.clone(),
-        }
+        self.init_code.clone()
     }
     fn scheme(&self) -> Option<CreateScheme> {
-        None
+        Some(self.scheme)
     }
-    fn set_caller(&mut self, caller: Address) {
-        self.caller = caller;
+    fn set_caller(&mut self, _caller: Address) {
+        // Cannot mutate &CreateInputs
+        panic!("Cannot mutate &CreateInputs")
     }
-    fn log_debug(&self, cheatcode: &mut Cheatcodes, _scheme: &CreateScheme) {
-        debug!(target: "cheatcodes", tx=?cheatcode.broadcastable_transactions.back().unwrap(), "broadcastable eofcreate");
+    fn log_debug(&self, cheatcode: &mut Cheatcodes, scheme: &CreateScheme) {
+        let kind = match scheme {
+            CreateScheme::Create => "create",
+            CreateScheme::Create2 { .. } => "create2",
+            CreateScheme::Custom { .. } => "custom",
+        };
+        debug!(target: "cheatcodes", tx=?cheatcode.broadcastable_transactions.back().unwrap(), "broadcastable {kind}");
     }
     fn allow_cheatcodes(&self, cheatcodes: &mut Cheatcodes, ecx: Ecx) -> Address {
-        let created_address =
-            <&mut EOFCreateInputs as CommonCreateInput>::computed_created_address(self)
-                .unwrap_or_default();
+        let old_nonce = ecx
+            .journaled_state
+            .state
+            .get(&self.caller)
+            .map(|acc| acc.info.nonce)
+            .unwrap_or_default();
+        let created_address = self.created_address(old_nonce);
         cheatcodes.allow_cheatcodes_on_create(ecx, self.caller, created_address);
         created_address
-    }
-    fn computed_created_address(&self) -> Option<Address> {
-        self.kind.created_address().copied()
     }
 }
