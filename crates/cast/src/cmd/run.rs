@@ -18,7 +18,7 @@ use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{
     Config,
     figment::{
-        self, Figment, Metadata, Profile,
+        self, Metadata, Profile,
         value::{Dict, Map},
     },
 };
@@ -126,13 +126,18 @@ impl RunArgs {
     ///
     /// Note: This executes the transaction(s) as is: Cheatcodes are disabled
     pub async fn run(self) -> Result<()> {
-        let figment = Into::<Figment>::into(&self.rpc).merge(&self);
+        let figment = self.rpc.clone().into_figment(self.with_local_artifacts).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
         let mut config = Config::from_provider(figment)?.sanitized();
         config.zksync.compile = self.zk_force;
         config.no_storage_caching = self.no_storage_caching;
         let strategy = utils::get_executor_strategy(&config);
 
+        let label = self.label;
+        let with_local_artifacts = self.with_local_artifacts;
+        let debug = self.debug;
+        let decode_internal = self.decode_internal;
+        let disable_labels = self.disable_labels;
         let compute_units_per_second =
             if self.no_rate_limit { Some(u64::MAX) } else { self.compute_units_per_second };
 
@@ -374,11 +379,11 @@ impl RunArgs {
             &config,
             chain,
             &contracts_bytecode,
-            self.label,
-            self.with_local_artifacts,
-            self.debug,
-            self.decode_internal,
-            self.disable_labels,
+            label,
+            with_local_artifacts,
+            debug,
+            decode_internal,
+            disable_labels,
         )
         .await?;
 
