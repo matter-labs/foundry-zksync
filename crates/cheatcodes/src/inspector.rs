@@ -110,7 +110,7 @@ pub trait CheatcodesExecutor {
     }
 
     /// Returns a mutable reference to the tracing inspector if it is available.
-    fn tracing_inspector(&mut self) -> Option<&mut Option<TraceCollector>> {
+    fn tracing_inspector(&mut self) -> Option<&mut Option<Box<TraceCollector>>> {
         None
     }
 

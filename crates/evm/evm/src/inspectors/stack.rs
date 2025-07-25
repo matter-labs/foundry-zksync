@@ -263,7 +263,7 @@ pub struct InspectorData {
     pub traces: Option<SparsedTraceArena>,
     pub line_coverage: Option<HitMaps>,
     pub edge_coverage: Option<Vec<u8>>,
-    pub cheatcodes: Option<Cheatcodes>,
+    pub cheatcodes: Option<Box<Cheatcodes>>,
     pub chisel_state: Option<(Vec<U256>, Vec<u8>, Option<InstructionResult>)>,
     pub reverter: Option<Address>,
 }
@@ -291,7 +291,7 @@ pub struct InnerContextData {
 /// collection, etc.
 #[derive(Clone, Debug, Default)]
 pub struct InspectorStack {
-    pub cheatcodes: Option<Cheatcodes>,
+    pub cheatcodes: Option<Box<Cheatcodes>>,
     pub inner: InspectorStackInner,
 }
 
@@ -301,15 +301,17 @@ pub struct InspectorStack {
 #[derive(Default, Clone, Debug)]
 pub struct InspectorStackInner {
     // Inspectors.
-    pub chisel_state: Option<ChiselState>,
-    pub edge_coverage: Option<EdgeCovInspector>,
-    pub fuzzer: Option<Fuzzer>,
-    pub line_coverage: Option<LineCoverageCollector>,
-    pub log_collector: Option<LogCollector>,
-    pub printer: Option<CustomPrintTracer>,
-    pub revert_diag: Option<RevertDiagnostic>,
-    pub script_execution_inspector: Option<ScriptExecutionInspector>,
-    pub tracer: Option<TraceCollector>,
+    // These are boxed to reduce the size of the struct and slightly improve performance of the
+    // `if let Some` checks.
+    pub chisel_state: Option<Box<ChiselState>>,
+    pub edge_coverage: Option<Box<EdgeCovInspector>>,
+    pub fuzzer: Option<Box<Fuzzer>>,
+    pub line_coverage: Option<Box<LineCoverageCollector>>,
+    pub log_collector: Option<Box<LogCollector>>,
+    pub printer: Option<Box<CustomPrintTracer>>,
+    pub revert_diag: Option<Box<RevertDiagnostic>>,
+    pub script_execution_inspector: Option<Box<ScriptExecutionInspector>>,
+    pub tracer: Option<Box<TraceCollector>>,
 
     // InspectorExt and other internal data.
     pub enable_isolation: bool,
@@ -336,7 +338,7 @@ impl CheatcodesExecutor for InspectorStackInner {
         Box::new(InspectorStackRefMut { cheatcodes: Some(cheats), inner: self })
     }
 
-    fn tracing_inspector(&mut self) -> Option<&mut Option<TraceCollector>> {
+    fn tracing_inspector(&mut self) -> Option<&mut Option<Box<TraceCollector>>> {
         Some(&mut self.tracer)
     }
 }
@@ -399,19 +401,19 @@ impl InspectorStack {
     /// Set the cheatcodes inspector.
     #[inline]
     pub fn set_cheatcodes(&mut self, cheatcodes: Cheatcodes) {
-        self.cheatcodes = Some(cheatcodes);
+        self.cheatcodes = Some(cheatcodes.into());
     }
 
     /// Set the fuzzer inspector.
     #[inline]
     pub fn set_fuzzer(&mut self, fuzzer: Fuzzer) {
-        self.fuzzer = Some(fuzzer);
+        self.fuzzer = Some(fuzzer.into());
     }
 
     /// Set the Chisel inspector.
     #[inline]
     pub fn set_chisel(&mut self, final_pc: usize) {
-        self.chisel_state = Some(ChiselState::new(final_pc));
+        self.chisel_state = Some(ChiselState::new(final_pc).into());
     }
 
     /// Set whether to enable the line coverage collector.
@@ -423,7 +425,8 @@ impl InspectorStack {
     /// Set whether to enable the edge coverage collector.
     #[inline]
     pub fn collect_edge_coverage(&mut self, yes: bool) {
-        self.edge_coverage = yes.then(EdgeCovInspector::new); // TODO configurable edge size?
+        // TODO: configurable edge size?
+        self.edge_coverage = yes.then(EdgeCovInspector::new).map(Into::into);
     }
 
     /// Set whether to enable call isolation.
@@ -460,11 +463,7 @@ impl InspectorStack {
     /// Revert diagnostic inspector is activated when `mode != TraceMode::None`
     #[inline]
     pub fn tracing(&mut self, mode: TraceMode) {
-        if mode.is_none() {
-            self.revert_diag = None;
-        } else {
-            self.revert_diag = Some(RevertDiagnostic::default());
-        }
+        self.revert_diag = (!mode.is_none()).then(RevertDiagnostic::default).map(Into::into);
 
         if let Some(config) = mode.into_config() {
             *self.tracer.get_or_insert_with(Default::default).config_mut() = config;
@@ -481,7 +480,6 @@ impl InspectorStack {
     }
 
     /// Collects all the data gathered during inspection into a single struct.
-    #[inline]
     pub fn collect(self) -> InspectorData {
         let Self {
             mut cheatcodes,
@@ -532,7 +530,7 @@ impl InspectorStack {
 
     #[inline(always)]
     fn as_mut(&mut self) -> InspectorStackRefMut<'_> {
-        InspectorStackRefMut { cheatcodes: self.cheatcodes.as_mut(), inner: &mut self.inner }
+        InspectorStackRefMut { cheatcodes: self.cheatcodes.as_deref_mut(), inner: &mut self.inner }
     }
 }
 
@@ -741,17 +739,16 @@ impl InspectorStackRefMut<'_> {
     /// it.
     fn with_stack<O>(&mut self, f: impl FnOnce(&mut InspectorStack) -> O) -> O {
         let mut stack = InspectorStack {
-            cheatcodes: self
-                .cheatcodes
-                .as_deref_mut()
-                .map(|cheats| core::mem::replace(cheats, Cheatcodes::new(cheats.config.clone()))),
+            cheatcodes: self.cheatcodes.as_deref_mut().map(|cheats| {
+                core::mem::replace(cheats, Cheatcodes::new(cheats.config.clone())).into()
+            }),
             inner: std::mem::take(self.inner),
         };
 
         let out = f(&mut stack);
 
         if let Some(cheats) = self.cheatcodes.as_deref_mut() {
-            *cheats = stack.cheatcodes.take().unwrap();
+            *cheats = *stack.cheatcodes.take().unwrap();
         }
 
         *self.inner = stack.inner;
@@ -792,6 +789,11 @@ impl InspectorStackRefMut<'_> {
         }
     }
 
+    // We take extra care in optimizing `step` and `step_end`, as they're are likely the most
+    // hot functions in all of Foundry.
+    // We want to `#[inline(always)]` these functions so that `InspectorStack` does not
+    // delegate to `InspectorStackRefMut` in this case.
+
     #[inline(always)]
     fn step_inlined(
         &mut self,
@@ -800,17 +802,18 @@ impl InspectorStackRefMut<'_> {
     ) {
         call_inspectors!(
             [
-                &mut self.fuzzer,
-                &mut self.tracer,
-                &mut self.line_coverage,
+                // These are sorted in definition order.
                 &mut self.edge_coverage,
-                &mut self.script_execution_inspector,
+                &mut self.fuzzer,
+                &mut self.line_coverage,
                 &mut self.printer,
                 &mut self.revert_diag,
+                &mut self.script_execution_inspector,
+                &mut self.tracer,
                 // Keep `cheatcodes` last to make use of the tail call.
                 &mut self.cheatcodes,
             ],
-            |inspector| (*inspector).step(interpreter, ecx),
+            |inspector| (**inspector).step(interpreter, ecx),
         );
     }
 
@@ -822,14 +825,15 @@ impl InspectorStackRefMut<'_> {
     ) {
         call_inspectors!(
             [
-                &mut self.tracer,
+                // These are sorted in definition order.
                 &mut self.chisel_state,
                 &mut self.printer,
                 &mut self.revert_diag,
+                &mut self.tracer,
                 // Keep `cheatcodes` last to make use of the tail call.
                 &mut self.cheatcodes,
             ],
-            |inspector| (*inspector).step_end(interpreter, ecx),
+            |inspector| (**inspector).step_end(interpreter, ecx),
         );
     }
 }
