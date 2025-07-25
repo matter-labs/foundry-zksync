@@ -688,7 +688,16 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
 
     let output = cmd
         .forge_fuse()
-        .args(["create", "Counter", "--rpc-url", &url, "--private-key", private_key, "--zksync"])
+        .args([
+            "create",
+            "Counter",
+            "--rpc-url",
+            &url,
+            "--private-key",
+            private_key,
+            "--zksync",
+            "--broadcast",
+        ])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -745,7 +754,16 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
 
     let output = cmd
         .forge_fuse()
-        .args(["create", "Counter", "--rpc-url", &url, "--private-key", private_key, "--zksync"])
+        .args([
+            "create",
+            "Counter",
+            "--rpc-url",
+            &url,
+            "--private-key",
+            private_key,
+            "--zksync",
+            "--broadcast",
+        ])
         .assert_success()
         .get_output()
         .stdout_lossy();
