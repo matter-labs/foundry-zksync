@@ -10,10 +10,10 @@ use revm::{
 };
 
 use crate::{
-    inspector::{check_if_fixed_gas_limit, CommonCreateInput, Ecx},
-    script::Broadcast,
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
     CheatsConfig, CheatsCtxt, DynCheatcode, Result,
+    inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit},
+    script::Broadcast,
 };
 
 /// Represents the context for [CheatcodeInspectorStrategy].
@@ -97,7 +97,7 @@ pub trait CheatcodeInspectorStrategyRunner:
         ecx: Ecx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: Option<SignedAuthorization>,
+        active_delegations: Vec<SignedAuthorization>,
         active_blob_sidecar: Option<BlobTransactionSidecar>,
     );
 
@@ -221,7 +221,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         ecx: Ecx,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: Option<SignedAuthorization>,
+        active_delegation: Vec<SignedAuthorization>,
         active_blob_sidecar: Option<BlobTransactionSidecar>,
     ) {
         let input = TransactionInput::new(call.input.bytes(ecx));
@@ -241,23 +241,23 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
             ..Default::default()
         };
 
-        match (active_delegation, active_blob_sidecar) {
-            (Some(_), Some(_)) => {
+        match (active_delegation.is_empty(), active_blob_sidecar) {
+            (false, Some(_)) => {
                 // Note(zk): We can't return a call outcome from here
                 return;
             }
-            (Some(auth_list), None) => {
-                tx_req.authorization_list = Some(vec![auth_list]);
+            (false, None) => {
+                tx_req.authorization_list = Some(active_delegation);
                 tx_req.sidecar = None;
 
                 // Increment nonce to reflect the signed authorization.
                 account.info.nonce += 1;
             }
-            (None, Some(blob_sidecar)) => {
+            (true, Some(blob_sidecar)) => {
                 tx_req.set_blob_sidecar(blob_sidecar);
                 tx_req.authorization_list = None;
             }
-            (None, None) => {
+            (true, None) => {
                 tx_req.sidecar = None;
                 tx_req.authorization_list = None;
             }

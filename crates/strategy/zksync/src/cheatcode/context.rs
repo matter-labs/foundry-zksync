@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use alloy_primitives::{keccak256, map::HashMap, Address, Bytes, B256};
+use alloy_primitives::{Address, B256, Bytes, keccak256, map::HashMap};
 use alloy_sol_types::SolValue;
 use foundry_cheatcodes::strategy::CheatcodeInspectorStrategyContext;
 use foundry_compilers::info::ContractInfo;
@@ -8,7 +8,7 @@ use foundry_evm_core::constants::{CHEATCODE_ADDRESS, CHEATCODE_CONTRACT_HASH};
 use foundry_zksync_compilers::dual_compiled_contracts::{
     DualCompiledContract, DualCompiledContracts,
 };
-use foundry_zksync_core::{vm::ZkEnv, ZkPaymasterData, H256};
+use foundry_zksync_core::{H256, ZkPaymasterData, vm::ZkEnv};
 use revm::state::Bytecode;
 
 use super::types::ZkStartupMigration;
@@ -74,7 +74,7 @@ impl ZksyncCheatcodeInspectorStrategyContext {
             ContractInfo::new("EmptyEVMBytecode"),
             DualCompiledContract {
                 zk_bytecode_hash,
-                zk_deployed_bytecode: zk_deployed_bytecode.clone(),
+                zk_deployed_bytecode,
                 zk_factory_deps: Default::default(),
                 evm_bytecode_hash: B256::from_slice(&keccak256(&empty_bytes)[..]),
                 evm_deployed_bytecode: Bytecode::new_raw(empty_bytes.clone())
@@ -106,9 +106,6 @@ impl ZksyncCheatcodeInspectorStrategyContext {
                 evm_bytecode: cheatcodes_bytecode.to_vec(),
             },
         );
-
-        let mut persisted_factory_deps = HashMap::new();
-        persisted_factory_deps.insert(zk_bytecode_hash, zk_deployed_bytecode);
 
         Self {
             using_zk_vm: false, // We need to migrate once on initialize_interp

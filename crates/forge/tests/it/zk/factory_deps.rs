@@ -1,9 +1,8 @@
 //! Forge tests for zksync factory contracts.
 
 use foundry_test_utils::{
-    forgetest_async,
+    Filter, ZkSyncNode, forgetest_async,
     util::{self, OutputExt},
-    Filter, ZkSyncNode,
 };
 use foundry_zksync_core::utils::MAX_L2_GAS_LIMIT;
 use revm::primitives::hardfork::SpecId;

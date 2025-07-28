@@ -1,57 +1,56 @@
 use std::sync::Arc;
 
-use alloy_network::TransactionBuilder4844;
-use alloy_primitives::{map::HashMap, Address, Bytes, TxKind, B256, U256};
+use alloy_primitives::{Address, B256, Bytes, TxKind, U256, map::HashMap};
 use alloy_rpc_types::{
+    BlobTransactionSidecar,
     request::{TransactionInput, TransactionRequest},
     serde_helpers::WithOtherFields,
-    BlobTransactionSidecar,
 };
 use foundry_cheatcodes::{
+    Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, Result,
+    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
     journaled_account,
     strategy::{
         CheatcodeInspectorStrategyContext, CheatcodeInspectorStrategyExt,
         CheatcodeInspectorStrategyRunner, EvmCheatcodeInspectorStrategyRunner,
     },
-    Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, Result,
-    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
+    Env,
     backend::{DatabaseError, LocalForkId},
     constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE},
-    Env,
 };
 use foundry_evm_core::backend::DatabaseExt;
 use foundry_zksync_core::{
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, PaymasterParams,
+    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key,
     state::parse_full_nonce,
-    PaymasterParams, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
-    CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, KNOWN_CODES_STORAGE_ADDRESS,
-    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use itertools::Itertools;
 use revm::{
     bytecode::opcode as op,
     context::{
-        result::{ExecutionResult, Output},
         CreateScheme, JournalTr,
+        result::{ExecutionResult, Output},
     },
     context_interface::transaction::SignedAuthorization,
     interpreter::{
-        interpreter_types::Jumps, CallInput, CallInputs, CallOutcome, CreateOutcome, Gas,
-        InstructionResult, Interpreter, InterpreterResult,
+        CallInput, CallInputs, CallOutcome, CreateOutcome, Gas, InstructionResult, Interpreter,
+        InterpreterResult, interpreter_types::Jumps,
     },
     primitives::{HashSet, KECCAK_EMPTY},
     state::{AccountInfo, Bytecode, EvmStorageSlot},
 };
 use tracing::{debug, error, info, trace, warn};
 use zksync_types::{
+    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
     block::{pack_block_info, unpack_block_info},
     utils::{decompose_full_nonce, nonces_to_full_nonce},
-    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
 };
 
 use crate::cheatcode::context::ZksyncCheatcodeInspectorStrategyContext;
@@ -302,7 +301,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         ecx_inner: Ecx<'_, '_, '_>,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
-        active_delegation: Option<SignedAuthorization>,
+        active_delegations: Vec<SignedAuthorization>,
         active_blob_sidecar: Option<BlobTransactionSidecar>,
     ) {
         let ctx_zk = get_context(ctx);
@@ -315,7 +314,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 ecx_inner,
                 broadcast,
                 broadcastable_transactions,
-                active_delegation,
+                active_delegations,
                 active_blob_sidecar,
             );
         }
@@ -374,20 +373,20 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             ..Default::default()
         };
 
-        match (active_delegation, active_blob_sidecar) {
-            (Some(_), Some(_)) => {
+        match (!active_delegations.is_empty(), active_blob_sidecar) {
+            (true, Some(_)) => {
                 // Note(zk): We can't return a call outcome from here
                 return;
             }
-            (Some(auth_list), None) => {
-                tx_req.authorization_list = Some(vec![auth_list]);
+            (true, None) => {
+                tx_req.authorization_list = Some(active_delegations);
                 tx_req.sidecar = None;
             }
-            (None, Some(blob_sidecar)) => {
-                tx_req.set_blob_sidecar(blob_sidecar);
+            (false, Some(blob_sidecar)) => {
+                tx_req.sidecar = Some(blob_sidecar);
                 tx_req.authorization_list = None;
             }
-            (None, None) => {
+            (false, None) => {
                 tx_req.sidecar = None;
                 tx_req.authorization_list = None;
             }
@@ -1059,7 +1058,11 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 data.journaled_state.sload(nonce_account, nonce_key).unwrap_or_default();
             let (tx_nonce, deployment_nonce) = decompose_full_nonce(full_nonce.to_u256());
             if !deployment_nonce.is_zero() {
-                warn!(?address, ?deployment_nonce, "discarding ZKsync deployment nonce for EVM context, might cause inconsistencies");
+                warn!(
+                    ?address,
+                    ?deployment_nonce,
+                    "discarding ZKsync deployment nonce for EVM context, might cause inconsistencies"
+                );
             }
             let nonce = tx_nonce.as_u64();
 

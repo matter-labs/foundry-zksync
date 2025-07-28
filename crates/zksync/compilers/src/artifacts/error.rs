@@ -58,8 +58,8 @@ impl fmt::Display for Error {
         // unless it includes a source location (denoted by 3+ colons) something like:
         // path/to/file:line:column: ErrorType: message
         if let Some(l) = lines.peek() {
-            if l.contains(self.severity.to_string().as_str()) &&
-                l.bytes().filter(|b| *b == b':').count() < 3
+            if l.contains(self.severity.to_string().as_str())
+                && l.bytes().filter(|b| *b == b':').count() < 3
             {
                 lines.next();
             }

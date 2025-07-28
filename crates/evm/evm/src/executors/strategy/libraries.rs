@@ -3,11 +3,11 @@
 use std::{borrow::Borrow, collections::BTreeMap, path::Path};
 
 use alloy_json_abi::JsonAbi;
-use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
+use alloy_primitives::{Address, B256, Bytes, TxKind, U256};
 use eyre::Context;
 use foundry_common::{ContractsByArtifact, TestFunctionExt, TransactionMaybeSigned};
 use foundry_compilers::{
-    artifacts::Libraries, contracts::ArtifactContracts, Artifact, ArtifactId, ProjectCompileOutput,
+    Artifact, ArtifactId, ProjectCompileOutput, artifacts::Libraries, contracts::ArtifactContracts,
 };
 use foundry_evm_core::decode::RevertDecoder;
 use foundry_linking::{Linker, LinkerError};
@@ -73,8 +73,8 @@ impl EvmExecutorStrategyRunner {
             let Some(abi) = &contract.abi else { continue };
 
             // if it's a test, link it and add to deployable contracts
-            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true) &&
-                abi.functions().any(|func| func.name.is_any_test())
+            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true)
+                && abi.functions().any(|func| func.name.is_any_test())
             {
                 let Some(bytecode) =
                     contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
@@ -131,7 +131,7 @@ impl EvmExecutorStrategyRunner {
                 let address = result
                     .out
                     .as_ref()
-                    .and_then(|out| out.address().cloned())
+                    .and_then(|out| out.address().copied())
                     .unwrap_or_else(|| create2_deployer.create2_from_code(salt, code.as_ref()));
                 debug!(%address, "deployed contract with create2");
 

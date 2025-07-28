@@ -1,7 +1,7 @@
 use crate::{bytecode::VerifyBytecodeArgs, types::VerificationType};
 use alloy_dyn_abi::DynSolValue;
 use alloy_primitives::{Address, Bytes, TxKind};
-use alloy_provider::{network::AnyRpcBlock, Provider};
+use alloy_provider::{Provider, network::AnyRpcBlock};
 use alloy_rpc_types::BlockId;
 use clap::ValueEnum;
 use eyre::{OptionExt, Result};
@@ -16,11 +16,11 @@ use foundry_common::{
 use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVersion};
 use foundry_config::Config;
 use foundry_evm::{
+    Env, EnvMut,
     constants::DEFAULT_CREATE2_DEPLOYER,
-    executors::{strategy::ExecutorStrategy, TracingExecutor},
+    executors::{TracingExecutor, strategy::ExecutorStrategy},
     opts::EvmOpts,
     traces::TraceMode,
-    Env, EnvMut,
 };
 use reqwest::Url;
 use revm::{bytecode::Bytecode, database::Database, primitives::hardfork::SpecId};
@@ -124,13 +124,12 @@ pub fn build_using_cache(
                 }
 
                 // Check if Solidity version matches
-                if let Ok(version) = Version::parse(&version) {
-                    if !(artifact.version.major == version.major &&
-                        artifact.version.minor == version.minor &&
-                        artifact.version.patch == version.patch)
-                    {
-                        continue;
-                    }
+                if let Ok(version) = Version::parse(&version)
+                    && !(artifact.version.major == version.major
+                        && artifact.version.minor == version.minor
+                        && artifact.version.patch == version.patch)
+                {
+                    continue;
                 }
 
                 return Ok(artifact.artifact);
@@ -227,8 +226,8 @@ fn find_mismatch_in_settings(
         );
         mismatches.push(str);
     }
-    if local_settings.optimizer_runs.is_some_and(|runs| etherscan_settings.runs != runs as u64) ||
-        (local_settings.optimizer_runs.is_none() && etherscan_settings.runs > 0)
+    if local_settings.optimizer_runs.is_some_and(|runs| etherscan_settings.runs != runs as u64)
+        || (local_settings.optimizer_runs.is_none() && etherscan_settings.runs > 0)
     {
         let str = format!(
             "Optimizer runs mismatch: local={}, onchain={}",
@@ -293,13 +292,14 @@ pub fn check_args_len(
     artifact: &CompactContractBytecode,
     args: &Bytes,
 ) -> Result<(), eyre::ErrReport> {
-    if let Some(constructor) = artifact.abi.as_ref().and_then(|abi| abi.constructor()) {
-        if !constructor.inputs.is_empty() && args.is_empty() {
-            eyre::bail!(
-                "Contract expects {} constructor argument(s), but none were provided",
-                constructor.inputs.len()
-            );
-        }
+    if let Some(constructor) = artifact.abi.as_ref().and_then(|abi| abi.constructor())
+        && !constructor.inputs.is_empty()
+        && args.is_empty()
+    {
+        eyre::bail!(
+            "Contract expects {} constructor argument(s), but none were provided",
+            constructor.inputs.len()
+        );
     }
     Ok(())
 }
@@ -325,6 +325,7 @@ pub async fn get_tracing_executor(
         TraceMode::Call,
         is_odyssey,
         create2_deployer,
+        None,
         strategy,
     )?;
 
@@ -356,7 +357,9 @@ pub fn deploy_contract(
     if to.is_some_and(|to| to.is_call()) {
         let TxKind::Call(to) = to.unwrap() else { unreachable!() };
         if to != DEFAULT_CREATE2_DEPLOYER {
-            eyre::bail!("Transaction `to` address is not the default create2 deployer i.e the tx is not a contract creation tx.");
+            eyre::bail!(
+                "Transaction `to` address is not the default create2 deployer i.e the tx is not a contract creation tx."
+            );
         }
         let result = executor.transact_with_env(env)?;
 

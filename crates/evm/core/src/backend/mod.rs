@@ -1,39 +1,39 @@
 //! Foundry's main executor backend abstraction and implementation.
 
 use crate::{
+    AsEnvMut, Env, EnvMut, InspectorExt,
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
     utils::configure_tx_env,
-    AsEnvMut, Env, EnvMut, InspectorExt,
 };
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
 use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
-use alloy_primitives::{keccak256, map::HashMap, uint, Address, Bytes, TxKind, B256, U256};
-use alloy_provider::Provider;
+use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256, uint};
+use alloy_provider::Provider as _;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
 use eyre::Context;
 use foundry_common::{
-    is_known_system_sender, provider::try_get_zksync_http_provider, SYSTEM_TRANSACTION_TYPE,
+    SYSTEM_TRANSACTION_TYPE, is_known_system_sender, provider::try_get_zksync_http_provider,
 };
-pub use foundry_fork_db::{cache::BlockchainDbMeta, BlockchainDb, SharedBackend};
+pub use foundry_fork_db::{BlockchainDb, SharedBackend, cache::BlockchainDbMeta};
 use itertools::Itertools;
 use revm::{
+    Database, DatabaseCommit, JournalEntry,
     bytecode::Bytecode,
     context::JournalInner,
     context_interface::{block::BlobExcessGasAndPrice, result::ResultAndState},
     database::{CacheDB, DatabaseRef},
     inspector::NoOpInspector,
     precompile::{PrecompileSpecId, Precompiles},
-    primitives::{hardfork::SpecId, HashMap as Map, Log, KECCAK_EMPTY},
+    primitives::{HashMap as Map, KECCAK_EMPTY, Log, hardfork::SpecId},
     state::{Account, AccountInfo, EvmState, EvmStorageSlot},
-    Database, DatabaseCommit, JournalEntry,
 };
 use std::{
     any::Any,
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -935,8 +935,8 @@ impl Backend {
         for tx in full_block.inner.transactions.txns() {
             // System transactions such as on L2s don't contain any pricing info so we skip them
             // otherwise this would cause reverts
-            if is_known_system_sender(tx.inner().inner.signer()) ||
-                tx.ty() == SYSTEM_TRANSACTION_TYPE
+            if is_known_system_sender(tx.inner().inner.signer())
+                || tx.ty() == SYSTEM_TRANSACTION_TYPE
             {
                 trace!(tx=?tx.tx_hash(), "skipping system transaction");
                 continue;
@@ -1013,12 +1013,11 @@ impl DatabaseExt for Backend {
             // Check if an error occurred either during or before the snapshot.
             // DSTest contracts don't have snapshot functionality, so this slot is enough to check
             // for failure here.
-            if let Some(account) = current_state.state.get(&CHEATCODE_ADDRESS) {
-                if let Some(slot) = account.storage.get(&GLOBAL_FAIL_SLOT) {
-                    if !slot.present_value.is_zero() {
-                        self.set_state_snapshot_failure(true);
-                    }
-                }
+            if let Some(account) = current_state.state.get(&CHEATCODE_ADDRESS)
+                && let Some(slot) = account.storage.get(&GLOBAL_FAIL_SLOT)
+                && !slot.present_value.is_zero()
+            {
+                self.set_state_snapshot_failure(true);
             }
 
             // merge additional logs
@@ -1100,6 +1099,7 @@ impl DatabaseExt for Backend {
             &mut env.as_env_mut(),
             &mut self.inner.new_journaled_state(),
         )?;
+
         Ok(id)
     }
 
@@ -1347,10 +1347,18 @@ impl DatabaseExt for Backend {
         let (fork_block, block) =
             self.get_block_number_and_block_for_transaction(id, transaction)?;
 
-        // roll the fork to the transaction's block or latest if it's pending
+        // roll the fork to the transaction's parent block or latest if it's pending, because we
+        // need to fork off the parent block's state for tx level forking and then replay the txs
+        // before the tx in that block to get the state at the tx
         self.roll_fork(Some(id), fork_block, env, journaled_state)?;
 
+        // we need to update the env to the block
         update_env_block(env, &block);
+
+        // after we forked at the fork block we need to properly update the block env to the block
+        // env of the tx's block
+        let _ =
+            self.forks.update_block_env(self.inner.ensure_fork_id(id).cloned()?, env.block.clone());
 
         let env = env.to_owned();
 
@@ -1438,11 +1446,7 @@ impl DatabaseExt for Backend {
             }
             eyre::bail!("Requested fork `{}` does not exit", id)
         }
-        if let Some(id) = self.active_fork_id() {
-            Ok(id)
-        } else {
-            eyre::bail!("No fork active")
-        }
+        if let Some(id) = self.active_fork_id() { Ok(id) } else { eyre::bail!("No fork active") }
     }
 
     fn ensure_fork_id(&self, id: LocalForkId) -> eyre::Result<&ForkId> {
@@ -1738,10 +1742,10 @@ pub struct Fork {
 impl Fork {
     /// Returns true if the account is a contract
     pub fn is_contract(&self, acc: Address) -> bool {
-        if let Ok(Some(acc)) = self.db.basic_ref(acc) {
-            if acc.code_hash != KECCAK_EMPTY {
-                return true;
-            }
+        if let Ok(Some(acc)) = self.db.basic_ref(acc)
+            && acc.code_hash != KECCAK_EMPTY
+        {
+            return true;
         }
         is_contract_in_state(&self.journaled_state, acc)
     }
@@ -2109,7 +2113,7 @@ fn apply_state_changeset(
 #[cfg(test)]
 mod tests {
     use crate::{
-        backend::{strategy::BackendStrategy, Backend},
+        backend::{Backend, strategy::BackendStrategy},
         fork::CreateFork,
         opts::EvmOpts,
     };
@@ -2120,8 +2124,8 @@ mod tests {
     use foundry_config::{Config, NamedChain};
     use foundry_fork_db::cache::{BlockchainDb, BlockchainDbMeta};
     use foundry_test_utils::{
-        httptest::{self, matchers, responders},
         MockServer, RpcRequest,
+        httptest::{self, matchers, responders},
     };
     // use foundry_zksync_core::EMPTY_CODE;
     use revm::database::{Database, DatabaseRef};

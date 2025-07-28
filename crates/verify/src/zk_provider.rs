@@ -1,20 +1,20 @@
 use crate::provider::VerificationContext;
 
 use alloy_json_abi::JsonAbi;
-use eyre::{eyre, OptionExt, Result};
+use eyre::{OptionExt, Result, eyre};
 use foundry_common::compile::ProjectCompiler;
 use foundry_compilers::{
-    artifacts::{output_selection::OutputSelection, BytecodeObject, Source},
+    Artifact, Graph, Project,
+    artifacts::{BytecodeObject, Source, output_selection::OutputSelection},
     compilers::CompilerSettings,
     resolver::parse::SolData,
     solc::{Solc, SolcCompiler},
-    Artifact, Graph, Project,
 };
 use foundry_config::Config;
 use foundry_zksync_compilers::compilers::{
     artifact_output::zk::ZkArtifactOutput,
     zksolc::{
-        self, ZkSolc, ZkSolcCompiler, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS,
+        self, ZKSOLC_FIRST_VERSION_SUPPORTS_CBOR, ZKSYNC_SOLC_REVISIONS, ZkSolc, ZkSolcCompiler,
     },
 };
 use revm::primitives::Bytes;
