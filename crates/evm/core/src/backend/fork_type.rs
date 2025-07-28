@@ -32,7 +32,7 @@ impl CachedForkType {
     /// The result is then cached
     pub fn get(&mut self, fork_url: &str) -> ForkType {
         if let Some(fork_url_type) = self.0.get(fork_url) {
-            return fork_url_type.clone()
+            return fork_url_type.clone();
         }
 
         let is_zk_url = foundry_common::provider::try_get_http_provider(fork_url)

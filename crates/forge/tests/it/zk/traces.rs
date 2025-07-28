@@ -3,7 +3,7 @@
 use std::{path::Path, sync::LazyLock};
 
 use crate::{config::*, test_helpers::TEST_DATA_DEFAULT};
-use alloy_primitives::{address, hex, Address, Bytes};
+use alloy_primitives::{Address, Bytes, address, hex};
 use forge::{
     revm::primitives::hardfork::SpecId,
     traces::{CallKind, CallTraceNode, SparsedTraceArena, TraceKind},
@@ -165,10 +165,10 @@ async fn test_zk_traces_work_during_create() {
     let filter = Filter::new("testZkTraceOutputDuringCreate", "ZkTraceTest", ".*");
 
     let results = TestConfig::with_filter(runner, filter).spec_id(SpecId::SHANGHAI).test().unwrap();
-    let traces = results["zk/Trace.t.sol:ZkTraceTest"].test_results
-        ["testZkTraceOutputDuringCreate()"]
-        .traces
-        .as_slice();
+    let traces =
+        results["zk/Trace.t.sol:ZkTraceTest"].test_results["testZkTraceOutputDuringCreate()"]
+            .traces
+            .as_slice();
 
     assert_execution_trace(
         vec![TraceAssertion {
@@ -283,7 +283,7 @@ fn assert_execution_trace(
                         expected: "<entry>".to_string(),
                         actual: "<none>".to_string(),
                         path: vec![idx],
-                    })
+                    });
                 }
             };
             if let Some(kind) = expected_node.kind {

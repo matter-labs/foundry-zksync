@@ -5,11 +5,10 @@ use crate::{
     traces::{CallTraceArena, CallTraceDecoder, CallTraceNode, DecodedCallData},
 };
 use alloy_primitives::map::HashSet;
-use comfy_table::{modifiers::UTF8_ROUND_CORNERS, Cell, Color, Table};
+use comfy_table::{Cell, Color, Table, modifiers::UTF8_ROUND_CORNERS};
 use foundry_common::{
-    calc,
-    reports::{report_kind, ReportKind},
-    TestFunctionExt,
+    TestFunctionExt, calc,
+    reports::{ReportKind, report_kind},
 };
 use foundry_evm::{constants::HARDHAT_CONSOLE_ADDRESS, traces::CallKind};
 use serde::{Deserialize, Serialize};
@@ -104,7 +103,7 @@ impl GasReport {
         if is_create_call {
             trace!(contract_name, "adding create size info");
             contract_info.size = trace.data.len();
-            if decoder.zk_contracts.contains(&node.trace.address) {
+            if foundry_zksync_core::utils::is_zksync_bytecode(&trace.output) {
                 // Intercepted creates in zkvm mode will have the evm bytecode as input
                 // and the zkvm bytecode as output on the trace.
                 contract_info.size = trace.output.len();
