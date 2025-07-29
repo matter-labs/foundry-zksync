@@ -32,6 +32,7 @@ use foundry_evm::{
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
+use foundry_zksync_core::MAX_L2_GAS_LIMIT;
 use regex::Regex;
 use revm::context::TransactionType;
 use std::{str::FromStr, sync::LazyLock};
@@ -309,7 +310,7 @@ impl CallArgs {
 
             // modify settings that usually set in eth_call
             env.evm_env.cfg_env.disable_block_gas_limit = true;
-            env.evm_env.block_env.gas_limit = u64::MAX;
+            env.evm_env.block_env.gas_limit = if is_zk { MAX_L2_GAS_LIMIT } else { u64::MAX };
 
             // Apply the block overrides.
             if let Some(block_overrides) = block_overrides {
