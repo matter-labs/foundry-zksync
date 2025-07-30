@@ -37,7 +37,6 @@ use zksync_multivm::{
     },
     tracers::CallTracer,
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
-    zk_evm_latest::zkevm_opcode_defs::MAX_TX_ERGS_LIMIT,
 };
 use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, PackedEthSignature, StorageKey,
