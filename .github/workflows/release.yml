@@ -192,6 +192,8 @@ jobs:
         env:
           TAG_NAME: ${{ (env.IS_NIGHTLY == 'true' && 'nightly') || needs.prepare.outputs.tag_name }}
           SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+          PROFILE: release
+          TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -eo pipefail
