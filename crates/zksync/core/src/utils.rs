@@ -32,11 +32,11 @@ use alloy_primitives::hex;
 use eyre::Result;
 use url::Url;
 use zksync_basic_types::U256;
-use zksync_multivm::zk_evm_latest::zkevm_opcode_defs::MAX_TX_ERGS_LIMIT;
 use zksync_types::H256;
 
-/// Max l2 gas limit to use in transactions.
-pub const MAX_L2_GAS_LIMIT: u64 = MAX_TX_ERGS_LIMIT as u64;
+/// Max l2 gas limit to use in transactions. Determined empirically to be good enough
+/// for all use cases.
+pub const MAX_L2_GAS_LIMIT: u64 = ((u32::MAX >> 1) as u64) * 2;
 
 /// Gets the RPC URL for Ethereum.
 ///
