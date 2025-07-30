@@ -315,7 +315,9 @@ impl CreateArgs {
                 sh_println!("Transaction: {}", serde_json::to_string_pretty(&deployer.tx)?)?;
                 sh_println!("ABI: {}\n", serde_json::to_string_pretty(&abi)?)?;
 
-                sh_warn!("To broadcast this transaction, add --broadcast to the previous command. See forge create --help for more.")?;
+                sh_warn!(
+                    "To broadcast this transaction, add --broadcast to the previous command. See forge create --help for more."
+                )?;
             } else {
                 let output = json!({
                     "contract": &self.contract.name,
