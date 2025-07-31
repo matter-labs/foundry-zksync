@@ -192,10 +192,12 @@ jobs:
         env:
           TAG_NAME: ${{ (env.IS_NIGHTLY == 'true' && 'nightly') || needs.prepare.outputs.tag_name }}
           SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+          TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -eo pipefail
-          flags=(--bins --no-default-features --features aws-kms,gcp-kms,cli,asm-keccak)
+          flags=(--target $TARGET --bins
+            --no-default-features --features aws-kms,gcp-kms,cli,asm-keccak)
 
           # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
           # # Remove jemalloc, only keep `asm-keccak` if applicable
@@ -203,7 +205,7 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          cargo build --release --bin forge --bin cast "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
