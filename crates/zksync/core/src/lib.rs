@@ -36,6 +36,7 @@ use zksync_types::{Nonce, ProtocolVersionId, bytecode::BytecodeHash};
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};
 pub use vm::{balance, deploy_nonce, encode_create_params, tx_nonce};
 
+pub use utils::MAX_L2_GAS_LIMIT;
 pub use vm::{SELECTOR_CONTRACT_DEPLOYER_CREATE, SELECTOR_CONTRACT_DEPLOYER_CREATE2};
 pub use zksync_multivm::interface::{Call, CallType};
 pub use zksync_types::{

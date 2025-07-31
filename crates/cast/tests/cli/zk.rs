@@ -650,7 +650,8 @@ casttest!(test_zk_cast_call_with_trace, async |_prj, cmd| {
         .args(["rpc", "hardhat_setCode", COUNTER_ADDRESS, COUNTER_BYTECODE, "--rpc-url", &url])
         .assert_success();
 
-    cmd.cast_fuse()
+    let output = cmd
+        .cast_fuse()
         .args([
             "call",
             "--trace",
@@ -664,15 +665,19 @@ casttest!(test_zk_cast_call_with_trace, async |_prj, cmd| {
         ])
         .assert_success()
         .get_output()
-        .stdout_lossy()
-        .contains(
+        .stdout_lossy();
+
+    assert!(
+        output.contains(
             format!(
                 "Traces:
-  [43369] {COUNTER_ADDRESS}::number()
-    └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000001"
+  [2141] {COUNTER_ADDRESS}::number()
+    └─ ← [Return] 0x0000000000000000000000000000000000000000000000000000000000000000"
             )
             .as_str(),
-        );
+        ),
+        "trace mismatch, got output:\n{output}"
+    );
 });
 
 casttest!(test_zk_cast_run_with_create, async |prj, cmd| {

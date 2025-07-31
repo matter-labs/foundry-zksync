@@ -46,7 +46,7 @@ use zksync_types::{
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
-    DEFAULT_PROTOCOL_VERSION,
+    DEFAULT_PROTOCOL_VERSION, MAX_L2_GAS_LIMIT,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256},
     fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address,
     state::{FullNonce, new_full_nonce, parse_full_nonce},
@@ -422,11 +422,13 @@ where
 {
     let value = ecx.tx.value.to_u256();
     let gas_price = U256::from(ecx.tx.gas_price);
-    let gas_limit = ecx.tx.gas_limit.into();
+    let gas_limit = U256::from(ecx.tx.gas_limit);
 
     let dev_mode = gas_price.is_zero();
     if !dev_mode {
-        // return the original gas limit and gas price
+        // return the original gas limit (subject to max tx gas limit in zkEVM) and gas price. If
+        // not limited, causes not enough funds error in bootloader.
+        let gas_limit = gas_limit.min(MAX_L2_GAS_LIMIT.into());
         return (gas_limit, gas_price);
     }
 
