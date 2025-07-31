@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.23](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.22...foundry-zksync-v0.0.23) (2025-07-31)
+
+
+### Features
+
+* **cast:** add --cost to cast estimate the eth cost at current gas price ([f2f5f2c](https://github.com/matter-labs/foundry-zksync/commit/f2f5f2c6fbafb41d84278b56b296dfaae357265e))
+* exclude tests option from coverage ([f2f5f2c](https://github.com/matter-labs/foundry-zksync/commit/f2f5f2c6fbafb41d84278b56b296dfaae357265e))
+* **script:** keep script timestamp as milis instead seconds ([f2f5f2c](https://github.com/matter-labs/foundry-zksync/commit/f2f5f2c6fbafb41d84278b56b296dfaae357265e))
+* Upstream c16f06a merge ([#1087](https://github.com/matter-labs/foundry-zksync/issues/1087)) ([f2f5f2c](https://github.com/matter-labs/foundry-zksync/commit/f2f5f2c6fbafb41d84278b56b296dfaae357265e))
+
+
+### Bug Fixes
+
+* cast call with --trace, missing test assertion ([#1100](https://github.com/matter-labs/foundry-zksync/issues/1100)) ([2b815dd](https://github.com/matter-labs/foundry-zksync/commit/2b815dddfb1bc533ddcdeed808a03d7cb73d768d))
+* **doc:** update router to use fallback_service for better 404 handling ([#1092](https://github.com/matter-labs/foundry-zksync/issues/1092)) ([e541e86](https://github.com/matter-labs/foundry-zksync/commit/e541e8628b0284749ccff1976efede7909fd626c))
+* **forge:** Filter out file access events to prevent rebuild loop ([f2f5f2c](https://github.com/matter-labs/foundry-zksync/commit/f2f5f2c6fbafb41d84278b56b296dfaae357265e))
+* guard against the blockchain advancing while checking latest block ([f2f5f2c](https://github.com/matter-labs/foundry-zksync/commit/f2f5f2c6fbafb41d84278b56b296dfaae357265e))
+* upstream docs diagram and prettier formatting  ([#1088](https://github.com/matter-labs/foundry-zksync/issues/1088)) ([d058bf5](https://github.com/matter-labs/foundry-zksync/commit/d058bf538043c3200e456cf57a5b2e4a49d5ee66))
+
 ## [0.0.22](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.21...foundry-zksync-v0.0.22) (2025-07-14)
 
 
