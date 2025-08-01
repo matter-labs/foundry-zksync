@@ -197,7 +197,7 @@ jobs:
           set -eo pipefail
           target="${{ matrix.target }}"
 
-          flags=(--target $TARGET --bins
+          flags=(--target $target --bins
             --no-default-features --features aws-kms,gcp-kms,cli,asm-keccak)
 
           # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
@@ -206,7 +206,7 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
+          cargo build --release --bin forge --bin cast "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
