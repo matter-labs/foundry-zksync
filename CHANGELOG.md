@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.24](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.23...foundry-zksync-v0.0.24) (2025-08-01)
+
+
+### Features
+
+* trigger yanked v0.0.23 release ([#1107](https://github.com/matter-labs/foundry-zksync/issues/1107)) ([6d4fecc](https://github.com/matter-labs/foundry-zksync/commit/6d4fecc4d0889bbc3eb90f969bbb1c7f8e49e866))
+
 ## [0.0.23](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.22...foundry-zksync-v0.0.23) (2025-07-31)
 
 
