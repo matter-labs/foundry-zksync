@@ -192,11 +192,12 @@ jobs:
         env:
           TAG_NAME: ${{ (env.IS_NIGHTLY == 'true' && 'nightly') || needs.prepare.outputs.tag_name }}
           SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
-          TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -eo pipefail
-          flags=(--target $TARGET --bins
+          target="${{ matrix.target }}"
+
+          flags=(--target $target --bins
             --no-default-features --features aws-kms,gcp-kms,cli,asm-keccak)
 
           # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
