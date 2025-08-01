@@ -192,10 +192,11 @@ jobs:
         env:
           TAG_NAME: ${{ (env.IS_NIGHTLY == 'true' && 'nightly') || needs.prepare.outputs.tag_name }}
           SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
-          TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -eo pipefail
+          target="${{ matrix.target }}"
+
           flags=(--target $TARGET --bins
             --no-default-features --features aws-kms,gcp-kms,cli,asm-keccak)
 
@@ -205,7 +206,7 @@ jobs:
           #     flags+=(--features asm-keccak)
           # fi
 
-          cargo build --release --bin forge --bin cast "${flags[@]}"
+          cargo build --release --bin forge --bin cast --target "$target" "${flags[@]}"
 
           bins=(cast forge)
           for name in "${bins[@]}"; do
