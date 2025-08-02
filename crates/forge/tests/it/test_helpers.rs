@@ -643,6 +643,7 @@ pub fn deploy_zk_contract(
         url,
         "--private-key",
         private_key,
+        "--broadcast",
     ]);
 
     if let Some(args) = extra_args {
