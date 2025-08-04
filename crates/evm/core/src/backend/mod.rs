@@ -1218,6 +1218,8 @@ impl DatabaseExt for Backend {
             // selected. This ensures that there are no gaps in depth which would
             // otherwise cause issues with the tracer
             fork.journaled_state.depth = active_journaled_state.depth;
+            // Set proper journal of state changes into the fork.
+            fork.journaled_state.journal = active_journaled_state.journal.clone();
 
             // another edge case where a fork is created and selected during setup with not
             // necessarily the same caller as for the test, however we must always
@@ -1298,6 +1300,8 @@ impl DatabaseExt for Backend {
                 active.journaled_state = self.fork_init_journaled_state.clone();
 
                 active.journaled_state.depth = journaled_state.depth;
+                // Set proper journal of state changes into the fork.
+                active.journaled_state.journal = journaled_state.journal.clone();
                 for addr in persistent_addrs {
                     self.strategy.runner.merge_journaled_state_data(
                         self.strategy.context.as_mut(),
