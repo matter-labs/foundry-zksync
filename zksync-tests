@@ -16,7 +16,6 @@ cast::cli:
 forge:
     cmd::create::zksync::tests::test_zk_deployer_builds_eip712_transactions
 forge::cli:
-    cmd::zk_can_init_with_zksync
     zk::build::test_zk_build_sizes
     zk::cmd::test_zk_calling_empty_code_with_zero_value_issues_warning
     zk::cmd::test_zk_can_detect_call_to_empty_contract
