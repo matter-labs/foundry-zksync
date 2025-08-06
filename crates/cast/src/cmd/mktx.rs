@@ -32,6 +32,7 @@ pub struct MakeTxArgs {
     sig: Option<String>,
 
     /// The arguments of the function to call.
+    #[arg(allow_negative_numbers = true)]
     args: Vec<String>,
 
     #[command(subcommand)]
@@ -83,6 +84,7 @@ pub enum MakeTxSubcommands {
         sig: Option<String>,
 
         /// The constructor arguments.
+        #[arg(allow_negative_numbers = true)]
         args: Vec<String>,
     },
 }
