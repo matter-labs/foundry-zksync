@@ -400,8 +400,8 @@ vise = { git = "https://github.com/matter-labs/vise.git", rev = "51669f42f60c50b
 # alloy-op-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "7762adc" }
 
 ## revm
-# revm = { git = "https://github.com/bluealloy/revm.git", rev = "b5808253" }
-# op-revm = { git = "https://github.com/bluealloy/revm.git", rev = "b5808253" }
+revm = { git = "https://github.com/bluealloy/revm.git", rev = "d9cda3a" }
+op-revm = { git = "https://github.com/bluealloy/revm.git", rev = "d9cda3a" }
 # revm-inspectors = { git = "https://github.com/paradigmxyz/revm-inspectors.git", rev = "956bc98" }
 
 ## foundry
