@@ -75,6 +75,7 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
             "--value",
             "1000000000000000000",
             "--zksync",
+            "--broadcast",
         ])
         .assert_success()
         .get_output()
@@ -102,7 +103,8 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
             "--zk-paymaster-input",
             "0x8c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
             "--via-ir",
-            "--zksync"
+            "--zksync",
+            "--broadcast",
         ])
         .assert_success()
         .get_output()
@@ -125,7 +127,8 @@ forgetest_async!(test_zk_deploy_with_paymaster, |prj, cmd| {
             "--zk-paymaster-input",
             "0x0000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
             "--via-ir",
-            "--zksync"
+            "--zksync",
+            "--broadcast",
         ])
         .assert_failure();
 });
