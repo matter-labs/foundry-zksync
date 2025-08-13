@@ -80,6 +80,8 @@ forge::it:
     zk::create::forge_zk_can_deploy_contracts_with_gas_per_pubdata_and_succeed
     zk::create::forge_zk_can_deploy_contracts_with_invalid_gas_per_pubdata_and_fail
     zk::create::forge_zk_can_deploy_erc20
+    zk::create::forge_zk_create_dry_run_without_broadcast
+    zk::create::forge_zk_create_with_broadcast_flag
     zk::deploy::multiple_deployments_of_the_same_contract
     zk::factory::script_zk_can_deploy_in_constructor
     zk::factory::script_zk_can_deploy_in_method

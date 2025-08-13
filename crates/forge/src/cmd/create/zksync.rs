@@ -304,6 +304,32 @@ impl CreateArgs {
             self.verify_preflight_check(constructor_args.clone(), chain, &id).await?;
         }
 
+        // Whether to broadcast the transaction or not
+        let dry_run = !self.broadcast;
+
+        if dry_run {
+            if !shell::is_json() {
+                sh_warn!("Dry run enabled, not broadcasting transaction\n")?;
+
+                sh_println!("Contract: {}", &self.contract.name)?;
+                sh_println!("Transaction: {}", serde_json::to_string_pretty(&deployer.tx)?)?;
+                sh_println!("ABI: {}\n", serde_json::to_string_pretty(&abi)?)?;
+
+                sh_warn!(
+                    "To broadcast this transaction, add --broadcast to the previous command. See forge create --help for more."
+                )?;
+            } else {
+                let output = json!({
+                    "contract": &self.contract.name,
+                    "transaction": &deployer.tx,
+                    "abi": &abi
+                });
+                sh_println!("{}", serde_json::to_string_pretty(&output)?)?;
+            }
+
+            return Ok(());
+        }
+
         // Deploy the actual contract
         let (deployed_contract, receipt) = deployer.send_with_receipt().await?;
         let tx_hash = receipt.transaction_hash();
