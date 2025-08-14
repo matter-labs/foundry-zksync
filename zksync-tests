@@ -29,6 +29,7 @@ forge::cli:
     zk::inspect::test_zk_inspect
     zk::script::test_zk_can_execute_script_with_arguments
     zk::verify::zk_can_create_verify_random_contract_sepolia
+    zk::verify::zk_can_create_verify_with_optimization_runs_sepolia
     zk::verify::zk_can_verify_random_contract_sepolia
     zk::verify_bytecode::zk_verify_bytecode
     zk::verify_bytecode::zk_verify_bytecode_error_diff
