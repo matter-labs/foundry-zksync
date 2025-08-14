@@ -242,7 +242,6 @@ fn create_verify_with_optimization_runs(
 ) {
     // only execute if keys present
     if let Some(info) = info {
-        println!("verifying with optimization runs on {}", info.chain);
         add_single_verify_target_file(&prj);
 
         let contract_path = "src/Verify.sol:Verify";
