@@ -11,9 +11,11 @@ use foundry_zksync_compilers::compilers::zksolc::{
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, thread::sleep, time::Duration};
-use zksync_types::H160;
-use zksync_types::contract_verification::etherscan::{
-    EtherscanBoolean, EtherscanCodeFormat, EtherscanVerificationRequest,
+use zksync_types::{
+    H160,
+    contract_verification::etherscan::{
+        EtherscanBoolean, EtherscanCodeFormat, EtherscanVerificationRequest,
+    },
 };
 
 pub mod standard_json;

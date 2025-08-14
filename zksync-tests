@@ -128,6 +128,9 @@ forge-verify:
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_ipfs
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_keccak
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_keccak_not_equal
+    zksync::tests::test_zk_etherscan_check_status_request_serialization
+    zksync::tests::test_zk_etherscan_response_parsing_pending
+    zksync::tests::test_zk_etherscan_response_parsing_success
 foundry-config:
     zksync::tests::zksync_project_has_zksync_solc_when_solc_req_is_a_version
 foundry-evm-core:
