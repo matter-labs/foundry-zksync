@@ -236,6 +236,7 @@ impl ZkVerificationProvider {
             }
         };
         let optimization_used = source.settings.optimizer.enabled.unwrap_or(false);
+        let _runs = args.num_of_optimizations.map(|n| n.to_string());
         let constructor_args = self.constructor_args(args, context).await?.unwrap_or_default();
 
         let request = EtherscanVerificationRequest {
@@ -252,7 +253,7 @@ impl ZkVerificationProvider {
             },
             code_format: EtherscanCodeFormat::StandardJsonInput,
             evm_version: None,
-            runs: None,
+            runs: _runs,
             optimizer_mode: None,
             compiler_mode: None,
             force_evmla: None,
