@@ -239,7 +239,7 @@ impl ZkVerificationProvider {
         };
         let optimization_used = source.settings.optimizer.enabled.unwrap_or(false);
         let _runs = args.num_of_optimizations.map(|n| n.to_string());
-        let constructor_args = self.constructor_args(args, context).await?.unwrap_or_default();
+        let constructor_args = self.constructor_args(args, context).await?;
 
         let request = EtherscanVerificationRequest {
             contract_address: H160::from_slice(args.address.as_slice()),
@@ -247,7 +247,7 @@ impl ZkVerificationProvider {
             contract_name,
             compiler_version: solc_version,
             zksolc_version: Some(zk_compiler_version),
-            constructor_arguments: constructor_args,
+            constructor_arguments: constructor_args.unwrap_or_else(String::new),
             optimization_used: if optimization_used {
                 Some(EtherscanBoolean::True)
             } else {
@@ -300,7 +300,7 @@ impl ZkVerificationProvider {
             }
         }
 
-        Ok(Some("0x".to_string()))
+        Ok(None)
     }
     /// Retry logic for checking the verification status
     async fn retry_verification_status(
