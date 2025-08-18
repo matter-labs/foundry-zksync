@@ -121,6 +121,10 @@ impl BuildArgs {
                 self.lint(&project, &config)?;
             }
 
+            // NOTE(zk): We skip returning output because currently there's no way to return from
+            // this function due to differing solc and zksolc project output types, and
+            // no way to return a default from either branch. Ok(output)
+
             Ok(())
         } else {
             let zk_project =
