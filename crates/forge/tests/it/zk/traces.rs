@@ -286,8 +286,8 @@ fn assert_execution_trace(
                     });
                 }
             };
-            if let Some(kind) = expected_node.kind {
-                if kind != actual_node.kind {
+            if let Some(kind) = expected_node.kind
+                && kind != actual_node.kind {
                     return Some(AssertionFailure {
                         field: "kind".to_string(),
                         expected: format!("{kind:?}"),
@@ -295,9 +295,8 @@ fn assert_execution_trace(
                         path: vec![idx],
                     });
                 }
-            }
-            if let Some(address) = expected_node.address {
-                if address != actual_node.address {
+            if let Some(address) = expected_node.address
+                && address != actual_node.address {
                     return Some(AssertionFailure {
                         field: "address".to_string(),
                         expected: format!("{address:?}"),
@@ -305,9 +304,8 @@ fn assert_execution_trace(
                         path: vec![idx],
                     });
                 }
-            }
-            if let Some(data) = &expected_node.data {
-                if data != &actual_node.data {
+            if let Some(data) = &expected_node.data
+                && data != &actual_node.data {
                     return Some(AssertionFailure {
                         field: "data".to_string(),
                         expected: format!("{data:?}"),
@@ -315,9 +313,8 @@ fn assert_execution_trace(
                         path: vec![idx],
                     });
                 }
-            }
-            if let Some(output) = &expected_node.output {
-                if output != &actual_node.output {
+            if let Some(output) = &expected_node.output
+                && output != &actual_node.output {
                     return Some(AssertionFailure {
                         field: "output".to_string(),
                         expected: format!("{output:?}"),
@@ -325,7 +322,6 @@ fn assert_execution_trace(
                         path: vec![idx],
                     });
                 }
-            }
 
             if let Some(mut failure) =
                 assert_recursive(&expected_node.children, &actual_node.children)
