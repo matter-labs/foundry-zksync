@@ -369,6 +369,9 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                 return_ok!() => {
                     let bytes = call.output().as_ref();
                     let addr = if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                        // ZkSync: Address in the last 20 bytes of a 32-byte word
+                        // We want to error out if the address is not valid as
+                        // Address::from_slice() does
                         if bytes.len() >= 32 {
                             Some(Address::from_slice(&bytes[12..32]))
                         } else {
