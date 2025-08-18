@@ -9,7 +9,7 @@ use foundry_compilers::{
     compilers::{CompilerInput, solc::SolcLanguage},
     solc,
 };
-use foundry_compilers_artifacts_solc::serde_helpers::tuple_vec_map;
+use foundry_compilers::artifacts::serde_helpers::tuple_vec_map;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{

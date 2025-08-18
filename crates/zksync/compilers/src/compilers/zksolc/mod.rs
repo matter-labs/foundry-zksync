@@ -7,9 +7,7 @@ use foundry_compilers::{
     error::{Result, SolcError},
     resolver::parse::SolData,
     solc::SolcCompiler,
-};
-use foundry_compilers_artifacts_solc::{
-    BytecodeObject, Severity, SolcLanguage, error::SourceLocation,
+    artifacts::{BytecodeObject, Severity, SolcLanguage, error::SourceLocation},
 };
 
 use itertools::Itertools;

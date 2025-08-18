@@ -263,7 +263,7 @@ pub struct InspectorData {
     pub line_coverage: Option<HitMaps>,
     pub edge_coverage: Option<Vec<u8>>,
     pub cheatcodes: Option<Cheatcodes>,
-    pub chisel_state: Option<(Vec<U256>, Vec<u8>, InstructionResult)>,
+    pub chisel_state: Option<(Vec<U256>, Vec<u8>, Option<InstructionResult>)>,
     pub reverter: Option<Address>,
 }
 
@@ -280,8 +280,8 @@ pub struct InnerContextData {
 
 /// An inspector that calls multiple inspectors in sequence.
 ///
-/// If a call to an inspector returns a value other than [InstructionResult::Continue] (or
-/// equivalent) the remaining inspectors are not called.
+/// If a call to an inspector returns a value (indicating a stop or revert) the remaining inspectors
+/// are not called.
 ///
 /// Stack is divided into [Cheatcodes] and `InspectorStackInner`. This is done to allow assembling
 /// `InspectorStackRefMut` inside [Cheatcodes] to allow usage of it as [revm::Inspector]. This gives
@@ -882,9 +882,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
             ],
             |inspector| {
                 let mut out = None;
-                if let Some(output) = inspector.call(ecx, call)
-                    && output.result.result != InstructionResult::Continue
-                {
+                if let Some(output) = inspector.call(ecx, call) {
                     out = Some(Some(output));
                 }
                 out
@@ -903,9 +901,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
                 }
             }
 
-            if let Some(output) = cheatcodes.call_with_executor(ecx, call, self.inner)
-                && output.result.result != InstructionResult::Continue
-            {
+            if let Some(output) = cheatcodes.call_with_executor(ecx, call, self.inner) {
                 return Some(output);
             }
         }
@@ -913,7 +909,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
         if self.enable_isolation && !self.in_inner_context && ecx.journaled_state.depth == 1 {
             match call.scheme {
                 // Isolate CALLs
-                CallScheme::Call | CallScheme::ExtCall => {
+                CallScheme::Call => {
                     let input = call.input.bytes(ecx);
                     let (result, _) = self.transact_inner(
                         ecx,
@@ -929,7 +925,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
                     });
                 }
                 // Mark accounts and storage cold before STATICCALLs
-                CallScheme::StaticCall | CallScheme::ExtStaticCall => {
+                CallScheme::StaticCall => {
                     let JournaledState { state, warm_preloaded_addresses, .. } =
                         &mut ecx.journaled_state.inner;
                     for (addr, acc_mut) in state {
@@ -950,7 +946,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
                     }
                 }
                 // Process other variants as usual
-                CallScheme::CallCode | CallScheme::DelegateCall | CallScheme::ExtDelegateCall => {}
+                CallScheme::CallCode | CallScheme::DelegateCall => {}
             }
         }
 
@@ -1003,10 +999,9 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
         ecx.journaled_state.depth += self.in_inner_context as usize;
         if let Some(cheatcodes) = self.cheatcodes.as_deref_mut() {
             if let Some(output) = cheatcodes.create_with_executor(ecx, create, self.inner) {
-                if output.result.result != InstructionResult::Continue {
-                    ecx.journaled_state.depth -= self.in_inner_context as usize;
-                    return Some(output);
-                }
+                // If cheatcode produced an explicit result, short-circuit and return it.
+                ecx.journaled_state.depth -= self.in_inner_context as usize;
+                return Some(output);
             }
         }
         ecx.journaled_state.depth -= self.in_inner_context as usize;

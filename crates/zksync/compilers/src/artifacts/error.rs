@@ -1,8 +1,8 @@
 //! zksolc error from std json output
-use foundry_compilers_artifacts_solc::error::{Severity, SourceLocation};
+use foundry_compilers::artifacts::error::{Severity, SourceLocation};
 
 use core::iter::Peekable;
-use foundry_compilers_artifacts_solc::serde_helpers;
+use foundry_compilers::artifacts::serde_helpers;
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops::Range};
 use yansi::{Color, Style};

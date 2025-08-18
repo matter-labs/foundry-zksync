@@ -112,10 +112,9 @@ where
     };
 
     match inspect::<_, DB::Error>(tx, &mut ecx, &mut ccx, call_ctx) {
-        Ok(ZKVMExecutionResult { execution_result: result, call_traces, .. }) => Ok((
-            ResultAndState { result, state: ecx.journaled_state.finalize().state },
-            call_traces,
-        )),
+        Ok(ZKVMExecutionResult { execution_result: result, call_traces, .. }) => {
+            Ok((ResultAndState { result, state: ecx.journaled_state.finalize() }, call_traces))
+        }
         Err(err) => eyre::bail!("zk backend: failed while inspecting: {err:?}"),
     }
 }
@@ -349,8 +348,9 @@ fn get_historical_block_hashes<DB: Database>(ecx: &mut EthEvmContext<DB>) -> Has
     let mut block_hashes = HashMap::default();
     let num_blocks = get_env_historical_block_count();
     tracing::debug!("fetching last {num_blocks} block hashes");
+    let current_number: u64 = ecx.block.number.saturating_to();
     for i in 1..=num_blocks {
-        let (block_number, overflow) = ecx.block.number.overflowing_sub(i as u64);
+        let (block_number, overflow) = current_number.overflowing_sub(i as u64);
         if overflow {
             break;
         }

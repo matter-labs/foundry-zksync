@@ -8,10 +8,10 @@ use std::{
 use foundry_compilers::{
     Artifact, ArtifactId, ProjectCompileOutput, ProjectPathsConfig, info::ContractInfo,
     solc::SolcLanguage,
+    artifacts::Offsets,
 };
 
 use alloy_primitives::{B256, keccak256};
-use foundry_compilers_artifacts_solc::Offsets;
 use tracing::debug;
 use zksync_types::H256;
 

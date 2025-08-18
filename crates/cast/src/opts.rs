@@ -117,6 +117,8 @@ pub enum CastSubcommand {
     ToCheckSumAddress {
         /// The address to convert.
         address: Option<Address>,
+        /// EIP-155 chain ID to encode the address using EIP-1191.
+        chain_id: Option<u64>,
     },
 
     /// Convert hex data to an ASCII string.
@@ -361,6 +363,10 @@ pub enum CastSubcommand {
         /// If specified, only get the given field of the block.
         #[arg(long, short)]
         field: Option<String>,
+
+        /// Print the raw RLP encoded block header.
+        #[arg(long, conflicts_with = "field")]
+        raw: bool,
 
         #[arg(long, env = "CAST_FULL_BLOCK")]
         full: bool,
@@ -1114,7 +1120,7 @@ impl CastSubcommand {
             Self::ConcatHex { data: _ } => "concat-hex",
             Self::FromBin => "from-bin",
             Self::ToHexdata { input: _ } => "to-hexdata",
-            Self::ToCheckSumAddress { address: _ } => "to-check-sum-address",
+            Self::ToCheckSumAddress { address: _, chain_id: _ } => "to-check-sum-address",
             Self::ToUint256 { value: _ } => "to-uint256",
             Self::ToInt256 { value: _ } => "to-int256",
             Self::ToUnit { value: _, unit: _ } => "to-unit",
@@ -1149,7 +1155,7 @@ impl CastSubcommand {
             Self::Age { block: _, rpc: _ } => "age",
             Self::Balance { block: _, who: _, ether: _, rpc: _, erc20: _ } => "balance",
             Self::BaseFee { block: _, rpc: _ } => "base-fee",
-            Self::Block { block: _, full: _, field: _, rpc: _ } => "block",
+            Self::Block { block: _, full: _, field: _, rpc: _, raw: _ } => "block",
             Self::BlockNumber { rpc: _, block: _ } => "block-number",
             Self::Chain { rpc: _ } => "chain",
             Self::ChainId { rpc: _ } => "chain-id",

@@ -3,12 +3,8 @@ use crate::artifacts::contract::Contract;
 use alloy_json_abi::JsonAbi;
 use foundry_compilers::{
     ArtifactOutput,
-    artifacts::{DevDoc, SourceFile, StorageLayout, UserDoc},
+    artifacts::{DevDoc, SourceFile, StorageLayout, UserDoc, CompactBytecode, CompactContract, CompactContractBytecode, CompactContractBytecodeCow, CompactDeployedBytecode},
     sources::VersionedSourceFile,
-};
-use foundry_compilers_artifacts_solc::{
-    CompactBytecode, CompactContract, CompactContractBytecode, CompactContractBytecodeCow,
-    CompactDeployedBytecode,
 };
 use serde::{Deserialize, Serialize};
 use std::{
