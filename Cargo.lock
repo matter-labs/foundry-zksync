@@ -5032,7 +5032,7 @@ dependencies = [
  "dirs 6.0.0",
  "dyn-clone",
  "foundry-compilers-artifacts",
- "foundry-compilers-core 0.18.2",
+ "foundry-compilers-core",
  "fs_extra",
  "futures-util",
  "home",
@@ -5062,27 +5062,8 @@ version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f88824bfa6a5c2d7ecd076ba232cf37532af611c764fc27bb74371a91f662c36"
 dependencies = [
- "foundry-compilers-artifacts-solc 0.18.2",
+ "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
-]
-
-[[package]]
-name = "foundry-compilers-artifacts-solc"
-version = "0.17.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53f7e0d4402323dce4f74bab71159bc5a9af3d6fbf74ba547f5305a2b0821299"
-dependencies = [
- "alloy-json-abi",
- "alloy-primitives",
- "foundry-compilers-core 0.17.4",
- "path-slash",
- "regex",
- "semver 1.0.26",
- "serde",
- "serde_json",
- "thiserror 2.0.15",
- "tracing",
- "yansi",
 ]
 
 [[package]]
@@ -5093,7 +5074,7 @@ checksum = "55273eea0135b2d6e80d8475f660c87c855100999ce6f3e8c065e2fc55b95d7c"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
- "foundry-compilers-core 0.18.2",
+ "foundry-compilers-core",
  "futures-util",
  "path-slash",
  "rayon",
@@ -5116,27 +5097,11 @@ checksum = "19d0254354ec10a7fc3b5a38ea0e6d9c841c35159f9b052e0bd87769e28c00da"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
- "foundry-compilers-artifacts-solc 0.18.2",
- "foundry-compilers-core 0.18.2",
+ "foundry-compilers-artifacts-solc",
+ "foundry-compilers-core",
  "path-slash",
  "semver 1.0.26",
  "serde",
-]
-
-[[package]]
-name = "foundry-compilers-core"
-version = "0.17.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "495c8b7739f7807921e8538182b2fc7335c8a49bd71bd7f3e7982d14ba8594dc"
-dependencies = [
- "alloy-primitives",
- "cfg-if",
- "dunce",
- "path-slash",
- "semver 1.0.26",
- "serde",
- "serde_json",
- "thiserror 2.0.15",
 ]
 
 [[package]]
@@ -5546,7 +5511,6 @@ dependencies = [
  "eyre",
  "fd-lock",
  "foundry-compilers",
- "foundry-compilers-artifacts-solc 0.17.4",
  "foundry-test-utils",
  "fs4",
  "itertools 0.14.0",
