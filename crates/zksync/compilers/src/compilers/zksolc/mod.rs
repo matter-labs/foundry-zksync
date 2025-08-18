@@ -4,10 +4,10 @@ use crate::artifacts::{CompilerOutput as ZkCompilerOutput, contract::Contract, e
 use alloy_json_abi::JsonAbi;
 use foundry_compilers::{
     CompilationError, Compiler, CompilerContract, CompilerOutput, CompilerVersion,
+    artifacts::{BytecodeObject, Severity, SolcLanguage, error::SourceLocation},
     error::{Result, SolcError},
     resolver::parse::SolData,
     solc::SolcCompiler,
-    artifacts::{BytecodeObject, Severity, SolcLanguage, error::SourceLocation},
 };
 
 use itertools::Itertools;
@@ -479,9 +479,10 @@ impl ZkSolc {
 
         // don't pass solc argument in yul mode (avoid verification)
         if !input.is_yul()
-            && let Some(solc) = &self.solc {
-                cmd.arg("--solc").arg(solc);
-            }
+            && let Some(solc) = &self.solc
+        {
+            cmd.arg("--solc").arg(solc);
+        }
 
         cmd.arg("--standard-json");
         cmd.stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());

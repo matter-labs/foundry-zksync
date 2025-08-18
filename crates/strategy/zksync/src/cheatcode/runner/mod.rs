@@ -948,15 +948,16 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
         if let Some(index) = ctx.remove_recorded_access_at.take()
             && let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut()
-                && let Some(last) = recorded_account_diffs_stack.last_mut() {
-                    // This entry has been inserted during CREATE/CALL operations in revm's
-                    // cheatcode inspector and must be removed.
-                    if index < last.len() {
-                        let _ = last.remove(index);
-                    } else {
-                        warn!(target: "zksync", index, len = last.len(), "skipping duplicate access removal: out of bounds");
-                    }
-                }
+            && let Some(last) = recorded_account_diffs_stack.last_mut()
+        {
+            // This entry has been inserted during CREATE/CALL operations in revm's
+            // cheatcode inspector and must be removed.
+            if index < last.len() {
+                let _ = last.remove(index);
+            } else {
+                warn!(target: "zksync", index, len = last.len(), "skipping duplicate access removal: out of bounds");
+            }
+        }
     }
 
     /// Increments the EraVM transaction nonce after recording broadcastable txs
@@ -975,10 +976,12 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         // Explicitly increment tx nonce if calls are not isolated and we are broadcasting
         // This isn't needed in EVM, but required in zkEVM as the nonces are split.
         if let Some(broadcast) = &state.broadcast
-            && ecx.journaled_state.depth() >= broadcast.depth && !state.config.evm_opts.isolate {
-                foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, ecx);
-                debug!("incremented zksync nonce after broadcastable create");
-            }
+            && ecx.journaled_state.depth() >= broadcast.depth
+            && !state.config.evm_opts.isolate
+        {
+            foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, ecx);
+            debug!("incremented zksync nonce after broadcastable create");
+        }
     }
 }
 

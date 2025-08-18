@@ -4,12 +4,12 @@ use super::{
     settings::ZkSolcSettings,
     types::{ErrorType, WarningType},
 };
+use foundry_compilers::artifacts::serde_helpers::tuple_vec_map;
 use foundry_compilers::{
     artifacts::{Remapping, Source, Sources},
     compilers::{CompilerInput, solc::SolcLanguage},
     solc,
 };
-use foundry_compilers::artifacts::serde_helpers::tuple_vec_map;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{

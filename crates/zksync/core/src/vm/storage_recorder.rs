@@ -212,12 +212,12 @@ impl AccountAccesses {
             AccountAccessKind::Call => {
                 if let Some((depth, call_addr)) = self.skip_next_call.take()
                     && depth == new_depth
-                        && call_addr.accessor == accessor
-                        && call_addr.account == account
-                    {
-                        self.call_skip_tracker.push(true);
-                        return;
-                    }
+                    && call_addr.accessor == accessor
+                    && call_addr.account == account
+                {
+                    self.call_skip_tracker.push(true);
+                    return;
+                }
             }
         }
 
@@ -251,10 +251,11 @@ impl AccountAccesses {
         record.new_balance = new_balance;
 
         if let Some((depth, _)) = &self.skip_next_call
-            && record.depth < *depth {
-                // reset call skip if not encountered (depth has been crossed)
-                self.skip_next_call = None;
-            }
+            && record.depth < *depth
+        {
+            // reset call skip if not encountered (depth has been crossed)
+            self.skip_next_call = None;
+        }
 
         if self.pending.is_empty() {
             // no more pending records, append everything recorded so far.

@@ -310,9 +310,10 @@ impl CallTraceDecoder {
             }
 
             if let Some(artifact_id) = artifact_id
-                && artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR) {
-                    self.zk_contracts.insert(address);
-                }
+                && artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR)
+            {
+                self.zk_contracts.insert(address);
+            }
         }
     }
 

@@ -98,13 +98,14 @@ pub fn remove_zk_contract(
     }) else {
         let mut err = format!("could not find artifact: `{name}`");
         if let Some(suggestion) = super::did_you_mean(name, other).pop()
-            && suggestion != name {
-                err = format!(
-                    r#"{err}
+            && suggestion != name
+        {
+            err = format!(
+                r#"{err}
 
         Did you mean `{suggestion}`?"#
-                );
-            }
+            );
+        }
         eyre::bail!(err)
     };
 

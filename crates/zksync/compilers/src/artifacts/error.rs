@@ -59,10 +59,10 @@ impl fmt::Display for Error {
         // path/to/file:line:column: ErrorType: message
         if let Some(l) = lines.peek()
             && l.contains(self.severity.to_string().as_str())
-                && l.bytes().filter(|b| *b == b':').count() < 3
-            {
-                lines.next();
-            }
+            && l.bytes().filter(|b| *b == b':').count() < 3
+        {
+            lines.next();
+        }
 
         // Format the main source location
         fmt_source_location(f, &mut lines)?;

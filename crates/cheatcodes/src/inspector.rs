@@ -23,7 +23,7 @@ use alloy_primitives::{
     Address, B256, Bytes, Log, TxKind, U256, hex,
     map::{AddressHashMap, HashMap, HashSet},
 };
-use alloy_rpc_types::{AccessList, TransactionRequest, TransactionInput};
+use alloy_rpc_types::{AccessList, TransactionInput, TransactionRequest};
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
@@ -742,11 +742,7 @@ impl Cheatcodes {
 
             // Return a revert with the initcode as error data
             return Some(CreateOutcome {
-                result: InterpreterResult {
-                    result: InstructionResult::Revert,
-                    output,
-                    gas,
-                },
+                result: InterpreterResult { result: InstructionResult::Revert, output, gas },
                 address: None,
             });
         }

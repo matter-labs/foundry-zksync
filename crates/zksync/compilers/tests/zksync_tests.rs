@@ -6,9 +6,8 @@ use std::{
 };
 
 use foundry_test_utils::foundry_compilers::{
-    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig, buildinfo::BuildInfo,
-    cache::CompilerCache, project_util::*, resolver::parse::SolData,
-    artifacts::Remapping,
+    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig, artifacts::Remapping,
+    buildinfo::BuildInfo, cache::CompilerCache, project_util::*, resolver::parse::SolData,
 };
 
 use foundry_zksync_compilers::{
