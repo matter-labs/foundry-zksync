@@ -2912,15 +2912,13 @@ Traces:
     │   └─ ← [Stop]
     └─ ← [Stop]
 
-  [31851] CounterTest::test_Increment()
+  [28783] CounterTest::test_Increment()
     ├─ [22418] Counter::increment()
     │   ├─  storage changes:
     │   │   @ 0: 0 → 1
     │   └─ ← [Stop]
     ├─ [424] Counter::number() [staticcall]
     │   └─ ← [Return] 1
-    ├─ [0] VM::assertEq(1, 1) [staticcall]
-    │   └─ ← [Return]
     └─ ← [Stop]
 
 Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]
