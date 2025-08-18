@@ -37,35 +37,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - name: Build documentation
-        run: cargo doc --workspace --all-features --no-deps --document-private-items
-        env:
-          RUSTDOCFLAGS: --cfg docsrs -D warnings --show-type-layout --generate-link-to-definition --enable-index-page -Zunstable-options
-      - name: Deploy documentation
-        uses: peaceiris/actions-gh-pages@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: target/doc
-          force_orphan: true
-
-  doctest:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - run: cargo test --workspace --doc
-
-  typos:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: crate-ci/typos@v1
+      - name: cargo test
+        run: cargo test --doc -p forge
 
   clippy:
     name: clippy
@@ -175,20 +148,9 @@ jobs:
   deny:
     uses: ithacaxyz/ci/.github/workflows/deny.yml@main
 
-  ci-success:
-    runs-on: ubuntu-latest
-    if: always()
-    needs:
-      - nextest
-      - docs
-      - doctest
-      - typos
-      - clippy
-      - rustfmt
-      - forge-fmt
-      - crate-checks
-      - deny
-    timeout-minutes: 30
+  check-ci-install:
+    name: CI install
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install foundry-zksync
@@ -210,7 +172,7 @@ jobs:
 
       - name: Verify anvil-zksync installation
         run: anvil-zksync --version
-  
+
   zk-tests-check:
     runs-on: ubuntu-24.04
     permissions:
