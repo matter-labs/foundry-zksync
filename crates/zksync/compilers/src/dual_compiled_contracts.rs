@@ -132,14 +132,13 @@ impl DualCompiledContracts {
             let immutable_references =
                 artifact.get_deployed_bytecode().map(|d| d.immutable_references.clone());
             let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
-            if let Some(bytecode) = bytecode {
-                if let Some(deployed_bytecode) = deployed_bytecode {
+            if let Some(bytecode) = bytecode
+                && let Some(deployed_bytecode) = deployed_bytecode {
                     solc_bytecodes.insert(
                         contract_info,
                         (bytecode, deployed_bytecode.clone(), immutable_references),
                     );
                 }
-            }
         }
 
         // DualCompiledContracts uses a vec of bytecodes as factory deps field vs
@@ -310,8 +309,8 @@ impl DualCompiledContracts {
 
         while let Some(dep) = queue.pop_front() {
             // try to insert in the list of visited, if it's already present, skip
-            if visited.insert(dep) {
-                if let Some((info, contract)) = self.find_by_zk_deployed_bytecode(dep) {
+            if visited.insert(dep)
+                && let Some((info, contract)) = self.find_by_zk_deployed_bytecode(dep) {
                     debug!(
                         name = info.name,
                         deps = contract.zk_factory_deps.len(),
@@ -326,7 +325,6 @@ impl DualCompiledContracts {
                         }
                     }
                 }
-            }
         }
 
         visited.into_iter().cloned().collect()

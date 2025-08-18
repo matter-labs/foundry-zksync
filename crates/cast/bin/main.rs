@@ -2,7 +2,6 @@
 //! transactions and getting chain data.
 
 use cast::args::run;
-use foundry_cli::utils;
 use foundry_common::{POSTHOG_API_KEY, TELEMETRY_CONFIG_NAME};
 use zksync_telemetry::init_telemetry;
 

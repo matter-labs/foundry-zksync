@@ -997,13 +997,12 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
         );
 
         ecx.journaled_state.depth += self.in_inner_context as usize;
-        if let Some(cheatcodes) = self.cheatcodes.as_deref_mut() {
-            if let Some(output) = cheatcodes.create_with_executor(ecx, create, self.inner) {
+        if let Some(cheatcodes) = self.cheatcodes.as_deref_mut()
+            && let Some(output) = cheatcodes.create_with_executor(ecx, create, self.inner) {
                 // If cheatcode produced an explicit result, short-circuit and return it.
                 ecx.journaled_state.depth -= self.in_inner_context as usize;
                 return Some(output);
             }
-        }
         ecx.journaled_state.depth -= self.in_inner_context as usize;
 
         if !matches!(create.scheme, CreateScheme::Create2 { .. })

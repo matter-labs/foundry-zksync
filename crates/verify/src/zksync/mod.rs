@@ -359,8 +359,8 @@ impl ContractVerificationStatusResponse {
         }
 
         // Detailed compilation errors, if any
-        if let Some(ref compilation_errors) = self.compilation_errors {
-            if !compilation_errors.is_empty() {
+        if let Some(ref compilation_errors) = self.compilation_errors
+            && !compilation_errors.is_empty() {
                 let detailed_errors = compilation_errors
                     .iter()
                     .map(|e| format!("- {e}"))
@@ -369,7 +369,6 @@ impl ContractVerificationStatusResponse {
                 error_message.push_str("\n\nError Details:\n");
                 error_message.push_str(&detailed_errors);
             }
-        }
 
         error_message.push_str("\n\nView verification response:\n");
         error_message.push_str(verification_url);

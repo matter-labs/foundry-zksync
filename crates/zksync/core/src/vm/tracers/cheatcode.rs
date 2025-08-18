@@ -260,8 +260,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
             }
 
             // record accesses
-            if self.farcall_handler.is_tx_executing() {
-                if let Some(call_status) = tx_tracking.call_status {
+            if self.farcall_handler.is_tx_executing()
+                && let Some(call_status) = tx_tracking.call_status {
                     let current = state.vm_local_state.callstack.current;
                     // Check if we have the msg.sender override correction scheduled and
                     // account for it as it is not yet applied
@@ -339,7 +339,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                         }
                     }
                 }
-            }
         }
 
         // Checks contract calls for expectCall cheatcode
@@ -401,8 +400,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                                 && mock.value.is_none_or(|value| value == call_value)
                         })
                         .map(|(_, v)| v),
-                } {
-                    if let Some(return_data) = if return_data_queue.len() == 1 {
+                }
+                    && let Some(return_data) = if return_data_queue.len() == 1 {
                         // If the mocked calls stack has a single element in it, don't empty it
                         return_data_queue.front().map(|x| x.to_owned())
                     } else {
@@ -418,7 +417,6 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                         self.farcall_handler.set_immediate_return(return_data);
                         return;
                     }
-                }
             }
 
             // if we get here there was no matching mock call,
@@ -524,8 +522,8 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         }
 
         // record immutables for an address during creates
-        if self.call_context.is_create {
-            if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+        if self.call_context.is_create
+            && let Opcode::FarCall(_call) = data.opcode.variant.opcode {
                 let current = state.vm_local_state.callstack.current;
 
                 if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS
@@ -568,17 +566,15 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                     }
                 }
             }
-        }
 
-        if let Some(delegate_as) = self.call_context.delegate_as {
-            if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
+        if let Some(delegate_as) = self.call_context.delegate_as
+            && let Opcode::FarCall(_call) = data.opcode.variant.opcode {
                 let current = state.vm_local_state.callstack.current;
                 if current.code_address.to_address() == self.call_context.contract {
                     self.farcall_handler
                         .set_action(CallDepth::current(), CallAction::SetThisAddress(delegate_as));
                 }
             }
-        }
     }
 }
 

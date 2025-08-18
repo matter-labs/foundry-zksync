@@ -478,11 +478,10 @@ impl ZkSolc {
         }
 
         // don't pass solc argument in yul mode (avoid verification)
-        if !input.is_yul() {
-            if let Some(solc) = &self.solc {
+        if !input.is_yul()
+            && let Some(solc) = &self.solc {
                 cmd.arg("--solc").arg(solc);
             }
-        }
 
         cmd.arg("--standard-json");
         cmd.stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::piped());

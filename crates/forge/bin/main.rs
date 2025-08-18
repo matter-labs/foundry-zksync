@@ -1,7 +1,6 @@
 //! The `forge` CLI: build, test, fuzz, debug and deploy Solidity contracts, like Hardhat, Brownie,
 //! Ape.
 use forge::args::run;
-use foundry_cli::utils;
 use foundry_common::{POSTHOG_API_KEY, TELEMETRY_CONFIG_NAME};
 use zksync_telemetry::init_telemetry;
 

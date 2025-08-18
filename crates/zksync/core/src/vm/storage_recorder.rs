@@ -210,15 +210,14 @@ impl AccountAccesses {
                     Some((new_depth.saturating_add(1), CallAddresses { account, accessor }));
             }
             AccountAccessKind::Call => {
-                if let Some((depth, call_addr)) = self.skip_next_call.take() {
-                    if depth == new_depth
+                if let Some((depth, call_addr)) = self.skip_next_call.take()
+                    && depth == new_depth
                         && call_addr.accessor == accessor
                         && call_addr.account == account
                     {
                         self.call_skip_tracker.push(true);
                         return;
                     }
-                }
             }
         }
 
@@ -251,12 +250,11 @@ impl AccountAccesses {
         let mut record = self.pending.pop().expect("unexpected return while recording call");
         record.new_balance = new_balance;
 
-        if let Some((depth, _)) = &self.skip_next_call {
-            if record.depth < *depth {
+        if let Some((depth, _)) = &self.skip_next_call
+            && record.depth < *depth {
                 // reset call skip if not encountered (depth has been crossed)
                 self.skip_next_call = None;
             }
-        }
 
         if self.pending.is_empty() {
             // no more pending records, append everything recorded so far.

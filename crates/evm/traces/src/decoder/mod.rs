@@ -309,11 +309,10 @@ impl CallTraceDecoder {
                 self.collect_abi(&abi, Some(address));
             }
 
-            if let Some(artifact_id) = artifact_id {
-                if artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR) {
+            if let Some(artifact_id) = artifact_id
+                && artifact_id.path.to_string_lossy().contains(ZKSYNC_ARTIFACTS_DIR) {
                     self.zk_contracts.insert(address);
                 }
-            }
         }
     }
 
