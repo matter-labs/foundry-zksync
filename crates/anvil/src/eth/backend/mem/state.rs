@@ -2,8 +2,10 @@
 
 use alloy_primitives::{Address, B256, U256, keccak256, map::HashMap};
 use alloy_rlp::Encodable;
+use alloy_rpc_types::{BlockOverrides, state::StateOverride};
 use alloy_trie::{HashBuilder, Nibbles};
-use revm::{database::DbAccount, state::AccountInfo};
+use crate::{eth::error::BlockchainError, mem::{CacheDB, DatabaseRef, DatabaseError, BlockEnv}};
+use revm::{Database, database::DbAccount, state::AccountInfo, bytecode::Bytecode};
 
 pub fn build_root(values: impl IntoIterator<Item = (Nibbles, Vec<u8>)>) -> B256 {
     let mut builder = HashBuilder::default();
@@ -61,8 +63,6 @@ pub fn trie_account_rlp(info: &AccountInfo, storage: &HashMap<U256, U256>) -> Ve
 
     out
 }
-<<<<<<< HEAD
-=======
 
 /// Applies the given state overrides to the given CacheDB
 pub fn apply_state_overrides<D>(
@@ -73,7 +73,7 @@ where
     D: DatabaseRef<Error = DatabaseError>,
 {
     for (account, account_overrides) in &overrides {
-        let mut account_info = cache_db.basic_ref(*account)?.unwrap_or_default();
+        let mut account_info = cache_db.basic(*account)?.unwrap_or_default();
 
         if let Some(nonce) = account_overrides.nonce {
             account_info.nonce = nonce;
@@ -163,4 +163,3 @@ pub fn apply_block_overrides<DB>(
         env.basefee = base_fee.saturating_to();
     }
 }
->>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))

@@ -1135,7 +1135,7 @@ fn convert_executed_result(
         transactions,
         state_changeset,
         env,
-        cheatcodes,
+        cheatcodes: cheatcodes.map(Box::new),
         out,
         chisel_state,
         reverter,

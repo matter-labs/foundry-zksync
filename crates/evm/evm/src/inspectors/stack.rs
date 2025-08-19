@@ -522,7 +522,7 @@ impl InspectorStack {
             traces,
             line_coverage: line_coverage.map(|line_coverage| line_coverage.finish()),
             edge_coverage: edge_coverage.map(|edge_coverage| edge_coverage.into_hitcount()),
-            cheatcodes,
+            cheatcodes: cheatcodes.map(|c| *c),
             chisel_state: chisel_state.and_then(|state| state.state),
             reverter,
         }

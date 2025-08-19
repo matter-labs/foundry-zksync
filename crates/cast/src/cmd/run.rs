@@ -336,7 +336,6 @@ impl RunArgs {
         let result = {
             executor.set_trace_printer(self.trace_printer);
 
-<<<<<<< HEAD
             if self.zk_force {
                 let raw_txs = raw_block
                     .as_ref()
@@ -365,11 +364,6 @@ impl RunArgs {
                 if is_impersonated_tx(tx.inner.inner.inner()) {
                     env.evm_env.cfg_env.disable_balance_check = true;
                 }
-=======
-            configure_tx_env(&mut env.as_env_mut(), &tx.inner);
-            if is_impersonated_tx(tx.inner.inner.inner()) {
-                env.evm_env.cfg_env.disable_balance_check = true;
->>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
             }
 
             if let Some(to) = Transaction::to(&tx) {
