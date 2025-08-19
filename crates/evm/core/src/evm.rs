@@ -311,7 +311,6 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                 // Get CREATE2 deployer.
                 let create2_deployer = evm.inspector().create2_deployer();
 
-<<<<<<< HEAD
                 // Generate call inputs for CREATE2 factory and allow zkSync strategy to adjust.
                 let mut call_inputs =
                     get_create2_factory_call_inputs(salt, inputs, create2_deployer);
@@ -335,17 +334,6 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                         evm.journal_mut().load_account(call_inputs.target_address)?.info.code_hash;
                     zk_is_create2_deployer = true;
                 }
-
-=======
-                // Generate call inputs for CREATE2 factory.
-                let call_inputs = get_create2_factory_call_inputs(salt, inputs, create2_deployer);
-
-                // Push data about current override to the stack.
-                self.create2_overrides.push((evm.journal().depth(), call_inputs.clone()));
-
-                // Sanity check that CREATE2 deployer exists.
-                let code_hash = evm.journal_mut().load_account(create2_deployer)?.info.code_hash;
->>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
                 if code_hash == KECCAK_EMPTY {
                     return Ok(Some(FrameResult::Call(CallOutcome {
                         result: InterpreterResult {
@@ -357,12 +345,8 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                         },
                         memory_offset: 0..0,
                     })));
-<<<<<<< HEAD
                 } else if code_hash != DEFAULT_CREATE2_DEPLOYER_CODEHASH && !zk_is_create2_deployer
                 {
-=======
-                } else if code_hash != DEFAULT_CREATE2_DEPLOYER_CODEHASH {
->>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
                     return Ok(Some(FrameResult::Call(CallOutcome {
                         result: InterpreterResult {
                             result: InstructionResult::Revert,
@@ -392,7 +376,6 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                 unreachable!("create2 override should be a call frame");
             };
 
-<<<<<<< HEAD
             let address = match call.instruction_result() {
                 return_ok!() => {
                     let bytes = call.output().as_ref();
@@ -412,12 +395,6 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                     };
 
                     if addr.is_none() {
-=======
-            // Decode address from output.
-            let address = match call.instruction_result() {
-                return_ok!() => Address::try_from(call.output().as_ref())
-                    .map_err(|_| {
->>>>>>> 887c9b748f (chore(deps): bump to revm 27.0.3 (#10838))
                         call.result = InterpreterResult {
                             result: InstructionResult::Revert,
                             output: "invalid CREATE2 factory output".into(),
