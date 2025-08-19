@@ -6,12 +6,11 @@ use std::{
 };
 
 use foundry_compilers::{
-    Artifact, ArtifactId, ProjectCompileOutput, ProjectPathsConfig, info::ContractInfo,
-    solc::SolcLanguage,
+    Artifact, ArtifactId, ProjectCompileOutput, ProjectPathsConfig, artifacts::Offsets,
+    info::ContractInfo, solc::SolcLanguage,
 };
 
 use alloy_primitives::{B256, keccak256};
-use foundry_compilers_artifacts_solc::Offsets;
 use tracing::debug;
 use zksync_types::H256;
 
@@ -132,13 +131,13 @@ impl DualCompiledContracts {
             let immutable_references =
                 artifact.get_deployed_bytecode().map(|d| d.immutable_references.clone());
             let bytecode = artifact.get_bytecode().and_then(|b| b.object.as_bytes().cloned());
-            if let Some(bytecode) = bytecode {
-                if let Some(deployed_bytecode) = deployed_bytecode {
-                    solc_bytecodes.insert(
-                        contract_info,
-                        (bytecode, deployed_bytecode.clone(), immutable_references),
-                    );
-                }
+            if let Some(bytecode) = bytecode
+                && let Some(deployed_bytecode) = deployed_bytecode
+            {
+                solc_bytecodes.insert(
+                    contract_info,
+                    (bytecode, deployed_bytecode.clone(), immutable_references),
+                );
             }
         }
 
@@ -310,20 +309,20 @@ impl DualCompiledContracts {
 
         while let Some(dep) = queue.pop_front() {
             // try to insert in the list of visited, if it's already present, skip
-            if visited.insert(dep) {
-                if let Some((info, contract)) = self.find_by_zk_deployed_bytecode(dep) {
-                    debug!(
-                        name = info.name,
-                        deps = contract.zk_factory_deps.len(),
-                        "new factory dependency"
-                    );
+            if visited.insert(dep)
+                && let Some((info, contract)) = self.find_by_zk_deployed_bytecode(dep)
+            {
+                debug!(
+                    name = info.name,
+                    deps = contract.zk_factory_deps.len(),
+                    "new factory dependency"
+                );
 
-                    for nested_dep in &contract.zk_factory_deps {
-                        // check that the nested dependency is inserted
-                        if !visited.contains(nested_dep) {
-                            // if not, add it to queue for processing
-                            queue.push_back(nested_dep);
-                        }
+                for nested_dep in &contract.zk_factory_deps {
+                    // check that the nested dependency is inserted
+                    if !visited.contains(nested_dep) {
+                        // if not, add it to queue for processing
+                        queue.push_back(nested_dep);
                     }
                 }
             }

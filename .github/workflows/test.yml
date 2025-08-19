@@ -148,7 +148,6 @@ jobs:
   deny:
     uses: ithacaxyz/ci/.github/workflows/deny.yml@main
 
-
   check-ci-install:
     name: CI install
     runs-on: ubuntu-24.04
@@ -173,7 +172,7 @@ jobs:
 
       - name: Verify anvil-zksync installation
         run: anvil-zksync --version
-  
+
   zk-tests-check:
     runs-on: ubuntu-24.04
     permissions:

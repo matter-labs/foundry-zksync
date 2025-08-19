@@ -42,7 +42,7 @@ where
     ecx.journaled_state
         .sstore(system_account, block_info_key, new_block_info)
         .expect("failed storing value");
-    ecx.block.timestamp = timestamp.try_into().expect("Timestamp exceeds u64 in warp cheatcode");
+    ecx.block.timestamp = timestamp;
 }
 
 /// Sets `block.number`.
@@ -64,7 +64,7 @@ where
     ecx.journaled_state
         .sstore(system_account, block_info_key, new_block_info)
         .expect("failed storing value");
-    ecx.block.number = number.try_into().expect("Block number exceeds u64 in roll cheatcode");
+    ecx.block.number = number;
 }
 
 /// Sets balance for a specific address.

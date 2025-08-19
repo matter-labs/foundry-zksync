@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use crate::artifacts::contract::{Contract, ObjectFormat};
 use alloy_primitives::Bytes;
-use foundry_compilers_artifacts_solc::{
+use foundry_compilers::artifacts::{
     BytecodeObject, CompactBytecode, CompactDeployedBytecode, Offsets,
 };
 use serde::{Deserialize, Serialize};

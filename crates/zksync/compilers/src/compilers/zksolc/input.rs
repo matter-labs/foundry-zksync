@@ -5,11 +5,10 @@ use super::{
     types::{ErrorType, WarningType},
 };
 use foundry_compilers::{
-    artifacts::{Remapping, Source, Sources},
+    artifacts::{Remapping, Source, Sources, serde_helpers::tuple_vec_map},
     compilers::{CompilerInput, solc::SolcLanguage},
     solc,
 };
-use foundry_compilers_artifacts_solc::serde_helpers::tuple_vec_map;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{

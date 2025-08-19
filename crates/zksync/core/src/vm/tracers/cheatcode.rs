@@ -260,83 +260,75 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
             }
 
             // record accesses
-            if self.farcall_handler.is_tx_executing() {
-                if let Some(call_status) = tx_tracking.call_status {
-                    let current = state.vm_local_state.callstack.current;
-                    // Check if we have the msg.sender override correction scheduled and
-                    // account for it as it is not yet applied
-                    // to some of the calls we record.
-                    let msg_sender = self
-                        .farcall_handler
-                        .immediate_actions()
-                        .iter()
-                        .find_map(|action| match action {
-                            CallAction::SetMessageSender(address) => Some(*address),
-                            _ => None,
-                        })
-                        .unwrap_or_else(|| current.msg_sender.to_address());
+            if self.farcall_handler.is_tx_executing()
+                && let Some(call_status) = tx_tracking.call_status
+            {
+                let current = state.vm_local_state.callstack.current;
+                // Check if we have the msg.sender override correction scheduled and
+                // account for it as it is not yet applied
+                // to some of the calls we record.
+                let msg_sender = self
+                    .farcall_handler
+                    .immediate_actions()
+                    .iter()
+                    .find_map(|action| match action {
+                        CallAction::SetMessageSender(address) => Some(*address),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| current.msg_sender.to_address());
 
-                    let value = U256::from(current.context_u128_value);
-                    let to = current.code_address;
+                let value = U256::from(current.context_u128_value);
+                let to = current.code_address;
 
-                    let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS
-                        && (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE)
-                            || calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
-                    {
-                        let mut params = ethabi::decode(
-                            &[
-                                ethabi::ParamType::Uint(256),
-                                ethabi::ParamType::Uint(256),
-                                ethabi::ParamType::Bytes,
-                            ],
-                            &calldata[4..],
-                        )
-                        .expect("failed to decode transfer parameters");
+                let (call_type, account, data) = if to == CONTRACT_DEPLOYER_ADDRESS
+                    && (calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE)
+                        || calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2))
+                {
+                    let mut params = ethabi::decode(
+                        &[
+                            ethabi::ParamType::Uint(256),
+                            ethabi::ParamType::Uint(256),
+                            ethabi::ParamType::Bytes,
+                        ],
+                        &calldata[4..],
+                    )
+                    .expect("failed to decode transfer parameters");
 
-                        let salt =
-                            params.remove(0).into_uint().expect("must be valid uint256").to_h256();
-                        let bytecode_hash =
-                            params.remove(0).into_uint().expect("must be valid uint256").to_h256();
-                        let constructor_input =
-                            params.remove(0).into_bytes().expect("must be valid uint256");
+                    let salt =
+                        params.remove(0).into_uint().expect("must be valid uint256").to_h256();
+                    let bytecode_hash =
+                        params.remove(0).into_uint().expect("must be valid uint256").to_h256();
+                    let constructor_input =
+                        params.remove(0).into_bytes().expect("must be valid uint256");
 
-                        let address = if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) {
-                            let full_nonce = storage
-                                .borrow_mut()
-                                .read_value(&get_nonce_key(&msg_sender.to_h160()));
-                            let FullNonce { deploy_nonce, .. } =
-                                parse_full_nonce(full_nonce.to_ru256());
-                            compute_create_address(msg_sender, deploy_nonce as u32)
-                        } else if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2) {
-                            compute_create2_address(
-                                msg_sender,
-                                bytecode_hash,
-                                salt,
-                                &constructor_input,
-                            )
-                        } else {
-                            unreachable!()
-                        };
-
-                        (CallType::Create(bytecode_hash), address, constructor_input.to_vec())
+                    let address = if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE) {
+                        let full_nonce =
+                            storage.borrow_mut().read_value(&get_nonce_key(&msg_sender.to_h160()));
+                        let FullNonce { deploy_nonce, .. } =
+                            parse_full_nonce(full_nonce.to_ru256());
+                        compute_create_address(msg_sender, deploy_nonce as u32)
+                    } else if calldata.starts_with(&SELECTOR_CONTRACT_DEPLOYER_CREATE2) {
+                        compute_create2_address(msg_sender, bytecode_hash, salt, &constructor_input)
                     } else {
-                        (CallType::Call, to.to_address(), calldata.clone())
+                        unreachable!()
                     };
 
-                    match call_status {
-                        CallExecutionStatus::CallStart(tx) => {
-                            storage.borrow_mut().record_call_start(
-                                matches!(tx.opcode, FarCallOpcode::Mimic),
-                                call_type,
-                                msg_sender,
-                                account,
-                                data,
-                                value.to_ru256(),
-                            )
-                        }
-                        CallExecutionStatus::CallFinished(_tx) => {
-                            storage.borrow_mut().record_call_end()
-                        }
+                    (CallType::Create(bytecode_hash), address, constructor_input.to_vec())
+                } else {
+                    (CallType::Call, to.to_address(), calldata.clone())
+                };
+
+                match call_status {
+                    CallExecutionStatus::CallStart(tx) => storage.borrow_mut().record_call_start(
+                        matches!(tx.opcode, FarCallOpcode::Mimic),
+                        call_type,
+                        msg_sender,
+                        account,
+                        data,
+                        value.to_ru256(),
+                    ),
+                    CallExecutionStatus::CallFinished(_tx) => {
+                        storage.borrow_mut().record_call_end()
                     }
                 }
             }
@@ -401,23 +393,21 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
                                 && mock.value.is_none_or(|value| value == call_value)
                         })
                         .map(|(_, v)| v),
+                } && let Some(return_data) = if return_data_queue.len() == 1 {
+                    // If the mocked calls stack has a single element in it, don't empty it
+                    return_data_queue.front().map(|x| x.to_owned())
+                } else {
+                    // Else, we pop the front element
+                    return_data_queue.pop_front()
                 } {
-                    if let Some(return_data) = if return_data_queue.len() == 1 {
-                        // If the mocked calls stack has a single element in it, don't empty it
-                        return_data_queue.front().map(|x| x.to_owned())
-                    } else {
-                        // Else, we pop the front element
-                        return_data_queue.pop_front()
-                    } {
-                        let return_data = return_data.data.clone().to_vec();
-                        tracing::info!(
-                            "returning mocked value {:?} for {:?}",
-                            hex::encode(calldata.as_slice()),
-                            hex::encode(&return_data)
-                        );
-                        self.farcall_handler.set_immediate_return(return_data);
-                        return;
-                    }
+                    let return_data = return_data.data.clone().to_vec();
+                    tracing::info!(
+                        "returning mocked value {:?} for {:?}",
+                        hex::encode(calldata.as_slice()),
+                        hex::encode(&return_data)
+                    );
+                    self.farcall_handler.set_immediate_return(return_data);
+                    return;
                 }
             }
 
@@ -524,59 +514,57 @@ impl<S: ReadStorage + StorageViewRecorder, H: HistoryMode> DynTracer<S, SimpleMe
         }
 
         // record immutables for an address during creates
-        if self.call_context.is_create {
-            if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-                let current = state.vm_local_state.callstack.current;
+        if self.call_context.is_create
+            && let Opcode::FarCall(_call) = data.opcode.variant.opcode
+        {
+            let current = state.vm_local_state.callstack.current;
 
-                if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS
-                    && calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
-                {
-                    let mut params = ethabi::decode(
-                        &[
-                            ethabi::ParamType::Address,
-                            ethabi::ParamType::Array(Box::new(ethabi::ParamType::Tuple(vec![
-                                ethabi::ParamType::Uint(256),
-                                ethabi::ParamType::FixedBytes(32),
-                            ]))),
-                        ],
-                        &calldata[4..],
-                    )
-                    .expect("failed decoding setImmutables parameters");
+            if current.code_address == IMMUTABLE_SIMULATOR_STORAGE_ADDRESS
+                && calldata.starts_with(&SELECTOR_IMMUTABLE_SIMULATOR_SET)
+            {
+                let mut params = ethabi::decode(
+                    &[
+                        ethabi::ParamType::Address,
+                        ethabi::ParamType::Array(Box::new(ethabi::ParamType::Tuple(vec![
+                            ethabi::ParamType::Uint(256),
+                            ethabi::ParamType::FixedBytes(32),
+                        ]))),
+                    ],
+                    &calldata[4..],
+                )
+                .expect("failed decoding setImmutables parameters");
 
-                    let address = params.remove(0).into_address().expect("must be valid address");
-                    let immutables = params.remove(0).into_array().expect("must be valid array");
-                    for immutable in immutables {
-                        let mut imm_tuple = immutable.into_tuple().expect("must be valid tuple");
-                        let imm_index =
-                            imm_tuple.remove(0).into_uint().expect("must be valid uint").to_ru256();
-                        let imm_value = imm_tuple
-                            .remove(0)
-                            .into_fixed_bytes()
-                            .expect("must be valid fixed bytes");
-                        let imm_value = FixedBytes::<32>::from_slice(&imm_value);
+                let address = params.remove(0).into_address().expect("must be valid address");
+                let immutables = params.remove(0).into_array().expect("must be valid array");
+                for immutable in immutables {
+                    let mut imm_tuple = immutable.into_tuple().expect("must be valid tuple");
+                    let imm_index =
+                        imm_tuple.remove(0).into_uint().expect("must be valid uint").to_ru256();
+                    let imm_value =
+                        imm_tuple.remove(0).into_fixed_bytes().expect("must be valid fixed bytes");
+                    let imm_value = FixedBytes::<32>::from_slice(&imm_value);
 
-                        self.recorded_immutables
-                            .entry(address)
-                            .and_modify(|entry| {
-                                entry.insert(imm_index, imm_value);
-                            })
-                            .or_insert_with(|| {
-                                let mut value = HashMap::default();
-                                value.insert(imm_index, imm_value);
-                                value
-                            });
-                    }
+                    self.recorded_immutables
+                        .entry(address)
+                        .and_modify(|entry| {
+                            entry.insert(imm_index, imm_value);
+                        })
+                        .or_insert_with(|| {
+                            let mut value = HashMap::default();
+                            value.insert(imm_index, imm_value);
+                            value
+                        });
                 }
             }
         }
 
-        if let Some(delegate_as) = self.call_context.delegate_as {
-            if let Opcode::FarCall(_call) = data.opcode.variant.opcode {
-                let current = state.vm_local_state.callstack.current;
-                if current.code_address.to_address() == self.call_context.contract {
-                    self.farcall_handler
-                        .set_action(CallDepth::current(), CallAction::SetThisAddress(delegate_as));
-                }
+        if let Some(delegate_as) = self.call_context.delegate_as
+            && let Opcode::FarCall(_call) = data.opcode.variant.opcode
+        {
+            let current = state.vm_local_state.callstack.current;
+            if current.code_address.to_address() == self.call_context.contract {
+                self.farcall_handler
+                    .set_action(CallDepth::current(), CallAction::SetThisAddress(delegate_as));
             }
         }
     }

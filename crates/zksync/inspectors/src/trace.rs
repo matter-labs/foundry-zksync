@@ -12,8 +12,8 @@ use revm::{
     context::{ContextTr, CreateScheme},
     inspector::JournalExt,
     interpreter::{
-        CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Gas,
-        InstructionResult, Interpreter, InterpreterResult,
+        CallInputs, CallOutcome, CreateInputs, CreateOutcome, Gas, InstructionResult, Interpreter,
+        InterpreterResult,
     },
 };
 
@@ -153,22 +153,7 @@ where
         self.inner.create_end(context, inputs, outcome)
     }
 
-    fn eofcreate(
-        &mut self,
-        context: &mut CTX,
-        inputs: &mut EOFCreateInputs,
-    ) -> Option<CreateOutcome> {
-        self.inner.eofcreate(context, inputs)
-    }
-
-    fn eofcreate_end(
-        &mut self,
-        context: &mut CTX,
-        inputs: &EOFCreateInputs,
-        outcome: &mut CreateOutcome,
-    ) {
-        self.inner.eofcreate_end(context, inputs, outcome)
-    }
+    // EOF create hooks were removed in current revm version; only standard create is supported.
 
     fn selfdestruct(&mut self, contract: Address, target: Address, value: U256) {
         <TracingInspector as Inspector<CTX>>::selfdestruct(&mut self.inner, contract, target, value)
@@ -200,7 +185,6 @@ impl InspectorExt for TraceCollector {
                 value: revm::interpreter::CallValue::Transfer(call.value.to_ru256()),
                 target_address: call.to.to_address(),
                 bytecode_address: call.to.to_address(),
-                is_eof: false,
                 is_static: false,
                 return_memory_offset: Default::default(),
             };
