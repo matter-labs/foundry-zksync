@@ -28,6 +28,7 @@ use thiserror::Error;
 #[macro_use]
 pub mod macros;
 
+pub mod codesize;
 pub mod gas;
 pub mod high;
 pub mod info;
@@ -44,7 +45,7 @@ static ALL_REGISTERED_LINTS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
 
 /// Linter implementation to analyze Solidity source code responsible for identifying
 /// vulnerabilities gas optimizations, and best practices.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SolidityLinter<'a> {
     path_config: ProjectPathsConfig,
     severity: Option<Vec<Severity>>,
