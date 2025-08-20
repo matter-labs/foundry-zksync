@@ -121,7 +121,6 @@ where
         }
     }
 
-
     fn db_mut(&mut self) -> &mut Self::DB {
         match self {
             Self::Eth(evm) => evm.db_mut(),

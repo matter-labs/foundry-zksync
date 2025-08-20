@@ -138,7 +138,7 @@ where
 {
     info!(?address, bytecode = hex::encode(bytecode), "cheatcode etch");
     let len = bytecode.len();
-    if len % 32 != 0 {
+    if !len.is_multiple_of(32) {
         panic!(
             "etch bytecode length must be divisible by 32, found '{}' with length {len}",
             hex::encode(bytecode)

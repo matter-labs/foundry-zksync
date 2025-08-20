@@ -1,11 +1,14 @@
 //! Support for generating the state root for memdb storage
 
+use crate::{
+    eth::error::BlockchainError,
+    mem::{BlockEnv, CacheDB, DatabaseError, DatabaseRef},
+};
 use alloy_primitives::{Address, B256, U256, keccak256, map::HashMap};
 use alloy_rlp::Encodable;
 use alloy_rpc_types::{BlockOverrides, state::StateOverride};
 use alloy_trie::{HashBuilder, Nibbles};
-use crate::{eth::error::BlockchainError, mem::{CacheDB, DatabaseRef, DatabaseError, BlockEnv}};
-use revm::{Database, database::DbAccount, state::AccountInfo, bytecode::Bytecode};
+use revm::{Database, bytecode::Bytecode, database::DbAccount, state::AccountInfo};
 
 pub fn build_root(values: impl IntoIterator<Item = (Nibbles, Vec<u8>)>) -> B256 {
     let mut builder = HashBuilder::default();

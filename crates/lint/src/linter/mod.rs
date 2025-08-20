@@ -154,14 +154,14 @@ impl<'s> LintContext<'s> {
     pub fn span_char_at_offset(&self, span: Span, offset: usize) -> char {
         let file = self.sess.source_map().lookup_source_file(span.lo());
         let lo = span.lo().to_usize();
-        if let Some(global_offset) = lo.checked_add(offset) {
-            if global_offset < file.end_position().to_usize() {
-                return file.src
+        if let Some(global_offset) = lo.checked_add(offset)
+            && global_offset < file.end_position().to_usize() {
+                return file
+                    .src
                     .chars()
                     .nth(global_offset - file.start_pos.to_usize())
                     .unwrap_or_default();
             }
-        }
 
         0 as char
     }
@@ -236,11 +236,8 @@ impl Snippet {
                     }
                 } else {
                     // No span provided, just show the addition
-                    let addition = if add.contains('\n') {
-                        format!("\n{add}")
-                    } else {
-                        format!("`{add}`")
-                    };
+                    let addition =
+                        if add.contains('\n') { format!("\n{add}") } else { format!("`{add}`") };
                     notes.push((addition.into(), Style::NoStyle));
                 }
 

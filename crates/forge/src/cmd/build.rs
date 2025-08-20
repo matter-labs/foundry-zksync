@@ -159,11 +159,13 @@ impl BuildArgs {
             }
 
             // TODO(zk): HUMAN INTERVENTION REQUIRED
-            // Complex type mismatch between ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput> 
+            // Complex type mismatch between ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>
             // and ProjectCompileOutput (solc default). This needs proper refactoring to unify
             // the return types or change the function signature. For now, returning an error
             // to avoid unsafe transmute.
-            Err(eyre::eyre!("ZkSync compilation output type conversion not implemented - requires human intervention"))
+            Err(eyre::eyre!(
+                "ZkSync compilation output type conversion not implemented - requires human intervention"
+            ))
         }
     }
 

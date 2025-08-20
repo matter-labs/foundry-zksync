@@ -186,7 +186,6 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
         self.inner.ctx.cfg.chain_id
     }
 
-
     fn db_mut(&mut self) -> &mut Self::DB {
         &mut self.inner.ctx.journaled_state.database
     }
