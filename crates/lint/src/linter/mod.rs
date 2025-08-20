@@ -29,6 +29,10 @@ use crate::inline_config::InlineConfig;
 /// - `init`: Creates a new solar `Session` with the appropriate linter configuration.
 /// - `early_lint`: Scans the source files (using the AST) emitting a diagnostic for lints found.
 /// - `late_lint`: Scans the source files (using the HIR) emitting a diagnostic for lints found.
+///
+/// # Note:
+///
+/// - For `early_lint` and `late_lint`, the `ParsingContext` should have the sources pre-loaded.
 pub trait Linter: Send + Sync + Clone {
     type Language: Language;
     type Lint: Lint;
@@ -49,34 +53,20 @@ pub struct LintContext<'s> {
     sess: &'s Session,
     with_description: bool,
     pub inline_config: InlineConfig,
-    active_lints: Vec<&'static str>,
 }
 
 impl<'s> LintContext<'s> {
-    pub fn new(
-        sess: &'s Session,
-        with_description: bool,
-        config: InlineConfig,
-        active_lints: Vec<&'static str>,
-    ) -> Self {
-        Self { sess, with_description, inline_config: config, active_lints }
+    pub fn new(sess: &'s Session, with_description: bool, config: InlineConfig) -> Self {
+        Self { sess, with_description, inline_config: config }
     }
 
     pub fn session(&self) -> &'s Session {
         self.sess
     }
 
-    // Helper method to check if a lint id is enabled.
-    //
-    // For performance reasons, some passes check several lints at once. Thus, this method is
-    // required to avoid unintended warnings.
-    pub fn is_lint_enabled(&self, id: &'static str) -> bool {
-        self.active_lints.contains(&id)
-    }
-
     /// Helper method to emit diagnostics easily from passes
     pub fn emit<L: Lint>(&self, lint: &'static L, span: Span) {
-        if self.inline_config.is_disabled(span, lint.id()) || !self.is_lint_enabled(lint.id()) {
+        if self.inline_config.is_disabled(span, lint.id()) {
             return;
         }
 
@@ -97,27 +87,19 @@ impl<'s> LintContext<'s> {
     /// For Diff snippets, if no span is provided, it will use the lint's span.
     /// If unable to get code from the span, it will fall back to a Block snippet.
     pub fn emit_with_fix<L: Lint>(&self, lint: &'static L, span: Span, snippet: Snippet) {
-        if self.inline_config.is_disabled(span, lint.id()) || !self.is_lint_enabled(lint.id()) {
+        if self.inline_config.is_disabled(span, lint.id()) {
             return;
         }
 
         // Convert the snippet to ensure we have the appropriate type
         let snippet = match snippet {
-<<<<<<< HEAD
             Snippet::Diff { desc, span: diff_span, add, trim_code } => {
-=======
-            Snippet::Diff { desc, span: diff_span, add } => {
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
                 // Use the provided span or fall back to the lint span
                 let target_span = diff_span.unwrap_or(span);
 
                 // Check if we can get the original code
                 if self.span_to_snippet(target_span).is_some() {
-<<<<<<< HEAD
                     Snippet::Diff { desc, span: Some(target_span), add, trim_code }
-=======
-                    Snippet::Diff { desc, span: Some(target_span), add }
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
                 } else {
                     // Fall back to Block if we can't get the original code
                     Snippet::Block { desc, code: add }
@@ -140,7 +122,6 @@ impl<'s> LintContext<'s> {
         diag.emit();
     }
 
-<<<<<<< HEAD
     /// Gets the "raw" source code (snippet) of the given span.
     pub fn span_to_snippet(&self, span: Span) -> Option<String> {
         self.sess.source_map().span_to_snippet(span).ok()
@@ -162,16 +143,10 @@ impl<'s> LintContext<'s> {
 
         0
     }
-=======
-    pub fn span_to_snippet(&self, span: Span) -> Option<String> {
-        self.sess.source_map().span_to_snippet(span).ok()
-    }
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Snippet {
-<<<<<<< HEAD
     /// A standalone block of code. Used for showing examples without suggesting a fix.
     Block {
         /// An optional description displayed above the code block.
@@ -195,17 +170,10 @@ pub enum Snippet {
         /// aligning the indentation of multi-line replacements.
         trim_code: bool,
     },
-=======
-    /// Represents a code block. Can have an optional description.
-    Block { desc: Option<&'static str>, code: String },
-    /// Represents a code diff. Can have an optional description and a span for the code to remove.
-    Diff { desc: Option<&'static str>, span: Option<Span>, add: String },
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
 }
 
 impl Snippet {
     pub fn to_note(self, ctx: &LintContext<'_>) -> Vec<(DiagMsg, Style)> {
-<<<<<<< HEAD
         let mut output = if let Some(desc) = self.desc() {
             vec![(DiagMsg::from(desc), Style::NoStyle), (DiagMsg::from("\n\n"), Style::NoStyle)]
         } else {
@@ -237,34 +205,6 @@ impl Snippet {
                 output.extend(
                     code.lines().map(|line| (DiagMsg::from(format!("{line}\n")), Style::NoStyle)),
                 );
-=======
-        let mut output = Vec::new();
-        match self.desc() {
-            Some(desc) => {
-                output.push((DiagMsg::from(desc), Style::NoStyle));
-                output.push((DiagMsg::from("\n\n"), Style::NoStyle));
-            }
-            None => output.push((DiagMsg::from(" \n"), Style::NoStyle)),
-        }
-        match self {
-            Self::Diff { span, add, .. } => {
-                // Get the original code from the span if provided
-                if let Some(span) = span
-                    && let Some(rmv) = ctx.span_to_snippet(span)
-                {
-                    for line in rmv.lines() {
-                        output.push((DiagMsg::from(format!("- {line}\n")), Style::Removal));
-                    }
-                }
-                for line in add.lines() {
-                    output.push((DiagMsg::from(format!("+ {line}\n")), Style::Addition));
-                }
-            }
-            Self::Block { code, .. } => {
-                for line in code.lines() {
-                    output.push((DiagMsg::from(format!("- {line}\n")), Style::NoStyle));
-                }
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
             }
         }
         output.push((DiagMsg::from("\n"), Style::NoStyle));
@@ -277,7 +217,6 @@ impl Snippet {
             Self::Block { desc, .. } => *desc,
         }
     }
-<<<<<<< HEAD
 
     /// Removes up to `max_chars` whitespaces from the start of the string.
     fn trim_start_limited(s: &str, max_chars: usize) -> &str {
@@ -292,6 +231,4 @@ impl Snippet {
 
         &s[byte_offset..]
     }
-=======
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
 }

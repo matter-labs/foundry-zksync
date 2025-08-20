@@ -115,7 +115,7 @@ impl SolidityLinter {
         }
 
         // Filter passes based on linter config
-        let (mut passes, lints): (Vec<Box<dyn EarlyLintPass<'_>>>, Vec<_>) = passes_and_lints
+        let (mut passes, _lints): (Vec<Box<dyn EarlyLintPass<'_>>>, Vec<_>) = passes_and_lints
             .into_iter()
             .fold((Vec::new(), Vec::new()), |(mut passes, mut ids), (pass, lints)| {
                 let included_ids: Vec<_> = lints
@@ -136,7 +136,7 @@ impl SolidityLinter {
         let inline_config = parse_inline_config(sess, &comments, InlineConfigSource::Ast(ast));
 
         // Initialize and run the early lint visitor
-        let ctx = LintContext::new(sess, self.with_description, inline_config, lints);
+        let ctx = LintContext::new(sess, self.with_description, inline_config);
         let mut early_visitor = EarlyLintVisitor::new(&ctx, &mut passes);
         _ = early_visitor.visit_source_unit(ast);
         early_visitor.post_source_unit(ast);
@@ -165,7 +165,7 @@ impl SolidityLinter {
         }
 
         // Filter passes based on config
-        let (mut passes, lints): (Vec<Box<dyn LateLintPass<'_>>>, Vec<_>) = passes_and_lints
+        let (mut passes, _lints): (Vec<Box<dyn LateLintPass<'_>>>, Vec<_>) = passes_and_lints
             .into_iter()
             .fold((Vec::new(), Vec::new()), |(mut passes, mut ids), (pass, lints)| {
                 let included_ids: Vec<_> = lints
@@ -187,7 +187,7 @@ impl SolidityLinter {
             parse_inline_config(sess, &comments, InlineConfigSource::Hir((&gcx.hir, source_id)));
 
         // Run late lint visitor
-        let ctx = LintContext::new(sess, self.with_description, inline_config, lints);
+        let ctx = LintContext::new(sess, self.with_description, inline_config);
         let mut late_visitor = LateLintVisitor::new(&ctx, &mut passes, &gcx.hir);
 
         // Visit this specific source
