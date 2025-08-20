@@ -126,9 +126,7 @@ impl UnwrappedModifierLogic {
         let param_list = param_list.join(", ");
         let param_decls = param_decls.join(", ");
 
-        let body_indent = " ".repeat(ctx.get_span_indentation(
-            before.first().or(after.first()).map(|stmt| stmt.span).unwrap_or(func.span),
-        ));
+        let body_indent = "        "; // Use 8 spaces for body indentation
         let body = match (wrap_before, wrap_after) {
             (true, true) => format!(
                 "{body_indent}_{modifier_name}Before({param_list});\n{body_indent}_;\n{body_indent}_{modifier_name}After({param_list});"
@@ -142,7 +140,7 @@ impl UnwrappedModifierLogic {
             _ => unreachable!(),
         };
 
-        let mod_indent = " ".repeat(ctx.get_span_indentation(func.span));
+        let mod_indent = "    "; // Use 4 spaces for modifier indentation
         let mut replacement = format!(
             "{mod_indent}modifier {modifier_name}({param_decls}) {{\n{body}\n{mod_indent}}}"
         );
@@ -169,7 +167,6 @@ impl UnwrappedModifierLogic {
             desc: Some("wrap modifier logic to reduce code size"),
             span: Some(Span::new(func.span.lo(), func.body_span.hi())),
             add: replacement,
-            trim_code: true,
         })
     }
 }

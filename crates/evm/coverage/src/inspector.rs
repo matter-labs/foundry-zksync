@@ -39,7 +39,7 @@ where
     CTX: ContextTr<Journal: JournalExt>,
 {
     fn initialize_interp(&mut self, interpreter: &mut Interpreter, _context: &mut CTX) {
-        interpreter.bytecode.get_or_calculate_hash();
+        let _ = interpreter.bytecode.hash();
         self.insert_map(interpreter);
     }
 
@@ -61,8 +61,8 @@ impl LineCoverageCollector {
     /// See comments on `current_map` for more details.
     #[inline]
     fn get_or_insert_map(&mut self, interpreter: &mut Interpreter) -> &mut HitMap {
-        let hash = interpreter.bytecode.get_or_calculate_hash();
-        if self.current_hash != *hash {
+        let hash = interpreter.bytecode.hash().unwrap_or(B256::ZERO);
+        if self.current_hash != hash {
             self.insert_map(interpreter);
         }
         // SAFETY: See comments on `current_map`.
@@ -72,7 +72,7 @@ impl LineCoverageCollector {
     #[cold]
     #[inline(never)]
     fn insert_map(&mut self, interpreter: &mut Interpreter) {
-        let hash = interpreter.bytecode.hash().unwrap_or_else(|| eof_panic());
+        let hash = interpreter.bytecode.hash().unwrap_or(B256::ZERO);
         self.current_hash = hash;
         // Converts the mutable reference to a `NonNull` pointer.
         self.current_map = self
