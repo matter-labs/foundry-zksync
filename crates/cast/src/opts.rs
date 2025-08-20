@@ -1144,7 +1144,7 @@ impl CastSubcommand {
             Self::ParseBytes32Address { bytes: _ } => "parse-bytes32-address",
             Self::DecodeAbi { sig: _, calldata: _, input: _ } => "decode-abi",
             Self::AbiEncode { sig: _, packed: _, args: _ } => "abi-encode",
-            Self::DecodeCalldata { sig: _, calldata: _ } => "decode-calldata",
+            Self::DecodeCalldata { sig: _, calldata: _, file: _ } => "decode-calldata",
             Self::CalldataEncode { sig: _, args: _, file: _ } => "calldata-encode",
             Self::DecodeString { data: _ } => "decode-string",
             Self::DecodeEvent { sig: _, data: _ } => "decode-event",

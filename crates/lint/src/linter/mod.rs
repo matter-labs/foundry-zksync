@@ -103,75 +103,63 @@ impl<'s> LintContext<'s> {
 
         // Convert the snippet to ensure we have the appropriate type
         let snippet = match snippet {
-<<<<<<< HEAD
-            Snippet::Diff { desc, span: diff_span, add, trim_code } => {
-=======
             Snippet::Diff { desc, span: diff_span, add } => {
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
                 // Use the provided span or fall back to the lint span
                 let target_span = diff_span.unwrap_or(span);
 
                 // Check if we can get the original code
                 if self.span_to_snippet(target_span).is_some() {
-<<<<<<< HEAD
-                    Snippet::Diff { desc, span: Some(target_span), add, trim_code }
-=======
                     Snippet::Diff { desc, span: Some(target_span), add }
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
                 } else {
-                    // Fall back to Block if we can't get the original code
+                    // Fallback to a Block snippet if we can't get the source
                     Snippet::Block { desc, code: add }
                 }
             }
-            // Block snippets remain unchanged
-            block => block,
+            other => other,
         };
 
         let desc = if self.with_description { lint.description() } else { "" };
-        let diag: DiagBuilder<'_, ()> = self
+        let mut diag: DiagBuilder<'_, ()> = self
             .sess
             .dcx
             .diag(lint.severity().into(), desc)
             .code(DiagId::new_str(lint.id()))
             .span(MultiSpan::from_span(span))
-            .highlighted_note(snippet.to_note(self))
             .help(lint.help());
+
+        // Add the snippet as notes
+        for (note, _style) in snippet.to_note(self) {
+            diag = diag.note(note.clone());
+        }
 
         diag.emit();
     }
 
-<<<<<<< HEAD
-    /// Gets the "raw" source code (snippet) of the given span.
+    /// Helper method to get code from spans
     pub fn span_to_snippet(&self, span: Span) -> Option<String> {
         self.sess.source_map().span_to_snippet(span).ok()
     }
 
-    /// Gets the number of leading whitespaces (indentation) of the line where the span begins.
-    pub fn get_span_indentation(&self, span: Span) -> usize {
-        if !span.is_dummy() {
-            // Get the line text and compute the indentation prior to the span's position.
-            let loc = self.sess.source_map().lookup_char_pos(span.lo());
-            if let Some(line_text) = loc.file.get_line(loc.line) {
-                let col_offset = loc.col.to_usize();
-                if col_offset <= line_text.len() {
-                    let prev_text = &line_text[..col_offset];
-                    return prev_text.len() - prev_text.trim().len();
-                }
+    /// Extracts the character at the byte `offset` of a span.
+    /// Returns `0` (null character) if offset is out-of-bounds
+    pub fn span_char_at_offset(&self, span: Span, offset: usize) -> char {
+        let file = self.sess.source_map().lookup_source_file(span.lo());
+        let lo = span.lo().to_usize();
+        if let Some(global_offset) = lo.checked_add(offset) {
+            if global_offset < file.end_position().to_usize() {
+                return file.src
+                    .chars()
+                    .nth(global_offset - file.start_pos.to_usize())
+                    .unwrap_or_default();
             }
         }
 
-        0
+        0 as char
     }
-=======
-    pub fn span_to_snippet(&self, span: Span) -> Option<String> {
-        self.sess.source_map().span_to_snippet(span).ok()
-    }
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Snippet {
-<<<<<<< HEAD
     /// A standalone block of code. Used for showing examples without suggesting a fix.
     Block {
         /// An optional description displayed above the code block.
@@ -188,110 +176,67 @@ pub enum Snippet {
         /// The `Span` of the source code to be removed. Note that, if uninformed,
         /// `fn emit_with_fix()` falls back to the lint span.
         span: Option<Span>,
-        /// The fix.
+        /// The replacement code to be suggested.
         add: String,
-        /// If `true`, the leading whitespaces of the first line will be trimmed from the whole
-        /// code block. Applies to both, the added and removed code. This is useful for
-        /// aligning the indentation of multi-line replacements.
-        trim_code: bool,
     },
-=======
-    /// Represents a code block. Can have an optional description.
-    Block { desc: Option<&'static str>, code: String },
-    /// Represents a code diff. Can have an optional description and a span for the code to remove.
-    Diff { desc: Option<&'static str>, span: Option<Span>, add: String },
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
 }
 
 impl Snippet {
     pub fn to_note(self, ctx: &LintContext<'_>) -> Vec<(DiagMsg, Style)> {
-<<<<<<< HEAD
-        let mut output = if let Some(desc) = self.desc() {
-            vec![(DiagMsg::from(desc), Style::NoStyle), (DiagMsg::from("\n\n"), Style::NoStyle)]
-        } else {
-            vec![(DiagMsg::from(" \n"), Style::NoStyle)]
-        };
-
         match self {
-            Self::Diff { span, add, trim_code: trim, .. } => {
-                // Get the original code from the span if provided and normalize its indentation
-                if let Some(span) = span
-                    && let Some(rmv) = ctx.span_to_snippet(span)
-                {
-                    let ind = ctx.get_span_indentation(span);
-                    let diag_msg = |line: &str, prefix: &str, style: Style| {
-                        let content = if trim { Self::trim_start_limited(line, ind) } else { line };
-                        (DiagMsg::from(format!("{prefix}{content}\n")), style)
-                    };
-                    output.extend(rmv.lines().map(|line| diag_msg(line, "- ", Style::Removal)));
-                    output.extend(add.lines().map(|line| diag_msg(line, "+ ", Style::Addition)));
+            Self::Block { desc, code } => {
+                let mut notes = Vec::new();
+
+                if let Some(desc) = desc {
+                    notes.push((desc.into(), Style::NoStyle));
+                }
+
+                // If the code contains newlines, display as a multi-line block
+                if code.contains('\n') {
+                    notes.push((format!("\n{code}").into(), Style::NoStyle));
                 } else {
-                    // Should never happen, but fall back to `Self::Block` behavior.
-                    output.extend(
-                        add.lines()
-                            .map(|line| (DiagMsg::from(format!("{line}\n")), Style::NoStyle)),
-                    );
+                    notes.push((format!("`{code}`").into(), Style::NoStyle));
                 }
+
+                notes
             }
-            Self::Block { code, .. } => {
-                output.extend(
-                    code.lines().map(|line| (DiagMsg::from(format!("{line}\n")), Style::NoStyle)),
-                );
-=======
-        let mut output = Vec::new();
-        match self.desc() {
-            Some(desc) => {
-                output.push((DiagMsg::from(desc), Style::NoStyle));
-                output.push((DiagMsg::from("\n\n"), Style::NoStyle));
-            }
-            None => output.push((DiagMsg::from(" \n"), Style::NoStyle)),
-        }
-        match self {
-            Self::Diff { span, add, .. } => {
-                // Get the original code from the span if provided
-                if let Some(span) = span
-                    && let Some(rmv) = ctx.span_to_snippet(span)
-                {
-                    for line in rmv.lines() {
-                        output.push((DiagMsg::from(format!("- {line}\n")), Style::Removal));
+            Self::Diff { desc, span, add } => {
+                let mut notes = Vec::new();
+
+                if let Some(desc) = desc {
+                    notes.push((desc.into(), Style::NoStyle));
+                }
+
+                if let Some(span) = span {
+                    if let Some(original) = ctx.span_to_snippet(span) {
+                        // Display as a diff: - original, + replacement
+                        let diff = if original.contains('\n') || add.contains('\n') {
+                            format!("\n- {original}\n+ {add}")
+                        } else {
+                            format!("`- {original}` `+ {add}`")
+                        };
+                        notes.push((diff.into(), Style::NoStyle));
+                    } else {
+                        // Fallback to just showing the addition
+                        let addition = if add.contains('\n') {
+                            format!("\n{add}")
+                        } else {
+                            format!("`{add}`")
+                        };
+                        notes.push((addition.into(), Style::NoStyle));
                     }
+                } else {
+                    // No span provided, just show the addition
+                    let addition = if add.contains('\n') {
+                        format!("\n{add}")
+                    } else {
+                        format!("`{add}`")
+                    };
+                    notes.push((addition.into(), Style::NoStyle));
                 }
-                for line in add.lines() {
-                    output.push((DiagMsg::from(format!("+ {line}\n")), Style::Addition));
-                }
-            }
-            Self::Block { code, .. } => {
-                for line in code.lines() {
-                    output.push((DiagMsg::from(format!("- {line}\n")), Style::NoStyle));
-                }
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
+
+                notes
             }
         }
-        output.push((DiagMsg::from("\n"), Style::NoStyle));
-        output
     }
-
-    pub fn desc(&self) -> Option<&'static str> {
-        match self {
-            Self::Diff { desc, .. } => *desc,
-            Self::Block { desc, .. } => *desc,
-        }
-    }
-<<<<<<< HEAD
-
-    /// Removes up to `max_chars` whitespaces from the start of the string.
-    fn trim_start_limited(s: &str, max_chars: usize) -> &str {
-        let (mut chars, mut byte_offset) = (0, 0);
-        for c in s.chars() {
-            if chars >= max_chars || !c.is_whitespace() {
-                break;
-            }
-            chars += 1;
-            byte_offset += c.len_utf8();
-        }
-
-        &s[byte_offset..]
-    }
-=======
->>>>>>> 03e3dbc186 (feat(forge-lint): new `LateLintPass` + support code snippets (#10846))
 }

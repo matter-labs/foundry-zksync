@@ -121,11 +121,7 @@ impl BuildArgs {
                 self.lint(&project, &config)?;
             }
 
-            // NOTE(zk): We skip returning output because currently there's no way to return from
-            // this function due to differing solc and zksolc project output types, and
-            // no way to return a default from either branch. Ok(output)
-
-            Ok(())
+            Ok(output)
         } else {
             let zk_project =
                 foundry_config::zksync::config_create_project(&config, config.cache, false)?;
@@ -158,38 +154,13 @@ impl BuildArgs {
                 sh_println!("{}", serde_json::to_string_pretty(&zk_output.output())?)?;
             }
 
-            // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
-            // solc output. For now, create a dummy ProjectCompileOutput.
-            // This is a temporary solution until ZKsync output types are unified.
-            use foundry_compilers::artifacts::CompilerOutput;
-            let dummy_output = ProjectCompileOutput::new(CompilerOutput::default(), vec![]);
-            Ok(dummy_output)
+            // TODO(zk): HUMAN INTERVENTION REQUIRED
+            // Complex type mismatch between ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput> 
+            // and ProjectCompileOutput (solc default). This needs proper refactoring to unify
+            // the return types or change the function signature. For now, returning an error
+            // to avoid unsafe transmute.
+            Err(eyre::eyre!("ZkSync compilation output type conversion not implemented - requires human intervention"))
         }
-
-        let format_json = shell::is_json();
-        let compiler = ProjectCompiler::new()
-            .files(files)
-            .dynamic_test_linking(config.dynamic_test_linking)
-            .print_names(self.names)
-            .print_sizes(self.sizes)
-            .ignore_eip_3860(self.ignore_eip_3860)
-            .bail(!format_json);
-
-        let output = compiler.compile(&project)?;
-
-        // Cache project selectors.
-        cache_local_signatures(&output)?;
-
-        if format_json && !self.names && !self.sizes {
-            sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
-        }
-
-        // Only run the `SolidityLinter` if there are no compilation errors
-        if output.output().errors.iter().all(|e| !e.is_error()) {
-            self.lint(&project, &config)?;
-        }
-
-        Ok(output)
     }
 
     fn lint(&self, project: &Project, config: &Config) -> Result<()> {
