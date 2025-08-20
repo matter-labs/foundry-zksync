@@ -121,19 +121,6 @@ where
         }
     }
 
-    fn components(&self) -> (&Self::DB, &Self::Inspector, &Self::Precompiles) {
-        match self {
-            Self::Eth(evm) => evm.components(),
-            Self::Op(evm) => evm.components(),
-        }
-    }
-
-    fn components_mut(&mut self) -> (&mut Self::DB, &mut Self::Inspector, &mut Self::Precompiles) {
-        match self {
-            Self::Eth(evm) => evm.components_mut(),
-            Self::Op(evm) => evm.components_mut(),
-        }
-    }
 
     fn db_mut(&mut self) -> &mut Self::DB {
         match self {

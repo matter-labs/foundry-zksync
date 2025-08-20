@@ -186,17 +186,6 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
         self.inner.ctx.cfg.chain_id
     }
 
-    fn components(&self) -> (&Self::DB, &Self::Inspector, &Self::Precompiles) {
-        (&self.inner.ctx.journaled_state.database, &self.inner.inspector, &self.inner.precompiles)
-    }
-
-    fn components_mut(&mut self) -> (&mut Self::DB, &mut Self::Inspector, &mut Self::Precompiles) {
-        (
-            &mut self.inner.ctx.journaled_state.database,
-            &mut self.inner.inspector,
-            &mut self.inner.precompiles,
-        )
-    }
 
     fn db_mut(&mut self) -> &mut Self::DB {
         &mut self.inner.ctx.journaled_state.database
