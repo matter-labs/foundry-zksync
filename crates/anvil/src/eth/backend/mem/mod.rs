@@ -95,7 +95,7 @@ use foundry_evm::{
     constants::DEFAULT_CREATE2_DEPLOYER_RUNTIME_CODE,
     decode::RevertDecoder,
     inspectors::AccessListInspector,
-    traces::TracingInspectorConfig,
+    traces::{TracingInspectorConfig, CallTraceDecoder},
     utils::{get_blob_base_fee_update_fraction, get_blob_base_fee_update_fraction_by_spec_id},
 };
 use foundry_evm_core::either_evm::EitherEvm;

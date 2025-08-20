@@ -1,5 +1,5 @@
 use super::{
-    backend::mem::{BlockRequest, DatabaseRef, State, state},
+    backend::mem::{BlockRequest, DatabaseRef, State},
     sign::build_typed_transaction,
 };
 use crate::{
