@@ -27,6 +27,7 @@ use thiserror::Error;
 #[macro_use]
 pub mod macros;
 
+pub mod codesize;
 pub mod gas;
 pub mod high;
 pub mod info;
@@ -38,6 +39,7 @@ static ALL_REGISTERED_LINTS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     lints.extend_from_slice(med::REGISTERED_LINTS);
     lints.extend_from_slice(info::REGISTERED_LINTS);
     lints.extend_from_slice(gas::REGISTERED_LINTS);
+    lints.extend_from_slice(codesize::REGISTERED_LINTS);
     lints.into_iter().map(|lint| lint.id()).collect()
 });
 
@@ -112,10 +114,11 @@ impl SolidityLinter {
         // Do not apply gas-severity rules on tests and scripts
         if !self.path_config.is_test_or_script(path) {
             passes_and_lints.extend(gas::create_early_lint_passes());
+            passes_and_lints.extend(codesize::create_early_lint_passes());
         }
 
         // Filter passes based on linter config
-        let (mut passes, _lints): (Vec<Box<dyn EarlyLintPass<'_>>>, Vec<_>) = passes_and_lints
+        let (mut passes, lints): (Vec<Box<dyn EarlyLintPass<'_>>>, Vec<_>) = passes_and_lints
             .into_iter()
             .fold((Vec::new(), Vec::new()), |(mut passes, mut ids), (pass, lints)| {
                 let included_ids: Vec<_> = lints
@@ -136,7 +139,7 @@ impl SolidityLinter {
         let inline_config = parse_inline_config(sess, &comments, InlineConfigSource::Ast(ast));
 
         // Initialize and run the early lint visitor
-        let ctx = LintContext::new(sess, self.with_description, inline_config);
+        let ctx = LintContext::new(sess, self.with_description, inline_config, lints);
         let mut early_visitor = EarlyLintVisitor::new(&ctx, &mut passes);
         _ = early_visitor.visit_source_unit(ast);
         early_visitor.post_source_unit(ast);
@@ -162,10 +165,11 @@ impl SolidityLinter {
             && !self.path_config.is_test_or_script(path)
         {
             passes_and_lints.extend(gas::create_late_lint_passes());
+            passes_and_lints.extend(codesize::create_late_lint_passes());
         }
 
         // Filter passes based on config
-        let (mut passes, _lints): (Vec<Box<dyn LateLintPass<'_>>>, Vec<_>) = passes_and_lints
+        let (mut passes, lints): (Vec<Box<dyn LateLintPass<'_>>>, Vec<_>) = passes_and_lints
             .into_iter()
             .fold((Vec::new(), Vec::new()), |(mut passes, mut ids), (pass, lints)| {
                 let included_ids: Vec<_> = lints
@@ -187,7 +191,7 @@ impl SolidityLinter {
             parse_inline_config(sess, &comments, InlineConfigSource::Hir((&gcx.hir, source_id)));
 
         // Run late lint visitor
-        let ctx = LintContext::new(sess, self.with_description, inline_config);
+        let ctx = LintContext::new(sess, self.with_description, inline_config, lints);
         let mut late_visitor = LateLintVisitor::new(&ctx, &mut passes, &gcx.hir);
 
         // Visit this specific source
@@ -363,6 +367,12 @@ impl<'a> TryFrom<&'a str> for SolLint {
         }
 
         for &lint in gas::REGISTERED_LINTS {
+            if lint.id() == value {
+                return Ok(lint);
+            }
+        }
+
+        for &lint in codesize::REGISTERED_LINTS {
             if lint.id() == value {
                 return Ok(lint);
             }
