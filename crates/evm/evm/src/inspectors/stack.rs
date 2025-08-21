@@ -638,9 +638,9 @@ impl InspectorStackRefMut<'_> {
         self.inner_context_data = Some(InnerContextData { original_origin: cached_env.tx.caller });
         self.in_inner_context = true;
 
-        let res = self.with_inspector(|inspector| {
+        let res = self.with_inspector(|mut inspector| {
             let (db, journal, env) = ecx.as_db_env_and_journal();
-            let mut evm = new_evm_with_inspector(db, env.to_owned(), inspector);
+            let mut evm = new_evm_with_inspector(db, env.to_owned(), &mut inspector);
 
             evm.journaled_state.state = {
                 let mut state = journal.state.clone();
