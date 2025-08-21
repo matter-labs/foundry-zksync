@@ -167,6 +167,7 @@ impl UnwrappedModifierLogic {
             desc: Some("wrap modifier logic to reduce code size"),
             span: Some(Span::new(func.span.lo(), func.body_span.hi())),
             add: replacement,
+            trim_code: false,
         })
     }
 }

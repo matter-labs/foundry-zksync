@@ -117,7 +117,7 @@ impl BuildArgs {
             }
 
             if !config.lint.lint_on_build {
-                return Ok(output);
+                return Ok(());
             }
 
             // Only run the `SolidityLinter` if there are no compilation errors
@@ -125,7 +125,7 @@ impl BuildArgs {
                 self.lint(&project, &config).map_err(|err| eyre!("Lint failed: {err}"))?;
             }
 
-            Ok(output)
+            Ok(())
         } else {
             let zk_project =
                 foundry_config::zksync::config_create_project(&config, config.cache, false)?;

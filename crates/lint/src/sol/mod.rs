@@ -2,7 +2,6 @@ use crate::{
     inline_config::{InlineConfig, InlineConfigItem},
     linter::{
         EarlyLintPass, EarlyLintVisitor, LateLintPass, LateLintVisitor, Lint, LintContext, Linter,
-        LinterConfig,
     },
 };
 use foundry_common::comments::Comments;
@@ -33,6 +32,13 @@ pub mod gas;
 pub mod high;
 pub mod info;
 pub mod med;
+
+/// Configuration passed to lint passes
+struct LinterConfig<'a> {
+    inline: InlineConfig,
+    #[allow(dead_code)]
+    mixed_case_exceptions: &'a [String],
+}
 
 static ALL_REGISTERED_LINTS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     let mut lints = Vec::new();
@@ -151,7 +157,8 @@ impl<'a> SolidityLinter<'a> {
         let inline_config = parse_inline_config(sess, &comments, InlineConfigSource::Ast(ast));
 
         // Initialize and run the early lint visitor
-        let ctx = LintContext::new(sess, self.with_description, self.config(inline_config), lints);
+        let config = self.config(inline_config);
+        let ctx = LintContext::new(sess, self.with_description, config.inline, lints);
         let mut early_visitor = EarlyLintVisitor::new(&ctx, &mut passes);
         _ = early_visitor.visit_source_unit(ast);
         early_visitor.post_source_unit(ast);
@@ -203,7 +210,8 @@ impl<'a> SolidityLinter<'a> {
             parse_inline_config(sess, &comments, InlineConfigSource::Hir((&gcx.hir, source_id)));
 
         // Run late lint visitor
-        let ctx = LintContext::new(sess, self.with_description, self.config(inline_config), lints);
+        let config = self.config(inline_config);
+        let ctx = LintContext::new(sess, self.with_description, config.inline, lints);
         let mut late_visitor = LateLintVisitor::new(&ctx, &mut passes, &gcx.hir);
 
         // Visit this specific source
