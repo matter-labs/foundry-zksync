@@ -3915,7 +3915,7 @@ Traces:
     │   └─ ← [Return]
     └─ ← [Stop]
 
-  [161909] PrankTest::test_Increment()
+  [161350] PrankTest::test_Increment()
     ├─ [0] VM::startPrank(0x0000000000000000000000000000000000000123)
     │   └─ ← [Return]
     ├─ [96345] → new Counter@0xc4B957Cd61beB9b9afD76204b30683EDAaaB51Ec

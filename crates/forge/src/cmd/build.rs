@@ -8,7 +8,7 @@ use foundry_cli::{
 };
 use foundry_common::{compile::ProjectCompiler, shell};
 use foundry_compilers::{
-    CompilationError, FileFilter, Project, ProjectCompileOutput,
+    CompilationError, FileFilter, Project,
     compilers::{Language, multi::MultiCompilerLanguage},
     solc::SolcLanguage,
     utils::source_files_iter,
@@ -73,7 +73,7 @@ pub struct BuildArgs {
 impl BuildArgs {
     // TODO(zk): We cannot return `ProjectCompileOutput` as there's currently no way to return
     // a common type from solc and zksolc branches.
-    pub fn run(self) -> Result<ProjectCompileOutput> {
+    pub fn run(self) -> Result<()> {
         let mut config = self.load_config()?;
 
         if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
@@ -158,14 +158,9 @@ impl BuildArgs {
                 sh_println!("{}", serde_json::to_string_pretty(&zk_output.output())?)?;
             }
 
-            // TODO(zk): HUMAN INTERVENTION REQUIRED
-            // Complex type mismatch between ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>
-            // and ProjectCompileOutput (solc default). This needs proper refactoring to unify
-            // the return types or change the function signature. For now, returning an error
-            // to avoid unsafe transmute.
-            Err(eyre::eyre!(
-                "ZkSync compilation output type conversion not implemented - requires human intervention"
-            ))
+            // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
+            // solc output. This is safe currently as the output is simply dropped.
+            Ok(())
         }
     }
 

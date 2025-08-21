@@ -40,6 +40,7 @@ static ALL_REGISTERED_LINTS: LazyLock<Vec<&'static str>> = LazyLock::new(|| {
     lints.extend_from_slice(med::REGISTERED_LINTS);
     lints.extend_from_slice(info::REGISTERED_LINTS);
     lints.extend_from_slice(gas::REGISTERED_LINTS);
+    lints.extend_from_slice(codesize::REGISTERED_LINTS);
     lints.into_iter().map(|lint| lint.id()).collect()
 });
 
@@ -125,6 +126,7 @@ impl<'a> SolidityLinter<'a> {
         // Do not apply gas-severity rules on tests and scripts
         if !self.path_config.is_test_or_script(path) {
             passes_and_lints.extend(gas::create_early_lint_passes());
+            passes_and_lints.extend(codesize::create_early_lint_passes());
         }
 
         // Filter passes based on linter config
@@ -175,6 +177,7 @@ impl<'a> SolidityLinter<'a> {
             && !self.path_config.is_test_or_script(path)
         {
             passes_and_lints.extend(gas::create_late_lint_passes());
+            passes_and_lints.extend(codesize::create_late_lint_passes());
         }
 
         // Filter passes based on config
