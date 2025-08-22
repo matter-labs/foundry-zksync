@@ -38,9 +38,7 @@ use foundry_evm_core::{
     constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
     evm::{FoundryEvm, new_evm_with_existing_context},
 };
-use foundry_evm_traces::{
-    TracingInspector, TracingInspectorConfig, identifier::SignaturesIdentifier,
-};
+use foundry_evm_traces::{TracingInspectorConfig, identifier::SignaturesIdentifier};
 use foundry_wallets::multi_wallet::MultiWallet;
 use foundry_zksync_inspectors::TraceCollector;
 use itertools::Itertools;
@@ -556,6 +554,7 @@ impl Clone for Cheatcodes {
             strategy: self.strategy.clone(),
             access_list: self.access_list.clone(),
             test_context: self.test_context.clone(),
+            signatures_identifier: self.signatures_identifier.clone(),
         }
     }
 }

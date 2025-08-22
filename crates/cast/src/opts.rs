@@ -1167,7 +1167,7 @@ impl CastSubcommand {
             Self::ParseBytes32Address { bytes: _ } => "parse-bytes32-address",
             Self::DecodeAbi { sig: _, calldata: _, input: _ } => "decode-abi",
             Self::AbiEncode { sig: _, packed: _, args: _ } => "abi-encode",
-            Self::DecodeCalldata { sig: _, calldata: _ } => "decode-calldata",
+            Self::DecodeCalldata { sig: _, calldata: _, file: _ } => "decode-calldata",
             Self::CalldataEncode { sig: _, args: _, file: _ } => "calldata-encode",
             Self::DecodeString { data: _ } => "decode-string",
             Self::DecodeEvent { sig: _, data: _ } => "decode-event",
@@ -1214,7 +1214,9 @@ impl CastSubcommand {
             }
             Self::Run(_) => "run",
             Self::SendTx(_) => "send-tx",
-            Self::Tx { tx_hash: _, field: _, raw: _, rpc: _, from: _, nonce: _ } => "tx",
+            Self::Tx { tx_hash: _, field: _, raw: _, rpc: _, from: _, nonce: _, to_request: _ } => {
+                "tx"
+            }
             Self::FourByte { selector: _ } => "four-byte",
             Self::FourByteCalldata { calldata: _ } => "four-byte-calldata",
             Self::FourByteEvent { topic: _ } => "four-byte-event",
@@ -1244,6 +1246,7 @@ impl CastSubcommand {
             Self::TxPool { command: _ } => "tx-pool",
             Self::DAEstimate(_) => "da-estimate",
             Self::RecoverAuthority { .. } => "recover-authority",
+            Self::Pad { .. } => "pad",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()
     }

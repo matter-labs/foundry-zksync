@@ -28,7 +28,7 @@ pub use inspector::{
 };
 pub use spec::{CheatcodeDef, Vm};
 
-// Exposed for ZKsync usage.
+// Note(zk): Exposed for ZKsync usage.
 pub use evm::{journaled_account, mock::make_acc_non_empty};
 
 #[macro_use]

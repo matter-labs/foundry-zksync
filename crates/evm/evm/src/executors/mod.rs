@@ -533,15 +533,10 @@ impl Executor {
             &mut backend,
             &mut env,
             &self.env,
-            &mut inspector,
+            &mut stack,
         )?;
 
-        convert_executed_result(
-            env.clone(),
-            inspector,
-            result,
-            backend.has_state_snapshot_failure(),
-        )
+        convert_executed_result(env.clone(), stack, result, backend.has_state_snapshot_failure())
     }
 
     /// Execute the transaction configured in `env.tx`.

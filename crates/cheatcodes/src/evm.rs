@@ -7,7 +7,7 @@ use crate::{
 };
 use alloy_consensus::TxEnvelope;
 use alloy_genesis::{Genesis, GenesisAccount};
-use alloy_primitives::{Address, B256, U256, map::HashMap};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
 use foundry_common::fs::{read_json_file, write_json_file};
@@ -860,7 +860,8 @@ impl Cheatcode for setBlockhashCall {
 
 impl Cheatcode for startDebugTraceRecordingCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
-        let Some(tracer) = executor.tracing_inspector() else {
+        let Some(tracer) = executor.tracing_inspector().and_then(|tracer| tracer.as_deref_mut())
+        else {
             return Err(Error::from("no tracer initiated, consider adding -vvv flag"));
         };
 
@@ -891,7 +892,8 @@ impl Cheatcode for startDebugTraceRecordingCall {
 
 impl Cheatcode for stopAndReturnDebugTraceRecordingCall {
     fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
-        let Some(tracer) = executor.tracing_inspector() else {
+        let Some(tracer) = executor.tracing_inspector().and_then(|tracer| tracer.as_deref_mut())
+        else {
             return Err(Error::from("no tracer initiated, consider adding -vvv flag"));
         };
 
@@ -1137,10 +1139,7 @@ fn read_callers(state: &Cheatcodes, default_sender: &Address, call_depth: usize)
 }
 
 /// Ensures the `Account` is loaded and touched.
-pub(super) fn journaled_account<'a>(
-    ecx: Ecx<'a, '_, '_>,
-    addr: Address,
-) -> Result<&'a mut Account> {
+pub fn journaled_account<'a>(ecx: Ecx<'a, '_, '_>, addr: Address) -> Result<&'a mut Account> {
     ensure_loaded_account(ecx, addr)?;
     Ok(ecx.journaled_state.state.get_mut(&addr).expect("account is loaded"))
 }
