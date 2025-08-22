@@ -38,7 +38,9 @@ use foundry_evm_core::{
     constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
     evm::{FoundryEvm, new_evm_with_existing_context},
 };
-use foundry_evm_traces::TracingInspectorConfig;
+use foundry_evm_traces::{
+    TracingInspector, TracingInspectorConfig, identifier::SignaturesIdentifier,
+};
 use foundry_wallets::multi_wallet::MultiWallet;
 use foundry_zksync_inspectors::TraceCollector;
 use itertools::Itertools;
@@ -506,6 +508,9 @@ pub struct Cheatcodes {
 
     /// The behavior strategy.
     pub strategy: CheatcodeInspectorStrategy,
+
+    /// Signatures identifier for decoding events and functions
+    pub signatures_identifier: Option<SignaturesIdentifier>,
 }
 
 impl Clone for Cheatcodes {
@@ -608,6 +613,7 @@ impl Cheatcodes {
             arbitrary_storage: Default::default(),
             deprecated: Default::default(),
             wallets: Default::default(),
+            signatures_identifier: SignaturesIdentifier::new(true).ok(),
         }
     }
 
@@ -1739,10 +1745,14 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
                 .collect::<Vec<_>>();
 
             // Revert if not all emits expected were matched.
-            if self.expected_emits.iter().any(|(expected, _)| !expected.found && expected.count > 0)
+            if let Some((expected, _)) = self
+                .expected_emits
+                .iter()
+                .find(|(expected, _)| !expected.found && expected.count > 0)
             {
                 outcome.result.result = InstructionResult::Revert;
-                outcome.result.output = "log != expected log".abi_encode().into();
+                let error_msg = expected.mismatch_error.as_deref().unwrap_or("log != expected log");
+                outcome.result.output = error_msg.abi_encode().into();
                 return;
             }
 

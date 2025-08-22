@@ -35,7 +35,7 @@ rand.workspace = true
 snapbox = { version = "0.6", features = ["json", "regex", "term-svg"] }
 tokio.workspace = true
 tempfile.workspace = true
-ui_test = "0.29.2"
+ui_test = "0.30.2"
 httptest.workspace = true
 tower-http = { version = "0.6.2", features = ["cors"] }
 anyhow = "1.0"
