@@ -24,7 +24,7 @@ jobs:
     outputs:
       test-matrix: ${{ steps.gen.outputs.test-matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -52,7 +52,7 @@ jobs:
       # Note(zk): Using our own Alchemy API key to avoid rate limiting issues
       ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           target: ${{ matrix.target }}
@@ -63,7 +63,7 @@ jobs:
         if: contains(matrix.name, 'external')
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Install Bun
         if: contains(matrix.name, 'external') && !contains(matrix.runner_label, 'windows')
         uses: oven-sh/setup-bun@v1

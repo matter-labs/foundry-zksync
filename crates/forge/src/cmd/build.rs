@@ -1,6 +1,6 @@
 use super::{install, watch::WatchArgs};
 use clap::Parser;
-use eyre::Result;
+use eyre::{Result, eyre};
 use forge_lint::{linter::Linter, sol::SolidityLinter};
 use foundry_cli::{
     opts::{BuildOpts, solar_pcx_from_build_opts},
@@ -164,9 +164,9 @@ impl BuildArgs {
         }
     }
 
-    fn lint(&self, project: &Project, config: &Config) -> Result<()> {
+    fn lint(&self, project: &Project, config: &Config, files: Option<&[PathBuf]>) -> Result<()> {
         let format_json = shell::is_json();
-        if project.compiler.solc.is_some() && config.lint.lint_on_build && !shell::is_quiet() {
+        if project.compiler.solc.is_some() && !shell::is_quiet() {
             let linter = SolidityLinter::new(config.project_paths())
                 .with_json_emitter(format_json)
                 .with_description(!format_json)
@@ -186,7 +186,8 @@ impl BuildArgs {
                             .filter_map(|s| forge_lint::sol::SolLint::try_from(s.as_str()).ok())
                             .collect(),
                     )
-                });
+                })
+                .with_mixed_case_exceptions(&config.lint.mixed_case_exceptions);
 
             // Expand ignore globs and canonicalize from the get go
             let ignored = expand_globs(&config.root, config.lint.ignore.iter())?
@@ -200,6 +201,10 @@ impl BuildArgs {
                 .project_paths::<SolcLanguage>()
                 .input_files_iter()
                 .filter(|p| {
+                    // Lint only specified build files, if any.
+                    if let Some(files) = files {
+                        return files.iter().any(|file| &curr_dir.join(file) == p);
+                    }
                     skip.is_match(p)
                         && !(ignored.contains(p) || ignored.contains(&curr_dir.join(p)))
                 })

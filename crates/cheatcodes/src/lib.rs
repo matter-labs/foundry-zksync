@@ -45,6 +45,8 @@ mod version;
 mod env;
 pub use env::set_execution_context;
 
+mod fork;
+
 mod evm;
 pub use evm::{DealRecord, mock::mock_call};
 
@@ -183,7 +185,7 @@ impl CheatsCtxt<'_, '_, '_, '_> {
 
     #[inline]
     pub(crate) fn is_precompile(&self, address: &Address) -> bool {
-        self.ecx.journaled_state.inner.precompiles.contains(address)
+        self.ecx.journaled_state.warm_addresses.precompiles().contains(address)
     }
 }
 

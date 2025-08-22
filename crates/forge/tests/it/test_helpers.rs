@@ -150,8 +150,8 @@ impl ForgeTestProfile {
                 max_fuzz_dictionary_values: 10_000,
             },
             gas_report_samples: 256,
+            corpus: FuzzCorpusConfig::default(),
             failure_persist_dir: Some(tempfile::tempdir().unwrap().keep()),
-            failure_persist_file: Some("testfailure".to_string()),
             show_logs: false,
             timeout: None,
             no_zksync_reserved_addresses: false,
@@ -171,10 +171,7 @@ impl ForgeTestProfile {
             shrink_run_limit: 5000,
             max_assume_rejects: 65536,
             gas_report_samples: 256,
-            corpus_dir: None,
-            corpus_gzip: true,
-            corpus_min_mutations: 5,
-            corpus_min_size: 0,
+            corpus: FuzzCorpusConfig::default(),
             failure_persist_dir: Some(
                 tempfile::Builder::new()
                     .prefix(&format!("foundry-{self}"))
@@ -186,7 +183,6 @@ impl ForgeTestProfile {
             timeout: None,
             show_solidity: false,
             no_zksync_reserved_addresses: false,
-            show_edge_coverage: false,
         };
 
         config.sanitized()
