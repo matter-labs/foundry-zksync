@@ -3928,8 +3928,6 @@ Traces:
     │   └─ ← [Stop]
     ├─ [..] Counter::number() [staticcall]
     │   └─ ← [Return] 1
-    ├─ [0] VM::assertEq(1, 1) [staticcall]
-    │   └─ ← [Return]
     ├─  storage changes:
     │   @ 31: 0x00000000000000000000006cdbd1b486b8fbd4140e8cd6daaed05be13ed91401 → 0x0000000000000000000000c4b957cd61beb9b9afd76204b30683edaaab51ec01
     └─ ← [Stop]

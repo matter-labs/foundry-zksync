@@ -1255,7 +1255,7 @@ exclude = []
     "show_metrics": true,
     "timeout": null,
     "show_solidity": false,
-    "no_zksync_reserved_addresses": false
+    "no_zksync_reserved_addresses": false,
     "show_edge_coverage": false
   },
   "ffi": false,
