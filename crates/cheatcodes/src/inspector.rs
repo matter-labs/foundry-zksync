@@ -110,7 +110,7 @@ pub trait CheatcodesExecutor {
     }
 
     /// Returns a mutable reference to the tracing inspector if it is available.
-    fn tracing_inspector(&mut self) -> Option<&mut Option<TraceCollector>> {
+    fn tracing_inspector(&mut self) -> Option<&mut Option<Box<TraceCollector>>> {
         None
     }
 
@@ -1012,7 +1012,7 @@ impl Cheatcodes {
         &mut self,
         ecx: Ecx,
         call: &mut CallInputs,
-        executor: &mut impl CheatcodesExecutor,
+        executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CallOutcome> {
         let gas = Gas::new(call.gas_limit);
         let curr_depth = ecx.journaled_state.depth();
@@ -1413,7 +1413,6 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
         );
     }
 
-    #[inline]
     fn step(&mut self, interpreter: &mut Interpreter, ecx: Ecx) {
         self.pc = interpreter.bytecode.pc();
 
@@ -1456,7 +1455,6 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
         }
     }
 
-    #[inline]
     fn step_end(&mut self, interpreter: &mut Interpreter, ecx: Ecx) {
         if self.strategy.runner.pre_step_end(self.strategy.context.as_mut(), interpreter, ecx) {
             return;

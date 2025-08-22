@@ -1139,6 +1139,7 @@ failure_persist_dir = "cache/invariant"
 show_metrics = true
 show_solidity = false
 no_zksync_reserved_addresses = false
+show_edge_coverage = false
 
 [labels]
 
@@ -1255,6 +1256,7 @@ exclude = []
     "timeout": null,
     "show_solidity": false,
     "no_zksync_reserved_addresses": false
+    "show_edge_coverage": false
   },
   "ffi": false,
   "allow_internal_expect_revert": false,

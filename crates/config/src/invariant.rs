@@ -26,8 +26,8 @@ pub struct InvariantConfig {
     pub max_assume_rejects: u32,
     /// Number of runs to execute and include in the gas report.
     pub gas_report_samples: u32,
-    /// Path where invariant corpus is stored. If not configured then coverage guided fuzzing is
-    /// disabled.
+    /// Path where invariant corpus is stored, enables coverage guided fuzzing and edge coverage
+    /// metrics.
     pub corpus_dir: Option<PathBuf>,
     /// Whether corpus to use gzip file compression and decompression.
     pub corpus_gzip: bool,
@@ -45,6 +45,8 @@ pub struct InvariantConfig {
     pub show_solidity: bool,
     /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
     pub no_zksync_reserved_addresses: bool,
+    /// Whether to collect and display edge coverage metrics.
+    pub show_edge_coverage: bool,
 }
 
 impl Default for InvariantConfig {
@@ -67,6 +69,7 @@ impl Default for InvariantConfig {
             timeout: None,
             show_solidity: false,
             no_zksync_reserved_addresses: false,
+            show_edge_coverage: false,
         }
     }
 }
@@ -92,6 +95,7 @@ impl InvariantConfig {
             timeout: None,
             show_solidity: false,
             no_zksync_reserved_addresses: false,
+            show_edge_coverage: false,
         }
     }
 }
