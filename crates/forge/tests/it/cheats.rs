@@ -67,7 +67,7 @@ async fn test_cheats_local_default() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_state_diff_storage_layout() {
-    let test_data = {
+    let test_data: ForgeTestData = {
         let profile = ForgeTestProfile::Default;
         install_crypto_provider();
         init_tracing();
@@ -76,7 +76,7 @@ async fn test_state_diff_storage_layout() {
         let mut project = config.project().unwrap();
         // Compile with StorageLayout
         let output = get_compiled(&mut project);
-        ForgeTestData { project, output, config: config.into(), profile }
+        ForgeTestData { project, output, config: config.into(), profile, zk_test_data: None }
     };
     let filter =
         Filter::new(".*", "StateDiffStorageLayoutTest", &format!(".*cheats{RE_PATH_SEPARATOR}*"));

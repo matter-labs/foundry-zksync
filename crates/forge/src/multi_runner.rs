@@ -19,7 +19,7 @@ use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
     executors::{
-        Executor, ExecutorBuilder,
+        Executor, ExecutorBuilder, FailFast,
         strategy::{ExecutorStrategy, LinkOutput},
     },
     fork::CreateFork,

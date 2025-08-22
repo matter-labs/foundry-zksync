@@ -33,6 +33,7 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_zksync_core::MAX_L2_GAS_LIMIT;
+use itertools::Either;
 use regex::Regex;
 use revm::context::TransactionType;
 use std::{str::FromStr, sync::LazyLock};

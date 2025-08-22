@@ -98,7 +98,9 @@ pub use filter::SkipBuildFilters;
 mod warning;
 pub use warning::*;
 
+pub mod extend;
 pub mod fix;
+use extend::Extends;
 
 // reexport so cli types can implement `figment::Provider` to easily merge compiler arguments
 pub use alloy_chains::{Chain, NamedChain};

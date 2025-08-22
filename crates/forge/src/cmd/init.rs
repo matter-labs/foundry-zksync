@@ -48,7 +48,7 @@ pub struct InitArgs {
 
 impl InitArgs {
     pub fn run(self) -> Result<()> {
-        let Self { root, template, branch, install, offline, force, vscode } = self;
+        let Self { root, template, branch, install, offline, force, vscode, use_parent_git } = self;
         let DependencyInstallOpts { shallow, no_git, commit, zksync } = install;
 
         // create the root dir if it does not exist

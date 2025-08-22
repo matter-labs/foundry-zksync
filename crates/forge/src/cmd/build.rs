@@ -1,6 +1,6 @@
 use super::{install, watch::WatchArgs};
 use clap::Parser;
-use eyre::{Result, eyre};
+use eyre::Result;
 use forge_lint::{linter::Linter, sol::SolidityLinter};
 use foundry_cli::{
     opts::{BuildOpts, solar_pcx_from_build_opts},
@@ -118,7 +118,7 @@ impl BuildArgs {
 
             // Only run the `SolidityLinter` if there are no compilation errors
             if output.output().errors.iter().all(|e| !e.is_error()) {
-                self.lint(&project, &config)?;
+                self.lint(&project, &config, None)?;
             }
 
             // NOTE(zk): We skip returning output because currently there's no way to return from
