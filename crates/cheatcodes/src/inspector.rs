@@ -857,7 +857,7 @@ impl Cheatcodes {
                 storageAccesses: vec![],    // updated on create_end
                 depth: curr_depth as u64,
                 oldNonce: 0,
-                newNonce: 0,
+                newNonce: 1,
             }]);
         }
 
