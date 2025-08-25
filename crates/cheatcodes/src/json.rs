@@ -360,6 +360,23 @@ impl Cheatcode for writeJson_1Call {
     }
 }
 
+impl Cheatcode for writeJsonUpsertCall {
+    fn apply(&self, state: &mut Cheatcodes) -> Result {
+        let Self { json: value, path, valueKey } = self;
+
+        // Read, parse, and update the JSON object
+        let data_path = state.config.ensure_path_allowed(path, FsAccessKind::Read)?;
+        let data_string = fs::read_to_string(&data_path)?;
+        let mut data =
+            serde_json::from_str(&data_string).unwrap_or_else(|_| Value::String(data_string));
+        upsert_json_value(&mut data, value, valueKey)?;
+
+        // Write the updated content back to the file
+        let json_string = serde_json::to_string_pretty(&data)?;
+        super::fs::write_file(state, path.as_ref(), json_string.as_bytes())
+    }
+}
+
 pub(super) fn check_json_key_exists(json: &str, key: &str) -> Result {
     let json = parse_json_str(json)?;
     let values = select(&json, key)?;
