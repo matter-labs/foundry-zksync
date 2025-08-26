@@ -186,6 +186,7 @@ impl ForgeTestProfile {
             timeout: None,
             show_solidity: false,
             no_zksync_reserved_addresses: false,
+            show_edge_coverage: false,
         };
 
         config.sanitized()
