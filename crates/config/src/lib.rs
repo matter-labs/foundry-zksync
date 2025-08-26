@@ -135,6 +135,8 @@ pub use compilation::{CompilationRestrictions, SettingsOverrides};
 pub mod zksync;
 use zksync::ZkSyncConfig;
 
+pub use semver;
+
 /// Foundry configuration
 ///
 /// # Defaults
