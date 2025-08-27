@@ -35,19 +35,23 @@ impl CachedForkType {
             return fork_url_type.clone();
         }
 
-        let is_zk_url = foundry_common::provider::try_get_http_provider(fork_url)
-            .map(|provider| {
-                tokio::task::block_in_place(move || {
-                    tokio::runtime::Handle::current()
-                        .block_on(
-                            provider
-                                .raw_request::<_, String>("zks_getBaseTokenL1Address".into(), ()),
-                        )
-                        .map(|_| true)
+        let is_zk_url =
+            foundry_common::provider::try_get_http_provider(fork_url)
+                .map(|provider| {
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        tokio::task::block_in_place(move || {
+                            tokio::runtime::Handle::current()
+                                .block_on(provider.raw_request::<_, String>(
+                                    "zks_getBaseTokenL1Address".into(),
+                                    (),
+                                ))
+                                .map(|_| true)
+                        })
+                    }))
+                    .unwrap_or_else(|_| Ok(false)) // Handle panics by returning false
+                    .unwrap_or_default()
                 })
-                .unwrap_or_default()
-            })
-            .unwrap_or_default();
+                .unwrap_or_default();
 
         let fork_type = if is_zk_url { ForkType::Zk } else { ForkType::Evm };
         self.0.insert(fork_url.to_string(), fork_type.clone());
