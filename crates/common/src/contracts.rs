@@ -152,6 +152,40 @@ impl ContractsByArtifact {
         Self(Arc::new(map))
     }
 
+    /// Creates a new instance by combining linked contracts with storage layouts from original output.
+    /// This provides both linked bytecode (for gas reporting) and storage layouts (for state diff).
+    pub fn with_linked_bytecode_and_storage_layout(
+        linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
+        original_output: ProjectCompileOutput,
+    ) -> Self {
+        let storage_layouts: BTreeMap<ArtifactId, _> = original_output
+            .into_artifacts()
+            .filter_map(|(id, artifact)| {
+                artifact.storage_layout.map(|layout| (id, Arc::new(layout)))
+            })
+            .collect();
+
+        let map = linked_contracts
+            .into_iter()
+            .filter_map(|(id, artifact)| {
+                let name = id.name.clone();
+                let CompactContractBytecode { abi, bytecode, deployed_bytecode } = artifact;
+                let storage_layout = storage_layouts.get(&id).cloned();
+                Some((
+                    id,
+                    ContractData {
+                        name,
+                        abi: abi?,
+                        bytecode: bytecode.map(Into::into),
+                        deployed_bytecode: deployed_bytecode.map(Into::into),
+                        storage_layout,
+                    },
+                ))
+            })
+            .collect();
+        Self(Arc::new(map))
+    }
+
     /// Clears all contracts.
     pub fn clear(&mut self) {
         *self = Self::default();

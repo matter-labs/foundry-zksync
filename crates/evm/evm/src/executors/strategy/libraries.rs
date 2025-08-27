@@ -86,7 +86,10 @@ impl EvmExecutorStrategyRunner {
             }
         }
 
-        let known_contracts = ContractsByArtifact::new(linked_contracts.clone());
+        let known_contracts = ContractsByArtifact::with_linked_bytecode_and_storage_layout(
+            linked_contracts.clone(),
+            input.clone(),
+        );
 
         Ok(LinkOutput {
             deployable_contracts,
