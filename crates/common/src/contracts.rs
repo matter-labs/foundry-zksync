@@ -159,10 +159,11 @@ impl ContractsByArtifact {
         linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
         original_output: ProjectCompileOutput,
     ) -> Self {
-        let storage_layouts: BTreeMap<ArtifactId, _> = original_output
+        // Create a map by contract name for more flexible matching
+        let storage_layouts_by_name: BTreeMap<String, Arc<StorageLayout>> = original_output
             .into_artifacts()
             .filter_map(|(id, artifact)| {
-                artifact.storage_layout.map(|layout| (id, Arc::new(layout)))
+                artifact.storage_layout.map(|layout| (id.name, Arc::new(layout)))
             })
             .collect();
 
@@ -171,7 +172,7 @@ impl ContractsByArtifact {
             .filter_map(|(id, artifact)| {
                 let name = id.name.clone();
                 let CompactContractBytecode { abi, bytecode, deployed_bytecode } = artifact;
-                let storage_layout = storage_layouts.get(&id).cloned();
+                let storage_layout = storage_layouts_by_name.get(&name).cloned();
                 Some((
                     id,
                     ContractData {
