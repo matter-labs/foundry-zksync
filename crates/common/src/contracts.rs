@@ -152,8 +152,9 @@ impl ContractsByArtifact {
         Self(Arc::new(map))
     }
 
-    /// Creates a new instance by combining linked contracts with storage layouts from original output.
-    /// This provides both linked bytecode (for gas reporting) and storage layouts (for state diff).
+    /// Creates a new instance by combining linked contracts with storage layouts from original
+    /// output. This provides both linked bytecode (for gas reporting) and storage layouts (for
+    /// state diff).
     pub fn with_linked_bytecode_and_storage_layout(
         linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
         original_output: ProjectCompileOutput,
