@@ -159,20 +159,46 @@ impl ContractsByArtifact {
         linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
         original_output: ProjectCompileOutput,
     ) -> Self {
-        // Create a map by contract name for more flexible matching
-        let storage_layouts_by_name: BTreeMap<String, Arc<StorageLayout>> = original_output
-            .into_artifacts()
-            .filter_map(|(id, artifact)| {
-                artifact.storage_layout.map(|layout| (id.name, Arc::new(layout)))
-            })
-            .collect();
+        // Create map with flexible path matching to handle abs/rel path differences
+        let storage_layouts_by_key: BTreeMap<(String, String), Arc<StorageLayout>> =
+            original_output
+                .into_artifacts()
+                .filter_map(|(id, artifact)| {
+                    if let Some(layout) = artifact.storage_layout {
+                        let key = (id.name.clone(), id.source.to_string_lossy().to_string());
+                        Some((key, Arc::new(layout)))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
         let map = linked_contracts
             .into_iter()
             .filter_map(|(id, artifact)| {
                 let name = id.name.clone();
                 let CompactContractBytecode { abi, bytecode, deployed_bytecode } = artifact;
-                let storage_layout = storage_layouts_by_name.get(&name).cloned();
+
+                // Try exact match first
+                let source_path = id.source.to_string_lossy().to_string();
+                let exact_key = (id.name.clone(), source_path.clone());
+                let mut storage_layout = storage_layouts_by_key.get(&exact_key).cloned();
+
+                // If exact match fails, try flexible path matching
+                if storage_layout.is_none() {
+                    for ((stored_name, stored_path), layout) in &storage_layouts_by_key {
+                        if stored_name == &id.name {
+                            // Handle absolute vs relative path differences by checking suffixes
+                            if source_path.ends_with(stored_path)
+                                || stored_path.ends_with(&source_path)
+                            {
+                                storage_layout = Some(layout.clone());
+                                break;
+                            }
+                        }
+                    }
+                }
+
                 Some((
                     id,
                     ContractData {
