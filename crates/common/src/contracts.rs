@@ -65,7 +65,7 @@ impl From<CompactDeployedBytecode> for BytecodeData {
 }
 
 /// Container for commonly used contract data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContractData {
     /// Contract name.
     pub name: String,
@@ -152,14 +152,9 @@ impl ContractsByArtifact {
         Self(Arc::new(map))
     }
 
-    /// Creates a new instance by combining linked contracts with storage layouts from original
-    /// output. This provides both linked bytecode (for gas reporting) and storage layouts (for
-    /// state diff).
-    pub fn with_linked_bytecode_and_storage_layout(
-        linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
-        original_output: ProjectCompileOutput,
-    ) -> Self {
-        // Create map with flexible path matching to handle abs/rel path differences
+    /// Note(zk): Patch storage layouts from original compilation output into existing contracts.
+    pub fn zksync_patch_storage_layouts(&mut self, original_output: ProjectCompileOutput) {
+        // Create storage layout lookup with flexible path matching
         let storage_layouts_by_key: BTreeMap<(String, String), Arc<StorageLayout>> =
             original_output
                 .into_artifacts()
@@ -173,22 +168,24 @@ impl ContractsByArtifact {
                 })
                 .collect();
 
-        let map = linked_contracts
+        // Patch existing contracts with storage layouts
+        let patched_map: BTreeMap<ArtifactId, ContractData> = Arc::try_unwrap(self.0.clone())
+            .unwrap_or_else(|arc| (*arc).clone())
             .into_iter()
-            .filter_map(|(id, artifact)| {
-                let name = id.name.clone();
-                let CompactContractBytecode { abi, bytecode, deployed_bytecode } = artifact;
+            .map(|(id, mut contract)| {
+                if contract.storage_layout.is_some() {
+                    return (id, contract);
+                }
 
                 // Try exact match first
                 let source_path = id.source.to_string_lossy().to_string();
                 let exact_key = (id.name.clone(), source_path.clone());
                 let mut storage_layout = storage_layouts_by_key.get(&exact_key).cloned();
 
-                // If exact match fails, try flexible path matching
+                // Flexible path matching fallback
                 if storage_layout.is_none() {
                     for ((stored_name, stored_path), layout) in &storage_layouts_by_key {
                         if stored_name == &id.name {
-                            // Handle absolute vs relative path differences by checking suffixes
                             if source_path.ends_with(stored_path)
                                 || stored_path.ends_with(&source_path)
                             {
@@ -199,19 +196,29 @@ impl ContractsByArtifact {
                     }
                 }
 
-                Some((
-                    id,
-                    ContractData {
-                        name,
-                        abi: abi?,
-                        bytecode: bytecode.map(Into::into),
-                        deployed_bytecode: deployed_bytecode.map(Into::into),
-                        storage_layout,
-                    },
-                ))
+                contract.storage_layout = storage_layout;
+                (id, contract)
             })
             .collect();
-        Self(Arc::new(map))
+
+        self.0 = Arc::new(patched_map);
+    }
+
+    /// foundry-zksync: Create contracts with both linked bytecode and storage layouts.
+    /// Uses the standard `new()` method then patches in storage layouts.
+    pub fn zksync_new_with_storage_layouts(
+        linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
+        original_output: ProjectCompileOutput,
+    ) -> Self {
+        let linked_contracts: Vec<_> = linked_contracts.into_iter().collect();
+
+        // Use upstream's standard method
+        let mut contracts = Self::new(linked_contracts);
+
+        // Patch in storage layouts using zksync-specific logic
+        contracts.zksync_patch_storage_layouts(original_output);
+
+        contracts
     }
 
     /// Clears all contracts.
