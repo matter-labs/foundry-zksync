@@ -143,6 +143,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                             })
                             .collect(),
                         depth: record.depth,
+                        oldNonce: 0,
+                        newNonce: 0,
                     };
                     last.push(access);
                 }

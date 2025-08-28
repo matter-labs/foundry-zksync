@@ -23,7 +23,7 @@ async fn test_zk_cheat_roll_works() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheat_get_code() {
-    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.as_ref().unwrap().zk_config.clone();
     zk_config.fs_permissions.add(PathPermission::read("./zk"));
 
     let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
@@ -58,7 +58,7 @@ async fn test_zk_cheat_set_nonce_works() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_cheat_etch_works() {
-    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.as_ref().unwrap().zk_config.clone();
     zk_config.fs_permissions.add(PathPermission::read_write("./zk/zkout/ConstantNumber.sol"));
     let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
     let filter = Filter::new("testZkCheatcodesEtch", "ZkCheatcodesTest", ".*");

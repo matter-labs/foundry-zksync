@@ -653,7 +653,7 @@ impl InspectorStackRefMut<'_> {
 
                 for (addr, acc_mut) in &mut state {
                     // mark all accounts cold, besides preloaded addresses
-                    if !journal.warm_preloaded_addresses.contains(addr) {
+                    if journal.warm_addresses.is_cold(addr) {
                         acc_mut.mark_cold();
                     }
 
@@ -959,7 +959,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
                 }
                 // Mark accounts and storage cold before STATICCALLs
                 CallScheme::StaticCall => {
-                    let JournaledState { state, warm_preloaded_addresses, .. } =
+                    let JournaledState { state, warm_addresses, .. } =
                         &mut ecx.journaled_state.inner;
                     for (addr, acc_mut) in state {
                         // Do not mark accounts and storage cold accounts with arbitrary storage.
@@ -969,7 +969,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
                             continue;
                         }
 
-                        if !warm_preloaded_addresses.contains(addr) {
+                        if warm_addresses.is_cold(addr) {
                             acc_mut.mark_cold();
                         }
 

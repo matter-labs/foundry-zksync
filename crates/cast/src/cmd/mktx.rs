@@ -32,6 +32,7 @@ pub struct MakeTxArgs {
     sig: Option<String>,
 
     /// The arguments of the function to call.
+    #[arg(allow_negative_numbers = true)]
     args: Vec<String>,
 
     #[command(subcommand)]
@@ -83,6 +84,7 @@ pub enum MakeTxSubcommands {
         sig: Option<String>,
 
         /// The constructor arguments.
+        #[arg(allow_negative_numbers = true)]
         args: Vec<String>,
     },
 }
@@ -181,13 +183,13 @@ impl MakeTxArgs {
             (from, Some(signer))
         };
 
-        let (tx, _) = if zk_tx.custom_signature.is_some() {
-            tx_builder.build_raw(SenderKind::Address(from)).await?
-        } else {
-            tx_builder.build_raw(maybe_signer.as_ref().expect("No signer found")).await?
-        };
-
         if zk_tx.has_zksync_args() || zk_force {
+            let (tx, _) = if zk_tx.custom_signature.is_some() {
+                tx_builder.build_raw(SenderKind::Address(from)).await?
+            } else {
+                tx_builder.build_raw(maybe_signer.as_ref().expect("No signer found")).await?
+            };
+
             let zktx = build_tx(zk_tx, tx, zkcode, &config).await?;
 
             let signed_tx = if zktx.custom_signature().is_some() {
@@ -203,11 +205,11 @@ impl MakeTxArgs {
             Ok(())
         } else {
             let signer = maybe_signer.expect("No signer found");
-            let tx = tx.build(&EthereumWallet::new(signer)).await?;
+            let (full_tx, _) = tx_builder.build(&signer).await?;
+            let signed_tx = full_tx.build(&EthereumWallet::new(signer)).await?;
+            let encoded_tx = hex::encode(signed_tx.encoded_2718());
 
-            let signed_tx = hex::encode(tx.encoded_2718());
-
-            sh_println!("0x{signed_tx}")?;
+            sh_println!("0x{encoded_tx}")?;
 
             Ok(())
         }

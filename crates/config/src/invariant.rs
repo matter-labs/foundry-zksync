@@ -1,6 +1,6 @@
 //! Configuration for invariant testing
 
-use crate::fuzz::FuzzDictionaryConfig;
+use crate::fuzz::{FuzzCorpusConfig, FuzzDictionaryConfig};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -26,15 +26,9 @@ pub struct InvariantConfig {
     pub max_assume_rejects: u32,
     /// Number of runs to execute and include in the gas report.
     pub gas_report_samples: u32,
-    /// Path where invariant corpus is stored, enables coverage guided fuzzing and edge coverage
-    /// metrics.
-    pub corpus_dir: Option<PathBuf>,
-    /// Whether corpus to use gzip file compression and decompression.
-    pub corpus_gzip: bool,
-    // Number of corpus mutations until marked as eligible to be flushed from memory.
-    pub corpus_min_mutations: usize,
-    // Number of corpus that won't be evicted from memory.
-    pub corpus_min_size: usize,
+    /// The fuzz corpus configuration.
+    #[serde(flatten)]
+    pub corpus: FuzzCorpusConfig,
     /// Path where invariant failures are recorded and replayed.
     pub failure_persist_dir: Option<PathBuf>,
     /// Whether to collect and display fuzzed selectors metrics.
@@ -45,8 +39,6 @@ pub struct InvariantConfig {
     pub show_solidity: bool,
     /// When enabled, filters all addresses below 2^16, as they are reserved in zkSync.
     pub no_zksync_reserved_addresses: bool,
-    /// Whether to collect and display edge coverage metrics.
-    pub show_edge_coverage: bool,
 }
 
 impl Default for InvariantConfig {
@@ -60,16 +52,12 @@ impl Default for InvariantConfig {
             shrink_run_limit: 5000,
             max_assume_rejects: 65536,
             gas_report_samples: 256,
-            corpus_dir: None,
-            corpus_gzip: true,
-            corpus_min_mutations: 5,
-            corpus_min_size: 0,
+            corpus: FuzzCorpusConfig::default(),
             failure_persist_dir: None,
             show_metrics: true,
             timeout: None,
             show_solidity: false,
             no_zksync_reserved_addresses: false,
-            show_edge_coverage: false,
         }
     }
 }
@@ -86,16 +74,12 @@ impl InvariantConfig {
             shrink_run_limit: 5000,
             max_assume_rejects: 65536,
             gas_report_samples: 256,
-            corpus_dir: None,
-            corpus_gzip: true,
-            corpus_min_mutations: 5,
-            corpus_min_size: 0,
+            corpus: FuzzCorpusConfig::default(),
             failure_persist_dir: Some(cache_dir),
             show_metrics: true,
             timeout: None,
             show_solidity: false,
             no_zksync_reserved_addresses: false,
-            show_edge_coverage: false,
         }
     }
 }

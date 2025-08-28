@@ -63,7 +63,7 @@ fn get_zk_artifact_bytecode<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Vec<u8
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_traces_work_during_call() {
-    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.as_ref().unwrap().zk_config.clone();
     zk_config.verbosity = 5;
     let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
     let filter = Filter::new("testZkTraceOutputDuringCall", "ZkTraceTest", ".*");
@@ -159,7 +159,7 @@ async fn test_zk_traces_work_during_call() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_traces_work_during_create() {
-    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.as_ref().unwrap().zk_config.clone();
     zk_config.verbosity = 5;
     let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
     let filter = Filter::new("testZkTraceOutputDuringCreate", "ZkTraceTest", ".*");
