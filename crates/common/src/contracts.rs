@@ -185,13 +185,12 @@ impl ContractsByArtifact {
                 // Flexible path matching fallback
                 if storage_layout.is_none() {
                     for ((stored_name, stored_path), layout) in &storage_layouts_by_key {
-                        if stored_name == &id.name {
-                            if source_path.ends_with(stored_path)
-                                || stored_path.ends_with(&source_path)
-                            {
-                                storage_layout = Some(layout.clone());
-                                break;
-                            }
+                        if stored_name == &id.name
+                            && (source_path.ends_with(stored_path)
+                                || stored_path.ends_with(&source_path))
+                        {
+                            storage_layout = Some(layout.clone());
+                            break;
                         }
                     }
                 }
