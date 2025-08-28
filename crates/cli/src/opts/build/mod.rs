@@ -9,7 +9,7 @@ mod paths;
 pub use self::paths::ProjectPathOpts;
 
 mod utils;
-pub use self::utils::{solar_pcx_from_build_opts, solar_pcx_from_solc_project};
+pub use self::utils::{configure_pcx, configure_pcx_from_solc};
 
 mod zksync;
 pub use self::zksync::ZkSyncArgs;

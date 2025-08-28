@@ -3,11 +3,7 @@
 use crate::{
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
     Vm::{self, AccountAccess},
-    evm::{
-        DealRecord, GasRecord,
-        mapping::{self, MappingSlots},
-        prank::Prank,
-    },
+    evm::{DealRecord, GasRecord, mapping, prank::Prank},
     script::{Broadcast, Wallets},
     strategy::CheatcodeInspectorStrategy,
     test::{
@@ -30,7 +26,9 @@ use foundry_cheatcodes_common::{
     mock::{MockCallDataContext, MockCallReturnData},
     record::RecordAccess,
 };
-use foundry_common::{SELECTOR_LEN, TransactionMaybeSigned, evm::Breakpoints};
+use foundry_common::{
+    SELECTOR_LEN, TransactionMaybeSigned, evm::Breakpoints, mapping_slots::MappingSlots,
+};
 use foundry_evm_core::{
     InspectorExt,
     abi::Vm::stopExpectSafeMemoryCall,
@@ -203,7 +201,6 @@ impl Clone for TestContext {
 
 impl TestContext {
     /// Clears the context.
-    #[inline]
     pub fn clear(&mut self) {
         self.opened_read_files.clear();
     }
@@ -1397,7 +1394,6 @@ impl Cheatcodes {
 }
 
 impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
-    #[inline]
     fn initialize_interp(&mut self, interpreter: &mut Interpreter, ecx: Ecx) {
         // When the first interpreter is initialized we've circumvented the balance and gas checks,
         // so we apply our actual block data with the correct fees and all.
@@ -2646,7 +2642,7 @@ fn apply_dispatch(
     let cheat = calls_as_dyn_cheatcode(calls);
 
     let _guard = debug_span!(target: "cheatcodes", "apply", id = %cheat.id()).entered();
-    trace!(target: "cheatcodes", cheat = ?cheat.as_debug(), "applying");
+    trace!(target: "cheatcodes", ?cheat, "applying");
 
     if let spec::Status::Deprecated(replacement) = *cheat.status() {
         ccx.state.deprecated.insert(cheat.signature(), replacement);

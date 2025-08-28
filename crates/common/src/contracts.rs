@@ -8,8 +8,9 @@ use eyre::{OptionExt, Result};
 use foundry_compilers::{
     ArtifactId, Project, ProjectCompileOutput,
     artifacts::{
-        BytecodeObject, CompactBytecode, CompactContractBytecode, CompactDeployedBytecode,
-        ConfigurableContractArtifact, ContractBytecodeSome, Offsets, StorageLayout,
+        BytecodeObject, CompactBytecode, CompactContractBytecode, CompactContractBytecodeCow,
+        CompactDeployedBytecode, ConfigurableContractArtifact, ContractBytecodeSome, Offsets,
+        StorageLayout,
     },
     utils::canonicalized,
 };
@@ -98,6 +99,58 @@ impl ContractData {
     /// Returns the deployed bytecode without placeholders, if present.
     pub fn deployed_bytecode_without_placeholders(&self) -> Option<Bytes> {
         strip_bytecode_placeholders(self.deployed_bytecode.as_ref()?.object.as_ref()?)
+    }
+}
+
+/// Builder for creating a `ContractsByArtifact` instance, optionally including storage layouts
+/// from project compile output.
+pub struct ContractsByArtifactBuilder<'a> {
+    /// All compiled artifact bytecodes (borrowed).
+    artifacts: BTreeMap<ArtifactId, CompactContractBytecodeCow<'a>>,
+    /// Optionally collected storage layouts for matching artifact IDs.
+    storage_layouts: BTreeMap<ArtifactId, StorageLayout>,
+}
+
+impl<'a> ContractsByArtifactBuilder<'a> {
+    /// Creates a new builder from artifacts with present bytecode iterator.
+    pub fn new(
+        artifacts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecodeCow<'a>)>,
+    ) -> Self {
+        Self { artifacts: artifacts.into_iter().collect(), storage_layouts: BTreeMap::new() }
+    }
+
+    /// Adds storage layouts from `ProjectCompileOutput` to known artifacts.
+    pub fn with_storage_layouts(mut self, output: ProjectCompileOutput) -> Self {
+        self.storage_layouts = output
+            .into_artifacts()
+            .filter_map(|(id, artifact)| artifact.storage_layout.map(|layout| (id, layout)))
+            .collect();
+        self
+    }
+
+    /// Builds `ContractsByArtifact`.
+    pub fn build(self) -> ContractsByArtifact {
+        let map = self
+            .artifacts
+            .into_iter()
+            .filter_map(|(id, artifact)| {
+                let name = id.name.clone();
+                let CompactContractBytecodeCow { abi, bytecode, deployed_bytecode } = artifact;
+
+                Some((
+                    id.clone(),
+                    ContractData {
+                        name,
+                        abi: abi?.into_owned(),
+                        bytecode: bytecode.map(|b| b.into_owned().into()),
+                        deployed_bytecode: deployed_bytecode.map(|b| b.into_owned().into()),
+                        storage_layout: self.storage_layouts.get(&id).map(|l| Arc::new(l.clone())),
+                    },
+                ))
+            })
+            .collect();
+
+        ContractsByArtifact(Arc::new(map))
     }
 }
 
@@ -204,17 +257,31 @@ impl ContractsByArtifact {
     }
 
     /// foundry-zksync: Create contracts with both linked bytecode and storage layouts.
-    /// Uses the standard `new()` method then patches in storage layouts.
+    /// Uses the upstream ContractsByArtifactBuilder pattern for compatibility.
     pub fn zksync_new_with_storage_layouts(
         linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
         original_output: ProjectCompileOutput,
     ) -> Self {
-        let linked_contracts: Vec<_> = linked_contracts.into_iter().collect();
+        // Convert CompactContractBytecode to CompactContractBytecodeCow for builder compatibility
+        let linked_contracts_cow = linked_contracts.into_iter().map(|(id, bytecode)| {
+            let CompactContractBytecode { abi, bytecode, deployed_bytecode } = bytecode;
+            (
+                id,
+                CompactContractBytecodeCow {
+                    abi: abi.map(std::borrow::Cow::Owned),
+                    bytecode: bytecode.map(std::borrow::Cow::Owned),
+                    deployed_bytecode: deployed_bytecode.map(std::borrow::Cow::Owned),
+                },
+            )
+        });
 
-        // Use upstream's standard method
-        let mut contracts = Self::new(linked_contracts);
+        // Use upstream's builder pattern like in forge/src/multi_runner.rs
+        let mut contracts = ContractsByArtifactBuilder::new(linked_contracts_cow)
+            .with_storage_layouts(original_output.clone())
+            .build();
 
-        // Patch in storage layouts using zksync-specific logic
+        // Apply ZKsync-specific flexible path matching for storage layouts
+        // This is needed because ZKsync compilation may produce different path structures
         contracts.zksync_patch_storage_layouts(original_output);
 
         contracts
@@ -634,6 +701,7 @@ pub fn find_matching_contract_artifact(
         Ok(artifact.clone())
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
