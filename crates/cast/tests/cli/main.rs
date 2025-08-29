@@ -2540,8 +2540,7 @@ contract LocalProjectContract {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
     prj.add_script(
         "LocalProjectScript",
         r#"
@@ -2556,8 +2555,7 @@ contract LocalProjectScript is Script {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
 
     cmd.args([
         "script",
@@ -2708,8 +2706,7 @@ library ExternalLib {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
     prj.add_source(
         "CounterInExternalLib",
         r#"
@@ -2724,8 +2721,7 @@ contract CounterInExternalLib {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
     prj.add_script(
         "CounterInExternalLibScript",
         r#"
@@ -2739,8 +2735,7 @@ contract CounterInExternalLibScript is Script {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
 
     cmd.args([
         "script",
@@ -2817,8 +2812,7 @@ contract Counter {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
 
     // Deploy counter contract.
     cmd.args([
@@ -2919,8 +2913,7 @@ contract Counter {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
 
     // Deploy counter contract.
     cmd.args([
@@ -3339,8 +3332,7 @@ contract SimpleStorage {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
     prj.add_script(
         "SimpleStorageScript",
         r#"
@@ -3354,8 +3346,7 @@ contract SimpleStorageScript is Script {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
 
     cmd.args([
         "script",
@@ -3476,8 +3467,7 @@ contract ConstructorContract {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
 
     // Compile to get bytecode
     cmd.forge_fuse().args(["build"]).assert_success();
@@ -3552,8 +3542,7 @@ contract EstimateContract {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
 
     // Compile to get bytecode
     cmd.forge_fuse().args(["build"]).assert_success();
@@ -3602,8 +3591,7 @@ contract SimpleContract {
     uint256 public constant VALUE = 42;
 }
 "#,
-    )
-    .unwrap();
+    );
 
     // Compile
     cmd.forge_fuse().args(["build"]).assert_success();
@@ -3661,8 +3649,7 @@ contract ComplexContract {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
 
     // Compile
     cmd.forge_fuse().args(["build"]).assert_success();
