@@ -144,7 +144,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 1,
@@ -176,7 +178,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[2] = Vm.AccountAccess({
             depth: 1,
@@ -208,7 +212,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[3] = Vm.AccountAccess({
             depth: 1,
@@ -240,7 +246,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -268,7 +276,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 2,
@@ -292,7 +302,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[2] = Vm.AccountAccess({
             depth: 2,
@@ -324,7 +336,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[3] = Vm.AccountAccess({
             depth: 2,
@@ -356,7 +370,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[4] = Vm.AccountAccess({
             depth: 2,
@@ -388,7 +404,9 @@ contract ZkStateDiffTest is DSTest {
             ),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -416,7 +434,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -444,7 +464,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 2,
@@ -459,7 +481,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -487,7 +511,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -515,7 +541,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 2,
@@ -530,7 +558,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -560,7 +590,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -590,7 +622,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 2,
@@ -605,7 +639,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -634,7 +670,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 1,
@@ -649,7 +687,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -677,7 +717,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 2,
@@ -692,7 +734,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[2] = Vm.AccountAccess({
             depth: 2,
@@ -707,7 +751,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -743,7 +789,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 1,
@@ -758,7 +806,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);
@@ -793,7 +843,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[1] = Vm.AccountAccess({
             depth: 2,
@@ -808,7 +860,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
         expected[2] = Vm.AccountAccess({
             depth: 2,
@@ -823,7 +877,9 @@ contract ZkStateDiffTest is DSTest {
             storageAccesses: new Vm.StorageAccess[](0),
             chainInfo: chainInfo,
             initialized: true,
-            reverted: false
+            reverted: false,
+            newNonce: 0,
+            oldNonce: 0
         });
 
         assertEq(expected, diff);

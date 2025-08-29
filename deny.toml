@@ -132,4 +132,4 @@ allow-git = [
 ]
 
 [sources.allow-org]
-github = ["matter-labs"]
+github = ["matter-labs", "Moonsong-Labs"]

@@ -2,7 +2,10 @@ use crate::{
     PrecompileFactory,
     eth::{
         backend::{
-            db::Db, env::Env, mem::op_haltreason_to_instruction_result,
+            cheats::{CheatEcrecover, CheatsManager},
+            db::Db,
+            env::Env,
+            mem::op_haltreason_to_instruction_result,
             validate::TransactionValidator,
         },
         error::InvalidTransactionError,
@@ -15,7 +18,11 @@ use alloy_consensus::{
     Receipt, ReceiptWithBloom, constants::EMPTY_WITHDRAWALS, proofs::calculate_receipt_root,
 };
 use alloy_eips::{eip7685::EMPTY_REQUESTS_HASH, eip7840::BlobParams};
-use alloy_evm::{EthEvm, Evm, eth::EthEvmContext, precompiles::PrecompilesMap};
+use alloy_evm::{
+    EthEvm, Evm,
+    eth::EthEvmContext,
+    precompiles::{DynPrecompile, Precompile, PrecompilesMap},
+};
 use alloy_op_evm::OpEvm;
 use alloy_primitives::{B256, Bloom, BloomInput, Log};
 use anvil_core::eth::{
@@ -24,8 +31,11 @@ use anvil_core::eth::{
         DepositReceipt, PendingTransaction, TransactionInfo, TypedReceipt, TypedTransaction,
     },
 };
-use foundry_evm::{backend::DatabaseError, traces::CallTraceNode};
-use foundry_evm_core::either_evm::EitherEvm;
+use foundry_evm::{
+    backend::DatabaseError,
+    traces::{CallTraceDecoder, CallTraceNode},
+};
+use foundry_evm_core::{either_evm::EitherEvm, precompiles::EC_RECOVER};
 use op_revm::{L1BlockInfo, OpContext, precompiles::OpPrecompiles};
 use revm::{
     Database, DatabaseRef, Inspector, Journal,
@@ -34,10 +44,13 @@ use revm::{
     database::WrapDatabaseRef,
     handler::{EthPrecompiles, instructions::EthInstructions},
     interpreter::InstructionResult,
-    precompile::{PrecompileSpecId, Precompiles, secp256r1::P256VERIFY},
+    precompile::{
+        PrecompileSpecId, Precompiles,
+        secp256r1::{P256VERIFY, P256VERIFY_BASE_GAS_FEE},
+    },
     primitives::hardfork::SpecId,
 };
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
 /// Represents an executed transaction (transacted on the DB)
 #[derive(Debug)]
@@ -116,9 +129,12 @@ pub struct TransactionExecutor<'a, Db: ?Sized, V: TransactionValidator> {
     pub optimism: bool,
     pub print_logs: bool,
     pub print_traces: bool,
+    /// Recorder used for decoding traces, used together with print_traces
+    pub call_trace_decoder: Arc<CallTraceDecoder>,
     /// Precompiles to inject to the EVM.
     pub precompile_factory: Option<Arc<dyn PrecompileFactory>>,
     pub blob_params: BlobParams,
+    pub cheats: CheatsManager,
 }
 
 impl<DB: Db + ?Sized, V: TransactionValidator> TransactionExecutor<'_, DB, V> {
@@ -229,10 +245,10 @@ impl<DB: Db + ?Sized, V: TransactionValidator> TransactionExecutor<'_, DB, V> {
             receipts_root,
             logs_bloom: bloom,
             difficulty,
-            number: block_number,
+            number: block_number.saturating_to(),
             gas_limit,
             gas_used: cumulative_gas_used,
-            timestamp,
+            timestamp: timestamp.saturating_to(),
             extra_data: Default::default(),
             mix_hash: mix_hash.unwrap_or_default(),
             nonce: Default::default(),
@@ -329,11 +345,19 @@ impl<DB: Db + ?Sized, V: TransactionValidator> Iterator for &mut TransactionExec
             let mut evm = new_evm_with_inspector(&mut *self.db, &env, &mut inspector);
 
             if self.odyssey {
-                inject_precompiles(&mut evm, vec![P256VERIFY]);
+                inject_precompiles(&mut evm, vec![(P256VERIFY, P256VERIFY_BASE_GAS_FEE)]);
             }
 
             if let Some(factory) = &self.precompile_factory {
                 inject_precompiles(&mut evm, factory.precompiles());
+            }
+
+            let cheats = Arc::new(self.cheats.clone());
+            if cheats.has_recover_overrides() {
+                let cheat_ecrecover = CheatEcrecover::new(Arc::clone(&cheats));
+                evm.precompiles_mut().apply_precompile(&EC_RECOVER, move |_| {
+                    Some(DynPrecompile::new_stateful(move |input| cheat_ecrecover.call(input)))
+                });
             }
 
             trace!(target: "backend", "[{:?}] executing", transaction.hash());
@@ -364,7 +388,7 @@ impl<DB: Db + ?Sized, V: TransactionValidator> Iterator for &mut TransactionExec
         };
 
         if self.print_traces {
-            inspector.print_traces();
+            inspector.print_traces(self.call_trace_decoder.clone());
         }
         inspector.print_logs();
 
@@ -428,7 +452,7 @@ pub fn new_evm_with_inspector<DB, I>(
     inspector: I,
 ) -> EitherEvm<DB, I, PrecompilesMap>
 where
-    DB: Database<Error = DatabaseError>,
+    DB: Database<Error = DatabaseError> + Debug,
     I: Inspector<EthEvmContext<DB>> + Inspector<OpContext<DB>>,
 {
     if env.is_optimism {
@@ -500,7 +524,7 @@ pub fn new_evm_with_inspector_ref<'db, DB, I>(
     inspector: &'db mut I,
 ) -> EitherEvm<WrapDatabaseRef<&'db DB>, &'db mut I, PrecompilesMap>
 where
-    DB: DatabaseRef<Error = DatabaseError> + 'db + ?Sized,
+    DB: DatabaseRef<Error = DatabaseError> + Debug + 'db + ?Sized,
     I: Inspector<EthEvmContext<WrapDatabaseRef<&'db DB>>>
         + Inspector<OpContext<WrapDatabaseRef<&'db DB>>>,
     WrapDatabaseRef<&'db DB>: Database<Error = DatabaseError>,

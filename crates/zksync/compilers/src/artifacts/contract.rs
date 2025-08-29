@@ -1,7 +1,7 @@
 //! Contract related types.
 use crate::artifacts::EraVM;
 use alloy_json_abi::JsonAbi;
-use foundry_compilers_artifacts_solc::{
+use foundry_compilers::artifacts::{
     Bytecode, CompactBytecode, CompactContractBytecode, CompactContractBytecodeCow,
     CompactContractRef, CompactDeployedBytecode, DevDoc, Evm, Offsets, StorageLayout, UserDoc,
 };

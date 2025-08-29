@@ -9,7 +9,7 @@ use foundry_compilers::{
     ArtifactId, Project, ProjectCompileOutput,
     artifacts::{
         BytecodeObject, CompactBytecode, CompactContractBytecode, CompactDeployedBytecode,
-        ConfigurableContractArtifact, ContractBytecodeSome, Offsets,
+        ConfigurableContractArtifact, ContractBytecodeSome, Offsets, StorageLayout,
     },
     utils::canonicalized,
 };
@@ -65,7 +65,7 @@ impl From<CompactDeployedBytecode> for BytecodeData {
 }
 
 /// Container for commonly used contract data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ContractData {
     /// Contract name.
     pub name: String,
@@ -75,6 +75,8 @@ pub struct ContractData {
     pub bytecode: Option<BytecodeData>,
     /// Contract runtime code.
     pub deployed_bytecode: Option<BytecodeData>,
+    /// Contract storage layout, if available.
+    pub storage_layout: Option<Arc<StorageLayout>>,
 }
 
 impl ContractData {
@@ -120,11 +122,102 @@ impl ContractsByArtifact {
                         abi: abi?,
                         bytecode: bytecode.map(Into::into),
                         deployed_bytecode: deployed_bytecode.map(Into::into),
+                        storage_layout: None,
                     },
                 ))
             })
             .collect();
         Self(Arc::new(map))
+    }
+
+    /// Creates a new instance from project compile output, preserving storage layouts.
+    pub fn with_storage_layout(output: ProjectCompileOutput) -> Self {
+        let map = output
+            .into_artifacts()
+            .filter_map(|(id, artifact)| {
+                let name = id.name.clone();
+                let abi = artifact.abi?;
+                Some((
+                    id,
+                    ContractData {
+                        name,
+                        abi,
+                        bytecode: artifact.bytecode.map(Into::into),
+                        deployed_bytecode: artifact.deployed_bytecode.map(Into::into),
+                        storage_layout: artifact.storage_layout.map(Arc::new),
+                    },
+                ))
+            })
+            .collect();
+        Self(Arc::new(map))
+    }
+
+    /// Note(zk): Patch storage layouts from original compilation output into existing contracts.
+    pub fn zksync_patch_storage_layouts(&mut self, original_output: ProjectCompileOutput) {
+        // Create storage layout lookup with flexible path matching
+        let storage_layouts_by_key: BTreeMap<(String, String), Arc<StorageLayout>> =
+            original_output
+                .into_artifacts()
+                .filter_map(|(id, artifact)| {
+                    if let Some(layout) = artifact.storage_layout {
+                        let key = (id.name.clone(), id.source.to_string_lossy().to_string());
+                        Some((key, Arc::new(layout)))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+        // Patch existing contracts with storage layouts
+        let patched_map: BTreeMap<ArtifactId, ContractData> = Arc::try_unwrap(self.0.clone())
+            .unwrap_or_else(|arc| (*arc).clone())
+            .into_iter()
+            .map(|(id, mut contract)| {
+                if contract.storage_layout.is_some() {
+                    return (id, contract);
+                }
+
+                // Try exact match first
+                let source_path = id.source.to_string_lossy().to_string();
+                let exact_key = (id.name.clone(), source_path.clone());
+                let mut storage_layout = storage_layouts_by_key.get(&exact_key).cloned();
+
+                // Flexible path matching fallback
+                if storage_layout.is_none() {
+                    for ((stored_name, stored_path), layout) in &storage_layouts_by_key {
+                        if stored_name == &id.name
+                            && (source_path.ends_with(stored_path)
+                                || stored_path.ends_with(&source_path))
+                        {
+                            storage_layout = Some(layout.clone());
+                            break;
+                        }
+                    }
+                }
+
+                contract.storage_layout = storage_layout;
+                (id, contract)
+            })
+            .collect();
+
+        self.0 = Arc::new(patched_map);
+    }
+
+    /// foundry-zksync: Create contracts with both linked bytecode and storage layouts.
+    /// Uses the standard `new()` method then patches in storage layouts.
+    pub fn zksync_new_with_storage_layouts(
+        linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
+        original_output: ProjectCompileOutput,
+    ) -> Self {
+        let linked_contracts: Vec<_> = linked_contracts.into_iter().collect();
+
+        // Use upstream's standard method
+        let mut contracts = Self::new(linked_contracts);
+
+        // Patch in storage layouts using zksync-specific logic
+        contracts.zksync_patch_storage_layouts(original_output);
+
+        contracts
     }
 
     /// Clears all contracts.
@@ -308,7 +401,7 @@ impl ContractsByArtifact {
     pub fn find_abi_by_name_or_src_path(&self, name_or_path: &str) -> Option<(JsonAbi, String)> {
         self.iter()
             .find(|(artifact, _)| {
-                artifact.name == name_or_path || artifact.source == PathBuf::from(name_or_path)
+                artifact.name == name_or_path || artifact.source == Path::new(name_or_path)
             })
             .map(|(_, contract)| (contract.abi.clone(), contract.name.clone()))
     }

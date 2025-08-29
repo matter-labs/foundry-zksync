@@ -12,7 +12,6 @@ use foundry_test_utils::{
     util::{OutputExt, TestCommand, read_string},
 };
 use semver::Version;
-use similar_asserts::assert_eq;
 use std::{
     fs,
     path::Path,
@@ -500,6 +499,53 @@ Warning: Target directory is not empty, but `--force` was specified
     let gitignore = root.join(".gitignore");
     let gitignore = fs::read_to_string(gitignore).unwrap();
     assert_eq!(gitignore, "not foundry .gitignore");
+});
+
+// `forge init --use-parent-git` works on already initialized git repository
+forgetest!(can_init_using_parent_repo, |prj, cmd| {
+    let root = prj.root();
+
+    // initialize new git repo
+    let status = Command::new("git")
+        .arg("init")
+        .current_dir(root)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("could not run git init");
+    assert!(status.success());
+    assert!(root.join(".git").exists());
+
+    prj.create_file("README.md", "non-empty dir");
+    prj.create_file(".gitignore", "not foundry .gitignore");
+
+    let folder = "foundry-folder";
+    cmd.arg("init").arg(folder).arg("--force").arg("--use-parent-git").assert_success().stdout_eq(
+        str![[r#"
+Initializing [..]...
+Installing forge-std in [..] (url: Some("https://github.com/foundry-rs/forge-std"), tag: None)
+    Installed forge-std[..]
+    Initialized forge project
+
+"#]],
+    );
+
+    assert!(root.join(folder).join("lib/forge-std").exists());
+
+    // not overwritten
+    let gitignore = root.join(".gitignore");
+    let gitignore = fs::read_to_string(gitignore).unwrap();
+    assert_eq!(gitignore, "not foundry .gitignore");
+
+    // submodules are registered at root
+    let gitmodules = root.join(".gitmodules");
+    let gitmodules = fs::read_to_string(gitmodules).unwrap();
+    assert!(gitmodules.contains(
+        "
+	path = foundry-folder/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+"
+    ));
 });
 
 // Checks that remappings.txt and .vscode/settings.json is generated
@@ -2678,7 +2724,7 @@ contract GasReportFallbackTest is Test {
 +========================================================================================================+
 | Deployment Cost                                   | Deployment Size |       |        |       |         |
 |---------------------------------------------------+-----------------+-------+--------+-------+---------|
-| 117171                                            | 471             |       |        |       |         |
+| 117159                                            | 471             |       |        |       |         |
 |---------------------------------------------------+-----------------+-------+--------+-------+---------|
 |                                                   |                 |       |        |       |         |
 |---------------------------------------------------+-----------------+-------+--------+-------+---------|
@@ -2717,7 +2763,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
   {
     "contract": "test/DelegateProxyTest.sol:DelegateProxy",
     "deployment": {
-      "gas": 117171,
+      "gas": 117159,
       "size": 471
     },
     "functions": {
@@ -2929,7 +2975,7 @@ contract NestedDeploy is Test {
 +============================================================================================+
 | Deployment Cost                           | Deployment Size |     |        |     |         |
 |-------------------------------------------+-----------------+-----+--------+-----+---------|
-| 328961                                    | 1163            |     |        |     |         |
+| 328949                                    | 1163            |     |        |     |         |
 |-------------------------------------------+-----------------+-----+--------+-----+---------|
 |                                           |                 |     |        |     |         |
 |-------------------------------------------+-----------------+-----+--------+-----+---------|
@@ -2984,7 +3030,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
   {
     "contract": "test/NestedDeployTest.sol:Parent",
     "deployment": {
-      "gas": 328961,
+      "gas": 328949,
       "size": 1163
     },
     "functions": {
@@ -3023,9 +3069,9 @@ forgetest_init!(can_use_absolute_imports, |prj, cmd| {
     prj.add_lib(
         "myDependency/src/Config.sol",
         r#"
-        import "src/interfaces/IConfig.sol";
+        import {IConfig} from "myDependency/src/interfaces/IConfig.sol";
 
-    contract Config {}
+    contract Config is IConfig {}
    "#,
     )
     .unwrap();
@@ -3033,9 +3079,11 @@ forgetest_init!(can_use_absolute_imports, |prj, cmd| {
     prj.add_source(
         "Greeter",
         r#"
-        import "myDependency/src/Config.sol";
+        import {Config} from "myDependency/src/Config.sol";
 
-    contract Greeter {}
+    contract Greeter {
+        Config config;
+    }
    "#,
     )
     .unwrap();
@@ -3669,7 +3717,7 @@ forgetest_init!(gas_report_include_tests, |prj, cmd| {
 +================================================================================================+
 | Deployment Cost                         | Deployment Size |        |        |        |         |
 |-----------------------------------------+-----------------+--------+--------+--------+---------|
-| 1545498                                 | 7578            |        |        |        |         |
+| 1544498                                 | 7573            |        |        |        |         |
 |-----------------------------------------+-----------------+--------+--------+--------+---------|
 |                                         |                 |        |        |        |         |
 |-----------------------------------------+-----------------+--------+--------+--------+---------|
@@ -3677,7 +3725,7 @@ forgetest_init!(gas_report_include_tests, |prj, cmd| {
 |-----------------------------------------+-----------------+--------+--------+--------+---------|
 | setUp                                   | 218902          | 218902 | 218902 | 218902 | 1       |
 |-----------------------------------------+-----------------+--------+--------+--------+---------|
-| test_Increment                          | 54915           | 54915  | 54915  | 54915  | 1       |
+| test_Increment                          | 51847           | 51847  | 51847  | 51847  | 1       |
 ╰-----------------------------------------+-----------------+--------+--------+--------+---------╯
 
 
@@ -3724,8 +3772,8 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
   {
     "contract": "test/Counter.t.sol:CounterTest",
     "deployment": {
-      "gas": 1545498,
-      "size": 7578
+      "gas": 1544498,
+      "size": 7573
     },
     "functions": {
       "setUp()": {
@@ -3737,10 +3785,10 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
       },
       "test_Increment()": {
         "calls": 1,
-        "min": 54915,
-        "mean": 54915,
-        "median": 54915,
-        "max": 54915
+        "min": 51847,
+        "mean": 51847,
+        "median": 51847,
+        "max": 51847
       }
     }
   }
@@ -3788,19 +3836,6 @@ contract FooBarTest is DSTest {
     .unwrap();
 
     cmd.args(["test", "--gas-report"]).assert_success();
-});
-
-forgetest_init!(zk_can_init_with_zksync, |prj, cmd| {
-    cmd.args(["init", "--zksync", "--force"]).assert_success();
-
-    // Check that zkout/ is in .gitignore
-    let gitignore_path = prj.root().join(".gitignore");
-    assert!(gitignore_path.exists());
-    let gitignore_contents = std::fs::read_to_string(&gitignore_path).unwrap();
-    assert!(gitignore_contents.contains("zkout/"));
-
-    // Assert that forge-zksync-std is installed
-    assert!(prj.root().join("lib/forge-zksync-std").exists());
 });
 
 // <https://github.com/foundry-rs/foundry/issues/5847>

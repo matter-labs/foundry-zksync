@@ -271,7 +271,7 @@ test_repro!(6501, false, None, |res| {
     assert_eq!(test_call.idx, 0);
     assert_eq!(test_call.children, [1, 2, 3]);
     assert_eq!(test_call.trace.depth, 0);
-    assert!(test_call.trace.success);
+    assert!(!test_call.trace.is_error());
 
     let expected = [
         ("log(string)", vec!["\"a\""]),
@@ -285,7 +285,7 @@ test_repro!(6501, false, None, |res| {
         assert_eq!(trace.address, HARDHAT_CONSOLE_ADDRESS);
         assert_eq!(decoded.label, Some("console".into()));
         assert_eq!(trace.depth, 1);
-        assert!(trace.success);
+        assert!(!trace.is_error());
         assert_eq!(
             decoded.call_data,
             Some(DecodedCallData {
@@ -415,3 +415,6 @@ test_repro!(10586);
 
 // https://github.com/foundry-rs/foundry/issues/10957
 test_repro!(10957);
+
+// https://github.com/foundry-rs/foundry/issues/11353
+test_repro!(11353);

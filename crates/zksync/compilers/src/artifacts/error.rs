@@ -1,8 +1,8 @@
 //! zksolc error from std json output
-use foundry_compilers_artifacts_solc::error::{Severity, SourceLocation};
+use foundry_compilers::artifacts::error::{Severity, SourceLocation};
 
 use core::iter::Peekable;
-use foundry_compilers_artifacts_solc::serde_helpers;
+use foundry_compilers::artifacts::serde_helpers;
 use serde::{Deserialize, Serialize};
 use std::{fmt, ops::Range};
 use yansi::{Color, Style};
@@ -57,12 +57,11 @@ impl fmt::Display for Error {
         // Skip the first line if it contains the same message as severity,
         // unless it includes a source location (denoted by 3+ colons) something like:
         // path/to/file:line:column: ErrorType: message
-        if let Some(l) = lines.peek() {
-            if l.contains(self.severity.to_string().as_str())
-                && l.bytes().filter(|b| *b == b':').count() < 3
-            {
-                lines.next();
-            }
+        if let Some(l) = lines.peek()
+            && l.contains(self.severity.to_string().as_str())
+            && l.bytes().filter(|b| *b == b':').count() < 3
+        {
+            lines.next();
         }
 
         // Format the main source location

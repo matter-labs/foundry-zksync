@@ -15,6 +15,7 @@ use crate::{
     hardfork::{ChainHardfork, ethereum_hardfork_from_block_tag, spec_id_from_ethereum_hardfork},
     mem::{self, in_memory_db::MemDb},
 };
+use alloy_chains::Chain;
 use alloy_consensus::BlockHeader;
 use alloy_genesis::Genesis;
 use alloy_network::{AnyNetwork, TransactionResponse};
@@ -38,7 +39,7 @@ use foundry_config::Config;
 use foundry_evm::{
     backend::{BlockchainDb, BlockchainDbMeta, SharedBackend},
     constants::DEFAULT_CREATE2_DEPLOYER,
-    utils::apply_chain_and_block_specific_env_changes,
+    utils::{apply_chain_and_block_specific_env_changes, get_blob_base_fee_update_fraction},
 };
 use foundry_evm_core::AsEnvMut;
 use itertools::Itertools;
@@ -64,6 +65,7 @@ use tokio::sync::RwLock as TokioRwLock;
 use yansi::Paint;
 
 pub use foundry_common::version::SHORT_VERSION as VERSION_MESSAGE;
+use foundry_evm::traces::{CallTraceDecoderBuilder, identifier::SignaturesIdentifier};
 
 /// Default port the rpc will open
 pub const NODE_PORT: u16 = 8545;
@@ -182,6 +184,8 @@ pub struct NodeConfig {
     pub transaction_block_keeper: Option<usize>,
     /// Disable the default CREATE2 deployer
     pub disable_default_create2_deployer: bool,
+    /// Disable pool balance checks
+    pub disable_pool_balance_checks: bool,
     /// Enable Optimism deposit transaction
     pub enable_optimism: bool,
     /// Slots in an epoch
@@ -482,6 +486,7 @@ impl Default for NodeConfig {
             init_state: None,
             transaction_block_keeper: None,
             disable_default_create2_deployer: false,
+            disable_pool_balance_checks: false,
             enable_optimism: false,
             slots_in_an_epoch: 32,
             memory_limit: None,
@@ -513,14 +518,18 @@ impl NodeConfig {
     }
 
     pub fn get_blob_excess_gas_and_price(&self) -> BlobExcessGasAndPrice {
-        if let Some(blob_excess_gas_and_price) = &self.blob_excess_gas_and_price {
-            *blob_excess_gas_and_price
-        } else if let Some(excess_blob_gas) = self.genesis.as_ref().and_then(|g| g.excess_blob_gas)
-        {
-            BlobExcessGasAndPrice::new(excess_blob_gas, false)
+        if let Some(value) = self.blob_excess_gas_and_price {
+            value
         } else {
-            // If no excess blob gas is configured, default to 0
-            BlobExcessGasAndPrice::new(0, false)
+            let excess_blob_gas =
+                self.genesis.as_ref().and_then(|g| g.excess_blob_gas).unwrap_or(0);
+            BlobExcessGasAndPrice::new(
+                excess_blob_gas,
+                get_blob_base_fee_update_fraction(
+                    self.chain_id.unwrap_or(Chain::mainnet().id()),
+                    self.get_genesis_timestamp(),
+                ),
+            )
         }
     }
 
@@ -987,6 +996,13 @@ impl NodeConfig {
         self
     }
 
+    /// Sets whether to disable pool balance checks
+    #[must_use]
+    pub fn with_disable_pool_balance_checks(mut self, yes: bool) -> Self {
+        self.disable_pool_balance_checks = yes;
+        self
+    }
+
     /// Injects precompiles to `anvil`'s EVM.
     #[must_use]
     pub fn with_precompile_factory(mut self, factory: impl PrecompileFactory + 'static) -> Self {
@@ -1079,12 +1095,12 @@ impl NodeConfig {
             if self.chain_id.is_none() {
                 env.evm_env.cfg_env.chain_id = genesis.config.chain_id;
             }
-            env.evm_env.block_env.timestamp = genesis.timestamp;
+            env.evm_env.block_env.timestamp = U256::from(genesis.timestamp);
             if let Some(base_fee) = genesis.base_fee_per_gas {
                 env.evm_env.block_env.basefee = base_fee.try_into()?;
             }
             if let Some(number) = genesis.number {
-                env.evm_env.block_env.number = number;
+                env.evm_env.block_env.number = U256::from(number);
             }
             env.evm_env.block_env.beneficiary = genesis.coinbase;
         }
@@ -1097,6 +1113,15 @@ impl NodeConfig {
             genesis_init: self.genesis.clone(),
         };
 
+        let mut decoder_builder = CallTraceDecoderBuilder::new();
+        if self.print_traces {
+            // if traces should get printed we configure the decoder with the signatures cache
+            if let Ok(identifier) = SignaturesIdentifier::new(false) {
+                debug!(target: "node", "using signature identifier");
+                decoder_builder = decoder_builder.with_signature_identifier(identifier);
+            }
+        }
+
         // only memory based backend for now
         let backend = mem::Backend::with_genesis(
             db,
@@ -1107,6 +1132,7 @@ impl NodeConfig {
             self.enable_steps_tracing,
             self.print_logs,
             self.print_traces,
+            Arc::new(decoder_builder.build()),
             self.odyssey,
             self.prune_history,
             self.max_persisted_states,
@@ -1237,8 +1263,8 @@ latest block number: {latest_block}"
         self.gas_limit = Some(gas_limit);
 
         env.evm_env.block_env = BlockEnv {
-            number: fork_block_number,
-            timestamp: block.header.timestamp,
+            number: U256::from(fork_block_number),
+            timestamp: U256::from(block.header.timestamp),
             difficulty: block.header.difficulty,
             // ensures prevrandao is set
             prevrandao: Some(block.header.mix_hash.unwrap_or_default()),
@@ -1268,13 +1294,24 @@ latest block number: {latest_block}"
             if let (Some(blob_excess_gas), Some(blob_gas_used)) =
                 (block.header.excess_blob_gas, block.header.blob_gas_used)
             {
-                env.evm_env.block_env.blob_excess_gas_and_price =
-                    Some(BlobExcessGasAndPrice::new(blob_excess_gas, false));
+                let blob_base_fee_update_fraction = get_blob_base_fee_update_fraction(
+                    fork_chain_id
+                        .unwrap_or_else(|| U256::from(Chain::mainnet().id()))
+                        .saturating_to(),
+                    block.header.timestamp,
+                );
+
+                env.evm_env.block_env.blob_excess_gas_and_price = Some(BlobExcessGasAndPrice::new(
+                    blob_excess_gas,
+                    blob_base_fee_update_fraction,
+                ));
+
                 let next_block_blob_excess_gas =
                     fees.get_next_block_blob_excess_gas(blob_excess_gas, blob_gas_used);
+
                 fees.set_blob_excess_gas_and_price(BlobExcessGasAndPrice::new(
                     next_block_blob_excess_gas,
-                    false,
+                    blob_base_fee_update_fraction,
                 ));
             }
         }
@@ -1409,7 +1446,9 @@ async fn derive_block_and_transactions(
                 .get_transaction_by_hash(transaction_hash.0.into())
                 .await?
                 .ok_or_else(|| eyre::eyre!("failed to get fork transaction by hash"))?;
-            let transaction_block_number = transaction.block_number.unwrap();
+            let transaction_block_number = transaction.block_number.ok_or_else(|| {
+                eyre::eyre!("fork transaction is not mined yet (no block number)")
+            })?;
 
             // Get the block pertaining to the fork transaction
             let transaction_block = provider

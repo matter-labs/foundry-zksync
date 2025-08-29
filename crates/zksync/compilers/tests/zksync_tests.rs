@@ -5,10 +5,9 @@ use std::{
     str::FromStr,
 };
 
-use foundry_compilers_artifacts_solc::Remapping;
 use foundry_test_utils::foundry_compilers::{
-    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig, buildinfo::BuildInfo,
-    cache::CompilerCache, project_util::*, resolver::parse::SolData,
+    CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig, artifacts::Remapping,
+    buildinfo::BuildInfo, cache::CompilerCache, project_util::*, resolver::parse::SolData,
 };
 
 use foundry_zksync_compilers::{

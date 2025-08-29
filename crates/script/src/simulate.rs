@@ -11,7 +11,7 @@ use crate::{
 };
 use alloy_chains::NamedChain;
 use alloy_network::TransactionBuilder;
-use alloy_primitives::{Address, Bytes, TxKind, map::HashMap, utils::format_units};
+use alloy_primitives::{Address, TxKind, U256, map::HashMap, utils::format_units};
 use dialoguer::Confirm;
 use eyre::{Context, Result};
 use forge_script_sequence::{ScriptSequence, TransactionWithMetadata};
@@ -131,7 +131,7 @@ impl PreSimulationState {
                         tx.from()
                             .expect("transaction doesn't have a `from` address at execution time"),
                         to,
-                        tx.input().map(Bytes::copy_from_slice),
+                        tx.input().cloned(),
                         tx.value(),
                         tx.authorization_list(),
                         other_fields,
@@ -144,7 +144,7 @@ impl PreSimulationState {
 
                 // Simulate mining the transaction if the user passes `--slow`.
                 if self.args.slow {
-                    runner.executor.env_mut().evm_env.block_env.number += 1;
+                    runner.executor.env_mut().evm_env.block_env.number += U256::from(1);
                 }
 
                 let is_noop_tx = if let Some(to) = to {
@@ -154,7 +154,11 @@ impl PreSimulationState {
                 };
 
                 let transaction = ScriptTransactionBuilder::from(transaction)
-                    .with_execution_result(&result, self.args.gas_estimate_multiplier)
+                    .with_execution_result(
+                        &result,
+                        self.args.gas_estimate_multiplier,
+                        &self.build_data,
+                    )
                     .build();
 
                 eyre::Ok((Some(transaction), is_noop_tx, result.traces))

@@ -31,16 +31,16 @@ resolver = "2"
 
 [workspace.metadata]
 # NOTE(zk): track upstream version after each merge
-metadata.upstream_version = "1.0.0"
+metadata.upstream_version = "1.3.0"
 
 [workspace.package]
-version = "0.0.24" # x-release-please-version
+version = "0.0.26" # x-release-please-version
 edition = "2024"
 # Remember to update clippy.toml as well
 rust-version = "1.88"
 authors = ["Foundry Contributors"]
 license = "MIT OR Apache-2.0"
-homepage = "https://github.com/foundry-rs/foundry"
+homepage = "https://getfoundry.sh"
 repository = "https://github.com/foundry-rs/foundry"
 exclude = ["benches/", "tests/", "test-data/", "testdata/"]
 
@@ -90,8 +90,7 @@ codegen-units = 16
 [profile.profiling]
 inherits = "release"
 debug = "full"
-split-debuginfo = "unpacked"
-strip = false
+strip = "none"
 
 [profile.bench]
 inherits = "profiling"
@@ -215,54 +214,54 @@ foundry-zksync-inspectors = { path = "crates/zksync/inspectors" }
 foundry-strategy-zksync = { path = "crates/strategy/zksync" }
 
 # solc & compilation utilities
-foundry-block-explorers = { version = "0.19.1", default-features = false }
-foundry-compilers = { version = "0.17.3", default-features = false }
-foundry-fork-db = "0.15"
+foundry-block-explorers = { version = "0.20.0", default-features = false }
+foundry-compilers = { version = "0.18.2", default-features = false }
+foundry-fork-db = "0.17"
 solang-parser = { version = "=0.3.9", package = "foundry-solang-parser" }
-solar-ast = { version = "=0.1.4", default-features = false }
-solar-parse = { version = "=0.1.4", default-features = false }
-solar-interface = { version = "=0.1.4", default-features = false }
-solar-sema = { version = "=0.1.4", default-features = false }
-solar-data-structures = { version = "=0.1.4", default-features = false }
+solar-ast = { version = "=0.1.5", default-features = false }
+solar-parse = { version = "=0.1.5", default-features = false }
+solar-interface = { version = "=0.1.5", default-features = false }
+solar-sema = { version = "=0.1.5", default-features = false }
+solar-data-structures = { version = "=0.1.5", default-features = false }
 
 ## alloy
-alloy-consensus = { version = "1.0.11", default-features = false }
-alloy-contract = { version = "1.0.11", default-features = false }
-alloy-eips = { version = "1.0.11", default-features = false }
-alloy-ens = { version = "1.0.11", default-features = false }
-alloy-genesis = { version = "1.0.11", default-features = false }
-alloy-json-rpc = { version = "1.0.11", default-features = false }
-alloy-network = { version = "1.0.11", default-features = false }
-alloy-provider = { version = "1.0.11", default-features = false }
-alloy-pubsub = { version = "1.0.11", default-features = false }
-alloy-rpc-client = { version = "1.0.11", default-features = false }
-alloy-rpc-types = { version = "1.0.11", default-features = true }
-alloy-serde = { version = "1.0.11", default-features = false }
-alloy-signer = { version = "1.0.11", default-features = false }
-alloy-signer-aws = { version = "1.0.11", default-features = false }
-alloy-signer-gcp = { version = "1.0.11", default-features = false }
-alloy-signer-ledger = { version = "1.0.11", default-features = false }
-alloy-signer-local = { version = "1.0.11", default-features = false }
-alloy-signer-trezor = { version = "1.0.11", default-features = false }
-alloy-transport = { version = "1.0.11", default-features = false }
-alloy-transport-http = { version = "1.0.11", default-features = false }
-alloy-transport-ipc = { version = "1.0.11", default-features = false }
-alloy-transport-ws = { version = "1.0.11", default-features = false }
-alloy-hardforks = { version = "0.2.6", default-features = false }
-alloy-op-hardforks = { version = "0.2.6", default-features = false }
+alloy-consensus = { version = "1.0.23", default-features = false }
+alloy-contract = { version = "1.0.23", default-features = false }
+alloy-eips = { version = "1.0.23", default-features = false }
+alloy-ens = { version = "1.0.23", default-features = false }
+alloy-genesis = { version = "1.0.23", default-features = false }
+alloy-json-rpc = { version = "1.0.23", default-features = false }
+alloy-network = { version = "1.0.23", default-features = false }
+alloy-provider = { version = "1.0.23", default-features = false }
+alloy-pubsub = { version = "1.0.23", default-features = false }
+alloy-rpc-client = { version = "1.0.23", default-features = false }
+alloy-rpc-types = { version = "1.0.23", default-features = true }
+alloy-serde = { version = "1.0.23", default-features = false }
+alloy-signer = { version = "1.0.23", default-features = false }
+alloy-signer-aws = { version = "1.0.23", default-features = false }
+alloy-signer-gcp = { version = "1.0.23", default-features = false }
+alloy-signer-ledger = { version = "1.0.23", default-features = false }
+alloy-signer-local = { version = "1.0.23", default-features = false }
+alloy-signer-trezor = { version = "1.0.23", default-features = false }
+alloy-transport = { version = "1.0.23", default-features = false }
+alloy-transport-http = { version = "1.0.23", default-features = false }
+alloy-transport-ipc = { version = "1.0.23", default-features = false }
+alloy-transport-ws = { version = "1.0.23", default-features = false }
+alloy-hardforks = { version = "0.2.12", default-features = false }
+alloy-op-hardforks = { version = "0.2.12", default-features = false }
 
 ## alloy-core
-alloy-dyn-abi = "1.2.1"
-alloy-json-abi = "1.2.1"
-alloy-primitives = { version = "1.2.1", features = [
+alloy-dyn-abi = "1.3.1"
+alloy-json-abi = "1.3.0"
+alloy-primitives = { version = "1.3.1", features = [
     "getrandom",
     "rand",
     "map-fxhash",
     "map-foldhash",
 ] }
-alloy-sol-macro-expander = "1.2.1"
-alloy-sol-macro-input = "1.2.1"
-alloy-sol-types = "1.2.1"
+alloy-sol-macro-expander = "1.3.1"
+alloy-sol-macro-input = "1.3.1"
+alloy-sol-types = "1.3.1"
 
 alloy-chains = "0.2"
 alloy-rlp = "0.3"
@@ -271,18 +270,18 @@ alloy-zksync = { version = "1.0.11-alpha.1", git = "https://github.com/matter-la
 alloy-trie = "0.9"
 
 ## op-alloy
-op-alloy-consensus = "0.17.2"
-op-alloy-rpc-types = "0.17.2"
+op-alloy-consensus = "0.18.13"
+op-alloy-rpc-types = "0.18.13"
 op-alloy-flz = "0.13.1"
 
 ## revm
-revm = { version = "24.0.1", default-features = false }
-revm-inspectors = { version = "0.23.0", features = ["serde"] }
-op-revm = { version = "5.0.1", default-features = false }
+revm = { version = "28.0.0", default-features = false }
+revm-inspectors = { version = "0.28.0", features = ["serde"] }
+op-revm = { version = "9.0.1", default-features = false }
 
 ## alloy-evm
-alloy-evm = "0.10.0"
-alloy-op-evm = "0.10.0"
+alloy-evm = "0.18.3"
+alloy-op-evm = "0.18.3"
 
 ## cli
 anstream = "0.6"
@@ -290,21 +289,21 @@ anstyle = "1.0"
 terminal_size = "0.4"
 
 ## zksync
-anvil_zksync_core = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
-anvil_zksync_types = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
-anvil_zksync_config = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
-anvil_zksync_api_server = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
-anvil_zksync_common = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
-anvil_zksync_console = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
-anvil_zksync_traces = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
-anvil_zksync_l1_sidecar = { git = "https://github.com/matter-labs/anvil-zksync.git", rev = "995970df1f2fd347845d0176c7f3d97d6907b508", default-features = false }
+anvil_zksync_core = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
+anvil_zksync_types = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
+anvil_zksync_config = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
+anvil_zksync_api_server = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
+anvil_zksync_common = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
+anvil_zksync_console = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
+anvil_zksync_traces = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
+anvil_zksync_l1_sidecar = { git = "https://github.com/Moonsong-Labs/anvil-zksync.git", branch = "chore/upgrade-sha-dep", default-features = false }
 zksync_telemetry = { git = "https://github.com/matter-labs/zksync-telemetry.git", rev = "f6d8618d870a09467ff24ea32ef57e01af8f311e" }
-zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.7.0" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.7.0" }
-zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.7.0" }
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.7.0" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.7.0" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "core-v28.7.0" }
+zksync_basic_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "tmp/upgrade-sha2" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", branch = "tmp/upgrade-sha2" }
+zksync_vm_interface = { git = "https://github.com/matter-labs/zksync-era.git", branch = "tmp/upgrade-sha2" }
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", branch = "tmp/upgrade-sha2" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", branch = "tmp/upgrade-sha2" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", branch = "tmp/upgrade-sha2" }
 
 # macros
 proc-macro2 = "1.0"
@@ -317,7 +316,6 @@ thiserror = "2"
 # allocators
 mimalloc = "0.1"
 tikv-jemallocator = "0.6"
-tracy-client = "0.18"
 
 # misc
 auto_impl = "1"
@@ -343,7 +341,7 @@ eyre = "0.6"
 figment = "0.10"
 futures = "0.3"
 hyper = "1.6"
-indicatif = "0.17"
+indicatif = "0.18"
 itertools = "0.14"
 jsonpath_lib = "0.3"
 k256 = "0.13"
@@ -366,12 +364,12 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 serde_urlencoded = "0.7.1"
 similar-asserts = "1.7"
-soldeer-commands = "=0.5.4"
-soldeer-core = { version = "=0.5.4", features = ["serde"] }
+soldeer-commands = "=0.6.1"
+soldeer-core = { version = "=0.6.1", features = ["serde"] }
 strum = "0.27"
 tempfile = "3.20"
 tokio = "1"
-toml = "0.8"
+toml = "0.9"
 tower = "0.5"
 tower-http = "0.6"
 tracing = "0.1"
@@ -392,25 +390,23 @@ flate2 = "1.1"
 # by the `url` crate.
 # See the `idna_adapter` README.md for more details: https://docs.rs/crate/idna_adapter/latest
 idna_adapter = "=1.1.0"
-# Avoid duplicating `zip 2` and `zip 3`. Remove once all `zip` dependencies are updated to `zip 3`.
-zip-extract = "=0.2.1"
 
 [patch.crates-io]
 vise = { git = "https://github.com/matter-labs/vise.git", rev = "51669f42f60c50b3a521662a4ecd71212a303299" }
 
 ## alloy-evm
-# alloy-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "dce752f" }
-# alloy-op-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "dce752f" }
+# alloy-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "7762adc" }
+# alloy-op-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "7762adc" }
 
 ## revm
-# revm = { git = "https://github.com/bluealloy/revm.git", rev = "b5808253" }
-# op-revm = { git = "https://github.com/bluealloy/revm.git", rev = "b5808253" }
-# revm-inspectors = { git = "https://github.com/paradigmxyz/revm-inspectors.git", rev = "a625c04" }
+# revm = { git = "https://github.com/bluealloy/revm.git", rev = "d9cda3a" }
+# op-revm = { git = "https://github.com/bluealloy/revm.git", rev = "d9cda3a" }
+# revm-inspectors = { git = "https://github.com/paradigmxyz/revm-inspectors.git", rev = "956bc98" }
 
 ## foundry
 # foundry-block-explorers = { git = "https://github.com/foundry-rs/block-explorers.git", rev = "e09cb89" }
 # foundry-compilers = { git = "https://github.com/foundry-rs/compilers.git", rev = "e4a9b04" }
-# foundry-fork-db = { git = "https://github.com/foundry-rs/foundry-fork-db", rev = "811a61a" }
+# foundry-fork-db = { git = "https://github.com/foundry-rs/foundry-fork-db", rev = "50683eb" }
 
 ## solar
 # solar-ast = { git = "https://github.com/paradigmxyz/solar.git", branch = "main" }

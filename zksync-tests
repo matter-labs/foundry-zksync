@@ -16,13 +16,13 @@ cast::cli:
 forge:
     cmd::create::zksync::tests::test_zk_deployer_builds_eip712_transactions
 forge::cli:
-    cmd::zk_can_init_with_zksync
     zk::build::test_zk_build_sizes
     zk::cmd::test_zk_calling_empty_code_with_zero_value_issues_warning
     zk::cmd::test_zk_can_detect_call_to_empty_contract
     zk::cmd::test_zk_can_init_with_zksync
     zk::cmd::test_zk_can_send_eth_to_eoa_without_warnings
     zk::cmd::test_zk_gas_report
+    zk::cmd::zk_can_init_with_zksync
     zk::config::test_zk_foundry_toml_config_error_does_not_skip_correct_settings
     zk::ext_integration::test_zk_aave_di
     zk::ext_integration::test_zk_zkemail_zk_email_verify
@@ -81,6 +81,8 @@ forge::it:
     zk::create::forge_zk_can_deploy_contracts_with_gas_per_pubdata_and_succeed
     zk::create::forge_zk_can_deploy_contracts_with_invalid_gas_per_pubdata_and_fail
     zk::create::forge_zk_can_deploy_erc20
+    zk::create::forge_zk_create_dry_run_without_broadcast
+    zk::create::forge_zk_create_with_broadcast_flag
     zk::deploy::multiple_deployments_of_the_same_contract
     zk::factory::script_zk_can_deploy_in_constructor
     zk::factory::script_zk_can_deploy_in_method

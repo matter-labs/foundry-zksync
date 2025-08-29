@@ -172,10 +172,9 @@ where
                                 .get_code_at(addr)
                                 .block_id(block.unwrap_or_default())
                                 .await
+                                && code.is_empty()
                             {
-                                if code.is_empty() {
-                                    eyre::bail!("contract {addr:?} does not have any code")
-                                }
+                                eyre::bail!("contract {addr:?} does not have any code")
                             }
                         } else if Some(TxKind::Create) == req.kind() {
                             eyre::bail!("tx req is a contract deployment");

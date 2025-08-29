@@ -28,7 +28,7 @@ pub use inspector::{
 };
 pub use spec::{CheatcodeDef, Vm};
 
-// Exposed for ZKsync usage.
+// Note(zk): Exposed for ZKsync usage.
 pub use evm::{journaled_account, mock::make_acc_non_empty};
 
 #[macro_use]
@@ -44,6 +44,8 @@ mod version;
 
 mod env;
 pub use env::set_execution_context;
+
+mod fork;
 
 mod evm;
 pub use evm::{DealRecord, mock::mock_call};
@@ -177,7 +179,17 @@ impl std::ops::DerefMut for CheatsCtxt<'_, '_, '_, '_> {
 
 impl CheatsCtxt<'_, '_, '_, '_> {
     #[inline]
-    pub(crate) fn is_precompile(&self, address: &Address) -> bool {
-        self.ecx.journaled_state.inner.precompiles.contains(address)
+    pub(crate) fn ensure_not_precompile(&self, address: &Address) -> Result<()> {
+        if self.is_precompile(address) { Err(precompile_error(address)) } else { Ok(()) }
     }
+
+    #[inline]
+    pub(crate) fn is_precompile(&self, address: &Address) -> bool {
+        self.ecx.journaled_state.warm_addresses.precompiles().contains(address)
+    }
+}
+
+#[cold]
+fn precompile_error(address: &Address) -> Error {
+    fmt_err!("cannot use precompile {address} as an argument")
 }

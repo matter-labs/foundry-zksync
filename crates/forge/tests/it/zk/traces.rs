@@ -63,7 +63,7 @@ fn get_zk_artifact_bytecode<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Vec<u8
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_traces_work_during_call() {
-    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.as_ref().unwrap().zk_config.clone();
     zk_config.verbosity = 5;
     let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
     let filter = Filter::new("testZkTraceOutputDuringCall", "ZkTraceTest", ".*");
@@ -159,7 +159,7 @@ async fn test_zk_traces_work_during_call() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_zk_traces_work_during_create() {
-    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.zk_config.clone();
+    let mut zk_config = TEST_DATA_DEFAULT.zk_test_data.as_ref().unwrap().zk_config.clone();
     zk_config.verbosity = 5;
     let runner = TEST_DATA_DEFAULT.runner_with_zksync_config(zk_config);
     let filter = Filter::new("testZkTraceOutputDuringCreate", "ZkTraceTest", ".*");
@@ -286,45 +286,45 @@ fn assert_execution_trace(
                     });
                 }
             };
-            if let Some(kind) = expected_node.kind {
-                if kind != actual_node.kind {
-                    return Some(AssertionFailure {
-                        field: "kind".to_string(),
-                        expected: format!("{kind:?}"),
-                        actual: format!("{:?}", actual_node.kind),
-                        path: vec![idx],
-                    });
-                }
+            if let Some(kind) = expected_node.kind
+                && kind != actual_node.kind
+            {
+                return Some(AssertionFailure {
+                    field: "kind".to_string(),
+                    expected: format!("{kind:?}"),
+                    actual: format!("{:?}", actual_node.kind),
+                    path: vec![idx],
+                });
             }
-            if let Some(address) = expected_node.address {
-                if address != actual_node.address {
-                    return Some(AssertionFailure {
-                        field: "address".to_string(),
-                        expected: format!("{address:?}"),
-                        actual: format!("{:?}", actual_node.address),
-                        path: vec![idx],
-                    });
-                }
+            if let Some(address) = expected_node.address
+                && address != actual_node.address
+            {
+                return Some(AssertionFailure {
+                    field: "address".to_string(),
+                    expected: format!("{address:?}"),
+                    actual: format!("{:?}", actual_node.address),
+                    path: vec![idx],
+                });
             }
-            if let Some(data) = &expected_node.data {
-                if data != &actual_node.data {
-                    return Some(AssertionFailure {
-                        field: "data".to_string(),
-                        expected: format!("{data:?}"),
-                        actual: format!("{:?}", actual_node.data),
-                        path: vec![idx],
-                    });
-                }
+            if let Some(data) = &expected_node.data
+                && data != &actual_node.data
+            {
+                return Some(AssertionFailure {
+                    field: "data".to_string(),
+                    expected: format!("{data:?}"),
+                    actual: format!("{:?}", actual_node.data),
+                    path: vec![idx],
+                });
             }
-            if let Some(output) = &expected_node.output {
-                if output != &actual_node.output {
-                    return Some(AssertionFailure {
-                        field: "output".to_string(),
-                        expected: format!("{output:?}"),
-                        actual: format!("{:?}", actual_node.output),
-                        path: vec![idx],
-                    });
-                }
+            if let Some(output) = &expected_node.output
+                && output != &actual_node.output
+            {
+                return Some(AssertionFailure {
+                    field: "output".to_string(),
+                    expected: format!("{output:?}"),
+                    actual: format!("{:?}", actual_node.output),
+                    path: vec![idx],
+                });
             }
 
             if let Some(mut failure) =

@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.0.26](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.25...foundry-zksync-v0.0.26) (2025-08-28)
+
+
+### Features
+
+* **`cheatcodes`:** add contract identifier to state diffs ([#11214](https://github.com/matter-labs/foundry-zksync/issues/11214)) ([f258f66](https://github.com/matter-labs/foundry-zksync/commit/f258f664664ab2db8b5e00529c3ad4eadd524f7e))
+* **`cheatcodes`:** getStorageAccesses ([#11296](https://github.com/matter-labs/foundry-zksync/issues/11296)) ([ddc5468](https://github.com/matter-labs/foundry-zksync/commit/ddc5468b01bd97cbf185756446ce60a25c8d69e0))
+* **`cheatcodes`:** include slot type and decode values in state diffs ([#11276](https://github.com/matter-labs/foundry-zksync/issues/11276)) ([a7e5d64](https://github.com/matter-labs/foundry-zksync/commit/a7e5d64ab56981b9514c3df2f66b0c5645fe84dd))
+* add linking error ([#9610](https://github.com/matter-labs/foundry-zksync/issues/9610)) ([690087f](https://github.com/matter-labs/foundry-zksync/commit/690087f7b7c78cd244705ca28f1b67820d318947))
+* added fake sig in executor ([#11308](https://github.com/matter-labs/foundry-zksync/issues/11308)) ([cb8364d](https://github.com/matter-labs/foundry-zksync/commit/cb8364d77b393f99a9169337bfd97a4f3e9d2b2d))
+* **cheats:** support arrays + rename `read` + resolve env vars ([#11302](https://github.com/matter-labs/foundry-zksync/issues/11302)) ([7cd93eb](https://github.com/matter-labs/foundry-zksync/commit/7cd93eb06eeabbe5014fb9af9700f8beeef5b2a2))
+* **forge:** Remove proptest runner from fuzzed tests ([#11061](https://github.com/matter-labs/foundry-zksync/issues/11061)) ([3412508](https://github.com/matter-labs/foundry-zksync/commit/341250813b248e72b6e459033bf5085c351f9f89))
+* **lint:** add UnsafeTypecast lint ([#11046](https://github.com/matter-labs/foundry-zksync/issues/11046)) ([1186156](https://github.com/matter-labs/foundry-zksync/commit/1186156961f648273299ac067d098ee0e33a0d7e))
+* **lint:** mixedCase exceptions ([#11330](https://github.com/matter-labs/foundry-zksync/issues/11330)) ([3e32767](https://github.com/matter-labs/foundry-zksync/commit/3e32767d2f15ddac6232b82b4afd84d8c2c028f9))
+
+
+### Bug Fixes
+
+* **`cast/test`:** disable balance check for impersonated tx ([8fad710](https://github.com/matter-labs/foundry-zksync/commit/8fad710bc591ae7ddbe6917a2afd7db9d509b3ab))
+* **cheatcodes:** remove redundant computation in validate_private_key function ([8fad710](https://github.com/matter-labs/foundry-zksync/commit/8fad710bc591ae7ddbe6917a2afd7db9d509b3ab))
+* disable tx gas limit cap ([#11347](https://github.com/matter-labs/foundry-zksync/issues/11347)) ([a66a814](https://github.com/matter-labs/foundry-zksync/commit/a66a814d3e96b24944272820b4990009b5e3907b))
+* force 4844 txtype in blobhashes setter ([#11355](https://github.com/matter-labs/foundry-zksync/issues/11355)) ([303afb8](https://github.com/matter-labs/foundry-zksync/commit/303afb84b41d2ca9521d7fbe8f6425b4c6e1aa1d))
+* **forge:** enable fail fast flag ([#11328](https://github.com/matter-labs/foundry-zksync/issues/11328)) ([5e3e557](https://github.com/matter-labs/foundry-zksync/commit/5e3e557e69a2733521c5b68dad465c5dd30f102a))
+* **forge:** handle error if etherscan identifier cannot resolve config ([#11356](https://github.com/matter-labs/foundry-zksync/issues/11356)) ([28fce09](https://github.com/matter-labs/foundry-zksync/commit/28fce09b0602eb5faf5bf0f574bedff791c93360))
+* **forge:** write ordered deps in foundry.lock ([#11360](https://github.com/matter-labs/foundry-zksync/issues/11360)) ([2c05015](https://github.com/matter-labs/foundry-zksync/commit/2c05015bc909e1e304fd33840b3549aa0820819d))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with `Severity::Gas` ([#11358](https://github.com/matter-labs/foundry-zksync/issues/11358)) ([129bea5](https://github.com/matter-labs/foundry-zksync/commit/129bea58b6f141ee8d6c25bd62b9a4f6d0f4d011))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([97afac5](https://github.com/matter-labs/foundry-zksync/commit/97afac5ce01f2c16d4388da03f03371965bea6fb))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([129bea5](https://github.com/matter-labs/foundry-zksync/commit/129bea58b6f141ee8d6c25bd62b9a4f6d0f4d011))
+* **lint:** lint only files that we build ([#11247](https://github.com/matter-labs/foundry-zksync/issues/11247)) ([ead9577](https://github.com/matter-labs/foundry-zksync/commit/ead95770abe06454c25a320b99836c3bb7463b06))
+* **script:** safely derive filename from calldata ([#11291](https://github.com/matter-labs/foundry-zksync/issues/11291)) ([5f8c855](https://github.com/matter-labs/foundry-zksync/commit/5f8c855e4709193d9172641402895667e3938327))
+* **tests:** ignore failing test for `can_get_code_by_hash` due to Alchemy limitations; update config formatting ([bfd9acf](https://github.com/matter-labs/foundry-zksync/commit/bfd9acf51f61303ea968e59f81546329e48f4767))
+
+## [0.0.25](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.24...foundry-zksync-v0.0.25) (2025-08-13)
+
+
+### Bug Fixes
+
+* improve error handling and add dry-run support for zkSync deployment ([#1094](https://github.com/matter-labs/foundry-zksync/issues/1094)) ([bb8f41f](https://github.com/matter-labs/foundry-zksync/commit/bb8f41f68ddae01a86badc00b5c5b14be8c79fc4))
+
 ## [0.0.24](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.23...foundry-zksync-v0.0.24) (2025-08-01)
 
 

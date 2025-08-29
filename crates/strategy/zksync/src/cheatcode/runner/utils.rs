@@ -56,23 +56,22 @@ pub(super) fn get_artifact_code(
                     // name might be in the form of "Counter.0.8.23"
                     let id_name = id.name.split('.').next().unwrap();
 
-                    if let Some(path) = &file {
-                        if !id.source.ends_with(path) {
-                            return false;
-                        }
+                    if let Some(path) = &file
+                        && !id.source.ends_with(path)
+                    {
+                        return false;
                     }
-                    if let Some(name) = contract_name {
-                        if id_name != name {
-                            return false;
-                        }
+                    if let Some(name) = contract_name
+                        && id_name != name
+                    {
+                        return false;
                     }
-                    if let Some(ref version) = version {
-                        if id.version.minor != version.minor
+                    if let Some(ref version) = version
+                        && (id.version.minor != version.minor
                             || id.version.major != version.major
-                            || id.version.patch != version.patch
-                        {
-                            return false;
-                        }
+                            || id.version.patch != version.patch)
+                    {
+                        return false;
                     }
                     true
                 })

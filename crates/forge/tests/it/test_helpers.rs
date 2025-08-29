@@ -8,13 +8,13 @@ use forge::{
 use foundry_cli::utils::{self, install_crypto_provider};
 use foundry_compilers::{
     Project, ProjectCompileOutput, SolcConfig, Vyper,
-    artifacts::{EvmVersion, Libraries, Settings},
+    artifacts::{EvmVersion, Libraries, Settings, output_selection::ContractOutputSelection},
     compilers::multi::MultiCompiler,
     utils::RuntimeOrHandle,
 };
 use foundry_config::{
-    Config, FsPermissions, FuzzConfig, FuzzDictionaryConfig, InvariantConfig, RpcEndpointUrl,
-    RpcEndpoints,
+    Config, FsPermissions, FuzzConfig, FuzzCorpusConfig, FuzzDictionaryConfig, InvariantConfig,
+    RpcEndpointUrl, RpcEndpoints,
     fs_permissions::PathPermission,
     zksync::{ZKSYNC_ARTIFACTS_DIR, ZKSYNC_SOLIDITY_FILES_CACHE_FILENAME},
 };
@@ -124,8 +124,8 @@ impl ForgeTestProfile {
         config.gas_limit = u64::MAX.into();
         config.chain = None;
         config.tx_origin = CALLER;
-        config.block_number = 1;
-        config.block_timestamp = 1;
+        config.block_number = U256::from(1);
+        config.block_timestamp = U256::from(1);
 
         config.sender = CALLER;
         config.initial_balance = U256::MAX;
@@ -150,8 +150,8 @@ impl ForgeTestProfile {
                 max_fuzz_dictionary_values: 10_000,
             },
             gas_report_samples: 256,
+            corpus: FuzzCorpusConfig::default(),
             failure_persist_dir: Some(tempfile::tempdir().unwrap().keep()),
-            failure_persist_file: Some("testfailure".to_string()),
             show_logs: false,
             timeout: None,
             no_zksync_reserved_addresses: false,
@@ -171,10 +171,7 @@ impl ForgeTestProfile {
             shrink_run_limit: 5000,
             max_assume_rejects: 65536,
             gas_report_samples: 256,
-            corpus_dir: None,
-            corpus_gzip: true,
-            corpus_min_mutations: 5,
-            corpus_min_size: 0,
+            corpus: FuzzCorpusConfig::default(),
             failure_persist_dir: Some(
                 tempfile::Builder::new()
                     .prefix(&format!("foundry-{self}"))
@@ -235,7 +232,7 @@ pub struct ForgeTestData {
     pub output: ProjectCompileOutput,
     pub config: Arc<Config>,
     pub profile: ForgeTestProfile,
-    pub zk_test_data: ZkTestData,
+    pub zk_test_data: Option<ZkTestData>,
 }
 
 impl ForgeTestData {
@@ -259,10 +256,24 @@ impl ForgeTestData {
             let zk_output = get_zk_compiled(&zk_project);
             let dual_compiled_contracts =
                 DualCompiledContracts::new(&output, &zk_output, &project.paths, &zk_project.paths);
-            ZkTestData { dual_compiled_contracts, zk_config, zk_project, output, zk_output }
+            Some(ZkTestData { dual_compiled_contracts, zk_config, zk_project, output, zk_output })
         };
 
         Self { project, output, config, profile, zk_test_data }
+    }
+
+    /// Builds [ForgeTestData] without zk-specific data for upstream compatibility
+    pub fn new_without_zk(profile: ForgeTestProfile) -> Self {
+        install_crypto_provider();
+        init_tracing();
+
+        let mut config = profile.config();
+        config.extra_output = vec![ContractOutputSelection::StorageLayout];
+        let config = Arc::new(config);
+        let mut project = config.project().unwrap();
+        let output = get_compiled(&mut project);
+
+        Self { project, output, config, profile, zk_test_data: None }
     }
 
     /// Builds a base runner
@@ -284,7 +295,7 @@ impl ForgeTestData {
     /// Builds a non-tracing zksync runner
     /// TODO: This needs to be implemented as currently it is a copy of the original function
     pub fn runner_zksync(&self) -> MultiContractRunner {
-        let mut zk_config = self.zk_test_data.zk_config.clone();
+        let mut zk_config = self.zk_test_data.as_ref().unwrap().zk_config.clone();
         zk_config.fs_permissions =
             FsPermissions::new(vec![PathPermission::read_write(manifest_root())]);
         self.runner_with_zksync_config(zk_config)
@@ -329,7 +340,7 @@ impl ForgeTestData {
         // no prompt testing
         zk_config.prompt_timeout = 0;
 
-        let root = self.zk_test_data.zk_project.root();
+        let root = self.zk_test_data.as_ref().unwrap().zk_project.root();
         let mut opts = config_evm_opts(&zk_config);
 
         if zk_config.isolate {
@@ -337,9 +348,10 @@ impl ForgeTestData {
         }
 
         let env = opts.local_evm_env();
-        let output = self.zk_test_data.output.clone();
-        let zk_output = self.zk_test_data.zk_output.clone();
-        let dual_compiled_contracts = self.zk_test_data.dual_compiled_contracts.clone();
+        let output = self.zk_test_data.as_ref().unwrap().output.clone();
+        let zk_output = self.zk_test_data.as_ref().unwrap().zk_output.clone();
+        let dual_compiled_contracts =
+            self.zk_test_data.as_ref().unwrap().dual_compiled_contracts.clone();
         let sender = zk_config.sender;
 
         let mut strategy = utils::get_executor_strategy(&zk_config);
@@ -643,6 +655,7 @@ pub fn deploy_zk_contract(
         url,
         "--private-key",
         private_key,
+        "--broadcast",
     ]);
 
     if let Some(args) = extra_args {

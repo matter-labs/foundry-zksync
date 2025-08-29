@@ -321,10 +321,7 @@ where
                     None
                 })
                 .unwrap_or_else(|| {
-                    self.ecx
-                        .journaled_state
-                        .db()
-                        .code_by_hash(hash_b256)
+                    Database::code_by_hash(&mut self.ecx.journaled_state.database, hash_b256)
                         .ok()
                         .map(|bytecode| bytecode.original_bytes().to_vec())
                 })

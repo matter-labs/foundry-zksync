@@ -5,7 +5,7 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
-    utils::configure_tx_env,
+    utils::{configure_tx_env, get_blob_base_fee_update_fraction_by_spec_id},
 };
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
@@ -34,6 +34,7 @@ use revm::{
 use std::{
     any::Any,
     collections::{BTreeMap, HashMap, HashSet},
+    fmt::Debug,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -106,7 +107,7 @@ pub type JournaledState = JournalInner<JournalEntry>;
 
 /// An extension trait that allows us to easily extend the `revm::Inspector` capabilities
 #[auto_impl::auto_impl(&mut)]
-pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit {
+pub trait DatabaseExt: Database<Error = DatabaseError> + DatabaseCommit + Debug {
     /// Creates a new state snapshot at the current point of execution.
     ///
     /// A state snapshot is associated with a new unique id that's created for the snapshot.
@@ -930,7 +931,8 @@ impl Backend {
         let fork_id = self.ensure_fork_id(id)?.clone();
 
         let fork = self.inner.get_fork_by_id_mut(id)?;
-        let full_block = fork.db.db.get_full_block(env.evm_env.block_env.number)?;
+        let full_block =
+            fork.db.db.get_full_block(env.evm_env.block_env.number.saturating_to::<u64>())?;
 
         for tx in full_block.inner.transactions.txns() {
             // System transactions such as on L2s don't contain any pricing info so we skip them
@@ -1216,6 +1218,8 @@ impl DatabaseExt for Backend {
             // selected. This ensures that there are no gaps in depth which would
             // otherwise cause issues with the tracer
             fork.journaled_state.depth = active_journaled_state.depth;
+            // Set proper journal of state changes into the fork.
+            fork.journaled_state.journal = active_journaled_state.journal.clone();
 
             // another edge case where a fork is created and selected during setup with not
             // necessarily the same caller as for the test, however we must always
@@ -1296,6 +1300,8 @@ impl DatabaseExt for Backend {
                 active.journaled_state = self.fork_init_journaled_state.clone();
 
                 active.journaled_state.depth = journaled_state.depth;
+                // Set proper journal of state changes into the fork.
+                active.journaled_state.journal = journaled_state.journal.clone();
                 for addr in persistent_addrs {
                     self.strategy.runner.merge_journaled_state_data(
                         self.strategy.context.as_mut(),
@@ -1548,6 +1554,7 @@ impl DatabaseExt for Backend {
                                 .map(|s| s.present_value)
                                 .unwrap_or_default(),
                             U256::from_be_bytes(value.0),
+                            0,
                         ),
                     )
                 })
@@ -1980,7 +1987,9 @@ impl BackendInner {
             journal_inner.set_spec_id(self.spec_id);
             journal_inner
         };
-        journal.precompiles.extend(self.precompiles().addresses().copied());
+        journal
+            .warm_addresses
+            .set_precompile_addresses(self.precompiles().addresses().copied().collect());
         journal
     }
 }
@@ -2028,16 +2037,19 @@ fn is_contract_in_state(journaled_state: &JournaledState, acc: Address) -> bool 
 
 /// Updates the env's block with the block's data
 fn update_env_block(env: &mut EnvMut<'_>, block: &AnyRpcBlock) {
-    env.block.timestamp = block.header.timestamp;
+    env.block.timestamp = U256::from(block.header.timestamp);
     env.block.beneficiary = block.header.beneficiary;
     env.block.difficulty = block.header.difficulty;
     env.block.prevrandao = Some(block.header.mix_hash.unwrap_or_default());
     env.block.basefee = block.header.base_fee_per_gas.unwrap_or_default();
     env.block.gas_limit = block.header.gas_limit;
-    env.block.number = block.header.number;
+    env.block.number = U256::from(block.header.number);
+
     if let Some(excess_blob_gas) = block.header.excess_blob_gas {
-        env.block.blob_excess_gas_and_price =
-            Some(BlobExcessGasAndPrice::new(excess_blob_gas, false));
+        env.block.blob_excess_gas_and_price = Some(BlobExcessGasAndPrice::new(
+            excess_blob_gas,
+            get_blob_base_fee_update_fraction_by_spec_id(env.cfg.spec),
+        ));
     }
 }
 
@@ -2171,7 +2183,11 @@ mod tests {
         }
         drop(backend);
 
-        let meta = BlockchainDbMeta { block_env: env.evm_env.block_env, hosts: Default::default() };
+        let meta = BlockchainDbMeta {
+            chain: None,
+            block_env: env.evm_env.block_env,
+            hosts: Default::default(),
+        };
 
         let db = BlockchainDb::new(
             meta,

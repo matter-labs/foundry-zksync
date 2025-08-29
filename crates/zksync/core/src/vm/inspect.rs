@@ -620,13 +620,11 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         // TODO: This is a hack to be able to print traces on demand. If `tx_common.input` is not
         // set, getting tx hash will panic.
         // It will not print correct transaction hash though.
-        if let zksync_types::ExecuteTransactionCommon::L2(tx_common) = &mut tx.common_data {
-            if tx_common.input.is_none() {
-                tx_common.input = Some(zksync_types::InputData {
-                    hash: Default::default(),
-                    data: Default::default(),
-                })
-            }
+        if let zksync_types::ExecuteTransactionCommon::L2(tx_common) = &mut tx.common_data
+            && tx_common.input.is_none()
+        {
+            tx_common.input =
+                Some(zksync_types::InputData { hash: Default::default(), data: Default::default() })
         }
 
         let tx_results_pretty = TransactionSummary::new(l2_gas_price, &tx, &tx_result, None);
@@ -738,15 +736,13 @@ fn call_traces_patch_create<S: ReadStorage>(
     storage: StoragePtr<StorageView<S>>,
     call: &mut Call,
 ) {
-    if matches!(call.r#type, CallType::Create) {
-        if let Some(hash) = deployed_bytecode_hashes.get(&call.to).cloned() {
-            let maybe_bytecode = bytecodes
-                .get(&hash)
-                .cloned()
-                .or_else(|| storage.borrow_mut().load_factory_dep(hash));
-            if let Some(bytecode) = maybe_bytecode {
-                call.output = bytecode;
-            }
+    if matches!(call.r#type, CallType::Create)
+        && let Some(hash) = deployed_bytecode_hashes.get(&call.to).cloned()
+    {
+        let maybe_bytecode =
+            bytecodes.get(&hash).cloned().or_else(|| storage.borrow_mut().load_factory_dep(hash));
+        if let Some(bytecode) = maybe_bytecode {
+            call.output = bytecode;
         }
     }
     for subcall in &mut call.calls {

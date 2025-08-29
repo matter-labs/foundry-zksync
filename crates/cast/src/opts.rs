@@ -117,6 +117,8 @@ pub enum CastSubcommand {
     ToCheckSumAddress {
         /// The address to convert.
         address: Option<Address>,
+        /// EIP-155 chain ID to encode the address using EIP-1191.
+        chain_id: Option<u64>,
     },
 
     /// Convert hex data to an ASCII string.
@@ -149,6 +151,25 @@ pub enum CastSubcommand {
     ToBytes32 {
         /// The hex data to convert.
         bytes: Option<String>,
+    },
+
+    /// Pads hex data to a specified length.
+    #[command(visible_aliases = &["pd"])]
+    Pad {
+        /// The hex data to pad.
+        data: Option<String>,
+
+        /// Right-pad the data (instead of left-pad).
+        #[arg(long)]
+        right: bool,
+
+        /// Left-pad the data (default).
+        #[arg(long, conflicts_with = "right")]
+        left: bool,
+
+        /// Target length in bytes (default: 32).
+        #[arg(long, default_value = "32")]
+        len: usize,
     },
 
     /// Convert an integer into a fixed point number.
@@ -362,6 +383,10 @@ pub enum CastSubcommand {
         #[arg(long, short)]
         field: Option<String>,
 
+        /// Print the raw RLP encoded block header.
+        #[arg(long, conflicts_with = "field")]
+        raw: bool,
+
         #[arg(long, env = "CAST_FULL_BLOCK")]
         full: bool,
 
@@ -492,6 +517,10 @@ pub enum CastSubcommand {
 
         #[command(flatten)]
         rpc: RpcOpts,
+
+        /// If specified, the transaction will be converted to a TransactionRequest JSON format.
+        #[arg(long)]
+        to_request: bool,
     },
 
     /// Get the transaction receipt for a transaction.
@@ -547,7 +576,12 @@ pub enum CastSubcommand {
         sig: String,
 
         /// The ABI-encoded calldata.
-        calldata: String,
+        #[arg(required_unless_present = "file", index = 2)]
+        calldata: Option<String>,
+
+        /// Load ABI-encoded calldata from a file instead.
+        #[arg(long = "file", short = 'f', conflicts_with = "calldata")]
+        file: Option<PathBuf>,
     },
 
     /// Decode ABI-encoded string.
@@ -1114,7 +1148,7 @@ impl CastSubcommand {
             Self::ConcatHex { data: _ } => "concat-hex",
             Self::FromBin => "from-bin",
             Self::ToHexdata { input: _ } => "to-hexdata",
-            Self::ToCheckSumAddress { address: _ } => "to-check-sum-address",
+            Self::ToCheckSumAddress { address: _, chain_id: _ } => "to-check-sum-address",
             Self::ToUint256 { value: _ } => "to-uint256",
             Self::ToInt256 { value: _ } => "to-int256",
             Self::ToUnit { value: _, unit: _ } => "to-unit",
@@ -1133,7 +1167,7 @@ impl CastSubcommand {
             Self::ParseBytes32Address { bytes: _ } => "parse-bytes32-address",
             Self::DecodeAbi { sig: _, calldata: _, input: _ } => "decode-abi",
             Self::AbiEncode { sig: _, packed: _, args: _ } => "abi-encode",
-            Self::DecodeCalldata { sig: _, calldata: _ } => "decode-calldata",
+            Self::DecodeCalldata { sig: _, calldata: _, file: _ } => "decode-calldata",
             Self::CalldataEncode { sig: _, args: _, file: _ } => "calldata-encode",
             Self::DecodeString { data: _ } => "decode-string",
             Self::DecodeEvent { sig: _, data: _ } => "decode-event",
@@ -1149,7 +1183,7 @@ impl CastSubcommand {
             Self::Age { block: _, rpc: _ } => "age",
             Self::Balance { block: _, who: _, ether: _, rpc: _, erc20: _ } => "balance",
             Self::BaseFee { block: _, rpc: _ } => "base-fee",
-            Self::Block { block: _, full: _, field: _, rpc: _ } => "block",
+            Self::Block { block: _, full: _, field: _, rpc: _, raw: _ } => "block",
             Self::BlockNumber { rpc: _, block: _ } => "block-number",
             Self::Chain { rpc: _ } => "chain",
             Self::ChainId { rpc: _ } => "chain-id",
@@ -1180,7 +1214,9 @@ impl CastSubcommand {
             }
             Self::Run(_) => "run",
             Self::SendTx(_) => "send-tx",
-            Self::Tx { tx_hash: _, field: _, raw: _, rpc: _, from: _, nonce: _ } => "tx",
+            Self::Tx { tx_hash: _, field: _, raw: _, rpc: _, from: _, nonce: _, to_request: _ } => {
+                "tx"
+            }
             Self::FourByte { selector: _ } => "four-byte",
             Self::FourByteCalldata { calldata: _ } => "four-byte-calldata",
             Self::FourByteEvent { topic: _ } => "four-byte-event",
@@ -1210,6 +1246,7 @@ impl CastSubcommand {
             Self::TxPool { command: _ } => "tx-pool",
             Self::DAEstimate(_) => "da-estimate",
             Self::RecoverAuthority { .. } => "recover-authority",
+            Self::Pad { .. } => "pad",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()
     }

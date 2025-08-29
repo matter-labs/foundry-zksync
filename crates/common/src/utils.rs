@@ -10,7 +10,17 @@ static BYTECODE_PLACEHOLDER_RE: LazyLock<Regex> =
 
 /// Block on a future using the current tokio runtime on the current thread.
 pub fn block_on<F: std::future::Future>(future: F) -> F::Output {
-    block_on_handle(&tokio::runtime::Handle::current(), future)
+    match tokio::runtime::Handle::try_current() {
+        Ok(handle) => block_on_handle(&handle, future),
+        Err(_) => {
+            // No runtime in context: create a minimal current-thread runtime and block on it
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("failed to build tokio runtime")
+                .block_on(future)
+        }
+    }
 }
 
 /// Block on a future using the current tokio runtime on the current thread with the given handle.

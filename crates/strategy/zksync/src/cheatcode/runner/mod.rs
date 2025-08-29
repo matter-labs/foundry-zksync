@@ -143,6 +143,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                             })
                             .collect(),
                         depth: record.depth,
+                        oldNonce: 0,
+                        newNonce: 0,
                     };
                     last.push(access);
                 }
@@ -438,7 +440,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             op::SELFBALANCE => interpreter.input.target_address,
             op::BALANCE => {
                 if interpreter.stack.is_empty() {
-                    interpreter.control.instruction_result = InstructionResult::StackUnderflow;
                     return true;
                 }
 
@@ -454,7 +455,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         if interpreter.stack.push(balance) {
             interpreter.bytecode.relative_jump(1);
         } else {
-            interpreter.control.instruction_result = InstructionResult::StackOverflow;
+            // stack overflow; nothing else to do here
         }
 
         false
@@ -947,18 +948,16 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     fn zksync_remove_duplicate_account_access(&self, state: &mut Cheatcodes) {
         let ctx = get_context(state.strategy.context.as_mut());
 
-        if let Some(index) = ctx.remove_recorded_access_at.take() {
-            if let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut()
-            {
-                if let Some(last) = recorded_account_diffs_stack.last_mut() {
-                    // This entry has been inserted during CREATE/CALL operations in revm's
-                    // cheatcode inspector and must be removed.
-                    if index < last.len() {
-                        let _ = last.remove(index);
-                    } else {
-                        warn!(target: "zksync", index, len = last.len(), "skipping duplicate access removal: out of bounds");
-                    }
-                }
+        if let Some(index) = ctx.remove_recorded_access_at.take()
+            && let Some(recorded_account_diffs_stack) = state.recorded_account_diffs_stack.as_mut()
+            && let Some(last) = recorded_account_diffs_stack.last_mut()
+        {
+            // This entry has been inserted during CREATE/CALL operations in revm's
+            // cheatcode inspector and must be removed.
+            if index < last.len() {
+                let _ = last.remove(index);
+            } else {
+                warn!(target: "zksync", index, len = last.len(), "skipping duplicate access removal: out of bounds");
             }
         }
     }
@@ -978,11 +977,12 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
         // Explicitly increment tx nonce if calls are not isolated and we are broadcasting
         // This isn't needed in EVM, but required in zkEVM as the nonces are split.
-        if let Some(broadcast) = &state.broadcast {
-            if ecx.journaled_state.depth() >= broadcast.depth && !state.config.evm_opts.isolate {
-                foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, ecx);
-                debug!("incremented zksync nonce after broadcastable create");
-            }
+        if let Some(broadcast) = &state.broadcast
+            && ecx.journaled_state.depth() >= broadcast.depth
+            && !state.config.evm_opts.isolate
+        {
+            foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, ecx);
+            debug!("incremented zksync nonce after broadcastable create");
         }
     }
 }
@@ -1040,8 +1040,8 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
         let block_info =
             data.journaled_state.sload(system_account, block_info_key).unwrap_or_default();
         let (block_number, block_timestamp) = unpack_block_info(block_info.to_u256());
-        data.block.number = block_number;
-        data.block.timestamp = block_timestamp;
+        data.block.number = U256::from(block_number);
+        data.block.timestamp = U256::from(block_timestamp);
 
         let test_contract = data.journaled_state.database.get_test_contract_address();
         for address in
@@ -1121,8 +1121,9 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
         let mut system_storage: HashMap<U256, EvmStorageSlot> = Default::default();
         let block_info_key = CURRENT_VIRTUAL_BLOCK_INFO_POSITION.to_ru256();
-        let block_info = pack_block_info(block_env.number, block_env.timestamp);
-        system_storage.insert(block_info_key, EvmStorageSlot::new(block_info.to_ru256()));
+        let block_info =
+            pack_block_info(block_env.number.saturating_to(), block_env.timestamp.saturating_to());
+        system_storage.insert(block_info_key, EvmStorageSlot::new(block_info.to_ru256(), 0));
 
         let mut l2_eth_storage: HashMap<U256, EvmStorageSlot> = Default::default();
         let mut nonce_storage: HashMap<U256, EvmStorageSlot> = Default::default();
@@ -1159,13 +1160,13 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
             let info = &account.info;
 
             let balance_key = get_balance_key(address);
-            l2_eth_storage.insert(balance_key, EvmStorageSlot::new(info.balance));
+            l2_eth_storage.insert(balance_key, EvmStorageSlot::new(info.balance, 0));
 
             debug!(?address, ?deployment_nonce, transaction_nonce=?info.nonce, "attempting to fit EVM nonce to ZKsync nonces, might cause inconsistencies");
             let full_nonce = nonces_to_full_nonce(info.nonce.into(), deployment_nonce);
 
             let nonce_key = get_nonce_key(address);
-            nonce_storage.insert(nonce_key, EvmStorageSlot::new(full_nonce.to_ru256()));
+            nonce_storage.insert(nonce_key, EvmStorageSlot::new(full_nonce.to_ru256(), 0));
 
             if let Some(bytecode) = &info.code {
                 // TODO(zk): This has O(N*M) complexity, since for each contract we need to
@@ -1178,11 +1179,11 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                 {
                     account_code_storage.insert(
                         get_account_code_key(address),
-                        EvmStorageSlot::new(contract.zk_bytecode_hash.to_ru256()),
+                        EvmStorageSlot::new(contract.zk_bytecode_hash.to_ru256(), 0),
                     );
                     known_codes_storage.insert(
                         contract.zk_bytecode_hash.to_ru256(),
-                        EvmStorageSlot::new(U256::ZERO),
+                        EvmStorageSlot::new(U256::ZERO, 0),
                     );
 
                     let code_hash = B256::from_slice(contract.zk_bytecode_hash.as_bytes());

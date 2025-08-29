@@ -20,9 +20,11 @@ foundry-config.workspace = true
 # foundry-zksync-core.workspace = true
 foundry-evm-abi.workspace = true
 
+alloy-chains.workspace = true
 alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
 alloy-evm.workspace = true
 alloy-genesis.workspace = true
+alloy-hardforks.workspace = true
 alloy-json-abi.workspace = true
 alloy-primitives = { workspace = true, features = [
     "serde",
@@ -47,7 +49,6 @@ revm = { workspace = true, features = [
     "arbitrary",
     "c-kzg",
     "blst",
-    "secp256r1",
 ] }
 revm-inspectors.workspace = true
 op-revm.workspace = true

@@ -236,7 +236,7 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
         let ctx = get_context(ctx);
 
         let provider = zksync_provider().with_recommended_fillers().connect_http(fork_url.parse()?);
-        let block_number = env.evm_env.block_env.number;
+        let block_number = env.evm_env.block_env.number.saturating_to();
         // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
         let maybe_block_details = tokio::task::block_in_place(move || {
             tokio::runtime::Handle::current().block_on(provider.get_block_details(block_number))

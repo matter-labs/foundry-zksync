@@ -23,7 +23,7 @@ use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{
     Config,
     figment::{
-        self, Figment, Metadata, Profile,
+        self, Metadata, Profile,
         value::{Dict, Map},
     },
 };
@@ -33,6 +33,7 @@ use foundry_evm::{
     traces::{InternalTraceMode, TraceMode},
 };
 use foundry_zksync_core::MAX_L2_GAS_LIMIT;
+use itertools::Either;
 use regex::Regex;
 use revm::context::TransactionType;
 use std::{str::FromStr, sync::LazyLock};
@@ -75,6 +76,7 @@ pub struct CallArgs {
     sig: Option<String>,
 
     /// The arguments of the function to call.
+    #[arg(allow_negative_numbers = true)]
     args: Vec<String>,
 
     /// Raw hex-encoded data for the transaction. Used instead of \[SIG\] and \[ARGS\].
@@ -188,6 +190,7 @@ pub enum CallSubcommands {
         sig: Option<String>,
 
         /// The arguments of the constructor.
+        #[arg(allow_negative_numbers = true)]
         args: Vec<String>,
 
         /// Ether to send in the transaction.
@@ -202,7 +205,7 @@ pub enum CallSubcommands {
 
 impl CallArgs {
     pub async fn run(self) -> Result<()> {
-        let figment = Into::<Figment>::into(&self.eth).merge(&self);
+        let figment = self.eth.rpc.clone().into_figment(self.with_local_artifacts).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
 
         let is_zk = self.zk_tx.has_zksync_args() || self.zk_force;
@@ -318,7 +321,7 @@ impl CallArgs {
                     env.evm_env.block_env.number = number.to();
                 }
                 if let Some(time) = block_overrides.time {
-                    env.evm_env.block_env.timestamp = time;
+                    env.evm_env.block_env.timestamp = U256::from(time);
                 }
             }
 
@@ -356,6 +359,12 @@ impl CallArgs {
                 if env_tx.tx_type == TransactionType::Legacy as u8 {
                     env_tx.tx_type = TransactionType::Eip2930 as u8;
                 }
+            }
+
+            if let Some(auth) = tx.inner.authorization_list {
+                env_tx.authorization_list = auth.into_iter().map(Either::Left).collect();
+
+                env_tx.tx_type = TransactionType::Eip7702 as u8;
             }
 
             let trace = match tx_kind {
@@ -704,5 +713,22 @@ mod tests {
             args.state_overrides,
             Some(vec!["0x123:0x1:0x1234".to_string(), "0x456:0x2:0x5678".to_string()])
         );
+    }
+
+    #[test]
+    fn test_negative_args_with_flags() {
+        // Test that negative args work with flags
+        let args = CallArgs::parse_from([
+            "foundry-cli",
+            "--trace",
+            "0xDeaDBeeFcAfEbAbEfAcEfEeDcBaDbEeFcAfEbAbE",
+            "process(int256)",
+            "-999999",
+            "--debug",
+        ]);
+
+        assert!(args.trace);
+        assert!(args.debug);
+        assert_eq!(args.args, vec!["-999999"]);
     }
 }

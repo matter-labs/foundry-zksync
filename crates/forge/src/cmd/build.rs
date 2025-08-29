@@ -1,20 +1,20 @@
 use super::{install, watch::WatchArgs};
 use clap::Parser;
-use eyre::Result;
+use eyre::{Result, eyre};
 use forge_lint::{linter::Linter, sol::SolidityLinter};
 use foundry_cli::{
-    opts::BuildOpts,
+    opts::{BuildOpts, solar_pcx_from_build_opts},
     utils::{LoadConfig, cache_local_signatures},
 };
 use foundry_common::{compile::ProjectCompiler, shell};
 use foundry_compilers::{
-    Project,
+    CompilationError, FileFilter, Project,
     compilers::{Language, multi::MultiCompilerLanguage},
     solc::SolcLanguage,
     utils::source_files_iter,
 };
 use foundry_config::{
-    Config,
+    Config, SkipBuildFilters,
     figment::{
         self, Metadata, Profile, Provider,
         error::Kind::InvalidType,
@@ -107,8 +107,6 @@ impl BuildArgs {
                 .ignore_eip_3860(self.ignore_eip_3860)
                 .bail(!format_json);
 
-            // Runs the SolidityLinter before compilation.
-            self.lint(&project, &config)?;
             let output = compiler.compile(&project)?;
 
             // Cache project selectors.
@@ -118,9 +116,16 @@ impl BuildArgs {
                 sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
             }
 
+            // Only run the `SolidityLinter` if lint on build and no compilation errors.
+            if config.lint.lint_on_build && !output.output().errors.iter().any(|e| e.is_error()) {
+                self.lint(&project, &config, self.paths.as_deref())
+                    .map_err(|err| eyre!("Lint failed: {err}"))?;
+            }
+
             // NOTE(zk): We skip returning output because currently there's no way to return from
             // this function due to differing solc and zksolc project output types, and
             // no way to return a default from either branch. Ok(output)
+
             Ok(())
         } else {
             let zk_project =
@@ -160,9 +165,9 @@ impl BuildArgs {
         }
     }
 
-    fn lint(&self, project: &Project, config: &Config) -> Result<()> {
+    fn lint(&self, project: &Project, config: &Config, files: Option<&[PathBuf]>) -> Result<()> {
         let format_json = shell::is_json();
-        if project.compiler.solc.is_some() && config.lint.lint_on_build && !shell::is_quiet() {
+        if project.compiler.solc.is_some() && !shell::is_quiet() {
             let linter = SolidityLinter::new(config.project_paths())
                 .with_json_emitter(format_json)
                 .with_description(!format_json)
@@ -182,7 +187,8 @@ impl BuildArgs {
                             .filter_map(|s| forge_lint::sol::SolLint::try_from(s.as_str()).ok())
                             .collect(),
                     )
-                });
+                })
+                .with_mixed_case_exceptions(&config.lint.mixed_case_exceptions);
 
             // Expand ignore globs and canonicalize from the get go
             let ignored = expand_globs(&config.root, config.lint.ignore.iter())?
@@ -190,15 +196,39 @@ impl BuildArgs {
                 .flat_map(foundry_common::fs::canonicalize_path)
                 .collect::<Vec<_>>();
 
+            let skip = SkipBuildFilters::new(config.skip.clone(), config.root.clone());
             let curr_dir = std::env::current_dir()?;
             let input_files = config
                 .project_paths::<SolcLanguage>()
                 .input_files_iter()
-                .filter(|p| !(ignored.contains(p) || ignored.contains(&curr_dir.join(p))))
+                .filter(|p| {
+                    // Lint only specified build files, if any.
+                    if let Some(files) = files {
+                        return files.iter().any(|file| &curr_dir.join(file) == p);
+                    }
+                    skip.is_match(p)
+                        && !(ignored.contains(p) || ignored.contains(&curr_dir.join(p)))
+                })
                 .collect::<Vec<_>>();
 
             if !input_files.is_empty() {
-                linter.lint(&input_files);
+                let sess = linter.init();
+
+                let pcx = solar_pcx_from_build_opts(
+                    &sess,
+                    &self.build,
+                    Some(project),
+                    Some(&input_files),
+                )?;
+                linter.early_lint(&input_files, pcx);
+
+                let pcx = solar_pcx_from_build_opts(
+                    &sess,
+                    &self.build,
+                    Some(project),
+                    Some(&input_files),
+                )?;
+                linter.late_lint(&input_files, pcx);
             }
         }
 
