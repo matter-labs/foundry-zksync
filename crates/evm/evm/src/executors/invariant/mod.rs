@@ -625,8 +625,7 @@ impl<'a> InvariantExecutor<'a> {
         }
 
         let corpus_manager = CorpusManager::new(
-            &self.config.corpus,
-            &invariant_contract.invariant_function.name,
+            self.config.corpus.clone(),
             strategy.boxed(),
             &self.executor,
             None,
