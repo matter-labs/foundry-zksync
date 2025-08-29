@@ -11,8 +11,37 @@ use foundry_zksync_compilers::compilers::zksolc::{
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, thread::sleep, time::Duration};
+use zksync_types::{
+    H160,
+    contract_verification::etherscan::{
+        EtherscanBoolean, EtherscanCodeFormat, EtherscanVerificationRequest,
+    },
+};
 
 pub mod standard_json;
+
+// Etherscan-compatible API structures
+#[derive(Debug, Deserialize, Serialize)]
+pub struct EtherscanResponse {
+    pub status: String,
+    pub message: String,
+    pub result: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EtherscanRequest {
+    pub module: String,
+    pub action: String,
+    #[serde(flatten)]
+    pub verification_request: EtherscanVerificationRequest,
+}
+
+#[derive(Debug, Serialize)]
+pub struct EtherscanCheckStatusRequest {
+    pub module: String,
+    pub action: String,
+    pub guid: String,
+}
 
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
@@ -42,10 +71,14 @@ impl VerificationProvider for ZkVerificationProvider {
         context: CompilerVerificationContext,
     ) -> Result<()> {
         trace!("ZkVerificationProvider::verify");
+        let verification_request = self.prepare_request(&args, &context).await?;
 
-        let request = self.prepare_request(&args, &context).await?;
+        let request = EtherscanRequest {
+            module: "contract".to_string(),
+            action: "verifysourcecode".to_string(),
+            verification_request: verification_request.clone(),
+        };
 
-        // builds fully-qualified name (path:contractName or just contractName)
         let fq_name = args
             .contract
             .as_ref()
@@ -55,18 +88,18 @@ impl VerificationProvider for ZkVerificationProvider {
                     .map(|p| format!("{}:{}", p, ci.name))
                     .unwrap_or_else(|| ci.name.clone())
             })
-            .unwrap_or_else(|| request.contract_name.clone());
+            .unwrap_or_else(|| verification_request.contract_name.clone());
 
         let client = reqwest::Client::new();
         let retry: Retry = args.retry.into_retry();
 
-        let maybe_id: Option<u64> = retry
+        let maybe_id: Option<String> = retry
             .run_async(|| {
                 async {
                     sh_println!(
                         "\nSubmitting verification for [{}] at address {}.",
                         fq_name,
-                        request.contract_address
+                        verification_request.contract_address
                     )?;
 
                     let verifier_url = args
@@ -75,25 +108,20 @@ impl VerificationProvider for ZkVerificationProvider {
                         .as_deref()
                         .ok_or_else(|| eyre::eyre!("verifier_url must be specified"))?;
 
+                    let form_data = serde_urlencoded::to_string(&request)
+                        .map_err(|e| eyre::eyre!("Failed to serialize request as form data: {}", e))?;
+
+
+
                     let resp = client
                         .post(verifier_url)
-                        .header("Content-Type", "application/json")
-                        .json(&request)
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .body(form_data)
                         .send()
                         .await?;
 
                     let status = resp.status();
                     let body = resp.text().await?;
-                    let lower = body.to_lowercase();
-
-                    if lower.contains("already verified") {
-                        sh_println!(
-                            "Contract [{}] \"{}\" is already verified. Skipping verification.",
-                            fq_name,
-                            request.contract_address
-                        )?;
-                        return Ok(None);
-                    }
 
                     if !status.is_success() {
                         eyre::bail!(
@@ -104,12 +132,26 @@ impl VerificationProvider for ZkVerificationProvider {
                         );
                     }
 
-                    let id = body
-                        .trim()
-                        .parse()
-                        .map_err(|e| eyre::eyre!("Failed to parse verification ID `{}`: {}", body, e))?;
+                    let etherscan_response: EtherscanResponse = serde_json::from_str(&body)
+                        .map_err(|e| eyre::eyre!("Failed to parse Etherscan response: {}", e))?;
 
-                    Ok(Some(id))
+                    if etherscan_response.result.contains("already verified") {
+                        sh_println!(
+                            "Contract [{}] \"{}\" is already verified. Skipping verification.",
+                            fq_name,
+                            verification_request.contract_address
+                        )?;
+                        return Ok(None);
+                    }
+
+                    if etherscan_response.status == "1" {
+                        Ok(Some(etherscan_response.result))
+                    } else {
+                        eyre::bail!(
+                            "Verification failed: {}",
+                            etherscan_response.result
+                        );
+                    }
                 }
                 .boxed()
             })
@@ -122,7 +164,7 @@ impl VerificationProvider for ZkVerificationProvider {
             )?;
 
             self.check(VerifyCheckArgs {
-                id: verification_id.to_string(),
+                id: verification_id,
                 verifier: args.verifier.clone(),
                 retry: args.retry,
                 etherscan: EtherscanOpts::default(),
@@ -150,12 +192,12 @@ impl VerificationProvider for ZkVerificationProvider {
         let base_url = args.verifier.verifier_url.as_deref().ok_or_else(|| {
             eyre::eyre!("verifier_url must be specified either in the config or through the CLI")
         })?;
-        let url = format!("{}/{}", base_url, args.id);
 
-        let verification_status =
-            self.retry_verification_status(&client, &url, max_retries, delay_in_seconds).await?;
+        let verification_status = self
+            .retry_verification_status(&client, base_url, &args.id, max_retries, delay_in_seconds)
+            .await?;
 
-        self.process_status_response(Some(verification_status), &url)
+        self.process_status_response_etherscan(verification_status, base_url)
     }
 }
 
@@ -167,7 +209,7 @@ impl ZkVerificationProvider {
         &mut self,
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
-    ) -> Result<VerifyContractRequest> {
+    ) -> Result<EtherscanVerificationRequest> {
         let (source, contract_name) = if let CompilerVerificationContext::ZkSolc(context) = context
         {
             self.source_provider().zk_source(context)?
@@ -196,19 +238,28 @@ impl ZkVerificationProvider {
             }
         };
         let optimization_used = source.settings.optimizer.enabled.unwrap_or(false);
-        // TODO: investigate runs better. Currently not included in the verification request.
-        let _runs = args.num_of_optimizations.map(|n| n as u64);
-        let constructor_args = self.constructor_args(args, context).await?.unwrap_or_default();
+        let _runs = args.num_of_optimizations.map(|n| n.to_string());
+        let constructor_args = self.constructor_args(args, context).await?;
 
-        let request = VerifyContractRequest {
-            contract_address: args.address.to_string(),
-            source_code: source,
-            code_format: "solidity-standard-json-input".to_string(),
+        let request = EtherscanVerificationRequest {
+            contract_address: H160::from_slice(args.address.as_slice()),
+            source_code: serde_json::to_string(&source)?,
             contract_name,
             compiler_version: solc_version,
-            zk_compiler_version,
-            constructor_arguments: constructor_args,
-            optimization_used,
+            zksolc_version: Some(zk_compiler_version),
+            constructor_arguments: constructor_args.unwrap_or_else(String::new),
+            optimization_used: if optimization_used {
+                Some(EtherscanBoolean::True)
+            } else {
+                Some(EtherscanBoolean::False)
+            },
+            code_format: EtherscanCodeFormat::StandardJsonInput,
+            evm_version: None,
+            runs: _runs,
+            optimizer_mode: None,
+            compiler_mode: None,
+            force_evmla: None,
+            is_system: None,
         };
 
         Ok(request)
@@ -249,20 +300,37 @@ impl ZkVerificationProvider {
             }
         }
 
-        Ok(Some("0x".to_string()))
+        Ok(None)
     }
     /// Retry logic for checking the verification status
     async fn retry_verification_status(
         &self,
         client: &reqwest::Client,
-        url: &str,
+        base_url: &str,
+        verification_id: &str,
         max_retries: u32,
         delay_in_seconds: u32,
-    ) -> Result<ContractVerificationStatusResponse> {
+    ) -> Result<EtherscanResponse> {
         let mut retries = 0;
 
         loop {
-            let response = client.get(url).send().await?;
+            let check_request = EtherscanCheckStatusRequest {
+                module: "contract".to_string(),
+                action: "checkverifystatus".to_string(),
+                guid: verification_id.to_string(),
+            };
+
+            let form_data = serde_urlencoded::to_string(&check_request).map_err(|e| {
+                eyre::eyre!("Failed to serialize check request as form data: {}", e)
+            })?;
+
+            let response = client
+                .post(base_url)
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .body(form_data)
+                .send()
+                .await?;
+
             let status = response.status();
             let text = response.text().await?;
 
@@ -274,9 +342,10 @@ impl ZkVerificationProvider {
                 );
             }
 
-            let resp: ContractVerificationStatusResponse = serde_json::from_str(&text)?;
+            let resp: EtherscanResponse = serde_json::from_str(&text)
+                .map_err(|e| eyre::eyre!("Failed to parse Etherscan response: {}", e))?;
 
-            if resp.is_pending() || resp.is_queued() {
+            if resp.status == "0" && resp.result.contains("Pending in queue") {
                 if retries >= max_retries {
                     let _ =
                         sh_println!("Verification is still pending after {max_retries} retries.");
@@ -290,37 +359,44 @@ impl ZkVerificationProvider {
                 continue;
             }
 
-            if resp.is_verification_success() || resp.is_verification_failure() {
-                return Ok(resp);
-            }
+            return Ok(resp);
         }
     }
 
-    fn process_status_response(
+    fn process_status_response_etherscan(
         &self,
-        response: Option<ContractVerificationStatusResponse>,
+        response: EtherscanResponse,
         verification_url: &str,
     ) -> Result<()> {
-        trace!("Processing verification status response. {:?}", response);
-
-        if let Some(resp) = response {
-            match resp.status {
-                VerificationStatusEnum::Successful => {
+        match response.status.as_str() {
+            "1" => {
+                if response.result.contains("Pass - Verified") {
                     let _ = sh_println!("Verification was successful.");
-                }
-                VerificationStatusEnum::Failed => {
-                    let error_message = resp.get_error(verification_url);
-                    eyre::bail!("Verification failed:\n\n{}", error_message);
-                }
-                VerificationStatusEnum::Queued => {
-                    let _ = sh_println!("Verification is queued.");
-                }
-                VerificationStatusEnum::InProgress => {
-                    let _ = sh_println!("Verification is in progress.");
+                } else {
+                    let _ = sh_println!("Verification completed: {}", response.result);
                 }
             }
-        } else {
-            eyre::bail!("Empty response from verification status endpoint");
+            "0" => {
+                if response.result.contains("Pending in queue") {
+                    let _ = sh_println!("Verification is still pending.");
+                } else if response.result.contains("already verified") {
+                    let _ = sh_println!("Contract source code already verified.");
+                } else {
+                    eyre::bail!(
+                        "Verification failed:\n\n{}\n\nView verification response:\n{}",
+                        response.result,
+                        verification_url
+                    );
+                }
+            }
+            _ => {
+                eyre::bail!(
+                    "Unknown verification status: {} - {}\n\nView verification response:\n{}",
+                    response.status,
+                    response.result,
+                    verification_url
+                );
+            }
         }
         Ok(())
     }
@@ -332,77 +408,50 @@ fn calculate_retry_delay(retries: u32, base_delay_in_seconds: u32) -> u64 {
     base_delay_in_ms * (1 << retries.min(5))
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum VerificationStatusEnum {
-    Successful,
-    Failed,
-    Queued,
-    InProgress,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct ContractVerificationStatusResponse {
-    pub status: VerificationStatusEnum,
-    pub error: Option<String>,
-    #[serde(rename = "compilationErrors")]
-    pub compilation_errors: Option<Vec<String>>,
-}
+    #[test]
+    fn test_zk_etherscan_response_parsing_success() {
+        let provider = ZkVerificationProvider;
+        let response = EtherscanResponse {
+            status: "1".to_string(),
+            message: "OK".to_string(),
+            result: "Pass - Verified".to_string(),
+        };
 
-impl ContractVerificationStatusResponse {
-    pub fn get_error(&self, verification_url: &str) -> String {
-        let mut error_message = String::new();
-
-        if let Some(ref error) = self.error {
-            error_message.push_str("Error:\n");
-            error_message.push_str(error);
-        }
-
-        // Detailed compilation errors, if any
-        if let Some(ref compilation_errors) = self.compilation_errors
-            && !compilation_errors.is_empty()
-        {
-            let detailed_errors =
-                compilation_errors.iter().map(|e| format!("- {e}")).collect::<Vec<_>>().join("\n");
-            error_message.push_str("\n\nError Details:\n");
-            error_message.push_str(&detailed_errors);
-        }
-
-        error_message.push_str("\n\nView verification response:\n");
-        error_message.push_str(verification_url);
-
-        error_message.trim_end().to_string()
+        let result = provider.process_status_response_etherscan(response, "http://test.com");
+        assert!(result.is_ok(), "Success response should be processed correctly");
     }
-    pub fn is_pending(&self) -> bool {
-        matches!(self.status, VerificationStatusEnum::InProgress)
-    }
-    pub fn is_verification_failure(&self) -> bool {
-        matches!(self.status, VerificationStatusEnum::Failed)
-    }
-    pub fn is_queued(&self) -> bool {
-        matches!(self.status, VerificationStatusEnum::Queued)
-    }
-    pub fn is_verification_success(&self) -> bool {
-        matches!(self.status, VerificationStatusEnum::Successful)
-    }
-}
 
-#[derive(Debug, Serialize)]
-pub struct VerifyContractRequest {
-    #[serde(rename = "contractAddress")]
-    contract_address: String,
-    #[serde(rename = "sourceCode")]
-    source_code: StandardJsonCompilerInput,
-    #[serde(rename = "codeFormat")]
-    code_format: String,
-    #[serde(rename = "contractName")]
-    contract_name: String,
-    #[serde(rename = "compilerSolcVersion")]
-    compiler_version: String,
-    #[serde(rename = "compilerZksolcVersion")]
-    zk_compiler_version: String,
-    #[serde(rename = "constructorArguments")]
-    constructor_arguments: String,
-    #[serde(rename = "optimizationUsed")]
-    optimization_used: bool,
+    #[test]
+    fn test_zk_etherscan_response_parsing_pending() {
+        let provider = ZkVerificationProvider;
+        let response = EtherscanResponse {
+            status: "0".to_string(),
+            message: "NOTOK".to_string(),
+            result: "Pending in queue".to_string(),
+        };
+
+        let result = provider.process_status_response_etherscan(response, "http://test.com");
+        assert!(result.is_ok(), "Pending response should be processed correctly");
+    }
+
+    #[test]
+    fn test_zk_etherscan_check_status_request_serialization() {
+        let request = EtherscanCheckStatusRequest {
+            module: "contract".to_string(),
+            action: "checkverifystatus".to_string(),
+            guid: "test-guid-123".to_string(),
+        };
+
+        let form_data = serde_urlencoded::to_string(&request);
+        assert!(form_data.is_ok(), "Check status serialization should succeed");
+
+        let serialized = form_data.unwrap();
+        assert!(serialized.contains("module=contract"));
+        assert!(serialized.contains("action=checkverifystatus"));
+        assert!(serialized.contains("guid=test-guid-123"));
+    }
 }

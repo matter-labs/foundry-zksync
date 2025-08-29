@@ -222,12 +222,52 @@ fn parse_verification_id(out: &str) -> Option<String> {
 }
 
 // tests `create && contract-verify && verify-check` on Sepolia testnet if correct env vars are set
-// ZKSYNC_TESTNET_TEST_PRIVATE_KEY=0x...
+// ZKSYNC_TESTNET_PRIVATE_KEY=0x... (run with --test-threads=1 to avoid nonce conflicts)
 forgetest!(zk_can_verify_random_contract_sepolia, |prj, cmd| {
     verify_on_chain(zk_env_externalities(), prj, cmd);
 });
 
-// tests `create --verify on Sepolia testnet if correct env vars are set
+// tests `create --verify` on Sepolia testnet if correct env vars are set
+// ZKSYNC_TESTNET_PRIVATE_KEY=0x... (run with --test-threads=1 to avoid nonce conflicts)
 forgetest!(zk_can_create_verify_random_contract_sepolia, |prj, cmd| {
     create_verify_on_chain(zk_env_externalities(), prj, cmd);
+});
+
+/// Executes create --verify with optimization runs on the given chain
+#[allow(clippy::disallowed_macros)]
+fn create_verify_with_optimization_runs(
+    info: Option<EnvExternalities>,
+    prj: TestProject,
+    mut cmd: TestCommand,
+) {
+    // only execute if keys present
+    if let Some(info) = info {
+        add_single_verify_target_file(&prj);
+
+        let contract_path = "src/Verify.sol:Verify";
+        let output = cmd
+            .arg("create")
+            .args(create_args(&info))
+            .args([contract_path, "--verify"])
+            .args([
+                "--verifier-url".to_string(),
+                "https://explorer.sepolia.era.zksync.dev/contract_verification".to_string(),
+                "--verifier".to_string(),
+                "zksync".to_string(),
+                "--zksync".to_string(),
+                "--optimizer-runs".to_string(),
+                "200".to_string(),
+            ])
+            .assert_success()
+            .get_output()
+            .stdout_lossy();
+
+        assert!(output.contains("Verification was successful"), "{}", output);
+    }
+}
+
+// tests `create --verify` with optimization runs on Sepolia testnet if correct env vars are set
+// ZKSYNC_TESTNET_PRIVATE_KEY=0x... (run with --test-threads=1 to avoid nonce conflicts)
+forgetest!(zk_can_create_verify_with_optimization_runs_sepolia, |prj, cmd| {
+    create_verify_with_optimization_runs(zk_env_externalities(), prj, cmd);
 });
