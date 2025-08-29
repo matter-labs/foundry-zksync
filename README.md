@@ -25,7 +25,26 @@ See our [contributing guidelines](./CONTRIBUTING.md).
 
 ## 🗣️ Acknowledgements
 
-### Foundry
+First, see if the answer to your question can be found in the [Foundry Docs][foundry-docs], or in the relevant crate.
+
+If the answer is not there:
+
+- Join the [support Telegram][tg-support-url] to get help, or
+- Open a [discussion](https://github.com/foundry-rs/foundry/discussions/new) with your question, or
+- Open an issue with [the bug](https://github.com/foundry-rs/foundry/issues/new)
+
+If you want to contribute, or follow along with contributor discussion, you can use our [main telegram](https://t.me/foundry_rs) to chat with us about the development of Foundry!
+
+## License
+
+Licensed under either of [Apache License](./LICENSE-APACHE), Version
+2.0 or [MIT License](./LICENSE-MIT) at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in these crates by you, as defined in the Apache-2.0 license,
+shall be dual licensed as above, without any additional terms or conditions.
+
+## Acknowledgements
 
 - Foundry is a clean-room rewrite of the testing framework [DappTools][dapptools]. None of this would have been possible without the DappHub team's work over the years.
 - [Matthias Seitz](https://twitter.com/mattsse_): Created [ethers-solc] (now [foundry-compilers]) which is the backbone of our compilation pipeline, as well as countless contributions to ethers, in particular the `abigen` macros.

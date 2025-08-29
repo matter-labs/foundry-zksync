@@ -86,17 +86,17 @@ contract ZkForkNonceTest is Script {{
     )
     .unwrap();
 
-    cmd.arg("script").args([
-        "ZkForkNonceTest",
-        "--zk-startup",
-        "./script/ForkNonce.s.sol",
-        "--no-storage-caching", // prevents rpc caching
-        "--rpc-url",
-        node.url().as_str(),
-        // set address as sender to be migrated on startup, so storage is read immediately
-        "--sender",
-        test_address.to_string().as_str(),
-    ]);
+    cmd.arg("script")
+        .args([
+            "--zk-startup=true",
+            "--no-storage-caching", // prevents rpc caching
+            "--rpc-url",
+            node.url().as_str(),
+            // set address as sender to be migrated on startup, so storage is read immediately
+            "--sender",
+            test_address.to_string().as_str(),
+        ])
+        .arg("ZkForkNonceTest"); // Contract name as the PATH argument
 
     cmd.assert_success();
 });

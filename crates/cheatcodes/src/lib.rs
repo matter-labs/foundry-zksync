@@ -45,8 +45,6 @@ mod version;
 mod env;
 pub use env::set_execution_context;
 
-mod fork;
-
 mod evm;
 pub use evm::{DealRecord, mock::mock_call};
 
@@ -99,10 +97,8 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     }
 }
 
-pub trait DynCheatcode: 'static + std::any::Any {
+pub trait DynCheatcode: 'static + std::fmt::Debug {
     fn cheatcode(&self) -> &'static spec::Cheatcode<'static>;
-
-    fn as_debug(&self) -> &dyn std::fmt::Debug;
 
     fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result;
 
@@ -110,17 +106,10 @@ pub trait DynCheatcode: 'static + std::any::Any {
 }
 
 impl<T: Cheatcode> DynCheatcode for T {
-    #[inline]
     fn cheatcode(&self) -> &'static spec::Cheatcode<'static> {
         Self::CHEATCODE
     }
 
-    #[inline]
-    fn as_debug(&self) -> &dyn std::fmt::Debug {
-        self
-    }
-
-    #[inline]
     fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
         self.apply_full(ccx, executor)
     }
@@ -178,12 +167,10 @@ impl std::ops::DerefMut for CheatsCtxt<'_, '_, '_, '_> {
 }
 
 impl CheatsCtxt<'_, '_, '_, '_> {
-    #[inline]
     pub(crate) fn ensure_not_precompile(&self, address: &Address) -> Result<()> {
         if self.is_precompile(address) { Err(precompile_error(address)) } else { Ok(()) }
     }
 
-    #[inline]
     pub(crate) fn is_precompile(&self, address: &Address) -> bool {
         self.ecx.journaled_state.warm_addresses.precompiles().contains(address)
     }

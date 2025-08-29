@@ -7,7 +7,7 @@ use std::{
 
 use foundry_test_utils::foundry_compilers::{
     CompilerOutput, Graph, ProjectBuilder, ProjectPathsConfig, artifacts::Remapping,
-    buildinfo::BuildInfo, cache::CompilerCache, project_util::*, resolver::parse::SolData,
+    buildinfo::BuildInfo, cache::CompilerCache, project_util::*, resolver::parse::SolParser,
 };
 
 use foundry_zksync_compilers::{
@@ -340,7 +340,7 @@ fn zksync_can_compile_dapp_detect_changes_in_libs() {
         )
         .unwrap();
 
-    let graph = Graph::<SolData>::resolve(project.paths()).unwrap();
+    let graph = Graph::<SolParser>::resolve(project.paths()).unwrap();
     assert_eq!(graph.files().len(), 2);
     assert_eq!(graph.files().clone(), HashMap::from([(src, 0), (lib, 1),]));
 
@@ -370,7 +370,7 @@ fn zksync_can_compile_dapp_detect_changes_in_libs() {
         )
         .unwrap();
 
-    let graph = Graph::<SolData>::resolve(project.paths()).unwrap();
+    let graph = Graph::<SolParser>::resolve(project.paths()).unwrap();
     assert_eq!(graph.files().len(), 2);
 
     let compiled = project.compile().unwrap();
@@ -412,7 +412,7 @@ fn zksync_can_compile_dapp_detect_changes_in_sources() {
         )
         .unwrap();
 
-    let graph = Graph::<SolData>::resolve(project.paths()).unwrap();
+    let graph = Graph::<SolParser>::resolve(project.paths()).unwrap();
     assert_eq!(graph.files().len(), 2);
     assert_eq!(graph.files().clone(), HashMap::from([(base, 0), (src, 1),]));
     assert_eq!(graph.imported_nodes(1).to_vec(), vec![0]);
@@ -449,7 +449,7 @@ fn zksync_can_compile_dapp_detect_changes_in_sources() {
    ",
         )
         .unwrap();
-    let graph = Graph::<SolData>::resolve(project.paths()).unwrap();
+    let graph = Graph::<SolParser>::resolve(project.paths()).unwrap();
     assert_eq!(graph.files().len(), 2);
 
     let compiled = project.compile().unwrap();

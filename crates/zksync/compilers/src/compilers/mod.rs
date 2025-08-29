@@ -9,7 +9,7 @@ use artifact_output::zk::ZkArtifactOutput;
 use foundry_compilers::{
     Graph, Project,
     error::{Result, SolcError},
-    resolver::parse::SolData,
+    resolver::parse::SolParser,
 };
 use zksolc::{ZkSolcCompiler, ZkSolcSettings, input::StandardJsonCompilerInput};
 
@@ -22,7 +22,7 @@ pub fn project_standard_json_input(
     target: &Path,
 ) -> Result<StandardJsonCompilerInput> {
     tracing::debug!(?target, "standard_json_input for zksync");
-    let graph = Graph::<SolData>::resolve(&project.paths)?;
+    let graph = Graph::<SolParser>::resolve(&project.paths)?;
     let target_index = graph
         .files()
         .get(target)

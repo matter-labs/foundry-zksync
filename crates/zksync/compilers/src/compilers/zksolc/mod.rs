@@ -6,7 +6,6 @@ use foundry_compilers::{
     CompilationError, Compiler, CompilerContract, CompilerOutput, CompilerVersion,
     artifacts::{BytecodeObject, Severity, SolcLanguage, error::SourceLocation},
     error::{Result, SolcError},
-    resolver::parse::SolData,
     solc::SolcCompiler,
 };
 
@@ -125,7 +124,7 @@ impl Compiler for ZkSolcCompiler {
     type Input = ZkSolcVersionedInput;
     type CompilationError = Error;
     type CompilerContract = Contract;
-    type ParsedSource = SolData;
+    type Parser = foundry_compilers::resolver::parse::SolParser;
     type Settings = ZkSolcSettings;
     type Language = SolcLanguage;
 

@@ -7,7 +7,7 @@ use foundry_compilers::{
     Artifact, Graph, Project,
     artifacts::{BytecodeObject, Source, output_selection::OutputSelection},
     compilers::CompilerSettings,
-    resolver::parse::SolData,
+    resolver::parse::SolParser,
     solc::{Solc, SolcCompiler},
 };
 use foundry_config::Config;
@@ -128,7 +128,7 @@ impl ZkVerificationContext {
     pub fn get_target_imports(&self) -> Result<Vec<PathBuf>> {
         let mut sources = self.project.paths.read_input_files()?;
         sources.insert(self.target_path.clone(), Source::read(&self.target_path)?);
-        let graph = Graph::<SolData>::resolve_sources(&self.project.paths, sources)?;
+        let graph = Graph::<SolParser>::resolve_sources(&self.project.paths, sources)?;
 
         Ok(graph.imports(&self.target_path).into_iter().map(|p| p.to_path_buf()).collect())
     }

@@ -187,6 +187,10 @@ pub struct TestArgs {
     #[arg(long, help_heading = "Display options", requires = "summary")]
     pub detailed: bool,
 
+    /// Disables the labels in the traces.
+    #[arg(long, help_heading = "Display options")]
+    pub disable_labels: bool,
+
     #[command(flatten)]
     filter: FilterArgs,
 
@@ -550,6 +554,7 @@ impl TestArgs {
         // Build the trace decoder.
         let mut builder = CallTraceDecoderBuilder::new()
             .with_known_contracts(&known_contracts)
+            .with_label_disabled(self.disable_labels)
             .with_verbosity(verbosity);
         // Signatures are of no value for gas reports.
         if !self.gas_report {
