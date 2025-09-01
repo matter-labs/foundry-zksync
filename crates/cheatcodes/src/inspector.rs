@@ -4,7 +4,7 @@ use crate::{
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
     Vm::{self, AccountAccess},
     evm::{
-        DealRecord, GasRecord, RecordAccess, mapping,
+        DealRecord, GasRecord, RecordAccess,
         mock::{MockCallDataContext, MockCallReturnData},
         prank::Prank,
     },
