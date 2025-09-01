@@ -36,34 +36,7 @@ forgetest!(can_set_filter_values, |prj, cmd| {
     assert_eq!(config.coverage_pattern_inverse, None);
 });
 
-// tests that warning is displayed when there are no tests in project
-forgetest!(warn_no_tests, |prj, cmd| {
-    prj.add_source(
-        "dummy",
-        r"
-contract Dummy {}
-",
-    );
-    // set up command
-    cmd.args(["test"]);
-
-    // run command and assert
-    cmd.assert_failure().stdout_eq(str![[r#"
-No tests found in project! Forge looks for functions that starts with `test`.
-
-"#]]);
-});
-
-// tests that warning is displayed with pattern when no tests match
-forgetest!(warn_no_tests_match, |prj, cmd| {
-    prj.add_source(
-        "dummy",
-        r"
-contract Dummy {}
-",
-    );
-
-    // set up command
+fn dummy_test_filter(cmd: &mut TestCommand) {
     cmd.args(["test", "--match-test", "testA.*", "--no-match-test", "testB.*"]);
     cmd.args(["--match-contract", "TestC.*", "--no-match-contract", "TestD.*"]);
     cmd.args(["--match-path", "*TestE*", "--no-match-path", "*TestF*"]);
@@ -525,7 +498,6 @@ forgetest_init!(exit_code_error_on_fail_fast_with_json, |prj, cmd| {
     prj.wipe_contracts();
 
     prj.add_source("failing_test", FAILING_TEST);
-    // set up command
     cmd.args(["test", "--fail-fast", "--json"]);
 
     cmd.assert_empty_stderr();
