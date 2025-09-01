@@ -242,7 +242,7 @@ impl CompilerSettingsRestrictions for ZkSolcRestrictions {
 impl CompilerSettings for ZkSolcSettings {
     type Restrictions = ZkSolcRestrictions;
 
-    fn update_output_selection(&mut self, _f: impl FnOnce(&mut OutputSelection) + Copy) {
+    fn update_output_selection(&mut self, _f: impl FnOnce(&mut OutputSelection)) {
         // TODO: see how to support this, noop for now
         //f(&mut self.output_selection)
     }

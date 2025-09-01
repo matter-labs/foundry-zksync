@@ -3,7 +3,12 @@
 use crate::{
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
     Vm::{self, AccountAccess},
-    evm::{DealRecord, GasRecord, mapping, prank::Prank},
+    evm::{
+        DealRecord, GasRecord, RecordAccess, mapping,
+        mock::{MockCallDataContext, MockCallReturnData},
+        prank::Prank,
+    },
+    inspector::utils::CommonCreateInput,
     script::{Broadcast, Wallets},
     strategy::CheatcodeInspectorStrategy,
     test::{
@@ -27,7 +32,9 @@ use foundry_cheatcodes_common::{
     record::RecordAccess,
 };
 use foundry_common::{
-    SELECTOR_LEN, TransactionMaybeSigned, evm::Breakpoints, mapping_slots::MappingSlots,
+    SELECTOR_LEN, TransactionMaybeSigned,
+    evm::Breakpoints,
+    mapping_slots::{MappingSlots, step as mapping_step},
 };
 use foundry_evm_core::{
     InspectorExt,
@@ -1454,7 +1461,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
 
         // `startMappingRecording`: record SSTORE and KECCAK256.
         if let Some(mapping_slots) = &mut self.mapping_slots {
-            mapping::step(mapping_slots, interpreter);
+            mapping_step(mapping_slots, interpreter);
         }
 
         // `snapshotGas*`: take a snapshot of the current gas.

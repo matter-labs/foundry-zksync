@@ -290,7 +290,7 @@ impl TestArgs {
                 foundry_config::zksync::config_create_project(&config, config.cache, false)?;
 
             let sources_to_compile = self.get_sources_to_compile(&config, &filter)?;
-            let zk_compiler = ProjectCompiler::new().files(sources_to_compile);
+            let zk_compiler = ProjectCompiler::new().files(sources_to_compile.unwrap_or_default());
 
             let zk_output = zk_compiler.zksync_compile(&zk_project)?;
             let dual_compiled_contracts =

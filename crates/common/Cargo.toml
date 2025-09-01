@@ -47,8 +47,9 @@ alloy-network.workspace = true
 
 alloy-zksync.workspace = true
 
-solar-parse.workspace = true
-solar-sema.workspace = true
+revm.workspace = true
+
+solar.workspace = true
 
 tower.workspace = true
 
