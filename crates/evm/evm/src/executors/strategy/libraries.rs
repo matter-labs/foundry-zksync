@@ -88,7 +88,7 @@ impl EvmExecutorStrategyRunner {
 
         let known_contracts = ContractsByArtifact::zksync_new_with_storage_layouts(
             linked_contracts.clone(),
-            input.clone(),
+            input.clone().with_stripped_file_prefixes(root),
         );
 
         Ok(LinkOutput {
