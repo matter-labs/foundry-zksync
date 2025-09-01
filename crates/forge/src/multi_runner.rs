@@ -7,7 +7,10 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_common::{ContractsByArtifact, TestFunctionExt, get_contract_name, shell::verbosity};
+use foundry_common::{
+    ContractsByArtifact, ContractsByArtifactBuilder, TestFunctionExt, get_contract_name,
+    shell::verbosity,
+};
 use foundry_compilers::{
     ArtifactId, ProjectCompileOutput,
     artifacts::{Contract, Libraries},

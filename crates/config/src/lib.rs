@@ -82,9 +82,6 @@ pub mod fs_permissions;
 pub use fs_permissions::FsPermissions;
 use fs_permissions::PathPermission;
 
-pub mod fork_config;
-pub use fork_config::{ForkChainConfig, ForkConfigs};
-
 pub mod error;
 use error::ExtractConfigError;
 pub use error::SolidityErrorCode;
@@ -134,6 +131,8 @@ pub use compilation::{CompilationRestrictions, SettingsOverrides};
 
 pub mod zksync;
 use zksync::ZkSyncConfig;
+
+pub use semver;
 
 /// Foundry configuration
 ///
@@ -451,8 +450,6 @@ pub struct Config {
     /// Multiple rpc endpoints and their aliases
     #[serde(default, skip_serializing_if = "RpcEndpoints::is_empty")]
     pub rpc_endpoints: RpcEndpoints,
-    /// Fork configuration
-    pub forks: ForkConfigs,
     /// Whether to store the referenced sources in the metadata as literal data.
     pub use_literal_content: bool,
     /// Whether to include the metadata hash.
@@ -603,7 +600,6 @@ impl Config {
         "soldeer",
         "vyper",
         "bind_json",
-        "forks",
     ];
 
     /// File name of config toml file
@@ -694,7 +690,6 @@ impl Config {
         add_profile(&config.profile);
 
         config.normalize_optimizer_settings();
-        config.forks.resolve_env_vars()?;
 
         Ok(config)
     }

@@ -176,7 +176,6 @@ forgetest!(can_extract_config_values, |prj, cmd| {
         additional_compiler_profiles: Default::default(),
         compilation_restrictions: Default::default(),
         script_execution_protection: true,
-        forks: Default::default(),
         _non_exhaustive: (),
         zksync: Default::default(),
     };
@@ -1163,8 +1162,6 @@ out = "utils/JsonBindings.sol"
 include = []
 exclude = []
 
-[forks]
-
 
 "#]]);
 
@@ -1309,7 +1306,6 @@ exclude = []
   },
   "no_storage_caching": false,
   "no_rpc_rate_limit": false,
-  "forks": {},
   "use_literal_content": false,
   "bytecode_hash": "ipfs",
   "cbor_metadata": true,
