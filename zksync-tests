@@ -29,6 +29,7 @@ forge::cli:
     zk::inspect::test_zk_inspect
     zk::script::test_zk_can_execute_script_with_arguments
     zk::verify::zk_can_create_verify_random_contract_sepolia
+    zk::verify::zk_can_create_verify_with_optimization_runs_sepolia
     zk::verify::zk_can_verify_random_contract_sepolia
     zk::verify_bytecode::zk_verify_bytecode
     zk::verify_bytecode::zk_verify_bytecode_error_diff
@@ -130,6 +131,9 @@ forge-verify:
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_ipfs
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_keccak
     bytecode::zksync::tests::test_zk_extract_and_compare_bytecodes_none_keccak_not_equal
+    zksync::tests::test_zk_etherscan_check_status_request_serialization
+    zksync::tests::test_zk_etherscan_response_parsing_pending
+    zksync::tests::test_zk_etherscan_response_parsing_success
 foundry-config:
     zksync::tests::zksync_project_has_zksync_solc_when_solc_req_is_a_version
 foundry-evm-core:
