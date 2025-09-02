@@ -4958,10 +4958,12 @@ dependencies = [
  "semver 1.0.26",
  "serde",
  "serde_json",
+ "serde_urlencoded",
  "tempfile",
  "tokio",
  "tracing",
  "yansi",
+ "zksync_types",
 ]
 
 [[package]]
@@ -14276,6 +14278,7 @@ dependencies = [
  "async-trait",
  "blake2",
  "chrono",
+ "ciborium",
  "derive_more 2.0.1",
  "hex",
  "num_enum 0.7.4",
