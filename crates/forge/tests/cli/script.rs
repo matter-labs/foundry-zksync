@@ -3101,11 +3101,11 @@ contract Counter {
     }
 }
    "#,
-    );
+        );
 
-    let deploy_script = prj.add_script(
-        "Counter.s.sol",
-        &r#"
+        let deploy_script = prj.add_script(
+            "Counter.s.sol",
+            &r#"
 import "forge-std/Script.sol";
 import {Counter} from "../src/Counter.sol";
 
@@ -3125,8 +3125,8 @@ contract CounterScript is Script {
     }
 }
    "#
-        .replace("<url>", &endpoint),
-    );
+            .replace("<url>", &endpoint),
+        );
 
         let (_api, handle) = spawn(NodeConfig::test()).await;
         cmd.args([

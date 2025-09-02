@@ -18,5 +18,5 @@ forgetest_async!(script_zk_can_deploy_nft, |prj, cmd| {
 
 fn setup_nft_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_script("NFT.s.sol", include_str!("../../fixtures/zk/NFT.s.sol")).unwrap();
+    prj.add_script("NFT.s.sol", include_str!("../../fixtures/zk/NFT.s.sol"));
 }

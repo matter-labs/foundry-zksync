@@ -257,8 +257,7 @@ contract Counter {
     }
 }
     "#,
-    )
-    .unwrap();
+    );
 
     prj.add_script(
     "SimpleScript.s.sol",
@@ -290,8 +289,7 @@ contract SimpleScript is Script {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
 
     cmd.forge_fuse();
 
@@ -368,8 +366,7 @@ fn setup_deploy_prj(prj: &mut TestProject) {
     prj.add_script(
         "DeployCounterWithBytecodeHash.s.sol",
         include_str!("../../fixtures/zk/DeployCounterWithBytecodeHash.s.sol"),
-    )
-    .unwrap();
-    prj.add_source("Factory.sol", include_str!("../../fixtures/zk/Factory.sol")).unwrap();
-    prj.add_source("Counter", "contract Counter {}").unwrap();
+    );
+    prj.add_source("Factory.sol", include_str!("../../fixtures/zk/Factory.sol"));
+    prj.add_source("Counter", "contract Counter {}");
 }

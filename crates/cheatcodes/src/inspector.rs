@@ -3,12 +3,7 @@
 use crate::{
     CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
     Vm::{self, AccountAccess},
-    evm::{
-        DealRecord, GasRecord, RecordAccess,
-        mock::{MockCallDataContext, MockCallReturnData},
-        prank::Prank,
-    },
-    inspector::utils::CommonCreateInput,
+    evm::{DealRecord, GasRecord, prank::Prank},
     script::{Broadcast, Wallets},
     strategy::CheatcodeInspectorStrategy,
     test::{

@@ -30,7 +30,7 @@ forgetest_async!(zk_verify_bytecode, |prj, cmd| {
         ..Default::default()
     };
 
-    prj.add_source("Counter.sol", COUNTER_SOURCE).unwrap();
+    prj.add_source("Counter.sol", COUNTER_SOURCE);
 
     prj.write_config(config);
 
@@ -61,7 +61,7 @@ forgetest_async!(zk_verify_bytecode_none, |prj, cmd| {
         ..Default::default()
     };
 
-    prj.add_source("Counter.sol", COUNTER_SOURCE).unwrap();
+    prj.add_source("Counter.sol", COUNTER_SOURCE);
 
     prj.write_config(config);
 
@@ -92,7 +92,7 @@ forgetest_async!(zk_verify_bytecode_ipfs, |prj, cmd| {
         ..Default::default()
     };
 
-    prj.add_source("Counter.sol", COUNTER_SOURCE).unwrap();
+    prj.add_source("Counter.sol", COUNTER_SOURCE);
 
     prj.write_config(config);
 
@@ -124,7 +124,7 @@ forgetest_async!(zk_verify_bytecode_error_diff, |prj, cmd| {
         ..Default::default()
     };
 
-    prj.add_source("Counter.sol", COUNTER_SOURCE).unwrap();
+    prj.add_source("Counter.sol", COUNTER_SOURCE);
 
     prj.write_config(config);
 
@@ -164,7 +164,7 @@ forgetest_async!(
 
         let etherscan_key = "TODO";
 
-        prj.add_source("Counter.sol", COUNTER_SOURCE).unwrap();
+        prj.add_source("Counter.sol", COUNTER_SOURCE);
 
         prj.write_config(config);
 
