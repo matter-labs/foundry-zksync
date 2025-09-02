@@ -203,3 +203,51 @@ impl ArtifactOutput for ZkArtifactOutput {
         None
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::artifacts::contract::Contract;
+    use std::path::Path;
+
+    #[test]
+    fn contract_to_artifact_empty_contract_produces_empty_artifact() {
+        let empty_contract = Contract {
+            abi: None,
+            metadata: None,
+            userdoc: UserDoc::default(),
+            devdoc: DevDoc::default(),
+            ir_optimized: None,
+            storage_layout: StorageLayout::default(),
+            hash: None,
+            factory_dependencies: None,
+            factory_dependencies_unlinked: None,
+            eravm: None,
+            evm: None,
+            missing_libraries: Vec::new(),
+            object_format: None,
+        };
+
+        let artifact =
+            ZkArtifactOutput().contract_to_artifact(Path::new(""), "Empty", empty_contract, None);
+
+        let expected = ZkContractArtifact {
+            abi: None,
+            bytecode: None,
+            assembly: None,
+            metadata: None,
+            storage_layout: Some(StorageLayout::default()),
+            userdoc: Some(UserDoc::default()),
+            devdoc: Some(DevDoc::default()),
+            method_identifiers: None,
+            legacy_assembly: None,
+            ir_optimized: None,
+            hash: None,
+            factory_dependencies: None,
+            factory_dependencies_unlinked: None,
+            id: None,
+        };
+
+        assert_eq!(artifact, expected);
+    }
+}
