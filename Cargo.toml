@@ -414,6 +414,7 @@ vise = { git = "https://github.com/matter-labs/vise.git", rev = "51669f42f60c50b
 # solar = { package = "solar-compiler", git = "https://github.com/paradigmxyz/solar.git", branch = "main" }
 
 # NOTE(zk): The following patches are to handle sha2@0.10.9 update. Add addtitional patches here as needed in future.
+# The patches need to be only applied once per zk_evm version, and can be cherry-picked on the latest in-use release.
 # See https://github.com/Moonsong-Labs/zksync-protocol/commit/5b5ba7fe13d6df186dc476aec99e1ee6f9299bff
 zksync_vm2 = { git = "https://github.com/Moonsong-Labs/vm2", branch = "chore/upgrade-sha2-deps"}
 zk_evm_1_4_1 = { git = "https://github.com/Moonsong-Labs/zksync-protocol", package = "zk_evm", branch = "chore/upgrade-sha-deps-141"}
