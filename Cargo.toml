@@ -365,6 +365,7 @@ rustls = "0.23"
 semver = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+serde_urlencoded = "0.7.1"
 similar-asserts = "1.7"
 soldeer-commands = "=0.6.1"
 soldeer-core = { version = "=0.6.1", features = ["serde"] }
