@@ -43,6 +43,8 @@ itertools.workspace = true
 
 # zk
 foundry-zksync-compilers.workspace = true
+zksync_types = { workspace = true, features = ["contract-verification"] }
+serde_urlencoded.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros"] }
