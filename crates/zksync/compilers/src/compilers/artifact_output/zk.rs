@@ -208,6 +208,12 @@ impl ArtifactOutput for ZkArtifactOutput {
 mod tests {
     use super::*;
     use crate::artifacts::contract::Contract;
+    use crate::artifacts::contract::ObjectFormat;
+    use alloy_json_abi::JsonAbi;
+    use alloy_primitives::Bytes;
+    use foundry_compilers::artifacts::Evm;
+    use foundry_compilers::artifacts::{Bytecode, BytecodeObject};
+    use std::collections::{BTreeMap, HashSet};
     use std::path::Path;
 
     #[test]
@@ -245,6 +251,92 @@ mod tests {
             hash: None,
             factory_dependencies: None,
             factory_dependencies_unlinked: None,
+            id: None,
+        };
+
+        assert_eq!(artifact, expected);
+    }
+
+    #[test]
+    fn contract_to_artifact_simple_valid_fields() {
+        let abi = Some(serde_json::from_str::<JsonAbi>(
+            r#"[
+                {"type":"function","name":"foo","inputs":[],"outputs":[]},
+                {"type":"function","name":"bar","inputs":[{"name":"x","type":"uint256"}],"outputs":[]}
+            ]"#,
+        ).expect("valid abi"));
+        let metadata = Some(serde_json::json!({"k":"v"}));
+        let userdoc = UserDoc { notice: Some("note".to_string()), ..Default::default() };
+        let devdoc = DevDoc { title: Some("title".to_string()), ..Default::default() };
+        let storage_layout = StorageLayout::default();
+        let hash = Some("0xdeadbeef".to_string());
+        let ir_optimized = Some("IR".to_string());
+        let factory_dependencies =
+            Some(BTreeMap::from([("0x01".to_string(), "src/Lib.sol:Lib".to_string())]));
+        let factory_dependencies_unlinked =
+            Some(HashSet::from(["src/Another.sol:Another".to_string()]));
+        let missing_libraries = vec!["src/Lib.sol:Lib".to_string()];
+        let method_identifiers_map = BTreeMap::from([
+            ("foo()".to_string(), "11111111".to_string()),
+            ("bar(uint256)".to_string(), "22222222".to_string()),
+        ]);
+        let legacy_asm = serde_json::json!({"foo":"bar"});
+
+        let evm = Some(Evm {
+            assembly: Some("ASM".to_string()),
+            legacy_assembly: Some(legacy_asm.clone()),
+            bytecode: Some(Bytecode {
+                function_debug_data: Default::default(),
+                object: BytecodeObject::Bytecode(Bytes::from(vec![0x01u8, 0x02])),
+                opcodes: None,
+                source_map: None,
+                generated_sources: vec![],
+                link_references: BTreeMap::new(),
+            }),
+            method_identifiers: method_identifiers_map.clone(),
+            deployed_bytecode: None,
+            gas_estimates: None,
+        });
+
+        let simple_contract = Contract {
+            abi: abi.clone(),
+            metadata: metadata.clone(),
+            userdoc: userdoc.clone(),
+            devdoc: devdoc.clone(),
+            ir_optimized: ir_optimized.clone(),
+            storage_layout: storage_layout.clone(),
+            hash: hash.clone(),
+            factory_dependencies: factory_dependencies.clone(),
+            factory_dependencies_unlinked: factory_dependencies_unlinked.clone(),
+            eravm: None,
+            evm,
+            missing_libraries: missing_libraries.clone(),
+            object_format: Some(ObjectFormat::Raw),
+        };
+
+        let artifact =
+            ZkArtifactOutput().contract_to_artifact(Path::new(""), "Simple", simple_contract, None);
+
+        let expected_bytecode = Some(ZkArtifactBytecode::with_object(
+            BytecodeObject::Bytecode(Bytes::from(vec![0x01u8, 0x02])),
+            ObjectFormat::Raw,
+            missing_libraries,
+        ));
+
+        let expected = ZkContractArtifact {
+            abi,
+            hash,
+            factory_dependencies,
+            factory_dependencies_unlinked,
+            storage_layout: Some(storage_layout),
+            bytecode: expected_bytecode,
+            assembly: Some("ASM".to_string()),
+            metadata,
+            method_identifiers: Some(method_identifiers_map),
+            legacy_assembly: Some(legacy_asm),
+            userdoc: Some(userdoc),
+            devdoc: Some(devdoc),
+            ir_optimized,
             id: None,
         };
 
