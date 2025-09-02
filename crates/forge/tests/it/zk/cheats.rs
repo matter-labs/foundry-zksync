@@ -225,7 +225,7 @@ forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
         "DeployCounterWithBytecodeHash",
         Some("transmissions11/solmate@v7 OpenZeppelin/openzeppelin-contracts cyfrin/zksync-contracts"),
         2,
-        Some(&["-vvvvv", "--via-ir", "--system-mode", "true", "--broadcast", "--optimize", "true"]),
+        Some(&["-vvvvv", "--via-ir", "--system-mode=true", "--broadcast", "--optimize=true"]),
     ).await;
 });
 
