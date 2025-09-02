@@ -207,14 +207,14 @@ impl ArtifactOutput for ZkArtifactOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::artifacts::contract::Contract;
-    use crate::artifacts::contract::ObjectFormat;
+    use crate::artifacts::contract::{Contract, ObjectFormat};
     use alloy_json_abi::JsonAbi;
     use alloy_primitives::Bytes;
-    use foundry_compilers::artifacts::Evm;
-    use foundry_compilers::artifacts::{Bytecode, BytecodeObject};
-    use std::collections::{BTreeMap, HashSet};
-    use std::path::Path;
+    use foundry_compilers::artifacts::{Bytecode, BytecodeObject, Evm};
+    use std::{
+        collections::{BTreeMap, HashSet},
+        path::Path,
+    };
 
     #[test]
     fn contract_to_artifact_empty_contract_produces_empty_artifact() {
