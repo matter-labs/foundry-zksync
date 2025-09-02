@@ -18,6 +18,8 @@ ignore = [
     "RUSTSEC-2025-0021",
     # https://rustsec.org/advisories/RUSTSEC-2025-0055 logging user input may result in poisoning logs with ANSI escape sequences
     "RUSTSEC-2025-0055",
+    # https://rustsec.org/advisories/RUSTSEC-2025-0047 Out-of-bounds access in `get_disjoint_mut` due to incorrect bounds check
+    "RUSTSEC-2025-0047",
 ]
 
 # This section is considered when running `cargo deny check bans`.
