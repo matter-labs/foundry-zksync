@@ -43,6 +43,9 @@ pub struct ZkContractArtifact {
     /// contract devdoc
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub devdoc: Option<DevDoc>,
+    /// contract function hashes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub method_identifiers: Option<BTreeMap<String, String>>,
     /// contract optimized IR code
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ir_optimized: Option<String>,
@@ -161,11 +164,15 @@ impl ArtifactOutput for ZkArtifactOutput {
 
         let (bytecode, assembly) = eravm
             .map(|eravm| (eravm.bytecode(object_format.is_unlinked()), eravm.assembly))
-            .or_else(|| evm.map(|evm| (evm.bytecode.map(|bc| bc.object), evm.assembly)))
+            .or_else(|| evm.clone().map(|evm| (evm.bytecode.map(|bc| bc.object), evm.assembly)))
             .unwrap_or_else(|| (None, None));
         let bytecode = bytecode.map(|object| {
             ZkArtifactBytecode::with_object(object, object_format, missing_libraries)
         });
+
+        let (method_identifiers, _legacy_assembly) = evm
+            .map(|evm| (Some(evm.method_identifiers), evm.legacy_assembly))
+            .unwrap_or_else(|| (None, None));
 
         ZkContractArtifact {
             abi,
@@ -176,6 +183,7 @@ impl ArtifactOutput for ZkArtifactOutput {
             bytecode,
             assembly,
             metadata,
+            method_identifiers,
             userdoc: Some(userdoc),
             devdoc: Some(devdoc),
             ir_optimized,
