@@ -156,9 +156,11 @@ scrypt.opt-level = 3
 
 # Misc.
 rayon.opt-level = 3
+rayon-core.opt-level = 3
 regex.opt-level = 3
 regex-syntax.opt-level = 3
 regex-automata.opt-level = 3
+walkdir.opt-level = 3
 
 # zksync
 zksync_multivm.opt-level = 3

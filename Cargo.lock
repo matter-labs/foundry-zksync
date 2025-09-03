@@ -5342,6 +5342,7 @@ dependencies = [
  "mesc",
  "number_prefix",
  "path-slash",
+ "rayon",
  "regex",
  "reqwest 0.12.23",
  "revm",
