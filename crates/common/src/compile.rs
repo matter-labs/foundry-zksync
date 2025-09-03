@@ -280,10 +280,7 @@ impl ProjectCompiler {
                 sh_println!()?;
             }
 
-            let mut size_report = SizeReport { 
-                contracts: BTreeMap::new(),
-                zksync: self.zksync,
-            };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
 
             let mut artifacts: BTreeMap<String, Vec<_>> = BTreeMap::new();
             for (id, artifact) in output.artifact_ids().filter(|(id, _)| {

@@ -12,7 +12,7 @@ use foundry_zksync_compilers::compilers::{
     zksolc::{ZKSOLC_UNSUPPORTED_VERSIONS, ZkSolc, ZkSolcCompiler},
 };
 
-use crate::{TestFunctionExt, reports::report_kind, shell, term::SpinnerReporter};
+use crate::{TestFunctionExt, shell, term::SpinnerReporter};
 
 use super::{ContractInfo, ProjectCompiler, SizeReport, contract_size};
 
@@ -166,11 +166,7 @@ impl ProjectCompiler {
                 let _ = sh_println!();
             }
 
-            let mut size_report = SizeReport {
-                report_kind: report_kind(),
-                contracts: BTreeMap::new(),
-                zksync: self.zksync,
-            };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
 
             let artifacts: BTreeMap<_, _> = output
                 .artifact_ids()

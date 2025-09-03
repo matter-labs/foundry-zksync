@@ -9,10 +9,7 @@ use alloy_primitives::Address;
 use async_trait::async_trait;
 use eyre::{Context, Result, eyre};
 use foundry_common::retry::RetryError;
-use foundry_compilers::{
-    artifacts::StandardJsonCompilerInput,
-    solc::SolcLanguage,
-};
+use foundry_compilers::{artifacts::StandardJsonCompilerInput, solc::SolcLanguage};
 use futures::FutureExt;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -36,7 +33,11 @@ impl VerificationProvider for SourcifyVerificationProvider {
         Ok(())
     }
 
-    async fn verify(&mut self, args: VerifyArgs, context: CompilerVerificationContext) -> Result<()> {
+    async fn verify(
+        &mut self,
+        args: VerifyArgs,
+        context: CompilerVerificationContext,
+    ) -> Result<()> {
         let body = self.prepare_verify_request(&args, &context).await?;
         let chain_id = args.etherscan.chain.unwrap_or_default().id();
 
@@ -228,7 +229,8 @@ impl SourcifyVerificationProvider {
         args: &VerifyArgs,
         context: &CompilerVerificationContext,
     ) -> Result<SourcifyVerifyRequest> {
-        // For now, assume Solidity - we may need to implement detect_language for CompilerVerificationContext
+        // For now, assume Solidity - we may need to implement detect_language for
+        // CompilerVerificationContext
         let _lang = ContractLanguage::Solidity;
         let contract_identifier = format!(
             "{}:{}",
@@ -256,7 +258,10 @@ impl SourcifyVerificationProvider {
                     .libs
                     .into_iter()
                     .map(|(f, libs)| {
-                        (f.strip_prefix(solc_context.project.root()).unwrap_or(&f).to_path_buf(), libs)
+                        (
+                            f.strip_prefix(solc_context.project.root()).unwrap_or(&f).to_path_buf(),
+                            libs,
+                        )
                     })
                     .collect();
 
@@ -270,7 +275,9 @@ impl SourcifyVerificationProvider {
                 let std_json_input = serde_json::to_value(&input)
                     .wrap_err("Failed to serialize standard json input")?;
                 let compiler_version =
-                    ensure_solc_build_metadata(context.compiler_version().clone()).await?.to_string();
+                    ensure_solc_build_metadata(context.compiler_version().clone())
+                        .await?
+                        .to_string();
 
                 Ok(SourcifyVerifyRequest {
                     std_json_input,
@@ -282,7 +289,9 @@ impl SourcifyVerificationProvider {
             CompilerVerificationContext::ZkSolc(_zk_context) => {
                 // For ZkSolc, we'll need to implement this differently since the standard
                 // Sourcify API may not support ZkSolc yet. For now, return an error.
-                Err(eyre::eyre!("Sourcify verification is not yet supported for ZkSolc contracts. Please use Etherscan verification instead."))
+                Err(eyre::eyre!(
+                    "Sourcify verification is not yet supported for ZkSolc contracts. Please use Etherscan verification instead."
+                ))
             }
         }
     }
