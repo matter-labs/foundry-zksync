@@ -366,11 +366,7 @@ impl CreateArgs {
             constructor_args,
             constructor_args_path: None,
             num_of_optimizations,
-            etherscan: EtherscanOpts {
-                key: self.eth.etherscan.key(),
-                chain: Some(chain.into()),
-                api_version: self.eth.etherscan.api_version,
-            },
+            etherscan: EtherscanOpts { key: self.eth.etherscan.key(), chain: Some(chain.into()) },
             rpc: Default::default(),
             flatten: false,
             force: false,

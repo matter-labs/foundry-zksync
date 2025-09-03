@@ -22,8 +22,7 @@ forgetest_async!(can_deploy_via_create2, |prj, cmd| {
 
 fn setup_create2_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_script("Create2.s.sol", include_str!("../../fixtures/zk/Create2.s.sol")).unwrap();
-    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
-    prj.add_source("Create2Utils.sol", include_str!("../../../../../testdata/zk/Create2Utils.sol"))
-        .unwrap();
+    prj.add_script("Create2.s.sol", include_str!("../../fixtures/zk/Create2.s.sol"));
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol"));
+    prj.add_source("Create2Utils.sol", include_str!("../../../../../testdata/zk/Create2Utils.sol"));
 }

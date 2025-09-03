@@ -238,6 +238,7 @@ jobs:
           fi
           echo "foundry_attestation=foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.attestation.txt" >> $GITHUB_OUTPUT
 
+
       - name: Build man page
         id: man
         if: matrix.target == 'x86_64-unknown-linux-gnu'

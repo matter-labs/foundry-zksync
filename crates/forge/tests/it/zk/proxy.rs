@@ -18,5 +18,5 @@ forgetest_async!(script_zk_can_deploy_proxy, |prj, cmd| {
 
 fn setup_proxy_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_script("Proxy.s.sol", include_str!("../../fixtures/zk/Proxy.s.sol")).unwrap();
+    prj.add_script("Proxy.s.sol", include_str!("../../fixtures/zk/Proxy.s.sol"));
 }

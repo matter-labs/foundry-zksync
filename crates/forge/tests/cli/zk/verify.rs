@@ -23,8 +23,7 @@ contract Unique {{
 }}
 "#
         ),
-    )
-    .unwrap();
+    );
 }
 
 fn add_verify_target(prj: &TestProject) {
@@ -36,8 +35,7 @@ contract Verify is Unique {
 function doStuff() external {}
 }
 "#,
-    )
-    .unwrap();
+    );
 }
 
 fn add_single_verify_target_file(prj: &TestProject) {
@@ -53,7 +51,7 @@ function doStuff() external {{}}
 "#
     );
 
-    prj.add_source("Verify.sol", &contract).unwrap();
+    prj.add_source("Verify.sol", &contract);
 }
 
 #[allow(clippy::disallowed_macros)]

@@ -106,10 +106,9 @@ fn setup_libs_prj(prj: &mut TestProject, cmd: &mut TestCommand, zksolc: Option<V
     }
     prj.write_config(config);
 
-    prj.add_script("Libraries.s.sol", include_str!("../../fixtures/zk/Libraries.s.sol")).unwrap();
+    prj.add_script("Libraries.s.sol", include_str!("../../fixtures/zk/Libraries.s.sol"));
     prj.add_source(
         "WithLibraries.sol",
         include_str!("../../../../../testdata/zk/WithLibraries.sol"),
-    )
-    .unwrap();
+    );
 }
