@@ -1803,7 +1803,7 @@ casttest!(tx_to_request_json, |_prj, cmd| {
 });
 
 casttest!(
-    #[ignore = "external RPC dependency fails - also fails in upstream"]
+    #[ignore = "reth is currently slightly broken"]
     tx_using_sender_and_nonce,
     |_prj, cmd| {
         let rpc = "https://reth-ethereum.ithaca.xyz/rpc";

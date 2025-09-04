@@ -2,6 +2,7 @@ use crate::{
     VerifierArgs,
     provider::{VerificationContext, VerificationProvider},
     retry::RETRY_CHECK_ON_VERIFY,
+    utils::ensure_solc_build_metadata,
     verify::{ContractLanguage, VerifyArgs, VerifyCheckArgs},
     zk_provider::CompilerVerificationContext,
 };
@@ -13,7 +14,6 @@ use eyre::{Context, OptionExt, Result, eyre};
 use foundry_block_explorers::{
     Client,
     errors::EtherscanError,
-    utils::lookup_compiler_version,
     verify::{CodeFormat, VerifyContract},
 };
 use foundry_cli::{
@@ -24,7 +24,7 @@ use foundry_common::{abi::encode_function_args, retry::RetryError};
 use foundry_config::Config;
 use foundry_evm::constants::DEFAULT_CREATE2_DEPLOYER;
 use regex::Regex;
-use semver::{BuildMetadata, Version};
+use semver::BuildMetadata;
 use std::{fmt::Debug, sync::LazyLock};
 
 mod zksync;
@@ -459,24 +459,6 @@ impl EtherscanVerificationProvider {
         } else {
             eyre::bail!("Local bytecode doesn't match on-chain bytecode")
         }
-    }
-}
-
-/// Given any solc [Version] return a [Version] with build metadata
-///
-/// # Example
-///
-/// ```ignore
-/// use semver::{BuildMetadata, Version};
-/// let version = Version::new(1, 2, 3);
-/// let version = ensure_solc_build_metadata(version).await?;
-/// assert_ne!(version.build, BuildMetadata::EMPTY);
-/// ```
-async fn ensure_solc_build_metadata(version: Version) -> Result<Version> {
-    if version.build != BuildMetadata::EMPTY {
-        Ok(version)
-    } else {
-        Ok(lookup_compiler_version(&version).await?)
     }
 }
 

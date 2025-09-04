@@ -383,6 +383,7 @@ impl CreateArgs {
             compilation_profile: None, //TODO(zk): provide comp profile
             language: None,            //TODO(zk): only solidity is supported for now
             zksync: self.build.compiler.zk.enabled(),
+            creation_transaction_hash: None,
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await

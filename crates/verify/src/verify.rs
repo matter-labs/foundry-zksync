@@ -7,7 +7,7 @@ use crate::{
     utils::is_host_only,
     zk_provider::CompilerVerificationContext,
 };
-use alloy_primitives::{Address, map::HashSet};
+use alloy_primitives::{Address, TxHash, map::HashSet};
 use alloy_provider::Provider;
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::Result;
@@ -71,7 +71,7 @@ pub struct VerifyArgs {
     /// The contract identifier in the form `<path>:<contractname>`.
     pub contract: Option<ContractInfo>,
 
-    /// The ABI-encoded constructor arguments.
+    /// The ABI-encoded constructor arguments. Only for Etherscan.
     #[arg(
         long,
         conflicts_with = "constructor_args_path",
@@ -87,6 +87,10 @@ pub struct VerifyArgs {
     /// Try to extract constructor arguments from on-chain creation code.
     #[arg(long)]
     pub guess_constructor_args: bool,
+
+    /// The hash of the transaction which created the contract. Optional for Sourcify.
+    #[arg(long)]
+    pub creation_transaction_hash: Option<TxHash>,
 
     /// The `solc` version to use to build the smart contract.
     #[arg(long, value_name = "VERSION")]
@@ -467,7 +471,7 @@ pub struct VerifyCheckArgs {
     ///
     /// For Etherscan - Submission GUID.
     ///
-    /// For Sourcify - Contract Address.
+    /// For Sourcify - Verification Job ID.
     pub id: String,
 
     #[command(flatten)]

@@ -31,7 +31,7 @@ resolver = "2"
 
 [workspace.metadata]
 # NOTE(zk): track upstream version after each merge
-metadata.upstream_version = "1.3.0"
+metadata.upstream_version = "1.3.4"
 
 [workspace.package]
 version = "0.0.26" # x-release-please-version
@@ -221,6 +221,7 @@ foundry-fork-db = "0.18"
 solang-parser = { version = "=0.3.9", package = "foundry-solang-parser" }
 solar = { package = "solar-compiler", version = "=0.1.6", default-features = false }
 # TODO: remove in next solar release: https://github.com/paradigmxyz/solar/pull/444
+solar-data-structures = { version = "=0.1.6", default-features = false }
 solar-interface = { version = "=0.1.6", default-features = false }
 solar-parse = { version = "=0.1.6", default-features = false }
 solar-sema = { version = "=0.1.6", default-features = false }
@@ -387,6 +388,7 @@ jiff = "0.2"
 heck = "0.5"
 uuid = "1.17.0"
 flate2 = "1.1"
+snapbox = { version = "0.6", features = ["json", "regex", "term-svg"] }
 
 ## Pinned dependencies. Enabled for the workspace in crates/test-utils.
 
@@ -397,6 +399,44 @@ idna_adapter = "=1.1.0"
 
 [patch.crates-io]
 vise = { git = "https://github.com/matter-labs/vise.git", rev = "51669f42f60c50b3a521662a4ecd71212a303299" }
+# https://github.com/rust-cli/rexpect/pull/106
+rexpect = { git = "https://github.com/rust-cli/rexpect", rev = "2ed0b1898d7edaf6a85bedbae71a01cc578958fc" }
+
+## alloy-core
+# alloy-dyn-abi = { path = "../../alloy-rs/core/crates/dyn-abi" }
+# alloy-json-abi = { path = "../../alloy-rs/core/crates/json-abi" }
+# alloy-primitives = { path = "../../alloy-rs/core/crates/primitives" }
+# alloy-sol-macro = { path = "../../alloy-rs/core/crates/sol-macro" }
+# alloy-sol-macro-expander = { path = "../../alloy-rs/core/crates/sol-macro-expander" }
+# alloy-sol-macro-input = { path = "../../alloy-rs/core/crates/sol-macro-input" }
+# alloy-sol-type-parser = { path = "../../alloy-rs/core/crates/sol-type-parser" }
+# alloy-sol-types = { path = "../../alloy-rs/core/crates/sol-types" }
+# syn-solidity = { path = "../../alloy-rs/core/crates/syn-solidity" }
+
+## alloy
+# alloy-consensus = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-contract = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-eips = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-genesis = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-json-rpc = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-network = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-network-primitives = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-provider = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-pubsub = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-rpc-client = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-rpc-types = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-rpc-types-eth = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-serde = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-signer-aws = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-signer-gcp = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-signer-ledger = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-signer-local = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-signer-trezor = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-transport = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-transport-http = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-transport-ipc = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
+# alloy-transport-ws = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
 
 ## alloy-evm
 # alloy-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "3c6cebb" }
