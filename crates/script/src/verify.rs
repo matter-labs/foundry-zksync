@@ -166,6 +166,7 @@ impl VerifyBundle {
                     guess_constructor_args: false,
                     compilation_profile: Some(artifact.profile.to_string()),
                     language: None,
+<<<<<<< HEAD
                     zksync: self.zksync,
                     creation_transaction_hash: None,
                 };
@@ -263,6 +264,8 @@ impl VerifyBundle {
                     compilation_profile: None, //TODO(zk): get compilation profile
                     language: None,            // TODO(zk): vyper is not supported right now
                     zksync: self.zksync,
+=======
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
                     creation_transaction_hash: None,
                 };
 

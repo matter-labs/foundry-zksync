@@ -7,7 +7,12 @@ use crate::{
 use alloy_primitives::map::HashSet;
 use comfy_table::{Cell, Color, Table, modifiers::UTF8_ROUND_CORNERS, presets::ASCII_MARKDOWN};
 use foundry_common::{TestFunctionExt, calc, shell};
+<<<<<<< HEAD
 use foundry_evm::{constants::HARDHAT_CONSOLE_ADDRESS, traces::CallKind};
+=======
+use foundry_evm::traces::CallKind;
+
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::BTreeMap, fmt::Display};

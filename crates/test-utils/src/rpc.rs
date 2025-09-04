@@ -124,6 +124,7 @@ pub fn next_ws_archive_rpc_url() -> String {
 
 /// Returns a URL that has access to archive state.
 fn next_archive_url(is_ws: bool) -> String {
+<<<<<<< HEAD
     // First try to use ALCHEMY_API_KEY if it exists
     if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
         let url = if is_ws {
@@ -136,6 +137,8 @@ fn next_archive_url(is_ws: bool) -> String {
     }
 
     // Fall back to existing logic (updated to use upstream pattern)
+=======
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
     let domain = next(if is_ws { &WS_ARCHIVE_DOMAINS } else { &HTTP_ARCHIVE_DOMAINS });
     let url = if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") };
     eprintln!("--- next_archive_url(is_ws={is_ws}) = {url} ---");
@@ -166,6 +169,7 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
     let domain = if reth_works && matches!(chain, Mainnet) {
         *next(if is_ws { &WS_DOMAINS } else { &HTTP_DOMAINS })
     } else {
+<<<<<<< HEAD
         &{
             // Try Alchemy API Key from environment first for non-Mainnet chains
             if let Ok(alchemy_key) = std::env::var("ALCHEMY_API_KEY") {
@@ -211,6 +215,19 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
             };
             format!("lb.drpc.org/ogrpc?network={network}&dkey={key}")
         }
+=======
+        // DRPC for other networks used in tests.
+        let key = next(&DRPC_KEYS);
+
+        let network = match chain {
+            Mainnet => "ethereum",
+            Arbitrum => "arbitrum",
+            Polygon => "polygon",
+            Sepolia => "sepolia",
+            _ => "",
+        };
+        &format!("lb.drpc.org/ogrpc?network={network}&dkey={key}")
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
     };
 
     // This part constructs the final URL only if the Alchemy check didn't return early

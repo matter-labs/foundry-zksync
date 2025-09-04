@@ -1100,7 +1100,11 @@ dependencies = [
 
 [[package]]
 name = "anvil"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -1166,7 +1170,11 @@ dependencies = [
 
 [[package]]
 name = "anvil-core"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -1190,7 +1198,11 @@ dependencies = [
 
 [[package]]
 name = "anvil-rpc"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "serde",
  "serde_json",
@@ -1198,7 +1210,11 @@ dependencies = [
 
 [[package]]
 name = "anvil-server"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "anvil-rpc",
  "async-trait",
@@ -2854,7 +2870,11 @@ checksum = "df8670b8c7b9dae1793364eafadf7239c40d669904660c5960d74cfd80b46a53"
 
 [[package]]
 name = "cast"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -2966,7 +2986,11 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chisel"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -2983,7 +3007,11 @@ dependencies = [
  "foundry-solang-parser",
  "foundry-test-utils",
  "itertools 0.14.0",
+<<<<<<< HEAD
  "reqwest 0.12.23",
+=======
+ "reqwest",
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
  "revm",
  "rexpect",
  "rustyline",
@@ -4709,7 +4737,11 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "forge"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-dyn-abi",
@@ -4796,7 +4828,11 @@ dependencies = [
 
 [[package]]
 name = "forge-doc"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-primitives",
  "derive_more 2.0.1",
@@ -4819,7 +4855,11 @@ dependencies = [
 
 [[package]]
 name = "forge-fmt"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-primitives",
  "ariadne",
@@ -4835,7 +4875,11 @@ dependencies = [
 
 [[package]]
 name = "forge-lint"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "foundry-common",
  "foundry-compilers",
@@ -4849,7 +4893,11 @@ dependencies = [
 
 [[package]]
 name = "forge-script"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -4897,7 +4945,11 @@ dependencies = [
 
 [[package]]
 name = "forge-script-sequence"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-network",
  "alloy-primitives",
@@ -4913,7 +4965,11 @@ dependencies = [
 
 [[package]]
 name = "forge-sol-macro-gen"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-sol-macro-expander",
  "alloy-sol-macro-input",
@@ -4929,7 +4985,11 @@ dependencies = [
 
 [[package]]
 name = "forge-verify"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -5013,7 +5073,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-cheatcodes"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -5074,7 +5138,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-cheatcodes-spec"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-sol-types",
  "foundry-macros",
@@ -5085,7 +5153,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-cli"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-dyn-abi",
@@ -5134,7 +5206,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-common"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -5198,7 +5274,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-common-fmt"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -5323,7 +5403,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-config"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -5362,7 +5446,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-debugger"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-primitives",
  "crossterm 0.29.0",
@@ -5380,7 +5468,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-dyn-abi",
  "alloy-evm",
@@ -5415,7 +5507,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-abi"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -5427,7 +5523,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-core"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -5466,7 +5566,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-coverage"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-primitives",
  "eyre",
@@ -5481,7 +5585,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-fuzz"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -5506,7 +5614,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-traces"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -5559,7 +5671,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-linking"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-primitives",
  "foundry-compilers",
@@ -5572,7 +5688,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-macros"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "proc-macro-error2",
  "proc-macro2",
@@ -5627,7 +5747,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-test-utils"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-primitives",
  "alloy-provider",
@@ -5664,7 +5788,11 @@ dependencies = [
 
 [[package]]
 name = "foundry-wallets"
+<<<<<<< HEAD
 version = "0.0.26"
+=======
+version = "1.3.4"
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -9842,6 +9970,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "rfc6979"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9853,6 +9982,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 name = "rfc6979"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -262,7 +262,10 @@ impl CreateArgs {
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
             language: None,
+<<<<<<< HEAD
             zksync: self.build.compiler.zk.enabled(),
+=======
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
             creation_transaction_hash: None,
         };
 
@@ -450,7 +453,10 @@ impl CreateArgs {
             guess_constructor_args: false,
             compilation_profile: Some(id.profile.to_string()),
             language: None,
+<<<<<<< HEAD
             zksync: self.build.compiler.zk.enabled(),
+=======
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
             creation_transaction_hash: Some(receipt.transaction_hash),
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;

@@ -47,7 +47,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrices.outputs.test-matrix) }}
     env:
+<<<<<<< HEAD
       ETH_RPC_URL: https://eth-mainnet.alchemyapi.io/v2/${{ secrets.ALCHEMY_API_KEY }}
+=======
+>>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
       CARGO_PROFILE_DEV_DEBUG: 0
       # Note(zk): Using our own Alchemy API key to avoid rate limiting issues
       ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
