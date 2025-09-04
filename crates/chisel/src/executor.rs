@@ -204,12 +204,10 @@ impl SessionSource {
 
     async fn build_runner(&mut self, final_pc: usize) -> Result<ChiselRunner> {
         let env = self.config.evm_opts.evm_env().await?;
-<<<<<<< HEAD
 
         let mut strategy = utils::get_executor_strategy(&self.config.foundry_config);
-=======
->>>>>>> b104ef4e8eb23b9200744e4b09b95e4b7bee7b90
 
+        // Create an in-memory backend
         let backend = match self.config.backend.take() {
             Some(backend) => backend,
             None => {
