@@ -247,9 +247,9 @@ impl SourcifyVerificationProvider {
             CompilerVerificationContext::Solc(solc_context) => {
                 let mut input: StandardJsonCompilerInput = solc_context
                     .project
-                    .standard_json_input(&context.target_path())
+                    .standard_json_input(context.target_path())
                     .wrap_err("Failed to get standard json input")?
-                    .normalize_evm_version(&context.compiler_version());
+                    .normalize_evm_version(context.compiler_version());
 
                 let mut settings = solc_context.compiler_settings.solc.settings.clone();
                 settings.libraries.libs = input
@@ -268,7 +268,7 @@ impl SourcifyVerificationProvider {
                 settings.remappings = input.settings.remappings;
 
                 // remove all incompatible settings
-                settings.sanitize(&context.compiler_version(), SolcLanguage::Solidity);
+                settings.sanitize(context.compiler_version(), SolcLanguage::Solidity);
 
                 input.settings = settings;
 
@@ -390,7 +390,7 @@ mod tests {
             &prj.root().to_string_lossy(),
         ]);
 
-        let context = args.resolve_context().await.unwrap();
+        let context = args.resolve_either_context().await.unwrap();
         let provider = SourcifyVerificationProvider::default();
         let request = provider.prepare_verify_request(&args, &context).await.unwrap();
 
