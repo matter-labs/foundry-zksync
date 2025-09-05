@@ -73,8 +73,7 @@ contract DeployScript is Script {
     }
 }
    "#,
-    )
-    .unwrap();
+    );
 
     cmd.arg("script").args([
         "--zksync",

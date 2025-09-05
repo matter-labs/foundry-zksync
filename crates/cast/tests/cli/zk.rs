@@ -515,14 +515,13 @@ casttest!(test_zk_cast_call_create, async |_prj, cmd| {
 
 casttest!(test_zk_cast_custom_signature, async |prj, cmd| {
     util::initialize(prj.root());
-    prj.add_script("DeployAA.s.sol", include_str!("../fixtures/zk/DeployAA.s.sol")).unwrap();
-    prj.add_source("AAAccount.sol", include_str!("../fixtures/zk/AAAccount.sol")).unwrap();
-    prj.add_source("AAFactory.sol", include_str!("../fixtures/zk/AAFactory.sol")).unwrap();
+    prj.add_script("DeployAA.s.sol", include_str!("../fixtures/zk/DeployAA.s.sol"));
+    prj.add_source("AAAccount.sol", include_str!("../fixtures/zk/AAAccount.sol"));
+    prj.add_source("AAFactory.sol", include_str!("../fixtures/zk/AAFactory.sol"));
     prj.add_source(
         "SystemContractErrors.sol",
         include_str!("../fixtures/zk/SystemContractErrors.sol"),
-    )
-    .unwrap();
+    );
     prj.write_config(Config {
         optimizer: Some(true),
         optimizer_runs: Some(200),
@@ -689,7 +688,7 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
         .map(|(addr, pk, _)| (addr, pk))
         .expect("No rich wallets available");
 
-    prj.add_script("Counter", "contract Counter { }").unwrap();
+    prj.add_script("Counter", "contract Counter { }");
 
     let output = cmd
         .forge_fuse()
@@ -754,8 +753,7 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
         }
 
        "#,
-    )
-    .unwrap();
+    );
 
     let output = cmd
         .forge_fuse()

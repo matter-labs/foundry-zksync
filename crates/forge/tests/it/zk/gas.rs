@@ -162,6 +162,6 @@ fn create_script_args<'a>(
 
 fn setup_gas_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_script("Gas.s.sol", include_str!("../../fixtures/zk/Gas.s.sol")).unwrap();
-    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
+    prj.add_script("Gas.s.sol", include_str!("../../fixtures/zk/Gas.s.sol"));
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol"));
 }

@@ -167,6 +167,7 @@ impl VerifyBundle {
                     compilation_profile: Some(artifact.profile.to_string()),
                     language: None,
                     zksync: self.zksync,
+                    creation_transaction_hash: None,
                 };
 
                 return Some(verify);
@@ -262,6 +263,7 @@ impl VerifyBundle {
                     compilation_profile: None, //TODO(zk): get compilation profile
                     language: None,            // TODO(zk): vyper is not supported right now
                     zksync: self.zksync,
+                    creation_transaction_hash: None,
                 };
 
                 return Some(verify);

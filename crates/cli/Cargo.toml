@@ -19,7 +19,7 @@ foundry-config.workspace = true
 foundry-debugger.workspace = true
 foundry-evm.workspace = true
 foundry-wallets.workspace = true
-foundry-block-explorers.workspace = true
+
 foundry-strategy-zksync.workspace = true
 
 foundry-compilers = { workspace = true, features = ["full"] }

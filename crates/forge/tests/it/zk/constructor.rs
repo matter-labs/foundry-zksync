@@ -31,7 +31,6 @@ forgetest_async!(test_zk_constructor_works_in_script, |prj, cmd| {
 
 fn setup_deploy_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_script("Constructor.s.sol", include_str!("../../fixtures/zk/Constructor.s.sol"))
-        .unwrap();
-    prj.add_source("Bank.sol", include_str!("../../../../../testdata/zk/Bank.sol")).unwrap();
+    prj.add_script("Constructor.s.sol", include_str!("../../fixtures/zk/Constructor.s.sol"));
+    prj.add_source("Bank.sol", include_str!("../../../../../testdata/zk/Bank.sol"));
 }

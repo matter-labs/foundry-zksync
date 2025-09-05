@@ -366,11 +366,7 @@ impl CreateArgs {
             constructor_args,
             constructor_args_path: None,
             num_of_optimizations,
-            etherscan: EtherscanOpts {
-                key: self.eth.etherscan.key(),
-                chain: Some(chain.into()),
-                api_version: self.eth.etherscan.api_version,
-            },
+            etherscan: EtherscanOpts { key: self.eth.etherscan.key(), chain: Some(chain.into()) },
             rpc: Default::default(),
             flatten: false,
             force: false,
@@ -387,6 +383,7 @@ impl CreateArgs {
             compilation_profile: None, //TODO(zk): provide comp profile
             language: None,            //TODO(zk): only solidity is supported for now
             zksync: self.build.compiler.zk.enabled(),
+            creation_transaction_hash: None,
         };
         sh_println!("Waiting for {} to detect contract deployment...", verify.verifier.verifier)?;
         verify.run().await

@@ -113,6 +113,6 @@ forgetest_async!(script_zk_can_use_predeployed_factory, |prj, cmd| {
 
 fn setup_factory_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_source("Factory.sol", include_str!("../../../../../testdata/zk/Factory.sol")).unwrap();
-    prj.add_script("Factory.s.sol", include_str!("../../fixtures/zk/Factory.s.sol")).unwrap();
+    prj.add_source("Factory.sol", include_str!("../../../../../testdata/zk/Factory.sol"));
+    prj.add_script("Factory.s.sol", include_str!("../../fixtures/zk/Factory.s.sol"));
 }

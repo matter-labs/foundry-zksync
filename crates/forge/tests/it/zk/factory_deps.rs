@@ -24,8 +24,7 @@ forgetest_async!(script_zk_can_deploy_large_factory_deps, |prj, cmd| {
     prj.add_source(
         "LargeContracts.sol",
         include_str!("../../../../../testdata/zk/LargeContracts.sol"),
-    )
-    .unwrap();
+    );
     prj.add_script(
         "LargeContracts.s.sol",
         r#"
@@ -39,8 +38,7 @@ contract ZkLargeFactoryDependenciesScript is Script {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
 
     let node = ZkSyncNode::start().await;
 

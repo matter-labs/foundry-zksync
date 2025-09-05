@@ -39,8 +39,7 @@ contract ContractOneTest is DSTest {
     }
 }   
     "#,
-    )
-    .unwrap();
+    );
 
     prj.write_config(Config {
         gas_reports: (vec!["*".to_string()]),
@@ -114,8 +113,7 @@ contract CallEmptyCode is Test {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
     cmd.args(["test", "--zksync", "--evm-version", "shanghai", "--mc", "CallEmptyCode"]);
 
     cmd.assert_success()
@@ -141,8 +139,7 @@ contract SendEthToEOA is Test {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
 
     cmd.args(["test", "--zksync", "--match-test", "testSendEthToEOA"]);
     let output = cmd.assert_success().get_output().stdout_lossy();
@@ -167,8 +164,7 @@ contract CallEmptyCodeWithZeroValue is Test {
     }
 }
 "#,
-    )
-    .unwrap();
+    );
 
     cmd.args(["test", "--zksync", "--match-test", "testCallEmptyCodeWithZeroValue"]);
     let output = cmd.assert_success().get_output().stdout_lossy();

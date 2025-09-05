@@ -43,12 +43,10 @@ forgetest_async!(setup_broadcast_in_setup_test, |prj, cmd| {
 
 fn setup_deploy_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_script("ScriptSetup.s.sol", include_str!("../../fixtures/zk/ScriptSetup.s.sol"))
-        .unwrap();
+    prj.add_script("ScriptSetup.s.sol", include_str!("../../fixtures/zk/ScriptSetup.s.sol"));
     prj.add_script(
         "ScriptBroadcastInSetup.s.sol",
         include_str!("../../fixtures/zk/ScriptBroadcastInSetup.s.sol"),
-    )
-    .unwrap();
-    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
+    );
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol"));
 }
