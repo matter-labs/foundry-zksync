@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.0.27](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.26...foundry-zksync-v0.0.27) (2025-09-05)
+
+
+### Features
+
+* **`invariants`:** use `SlotIdentifier` for identifying complex types and sampling them ([#11450](https://github.com/matter-labs/foundry-zksync/issues/11450)) ([8a710a0](https://github.com/matter-labs/foundry-zksync/commit/8a710a02163de0e61fc5ea34d4031fef57026049))
+* Adapt zksync verification to etherscan compatible api ([#1114](https://github.com/matter-labs/foundry-zksync/issues/1114)) ([6408a7e](https://github.com/matter-labs/foundry-zksync/commit/6408a7e8d6207df484d84775d0b3d9ac71af14f9))
+* add method_identifiers and legacy_assembly fields to ZkContractArtifact ([#1145](https://github.com/matter-labs/foundry-zksync/issues/1145)) ([d592610](https://github.com/matter-labs/foundry-zksync/commit/d592610122174a1370129f2cb74d3d9102b3dfb6))
+* add missing eip7702 support ([#11490](https://github.com/matter-labs/foundry-zksync/issues/11490)) ([0c7e1b8](https://github.com/matter-labs/foundry-zksync/commit/0c7e1b8d228fa186388024594b74f0d5b3d996e1))
+* **anvil:** support celo transfer precompile ([#11491](https://github.com/matter-labs/foundry-zksync/issues/11491)) ([81b65df](https://github.com/matter-labs/foundry-zksync/commit/81b65df3e2adc0e77e8a4af52a83129688593a36))
+* **forge:** add md flag to support markdown table styling ([#11478](https://github.com/matter-labs/foundry-zksync/issues/11478)) ([db91bd4](https://github.com/matter-labs/foundry-zksync/commit/db91bd443963186d167ab03026561ba386f55ec9))
+* **npm:** publish forge to `npm` for each arch ([#11047](https://github.com/matter-labs/foundry-zksync/issues/11047)) ([592d09d](https://github.com/matter-labs/foundry-zksync/commit/592d09d5c562d0d38392c95d69b369a4c1113d25))
+* switch solar_project to use cache ([#11481](https://github.com/matter-labs/foundry-zksync/issues/11481)) ([a02c14b](https://github.com/matter-labs/foundry-zksync/commit/a02c14bdbe7c1f80aa6d922a8d8ffbb714d77dbb))
+
+
+### Bug Fixes
+
+* **forge:** persist corpus per test suite ([#11469](https://github.com/matter-labs/foundry-zksync/issues/11469)) ([30cc56e](https://github.com/matter-labs/foundry-zksync/commit/30cc56efce344ef02529d064b81d098079d46ede))
+* invalid tx input error in anvil component ([#11488](https://github.com/matter-labs/foundry-zksync/issues/11488)) ([d80fcf6](https://github.com/matter-labs/foundry-zksync/commit/d80fcf6019a91164c10eda0a1b851c789d67ce45))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70a6f77](https://github.com/matter-labs/foundry-zksync/commit/70a6f7774a9578e267edd1596335b2488b9865e1))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70a6f77](https://github.com/matter-labs/foundry-zksync/commit/70a6f7774a9578e267edd1596335b2488b9865e1))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70a6f77](https://github.com/matter-labs/foundry-zksync/commit/70a6f7774a9578e267edd1596335b2488b9865e1))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70ebee1](https://github.com/matter-labs/foundry-zksync/commit/70ebee193f186f5bb16acdd3af58c9fcb00be07d))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([8a710a0](https://github.com/matter-labs/foundry-zksync/commit/8a710a02163de0e61fc5ea34d4031fef57026049))
+* **lint:** avoid ANSI chars with JSON emitter ([#11470](https://github.com/matter-labs/foundry-zksync/issues/11470)) ([56aadcb](https://github.com/matter-labs/foundry-zksync/commit/56aadcb20c7edfe2c17525df1a5a7c6e5ffe7a5a))
+
 ## [0.0.26](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.25...foundry-zksync-v0.0.26) (2025-08-28)
 
 
