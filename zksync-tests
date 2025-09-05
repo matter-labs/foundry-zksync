@@ -140,6 +140,8 @@ foundry-evm-core:
     backend::tests::test_zk_code_by_hash_failure_is_propagated
 foundry-zksync-compilers:
     compilers::artifact_output::zk::bytecode::tests::serialized_bytecode_is_not_prefixed
+    compilers::artifact_output::zk::tests::contract_to_artifact_empty_contract_produces_empty_artifact
+    compilers::artifact_output::zk::tests::contract_to_artifact_simple_valid_fields
     compilers::zksolc::input::tests::test_zk_llvm_options_sanitization
     compilers::zksolc::input::tests::test_zk_optimizer_sanitization_post_1_5_11
     compilers::zksolc::input::tests::test_zk_optimizer_sanitization_pre_1_5_11
