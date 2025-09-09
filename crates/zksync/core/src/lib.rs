@@ -52,7 +52,7 @@ use zksync_types::{
 type Result<T> = std::result::Result<T, eyre::Report>;
 
 /// Default ZKsync protocol version.
-pub const DEFAULT_PROTOCOL_VERSION: ProtocolVersionId = ProtocolVersionId::Version27;
+pub const DEFAULT_PROTOCOL_VERSION: ProtocolVersionId = ProtocolVersionId::Version29;
 
 /// Represents an empty code
 pub const EMPTY_CODE: [u8; 32] = [0; 32];
