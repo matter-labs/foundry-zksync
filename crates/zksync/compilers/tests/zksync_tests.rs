@@ -11,7 +11,11 @@ use foundry_test_utils::foundry_compilers::{
 };
 
 use foundry_zksync_compilers::{
-    artifacts::{contract::Contract, error::Error},
+    artifacts::{
+        contract::Contract,
+        error::Error,
+        output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
+    },
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
@@ -783,4 +787,162 @@ contract B { }
             bi.build_info.get("output").unwrap()["metadata"]["zksolcVersion"].to_string();
         assert_eq!(zksolc_version, "\"1.5.7\"");
     }
+}
+
+#[test]
+fn zksync_can_compile_with_ast_output() {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+
+    // Configure output selection to include AST
+    let mut settings = project.project().settings.clone();
+    settings.settings.output_selection = OutputSelection {
+        all: FileOutputSelection {
+            per_file: [OutputSelectionFlag::AST].into(),
+            per_contract: [OutputSelectionFlag::ABI, OutputSelectionFlag::Metadata].into(),
+        },
+    };
+    project.project_mut().settings = settings;
+
+    project
+        .add_source(
+            "TestContract",
+            r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.10;
+
+contract TestContract {
+    uint256 public value;
+    
+    event ValueChanged(uint256 indexed newValue);
+    
+    constructor(uint256 _initialValue) {
+        value = _initialValue;
+    }
+    
+    function setValue(uint256 _newValue) public {
+        value = _newValue;
+        emit ValueChanged(_newValue);
+    }
+    
+    function getValue() public view returns (uint256) {
+        return value;
+    }
+}
+"#,
+        )
+        .unwrap();
+
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+
+    let test_contract = compiled.find_first("TestContract").expect("TestContract not found");
+
+    assert!(test_contract.ast.is_some(), "AST should be present in artifact");
+
+    let ast = test_contract.ast.as_ref().unwrap();
+
+    assert_eq!(ast["nodeType"].as_str(), Some("SourceUnit"), "AST root should be SourceUnit");
+    assert!(ast["src"].is_string(), "AST should have src field");
+    assert!(ast["nodes"].is_array(), "AST should have nodes array");
+
+    let nodes = ast["nodes"].as_array().expect("nodes should be array");
+    assert!(!nodes.is_empty(), "AST nodes should not be empty");
+
+    // Find the contract definition node
+    let contract_node = nodes
+        .iter()
+        .find(|node| {
+            node["nodeType"].as_str() == Some("ContractDefinition")
+                && node["name"].as_str() == Some("TestContract")
+        })
+        .expect("Should find TestContract definition in AST");
+
+    assert!(contract_node["src"].is_string(), "Contract node should have src field");
+    assert!(contract_node["nodes"].is_array(), "Contract should have nodes array");
+
+    let contract_nodes = contract_node["nodes"].as_array().expect("Contract nodes should be array");
+
+    let has_constructor = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("FunctionDefinition")
+            && node["kind"].as_str() == Some("constructor")
+    });
+    assert!(has_constructor, "Should find constructor in AST");
+
+    let has_set_value_function = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("FunctionDefinition")
+            && node["name"].as_str() == Some("setValue")
+    });
+    assert!(has_set_value_function, "Should find setValue function in AST");
+
+    let has_value_variable = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("VariableDeclaration")
+            && node["name"].as_str() == Some("value")
+    });
+    assert!(has_value_variable, "Should find value variable in AST");
+
+    let has_event = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("EventDefinition")
+            && node["name"].as_str() == Some("ValueChanged")
+    });
+    assert!(has_event, "Should find ValueChanged event in AST");
+}
+
+#[test]
+fn zksync_ast_bridge_works_for_simple_contract() {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+
+    // Configure output selection to include AST
+    let mut settings = project.project().settings.clone();
+    settings.settings.output_selection = OutputSelection {
+        all: FileOutputSelection {
+            per_file: [OutputSelectionFlag::AST].into(),
+            per_contract: [OutputSelectionFlag::ABI].into(),
+        },
+    };
+    project.project_mut().settings = settings;
+
+    project
+        .add_source(
+            "SimpleAstTest",
+            r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.10;
+
+contract SimpleAstTest {
+    uint256 public counter;
+    
+    function increment() public {
+        counter += 1;
+    }
+}
+"#,
+        )
+        .unwrap();
+
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+
+    let contract = compiled.find_first("SimpleAstTest").expect("SimpleAstTest contract not found");
+
+    assert!(contract.ast.is_some(), "AST should be present via AST bridge");
+
+    let ast = contract.ast.as_ref().unwrap();
+
+    assert_eq!(ast["nodeType"].as_str(), Some("SourceUnit"));
+
+    let nodes = ast["nodes"].as_array().expect("AST should have nodes");
+    let contract_node = nodes
+        .iter()
+        .find(|node| {
+            node["nodeType"].as_str() == Some("ContractDefinition")
+                && node["name"].as_str() == Some("SimpleAstTest")
+        })
+        .expect("Should find SimpleAstTest in AST");
+
+    let contract_elements = contract_node["nodes"].as_array().expect("Contract should have nodes");
+    let has_counter_var = contract_elements.iter().any(|node| {
+        node["nodeType"].as_str() == Some("VariableDeclaration")
+            && node["name"].as_str() == Some("counter")
+    });
+    assert!(has_counter_var, "Should find counter variable in AST");
 }

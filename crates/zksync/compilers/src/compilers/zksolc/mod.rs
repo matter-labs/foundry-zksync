@@ -360,6 +360,9 @@ impl ZkSolc {
 
         let mut compiler_output: ZkCompilerOutput = serde_json::from_str(output)?;
 
+        // Bridge AST data from sources to contracts for easier access
+        compiler_output = compiler_output.with_ast_bridged();
+
         // Sanitize contract names that are source file paths, using the file name without
         // path or .yul extension. This happens in zksolc versions older than 1.5.9 and
         // creates issues.
