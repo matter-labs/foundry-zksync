@@ -554,6 +554,7 @@ checksum = "39676beaa50db545cf15447fc94ec5513b64e85a48357a0625b9a04aef08a910"
 dependencies = [
  "alloy-primitives",
  "alloy-rpc-types-anvil",
+ "alloy-rpc-types-debug",
  "alloy-rpc-types-engine",
  "alloy-rpc-types-eth",
  "alloy-rpc-types-trace",
@@ -1220,8 +1221,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_api_decl"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "anvil_zksync_types",
  "jsonrpsee",
@@ -1232,8 +1233,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_api_server"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "anvil_zksync_api_decl",
  "anvil_zksync_common",
@@ -1260,8 +1261,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_common"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "alloy",
  "anstream",
@@ -1283,8 +1284,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_config"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1301,8 +1302,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_console"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1316,8 +1317,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_core"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1354,14 +1355,15 @@ dependencies = [
  "zksync_error",
  "zksync_mini_merkle_tree",
  "zksync_multivm",
+ "zksync_system_constants",
  "zksync_types",
  "zksync_web3_decl",
 ]
 
 [[package]]
 name = "anvil_zksync_l1_sidecar"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "alloy",
  "anvil_zksync_common",
@@ -1385,8 +1387,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_traces"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "alloy",
  "anstyle",
@@ -1408,8 +1410,8 @@ dependencies = [
 
 [[package]]
 name = "anvil_zksync_types"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "anvil_zksync_common",
  "clap",
@@ -3076,7 +3078,8 @@ dependencies = [
 [[package]]
 name = "circuit_sequencer_api"
 version = "0.152.3"
-source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=chore%2Fupgrade-sha-deps-152#0a0f9f7788f5b5f151077dc9cc8687f3747fa7e4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b1b6a32c5c902ea01ef7eca76dd9c16585d5c9005aabcb2c08a7a4a45827b07"
 dependencies = [
  "derivative",
  "rayon",
@@ -7337,17 +7340,6 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_asn1",
-]
-
-[[package]]
-name = "k256"
-version = "0.11.0"
-source = "git+https://github.com/Moonsong-Labs/elliptic-curves?branch=chore%2Fupgrade-sha2-dep-0.11.0#c94ee15c610488d5a739310a129de60292069e24"
-dependencies = [
- "cfg-if",
- "ecdsa 0.14.8",
- "elliptic-curve 0.12.3",
- "sha2 0.10.9",
 ]
 
 [[package]]
@@ -13821,10 +13813,11 @@ dependencies = [
 [[package]]
 name = "zk_evm"
 version = "0.131.0-rc.2"
-source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=chore%2Fupgrade-sha-deps-131#8d5536c22100dde64ff7553728b651d0dd82ccff"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2b83ee7887fb29fda57c6b26a0f64c9b211459d718f8a26310f962e69f0b764"
 dependencies = [
  "blake2_ce",
- "k256 0.11.0",
+ "k256 0.11.6",
  "lazy_static",
  "num",
  "serde",
@@ -13899,7 +13892,7 @@ dependencies = [
 [[package]]
 name = "zk_evm"
 version = "0.152.3"
-source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=chore%2Fupgrade-sha-deps-152#0a0f9f7788f5b5f151077dc9cc8687f3747fa7e4"
+source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=sha2-v0.152.3#5b5ba7fe13d6df186dc476aec99e1ee6f9299bff"
 dependencies = [
  "anyhow",
  "lazy_static",
@@ -13907,7 +13900,7 @@ dependencies = [
  "serde",
  "serde_json",
  "static_assertions",
- "zk_evm_abstractions 0.152.3",
+ "zk_evm_abstractions 0.152.3 (git+https://github.com/Moonsong-Labs/zksync-protocol?branch=sha2-v0.152.3)",
 ]
 
 [[package]]
@@ -13956,13 +13949,26 @@ dependencies = [
  "num_enum 0.6.1",
  "serde",
  "static_assertions",
- "zkevm_opcode_defs 0.152.3",
+ "zkevm_opcode_defs 0.152.3 (git+https://github.com/Moonsong-Labs/zksync-protocol?branch=chore%2Fupgrade-sha-deps-152)",
+]
+
+[[package]]
+name = "zk_evm_abstractions"
+version = "0.152.3"
+source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=sha2-v0.152.3#5b5ba7fe13d6df186dc476aec99e1ee6f9299bff"
+dependencies = [
+ "anyhow",
+ "num_enum 0.6.1",
+ "serde",
+ "static_assertions",
+ "zkevm_opcode_defs 0.152.3 (git+https://github.com/Moonsong-Labs/zksync-protocol?branch=sha2-v0.152.3)",
 ]
 
 [[package]]
 name = "zkevm_opcode_defs"
 version = "0.131.0"
-source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=chore%2Fupgrade-sha-deps-131#8d5536c22100dde64ff7553728b651d0dd82ccff"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49e0154bd4ae8202c96c52b29dd44f944bfd08c1c233fef843744463964de957"
 dependencies = [
  "bitflags 1.3.2",
  "ethereum-types",
@@ -14033,6 +14039,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "zkevm_opcode_defs"
+version = "0.152.3"
+source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=sha2-v0.152.3#5b5ba7fe13d6df186dc476aec99e1ee6f9299bff"
+dependencies = [
+ "bitflags 2.9.3",
+ "blake2",
+ "ethereum-types",
+ "k256 0.13.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static",
+ "p256 0.13.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde",
+ "sha2 0.10.9",
+ "sha3",
+ "zksync_pairing",
+]
+
+[[package]]
 name = "zksync-error-codegen"
 version = "0.1.0"
 source = "git+https://github.com/matter-labs/zksync-error?rev=3f8c749249d29786e22208ece7baebd169a722c4#3f8c749249d29786e22208ece7baebd169a722c4"
@@ -14078,8 +14101,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_basic_types"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "anyhow",
  "chrono",
@@ -14124,8 +14147,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_contracts"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "hex",
  "once_cell",
@@ -14137,8 +14160,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_crypto_primitives"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "anyhow",
  "blake2",
@@ -14154,8 +14177,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_error"
-version = "0.6.9"
-source = "git+https://github.com/Moonsong-Labs/anvil-zksync.git?branch=chore%2Fupgrade-sha-dep#307b6fdad2cfcf37b014bc84a63b07abd152ee97"
+version = "0.6.10"
+source = "git+https://github.com/matter-labs/anvil-zksync.git?rev=a37ef3c85c8f89371954dab6350b3beb6a61a175#a37ef3c85c8f89371954dab6350b3beb6a61a175"
 dependencies = [
  "anyhow",
  "lazy_static",
@@ -14198,8 +14221,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_mini_merkle_tree"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -14208,8 +14231,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_multivm"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "anyhow",
  "circuit_sequencer_api",
@@ -14249,8 +14272,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_system_constants"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "once_cell",
  "zksync_basic_types",
@@ -14275,8 +14298,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_types"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -14302,8 +14325,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_utils"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "anyhow",
  "once_cell",
@@ -14318,8 +14341,8 @@ source = "git+https://github.com/Moonsong-Labs/vm2?branch=chore%2Fupgrade-sha2-d
 dependencies = [
  "enum_dispatch",
  "primitive-types",
- "zk_evm_abstractions 0.152.3",
- "zkevm_opcode_defs 0.152.3",
+ "zk_evm_abstractions 0.152.3 (git+https://github.com/Moonsong-Labs/zksync-protocol?branch=chore%2Fupgrade-sha-deps-152)",
+ "zkevm_opcode_defs 0.152.3 (git+https://github.com/Moonsong-Labs/zksync-protocol?branch=chore%2Fupgrade-sha-deps-152)",
  "zksync_vm2_interface",
 ]
 
@@ -14333,8 +14356,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_vm_interface"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -14350,8 +14373,8 @@ dependencies = [
 
 [[package]]
 name = "zksync_web3_decl"
-version = "28.7.0-non-semver-compat"
-source = "git+https://github.com/matter-labs/zksync-era.git?branch=tmp%2Fupgrade-sha2#20da6b0046e19c3919bae6fcfbae6ec4b1320a58"
+version = "29.0.0-non-semver-compat"
+source = "git+https://github.com/matter-labs/zksync-era.git?rev=core-v29.0.0#7ceddb8f5a0cc6ca05959636fa439482bf4119fa"
 dependencies = [
  "anyhow",
  "async-trait",
