@@ -27,8 +27,8 @@ async fn test_zk_contract_paymaster() {
     let config = cmd.config();
     prj.write_config(config);
 
-    prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol")).unwrap();
-    prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol")).unwrap();
+    prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol"));
+    prj.add_source("Paymaster.t.sol", include_str!("../../fixtures/zk/Paymaster.t.sol"));
 
     cmd.args([
         "test",
@@ -151,7 +151,7 @@ forgetest_async!(paymaster_script_test, |prj, cmd| {
 
 fn setup_deploy_prj(prj: &mut TestProject) {
     util::initialize(prj.root());
-    prj.add_script("Paymaster.s.sol", include_str!("../../fixtures/zk/Paymaster.s.sol")).unwrap();
-    prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol")).unwrap();
-    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
+    prj.add_script("Paymaster.s.sol", include_str!("../../fixtures/zk/Paymaster.s.sol"));
+    prj.add_source("MyPaymaster.sol", include_str!("../../fixtures/zk/MyPaymaster.sol"));
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol"));
 }

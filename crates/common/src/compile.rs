@@ -1,13 +1,9 @@
 //! Support for compiling [foundry_compilers::Project]
 
 use crate::{
-    TestFunctionExt,
-    preprocessor::DynamicTestLinkingPreprocessor,
-    reports::{ReportKind, report_kind},
-    shell,
-    term::SpinnerReporter,
+    TestFunctionExt, preprocessor::DynamicTestLinkingPreprocessor, shell, term::SpinnerReporter,
 };
-use comfy_table::{Cell, Color, Table, modifiers::UTF8_ROUND_CORNERS};
+use comfy_table::{Cell, Color, Table, modifiers::UTF8_ROUND_CORNERS, presets::ASCII_MARKDOWN};
 use eyre::Result;
 use foundry_block_explorers::contract::Metadata;
 use foundry_compilers::{
@@ -284,11 +280,7 @@ impl ProjectCompiler {
                 sh_println!()?;
             }
 
-            let mut size_report = SizeReport {
-                report_kind: report_kind(),
-                contracts: BTreeMap::new(),
-                zksync: self.zksync,
-            };
+            let mut size_report = SizeReport { contracts: BTreeMap::new(), zksync: self.zksync };
 
             let mut artifacts: BTreeMap<String, Vec<_>> = BTreeMap::new();
             for (id, artifact) in output.artifact_ids().filter(|(id, _)| {
@@ -358,8 +350,6 @@ const CONTRACT_INITCODE_SIZE_LIMIT: usize = 49152;
 
 /// Contracts with info about their size
 pub struct SizeReport {
-    /// What kind of report to generate.
-    report_kind: ReportKind,
     /// `contract name -> info`
     pub contracts: BTreeMap<String, ContractInfo>,
     /// Using zksync size report
@@ -408,15 +398,11 @@ impl SizeReport {
 
 impl Display for SizeReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self.report_kind {
-            ReportKind::Text => {
-                writeln!(f, "\n{}", self.format_table_output())?;
-            }
-            ReportKind::JSON => {
-                writeln!(f, "{}", self.format_json_output())?;
-            }
+        if shell::is_json() {
+            writeln!(f, "{}", self.format_json_output())?;
+        } else {
+            writeln!(f, "\n{}", self.format_table_output())?;
         }
-
         Ok(())
     }
 }
@@ -445,7 +431,11 @@ impl SizeReport {
 
     fn format_table_output(&self) -> Table {
         let mut table = Table::new();
-        table.apply_modifier(UTF8_ROUND_CORNERS);
+        if shell::is_markdown() {
+            table.load_preset(ASCII_MARKDOWN);
+        } else {
+            table.apply_modifier(UTF8_ROUND_CORNERS);
+        }
 
         table.set_header(vec![
             Cell::new("Contract"),

@@ -76,15 +76,13 @@ async fn test_zk_contract_create2() {
     config.fs_permissions.add(PathPermission::read("./zkout"));
     prj.write_config(config);
 
-    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol"));
 
-    prj.add_source("CustomNumber.sol", include_str!("../../../../../testdata/zk/CustomNumber.sol"))
-        .unwrap();
+    prj.add_source("CustomNumber.sol", include_str!("../../../../../testdata/zk/CustomNumber.sol"));
 
-    prj.add_source("Create2Utils.sol", include_str!("../../../../../testdata/zk/Create2Utils.sol"))
-        .unwrap();
+    prj.add_source("Create2Utils.sol", include_str!("../../../../../testdata/zk/Create2Utils.sol"));
 
-    prj.add_test("Create2.t.sol", include_str!("../../fixtures/zk/Create2.t.sol")).unwrap();
+    prj.add_test("Create2.t.sol", include_str!("../../fixtures/zk/Create2.t.sol"));
 
     cmd.args([
         "test",

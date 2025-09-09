@@ -47,6 +47,8 @@ alloy-network.workspace = true
 
 alloy-zksync.workspace = true
 
+revm.workspace = true
+
 solar-parse.workspace = true
 solar-sema.workspace = true
 
@@ -87,5 +89,6 @@ vergen = { workspace = true, features = ["build", "git", "gitcl"] }
 cargo_metadata = "0.19.2"
 
 [dev-dependencies]
+solar-data-structures.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 axum = { workspace = true }

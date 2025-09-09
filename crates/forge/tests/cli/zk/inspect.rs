@@ -24,8 +24,7 @@ contract ContractOne {
     }
 }
     "#,
-    )
-    .unwrap();
+    );
 
     prj.write_config(Config {
         gas_reports: (vec!["*".to_string()]),

@@ -7,11 +7,10 @@ use crate::{
     utils::is_host_only,
     zk_provider::CompilerVerificationContext,
 };
-use alloy_primitives::{Address, map::HashSet};
+use alloy_primitives::{Address, TxHash, map::HashSet};
 use alloy_provider::Provider;
 use clap::{Parser, ValueEnum, ValueHint};
 use eyre::Result;
-use foundry_block_explorers::EtherscanApiVersion;
 use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
     utils::{self, LoadConfig},
@@ -51,10 +50,6 @@ pub struct VerifierArgs {
     /// The verifier URL, if using a custom provider.
     #[arg(long, help_heading = "Verifier options", env = "VERIFIER_URL")]
     pub verifier_url: Option<String>,
-
-    /// The verifier API version, if using a custom provider.
-    #[arg(long, help_heading = "Verifier options", env = "VERIFIER_API_VERSION")]
-    pub verifier_api_version: Option<EtherscanApiVersion>,
 }
 
 impl Default for VerifierArgs {
@@ -63,7 +58,6 @@ impl Default for VerifierArgs {
             verifier: VerificationProviderType::Sourcify,
             verifier_api_key: None,
             verifier_url: None,
-            verifier_api_version: None,
         }
     }
 }
@@ -77,7 +71,7 @@ pub struct VerifyArgs {
     /// The contract identifier in the form `<path>:<contractname>`.
     pub contract: Option<ContractInfo>,
 
-    /// The ABI-encoded constructor arguments.
+    /// The ABI-encoded constructor arguments. Only for Etherscan.
     #[arg(
         long,
         conflicts_with = "constructor_args_path",
@@ -93,6 +87,10 @@ pub struct VerifyArgs {
     /// Try to extract constructor arguments from on-chain creation code.
     #[arg(long)]
     pub guess_constructor_args: bool,
+
+    /// The hash of the transaction which created the contract. Optional for Sourcify.
+    #[arg(long)]
+    pub creation_transaction_hash: Option<TxHash>,
 
     /// The `solc` version to use to build the smart contract.
     #[arg(long, value_name = "VERSION")]
@@ -205,10 +203,6 @@ impl figment::Provider for VerifyArgs {
 
         if let Some(api_key) = &self.verifier.verifier_api_key {
             dict.insert("etherscan_api_key".into(), api_key.as_str().into());
-        }
-
-        if let Some(api_version) = &self.verifier.verifier_api_version {
-            dict.insert("etherscan_api_version".into(), api_version.to_string().into());
         }
 
         Ok(figment::value::Map::from([(Config::selected_profile(), dict)]))
@@ -477,7 +471,7 @@ pub struct VerifyCheckArgs {
     ///
     /// For Etherscan - Submission GUID.
     ///
-    /// For Sourcify - Contract Address.
+    /// For Sourcify - Verification Job ID.
     pub id: String,
 
     #[command(flatten)]
@@ -514,10 +508,6 @@ impl figment::Provider for VerifyCheckArgs {
         let mut dict = self.etherscan.dict();
         if let Some(api_key) = &self.etherscan.key {
             dict.insert("etherscan_api_key".into(), api_key.as_str().into());
-        }
-
-        if let Some(api_version) = &self.etherscan.api_version {
-            dict.insert("etherscan_api_version".into(), api_version.to_string().into());
         }
 
         Ok(figment::value::Map::from([(Config::selected_profile(), dict)]))

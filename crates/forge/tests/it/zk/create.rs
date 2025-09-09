@@ -7,7 +7,7 @@ use crate::test_helpers::deploy_zk_contract;
 
 forgetest_async!(forge_zk_can_deploy_erc20, |prj, cmd| {
     util::initialize(prj.root());
-    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
+    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol"));
 
     let node = ZkSyncNode::start().await;
     let url = node.url();
@@ -27,9 +27,8 @@ forgetest_async!(forge_zk_can_deploy_contracts_and_cast_a_transaction, |prj, cmd
     prj.add_source(
         "TokenReceiver.sol",
         include_str!("../../../../../testdata/zk/TokenReceiver.sol"),
-    )
-    .unwrap();
-    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
+    );
+    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol"));
 
     let node = ZkSyncNode::start().await;
     let url = node.url();
@@ -69,7 +68,7 @@ forgetest_async!(forge_zk_can_deploy_contracts_and_cast_a_transaction, |prj, cmd
 
 forgetest_async!(forge_zk_can_deploy_contracts_with_gas_per_pubdata_and_succeed, |prj, cmd| {
     util::initialize(prj.root());
-    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
+    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol"));
 
     let node = ZkSyncNode::start().await;
     let url = node.url();
@@ -91,7 +90,7 @@ forgetest_async!(
     forge_zk_can_deploy_contracts_with_invalid_gas_per_pubdata_and_fail,
     |prj, cmd| {
         util::initialize(prj.root());
-        prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
+        prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol"));
 
         let node = ZkSyncNode::start().await;
         let url = node.url();
@@ -121,7 +120,7 @@ forgetest_async!(
 
 forgetest_async!(forge_zk_create_dry_run_without_broadcast, |prj, cmd| {
     util::initialize(prj.root());
-    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
+    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol"));
 
     let node = ZkSyncNode::start().await;
     let url = node.url();
@@ -154,7 +153,7 @@ forgetest_async!(forge_zk_create_dry_run_without_broadcast, |prj, cmd| {
 
 forgetest_async!(forge_zk_create_with_broadcast_flag, |prj, cmd| {
     util::initialize(prj.root());
-    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol")).unwrap();
+    prj.add_source("ERC20.sol", include_str!("../../../../../testdata/zk/ERC20.sol"));
 
     let node = ZkSyncNode::start().await;
     let url = node.url();

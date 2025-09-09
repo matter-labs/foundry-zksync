@@ -83,8 +83,7 @@ contract ZkForkNonceTest is Script {{
     }}
 }}
 "#).as_str(),
-    )
-    .unwrap();
+    );
 
     cmd.arg("script")
         .args([

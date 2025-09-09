@@ -6,8 +6,8 @@ use std::path::Path;
 
 forgetest_async!(test_zk_can_broadcast_with_keystore_account, |prj, cmd| {
     util::initialize(prj.root());
-    prj.add_script("Deploy.s.sol", include_str!("../../fixtures/zk/Deploy.s.sol")).unwrap();
-    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol")).unwrap();
+    prj.add_script("Deploy.s.sol", include_str!("../../fixtures/zk/Deploy.s.sol"));
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol"));
 
     let node = ZkSyncNode::start().await;
     let url = node.url();
