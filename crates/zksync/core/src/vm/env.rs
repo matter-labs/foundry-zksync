@@ -56,6 +56,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
             timestamp: last_l2_block.timestamp + 1,
             prev_block_hash: last_l2_block.hash,
             max_virtual_blocks_to_create: 1,
+            interop_roots: vec![],
         }
     } else {
         // This is the scenario of either the first L2 block ever
@@ -64,6 +65,7 @@ pub(crate) fn create_l1_batch_env<ST: ReadStorage>(
             timestamp: 1,
             prev_block_hash: L2BlockHasher::legacy_hash(L2BlockNumber(0)),
             max_virtual_blocks_to_create: 1,
+            interop_roots: vec![],
         }
     };
     let (mut batch_number, mut batch_timestamp) = load_last_l1_batch(storage).unwrap_or_default();
