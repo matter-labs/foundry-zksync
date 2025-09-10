@@ -147,7 +147,7 @@ impl ZkSyncConfig {
             llvm_options_legacy: Default::default(),
             output_selection: OutputSelection {
                 all: FileOutputSelection {
-                    per_file: [OutputSelectionFlag::AST].into(),
+                    per_file: [].into(),
                     per_contract: [OutputSelectionFlag::ABI].into(),
                 },
             },

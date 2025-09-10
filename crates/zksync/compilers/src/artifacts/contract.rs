@@ -102,9 +102,6 @@ pub struct Contract {
     /// was always fully linked
     #[serde(default)]
     pub object_format: Option<ObjectFormat>,
-    /// The contract Abstract Syntax Tree (AST).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ast: Option<serde_json::Value>,
 }
 
 fn storage_layout_is_empty(storage_layout: &StorageLayout) -> bool {

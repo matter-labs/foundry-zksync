@@ -54,38 +54,6 @@ impl CompilerOutput {
     pub fn split(self) -> (SourceFiles, OutputContracts) {
         (SourceFiles(self.sources), OutputContracts(self.contracts))
     }
-
-    /// Bridges AST data from sources to contracts from the same file.
-    ///
-    /// zksolc returns AST data in the `sources` section (following Solidity JSON standard),
-    /// but contracts are deserialized from the `contracts` section. This method bridges
-    /// the AST data to individual contract artifacts for easier access.
-    pub fn with_ast_bridged(mut self) -> Self {
-        // Extract AST map from sources, converting Ast to serde_json::Value
-        let ast_map: BTreeMap<&PathBuf, serde_json::Value> = self
-            .sources
-            .iter()
-            .filter_map(|(path, source)| {
-                source.ast.as_ref().and_then(|ast| {
-                    // Convert foundry_compilers::Ast to serde_json::Value
-                    serde_json::to_value(ast).ok().map(|json_ast| (path, json_ast))
-                })
-            })
-            .collect();
-
-        // Inject AST into contracts from same file
-        for (file_path, contracts) in &mut self.contracts {
-            if let Some(ast) = ast_map.get(file_path) {
-                // Clone AST once per file, not per contract
-                let shared_ast = Some(ast.clone());
-                for contract in contracts.values_mut() {
-                    contract.ast = shared_ast.clone();
-                }
-            }
-        }
-
-        self
-    }
 }
 
 /// Evm zksolc output field (deprecated)

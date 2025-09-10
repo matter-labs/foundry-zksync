@@ -835,11 +835,21 @@ contract TestContract {
     let compiled = project.compile().unwrap();
     compiled.assert_success();
 
-    let test_contract = compiled.find_first("TestContract").expect("TestContract not found");
+    let sources = &compiled.output().sources;
+    let (_path, versioned_files) = sources
+        .0
+        .iter()
+        .find(|(path, _)| {
+            path.file_name().and_then(|name| name.to_str()) == Some("TestContract.sol")
+        })
+        .expect("TestContract.sol source not found");
 
-    assert!(test_contract.ast.is_some(), "AST should be present in artifact");
+    let versioned_source_file = &versioned_files[0]; // Get first version
+    let source_file = &versioned_source_file.source_file;
 
-    let ast = test_contract.ast.as_ref().unwrap();
+    assert!(source_file.ast.is_some(), "AST should be present in source file");
+    let ast =
+        serde_json::to_value(source_file.ast.as_ref().unwrap()).expect("Failed to serialize AST");
 
     assert_eq!(ast["nodeType"].as_str(), Some("SourceUnit"), "AST root should be SourceUnit");
     assert!(ast["src"].is_string(), "AST should have src field");
@@ -922,11 +932,21 @@ contract SimpleAstTest {
     let compiled = project.compile().unwrap();
     compiled.assert_success();
 
-    let contract = compiled.find_first("SimpleAstTest").expect("SimpleAstTest contract not found");
+    let sources = &compiled.output().sources;
+    let (_path, versioned_files) = sources
+        .0
+        .iter()
+        .find(|(path, _)| {
+            path.file_name().and_then(|name| name.to_str()) == Some("SimpleAstTest.sol")
+        })
+        .expect("SimpleAstTest.sol source not found");
 
-    assert!(contract.ast.is_some(), "AST should be present via AST bridge");
+    let versioned_source_file = &versioned_files[0]; // Get first version
+    let source_file = &versioned_source_file.source_file;
 
-    let ast = contract.ast.as_ref().unwrap();
+    assert!(source_file.ast.is_some(), "AST should be present in source file");
+    let ast =
+        serde_json::to_value(source_file.ast.as_ref().unwrap()).expect("Failed to serialize AST");
 
     assert_eq!(ast["nodeType"].as_str(), Some("SourceUnit"));
 

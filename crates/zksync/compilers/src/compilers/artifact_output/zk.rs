@@ -68,9 +68,6 @@ pub struct ZkContractArtifact {
     /// The identifier of the source file
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<u32>,
-    /// The contract Abstract Syntax Tree (AST).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ast: Option<serde_json::Value>,
 }
 
 impl ZkContractArtifact {
@@ -165,7 +162,6 @@ impl ArtifactOutput for ZkArtifactOutput {
             factory_dependencies_unlinked,
             missing_libraries,
             object_format,
-            ast,
         } = contract;
         let object_format = object_format.unwrap_or_default();
 
@@ -196,7 +192,6 @@ impl ArtifactOutput for ZkArtifactOutput {
             devdoc: Some(devdoc),
             ir_optimized,
             id: source_file.as_ref().map(|s| s.id),
-            ast,
         }
     }
 
@@ -237,7 +232,6 @@ mod tests {
             evm: None,
             missing_libraries: Vec::new(),
             object_format: None,
-            ast: None,
         };
 
         let artifact =
@@ -258,7 +252,6 @@ mod tests {
             factory_dependencies: None,
             factory_dependencies_unlinked: None,
             id: None,
-            ast: None,
         };
 
         assert_eq!(artifact, expected);
@@ -319,7 +312,6 @@ mod tests {
             evm,
             missing_libraries: missing_libraries.clone(),
             object_format: Some(ObjectFormat::Raw),
-            ast: None,
         };
 
         let artifact =
@@ -346,70 +338,8 @@ mod tests {
             devdoc: Some(devdoc),
             ir_optimized,
             id: None,
-            ast: None,
         };
 
         assert_eq!(artifact, expected);
-    }
-
-    #[test]
-    fn contract_to_artifact_preserves_ast() {
-        let sample_ast = serde_json::json!({
-            "nodeType": "SourceUnit",
-            "src": "0:123:0",
-            "nodes": [
-                {
-                    "nodeType": "ContractDefinition",
-                    "name": "TestContract",
-                    "src": "25:98:0"
-                }
-            ]
-        });
-
-        let contract_with_ast = Contract {
-            abi: None,
-            metadata: None,
-            userdoc: UserDoc::default(),
-            devdoc: DevDoc::default(),
-            ir_optimized: None,
-            storage_layout: StorageLayout::default(),
-            hash: None,
-            factory_dependencies: None,
-            factory_dependencies_unlinked: None,
-            eravm: None,
-            evm: None,
-            missing_libraries: Vec::new(),
-            object_format: None,
-            ast: Some(sample_ast.clone()),
-        };
-
-        let artifact = ZkArtifactOutput().contract_to_artifact(
-            Path::new(""),
-            "TestContract",
-            contract_with_ast,
-            None,
-        );
-
-        let expected = ZkContractArtifact {
-            abi: None,
-            bytecode: None,
-            assembly: None,
-            metadata: None,
-            storage_layout: Some(StorageLayout::default()),
-            userdoc: Some(UserDoc::default()),
-            devdoc: Some(DevDoc::default()),
-            method_identifiers: None,
-            legacy_assembly: None,
-            ir_optimized: None,
-            hash: None,
-            factory_dependencies: None,
-            factory_dependencies_unlinked: None,
-            id: None,
-            ast: Some(sample_ast),
-        };
-
-        assert_eq!(artifact, expected);
-        assert!(artifact.ast.is_some());
-        assert_eq!(artifact.ast.as_ref().unwrap()["nodeType"].as_str(), Some("SourceUnit"));
     }
 }
