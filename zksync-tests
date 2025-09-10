@@ -156,7 +156,7 @@ foundry-zksync-compilers:
     dual_compiled_contracts::tests::find_by_path
     dual_compiled_contracts::tests::find_nothing
 foundry-zksync-compilers::zksync_tests:
-    test_zk_ast_bridge_works_for_simple_contract
+    test_zk_ast_available_in_sources
     test_zk_can_clean_build_info
     test_zk_can_compile_a_file_in_allowed_paths_successfully
     test_zk_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10
