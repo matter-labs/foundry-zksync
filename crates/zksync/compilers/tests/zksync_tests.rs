@@ -28,7 +28,7 @@ use foundry_zksync_compilers::{
 use semver::Version;
 
 #[test]
-fn zksync_can_compile_dapp_sample() {
+fn test_zk_can_compile_dapp_sample() {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
@@ -59,7 +59,7 @@ fn zksync_can_compile_dapp_sample() {
 }
 
 #[test]
-fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
+fn test_zk_can_compile_dapp_sample_with_supported_zksolc_versions() {
     for version in ZkSolc::zksolc_supported_versions() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data/dapp-sample");
         let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
@@ -86,7 +86,7 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
 }
 
 #[test]
-fn zksync_can_set_hash_type_with_supported_versions() {
+fn test_zk_can_set_hash_type_with_supported_versions() {
     for version in ZkSolc::zksolc_supported_versions() {
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
         project.project_mut().settings.set_zksolc_version(version.clone()).unwrap();
@@ -171,14 +171,14 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(zksolc_version: Versi
 }
 
 #[test]
-fn zksync_can_compile_contract_with_suppressed_errors() {
+fn test_zk_can_compile_contract_with_suppressed_errors() {
     test_zksync_can_compile_contract_with_suppressed_errors(
         ZkSolc::zksolc_latest_supported_version(),
     );
 }
 
 #[test]
-fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_errors() {
+fn test_zk_pre_1_5_7_can_compile_contract_with_suppressed_errors() {
     test_zksync_can_compile_contract_with_suppressed_errors(Version::new(1, 5, 6));
 }
 
@@ -235,14 +235,14 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(zksolc_version: Ver
 }
 
 #[test]
-fn zksync_can_compile_contract_with_suppressed_warnings() {
+fn test_zk_can_compile_contract_with_suppressed_warnings() {
     test_zksync_can_compile_contract_with_suppressed_warnings(
         ZkSolc::zksolc_latest_supported_version(),
     );
 }
 
 #[test]
-fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
+fn test_zk_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
     test_zksync_can_compile_contract_with_suppressed_warnings(Version::new(1, 5, 6));
 }
 
@@ -301,14 +301,14 @@ fn test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(
 }
 
 #[test]
-fn zksync_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10() {
+fn test_zk_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10() {
     test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(Version::new(
         1, 5, 10,
     ));
 }
 
 #[test]
-fn zksync_can_compile_dapp_detect_changes_in_libs() {
+fn test_zk_can_compile_dapp_detect_changes_in_libs() {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
@@ -385,7 +385,7 @@ fn zksync_can_compile_dapp_detect_changes_in_libs() {
 }
 
 #[test]
-fn zksync_can_compile_dapp_detect_changes_in_sources() {
+fn test_zk_can_compile_dapp_detect_changes_in_sources() {
     let project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     let src = project
@@ -474,7 +474,7 @@ fn zksync_can_compile_dapp_detect_changes_in_sources() {
 }
 
 #[test]
-fn zksync_can_emit_build_info() {
+fn test_zk_can_emit_build_info() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
     project.project_mut().build_info = true;
     project
@@ -516,7 +516,7 @@ contract B { }
 }
 
 #[test]
-fn zksync_can_clean_build_info() {
+fn test_zk_can_clean_build_info() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     project.project_mut().build_info = true;
@@ -563,7 +563,7 @@ contract B { }
 }
 
 #[test]
-fn zksync_cant_compile_a_file_outside_allowed_paths() {
+fn test_zk_cant_compile_a_file_outside_allowed_paths() {
     // For this test we should create the following directory structure:
     // project_root/
     // ├── outer/
@@ -640,7 +640,7 @@ contract Util {}
 }
 
 #[test]
-fn zksync_can_compile_a_file_in_allowed_paths_successfully() {
+fn test_zk_can_compile_a_file_in_allowed_paths_successfully() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let project_root = tmp_dir.path().to_path_buf();
     let contracts_dir = tempfile::tempdir_in(&project_root).unwrap();
@@ -703,7 +703,7 @@ contract Util {}
 }
 
 #[test]
-fn zksync_can_compile_yul_sample() {
+fn test_zk_can_compile_yul_sample() {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
@@ -736,7 +736,7 @@ fn zksync_can_compile_yul_sample() {
 }
 
 #[test]
-fn zksync_detects_change_on_cache_if_zksolc_version_changes() {
+fn test_zk_detects_change_on_cache_if_zksolc_version_changes() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     project.project_mut().build_info = true;
@@ -790,7 +790,7 @@ contract B { }
 }
 
 #[test]
-fn zksync_can_compile_with_ast_output() {
+fn test_zk_can_compile_with_ast_output() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     // Configure output selection to include AST
@@ -898,7 +898,7 @@ contract TestContract {
 }
 
 #[test]
-fn zksync_ast_bridge_works_for_simple_contract() {
+fn test_zk_ast_bridge_works_for_simple_contract() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     // Configure output selection to include AST
