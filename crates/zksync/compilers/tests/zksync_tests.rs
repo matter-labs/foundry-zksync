@@ -898,7 +898,7 @@ contract TestContract {
 }
 
 #[test]
-fn test_zk_ast_bridge_works_for_simple_contract() {
+fn test_zk_ast_available_in_sources() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     // Configure output selection to include AST
