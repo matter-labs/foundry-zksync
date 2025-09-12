@@ -37,7 +37,7 @@ metadata.upstream_version = "1.3.5"
 version = "0.0.26" # x-release-please-version
 edition = "2024"
 # Remember to update clippy.toml as well
-rust-version = "1.88"
+rust-version = "1.89"
 authors = ["Foundry Contributors"]
 license = "MIT OR Apache-2.0"
 homepage = "https://getfoundry.sh"
