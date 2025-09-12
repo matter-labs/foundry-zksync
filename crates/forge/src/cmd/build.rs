@@ -8,7 +8,7 @@ use foundry_cli::{
 };
 use foundry_common::{compile::ProjectCompiler, shell};
 use foundry_compilers::{
-    CompilationError, FileFilter, Project,
+    CompilationError, FileFilter, Project, ProjectCompileOutput,
     compilers::{Language, multi::MultiCompilerLanguage},
     solc::SolcLanguage,
     utils::source_files_iter,
@@ -107,7 +107,7 @@ impl BuildArgs {
                 .ignore_eip_3860(self.ignore_eip_3860)
                 .bail(!format_json);
 
-            let output = compiler.compile(&project)?;
+            let mut output = compiler.compile(&project)?;
 
             // Cache project selectors.
             cache_local_signatures(&output)?;
@@ -118,7 +118,7 @@ impl BuildArgs {
 
             // Only run the `SolidityLinter` if lint on build and no compilation errors.
             if config.lint.lint_on_build && !output.output().errors.iter().any(|e| e.is_error()) {
-                self.lint(&project, &config, self.paths.as_deref())
+                self.lint(&project, &config, self.paths.as_deref(), &mut output)
                     .map_err(|err| eyre!("Lint failed: {err}"))?;
             }
 
@@ -162,32 +162,6 @@ impl BuildArgs {
             // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
             // solc output. This is safe currently as the output is simply dropped.
             Ok(())
-        } else {
-            let format_json = shell::is_json();
-            let compiler = ProjectCompiler::new()
-                .files(files)
-                .dynamic_test_linking(config.dynamic_test_linking)
-                .print_names(self.names)
-                .print_sizes(self.sizes)
-                .ignore_eip_3860(self.ignore_eip_3860)
-                .bail(!format_json);
-
-            let mut output = compiler.compile(&project)?;
-
-            // Cache project selectors.
-            cache_local_signatures(&output)?;
-
-            if format_json && !self.names && !self.sizes {
-                sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
-            }
-
-            // Only run the `SolidityLinter` if lint on build and no compilation errors.
-            if config.lint.lint_on_build && !output.output().errors.iter().any(|e| e.is_error()) {
-                self.lint(&project, &config, self.paths.as_deref(), &mut output)
-                    .map_err(|err| eyre!("Lint failed: {err}"))?;
-            }
-
-            Ok(output)
         }
     }
 
