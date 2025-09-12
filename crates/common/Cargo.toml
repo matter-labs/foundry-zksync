@@ -49,6 +49,7 @@ alloy-zksync.workspace = true
 
 revm.workspace = true
 
+solar.workspace = true
 solar-parse.workspace = true
 solar-sema.workspace = true
 
