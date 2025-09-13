@@ -11,7 +11,11 @@ use foundry_test_utils::foundry_compilers::{
 };
 
 use foundry_zksync_compilers::{
-    artifacts::{contract::Contract, error::Error},
+    artifacts::{
+        contract::Contract,
+        error::Error,
+        output_selection::{FileOutputSelection, OutputSelection, OutputSelectionFlag},
+    },
     compilers::{
         artifact_output::zk::ZkArtifactOutput,
         zksolc::{
@@ -24,7 +28,7 @@ use foundry_zksync_compilers::{
 use semver::Version;
 
 #[test]
-fn zksync_can_compile_dapp_sample() {
+fn test_zk_can_compile_dapp_sample() {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
@@ -55,7 +59,7 @@ fn zksync_can_compile_dapp_sample() {
 }
 
 #[test]
-fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
+fn test_zk_can_compile_dapp_sample_with_supported_zksolc_versions() {
     for version in ZkSolc::zksolc_supported_versions() {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data/dapp-sample");
         let paths = ProjectPathsConfig::builder().sources(root.join("src")).lib(root.join("lib"));
@@ -82,7 +86,7 @@ fn zksync_can_compile_dapp_sample_with_supported_zksolc_versions() {
 }
 
 #[test]
-fn zksync_can_set_hash_type_with_supported_versions() {
+fn test_zk_can_set_hash_type_with_supported_versions() {
     for version in ZkSolc::zksolc_supported_versions() {
         let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
         project.project_mut().settings.set_zksolc_version(version.clone()).unwrap();
@@ -167,14 +171,14 @@ fn test_zksync_can_compile_contract_with_suppressed_errors(zksolc_version: Versi
 }
 
 #[test]
-fn zksync_can_compile_contract_with_suppressed_errors() {
+fn test_zk_can_compile_contract_with_suppressed_errors() {
     test_zksync_can_compile_contract_with_suppressed_errors(
         ZkSolc::zksolc_latest_supported_version(),
     );
 }
 
 #[test]
-fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_errors() {
+fn test_zk_pre_1_5_7_can_compile_contract_with_suppressed_errors() {
     test_zksync_can_compile_contract_with_suppressed_errors(Version::new(1, 5, 6));
 }
 
@@ -231,14 +235,14 @@ fn test_zksync_can_compile_contract_with_suppressed_warnings(zksolc_version: Ver
 }
 
 #[test]
-fn zksync_can_compile_contract_with_suppressed_warnings() {
+fn test_zk_can_compile_contract_with_suppressed_warnings() {
     test_zksync_can_compile_contract_with_suppressed_warnings(
         ZkSolc::zksolc_latest_supported_version(),
     );
 }
 
 #[test]
-fn zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
+fn test_zk_pre_1_5_7_can_compile_contract_with_suppressed_warnings() {
     test_zksync_can_compile_contract_with_suppressed_warnings(Version::new(1, 5, 6));
 }
 
@@ -297,14 +301,14 @@ fn test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(
 }
 
 #[test]
-fn zksync_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10() {
+fn test_zk_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10() {
     test_zksync_can_compile_contract_with_assembly_create_suppressed_warnings(Version::new(
         1, 5, 10,
     ));
 }
 
 #[test]
-fn zksync_can_compile_dapp_detect_changes_in_libs() {
+fn test_zk_can_compile_dapp_detect_changes_in_libs() {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
@@ -381,7 +385,7 @@ fn zksync_can_compile_dapp_detect_changes_in_libs() {
 }
 
 #[test]
-fn zksync_can_compile_dapp_detect_changes_in_sources() {
+fn test_zk_can_compile_dapp_detect_changes_in_sources() {
     let project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     let src = project
@@ -470,7 +474,7 @@ fn zksync_can_compile_dapp_detect_changes_in_sources() {
 }
 
 #[test]
-fn zksync_can_emit_build_info() {
+fn test_zk_can_emit_build_info() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
     project.project_mut().build_info = true;
     project
@@ -512,7 +516,7 @@ contract B { }
 }
 
 #[test]
-fn zksync_can_clean_build_info() {
+fn test_zk_can_clean_build_info() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     project.project_mut().build_info = true;
@@ -559,7 +563,7 @@ contract B { }
 }
 
 #[test]
-fn zksync_cant_compile_a_file_outside_allowed_paths() {
+fn test_zk_cant_compile_a_file_outside_allowed_paths() {
     // For this test we should create the following directory structure:
     // project_root/
     // ├── outer/
@@ -636,7 +640,7 @@ contract Util {}
 }
 
 #[test]
-fn zksync_can_compile_a_file_in_allowed_paths_successfully() {
+fn test_zk_can_compile_a_file_in_allowed_paths_successfully() {
     let tmp_dir = tempfile::tempdir().unwrap();
     let project_root = tmp_dir.path().to_path_buf();
     let contracts_dir = tempfile::tempdir_in(&project_root).unwrap();
@@ -699,7 +703,7 @@ contract Util {}
 }
 
 #[test]
-fn zksync_can_compile_yul_sample() {
+fn test_zk_can_compile_yul_sample() {
     // let _ = tracing_subscriber::fmt()
     //     .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
     //     .try_init()
@@ -732,7 +736,7 @@ fn zksync_can_compile_yul_sample() {
 }
 
 #[test]
-fn zksync_detects_change_on_cache_if_zksolc_version_changes() {
+fn test_zk_detects_change_on_cache_if_zksolc_version_changes() {
     let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
 
     project.project_mut().build_info = true;
@@ -783,4 +787,182 @@ contract B { }
             bi.build_info.get("output").unwrap()["metadata"]["zksolcVersion"].to_string();
         assert_eq!(zksolc_version, "\"1.5.7\"");
     }
+}
+
+#[test]
+fn test_zk_can_compile_with_ast_output() {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+
+    // Configure output selection to include AST
+    let mut settings = project.project().settings.clone();
+    settings.settings.output_selection = OutputSelection {
+        all: FileOutputSelection {
+            per_file: [OutputSelectionFlag::AST].into(),
+            per_contract: [OutputSelectionFlag::ABI, OutputSelectionFlag::Metadata].into(),
+        },
+    };
+    project.project_mut().settings = settings;
+
+    project
+        .add_source(
+            "TestContract",
+            r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.10;
+
+contract TestContract {
+    uint256 public value;
+    
+    event ValueChanged(uint256 indexed newValue);
+    
+    constructor(uint256 _initialValue) {
+        value = _initialValue;
+    }
+    
+    function setValue(uint256 _newValue) public {
+        value = _newValue;
+        emit ValueChanged(_newValue);
+    }
+    
+    function getValue() public view returns (uint256) {
+        return value;
+    }
+}
+"#,
+        )
+        .unwrap();
+
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+
+    let sources = &compiled.output().sources;
+    let (_path, versioned_files) = sources
+        .0
+        .iter()
+        .find(|(path, _)| {
+            path.file_name().and_then(|name| name.to_str()) == Some("TestContract.sol")
+        })
+        .expect("TestContract.sol source not found");
+
+    let versioned_source_file = &versioned_files[0]; // Get first version
+    let source_file = &versioned_source_file.source_file;
+
+    assert!(source_file.ast.is_some(), "AST should be present in source file");
+    let ast =
+        serde_json::to_value(source_file.ast.as_ref().unwrap()).expect("Failed to serialize AST");
+
+    assert_eq!(ast["nodeType"].as_str(), Some("SourceUnit"), "AST root should be SourceUnit");
+    assert!(ast["src"].is_string(), "AST should have src field");
+    assert!(ast["nodes"].is_array(), "AST should have nodes array");
+
+    let nodes = ast["nodes"].as_array().expect("nodes should be array");
+    assert!(!nodes.is_empty(), "AST nodes should not be empty");
+
+    // Find the contract definition node
+    let contract_node = nodes
+        .iter()
+        .find(|node| {
+            node["nodeType"].as_str() == Some("ContractDefinition")
+                && node["name"].as_str() == Some("TestContract")
+        })
+        .expect("Should find TestContract definition in AST");
+
+    assert!(contract_node["src"].is_string(), "Contract node should have src field");
+    assert!(contract_node["nodes"].is_array(), "Contract should have nodes array");
+
+    let contract_nodes = contract_node["nodes"].as_array().expect("Contract nodes should be array");
+
+    let has_constructor = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("FunctionDefinition")
+            && node["kind"].as_str() == Some("constructor")
+    });
+    assert!(has_constructor, "Should find constructor in AST");
+
+    let has_set_value_function = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("FunctionDefinition")
+            && node["name"].as_str() == Some("setValue")
+    });
+    assert!(has_set_value_function, "Should find setValue function in AST");
+
+    let has_value_variable = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("VariableDeclaration")
+            && node["name"].as_str() == Some("value")
+    });
+    assert!(has_value_variable, "Should find value variable in AST");
+
+    let has_event = contract_nodes.iter().any(|node| {
+        node["nodeType"].as_str() == Some("EventDefinition")
+            && node["name"].as_str() == Some("ValueChanged")
+    });
+    assert!(has_event, "Should find ValueChanged event in AST");
+}
+
+#[test]
+fn test_zk_ast_available_in_sources() {
+    let mut project = TempProject::<ZkSolcCompiler, ZkArtifactOutput>::dapptools().unwrap();
+
+    // Configure output selection to include AST
+    let mut settings = project.project().settings.clone();
+    settings.settings.output_selection = OutputSelection {
+        all: FileOutputSelection {
+            per_file: [OutputSelectionFlag::AST].into(),
+            per_contract: [OutputSelectionFlag::ABI].into(),
+        },
+    };
+    project.project_mut().settings = settings;
+
+    project
+        .add_source(
+            "SimpleAstTest",
+            r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.10;
+
+contract SimpleAstTest {
+    uint256 public counter;
+    
+    function increment() public {
+        counter += 1;
+    }
+}
+"#,
+        )
+        .unwrap();
+
+    let compiled = project.compile().unwrap();
+    compiled.assert_success();
+
+    let sources = &compiled.output().sources;
+    let (_path, versioned_files) = sources
+        .0
+        .iter()
+        .find(|(path, _)| {
+            path.file_name().and_then(|name| name.to_str()) == Some("SimpleAstTest.sol")
+        })
+        .expect("SimpleAstTest.sol source not found");
+
+    let versioned_source_file = &versioned_files[0]; // Get first version
+    let source_file = &versioned_source_file.source_file;
+
+    assert!(source_file.ast.is_some(), "AST should be present in source file");
+    let ast =
+        serde_json::to_value(source_file.ast.as_ref().unwrap()).expect("Failed to serialize AST");
+
+    assert_eq!(ast["nodeType"].as_str(), Some("SourceUnit"));
+
+    let nodes = ast["nodes"].as_array().expect("AST should have nodes");
+    let contract_node = nodes
+        .iter()
+        .find(|node| {
+            node["nodeType"].as_str() == Some("ContractDefinition")
+                && node["name"].as_str() == Some("SimpleAstTest")
+        })
+        .expect("Should find SimpleAstTest in AST");
+
+    let contract_elements = contract_node["nodes"].as_array().expect("Contract should have nodes");
+    let has_counter_var = contract_elements.iter().any(|node| {
+        node["nodeType"].as_str() == Some("VariableDeclaration")
+            && node["name"].as_str() == Some("counter")
+    });
+    assert!(has_counter_var, "Should find counter variable in AST");
 }
