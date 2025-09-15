@@ -1221,6 +1221,10 @@ impl Cheatcodes {
                     let has_delegation = !active_delegation.is_empty();
                     let has_blob_sidecar = active_blob_sidecar.is_some();
 
+                    let input = TransactionInput::new(call.input.bytes(ecx));
+                    // Ensure account is touched.
+                    ecx.journaled_state.touch(broadcast.new_origin);
+
                     self.strategy.runner.record_broadcastable_call_transactions(
                         self.strategy.context.as_mut(),
                         self.config.clone(),
@@ -1970,6 +1974,8 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
             if curr_depth == broadcast.depth {
                 input.set_caller(broadcast.new_origin);
                 let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx, input.gas_limit());
+                // Ensure account is touched.
+                ecx.journaled_state.touch(broadcast.new_origin);
 
                 let account = &ecx.journaled_state.inner.state()[&broadcast.new_origin];
                 self.broadcastable_transactions.push_back(BroadcastableTransaction {
