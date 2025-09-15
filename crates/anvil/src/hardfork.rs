@@ -59,7 +59,6 @@ pub fn spec_id_from_ethereum_hardfork(hardfork: EthereumHardfork) -> SpecId {
         | EthereumHardfork::Bpo3
         | EthereumHardfork::Bpo4
         | EthereumHardfork::Bpo5 => unimplemented!(),
-        f => unreachable!("unimplemented {}", f),
     }
 }
 
@@ -76,7 +75,6 @@ pub fn spec_id_from_optimism_hardfork(hardfork: OpHardfork) -> OpSpecId {
         OpHardfork::Isthmus => OpSpecId::ISTHMUS,
         OpHardfork::Interop => OpSpecId::INTEROP,
         OpHardfork::Jovian => OpSpecId::ISTHMUS,
-        f => unreachable!("unimplemented {}", f),
     }
 }
 
