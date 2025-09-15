@@ -156,22 +156,24 @@ foundry-zksync-compilers:
     dual_compiled_contracts::tests::find_by_path
     dual_compiled_contracts::tests::find_nothing
 foundry-zksync-compilers::zksync_tests:
-    zksync_can_clean_build_info
-    zksync_can_compile_a_file_in_allowed_paths_successfully
-    zksync_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10
-    zksync_can_compile_contract_with_suppressed_errors
-    zksync_can_compile_contract_with_suppressed_warnings
-    zksync_can_compile_dapp_detect_changes_in_libs
-    zksync_can_compile_dapp_detect_changes_in_sources
-    zksync_can_compile_dapp_sample
-    zksync_can_compile_dapp_sample_with_supported_zksolc_versions
-    zksync_can_compile_yul_sample
-    zksync_can_emit_build_info
-    zksync_can_set_hash_type_with_supported_versions
-    zksync_cant_compile_a_file_outside_allowed_paths
-    zksync_detects_change_on_cache_if_zksolc_version_changes
-    zksync_pre_1_5_7_can_compile_contract_with_suppressed_errors
-    zksync_pre_1_5_7_can_compile_contract_with_suppressed_warnings
+    test_zk_ast_available_in_sources
+    test_zk_can_clean_build_info
+    test_zk_can_compile_a_file_in_allowed_paths_successfully
+    test_zk_can_compile_contract_with_assembly_create_suppressed_warnings_1_5_10
+    test_zk_can_compile_contract_with_suppressed_errors
+    test_zk_can_compile_contract_with_suppressed_warnings
+    test_zk_can_compile_dapp_detect_changes_in_libs
+    test_zk_can_compile_dapp_detect_changes_in_sources
+    test_zk_can_compile_dapp_sample
+    test_zk_can_compile_dapp_sample_with_supported_zksolc_versions
+    test_zk_can_compile_with_ast_output
+    test_zk_can_compile_yul_sample
+    test_zk_can_emit_build_info
+    test_zk_can_set_hash_type_with_supported_versions
+    test_zk_cant_compile_a_file_outside_allowed_paths
+    test_zk_detects_change_on_cache_if_zksolc_version_changes
+    test_zk_pre_1_5_7_can_compile_contract_with_suppressed_errors
+    test_zk_pre_1_5_7_can_compile_contract_with_suppressed_warnings
 foundry-zksync-core:
     cheatcodes::tests::test_etch_panics_when_bytecode_not_aligned_on_32_bytes
     convert::test::test_160_conversion
