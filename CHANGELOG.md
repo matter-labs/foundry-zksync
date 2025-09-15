@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.28](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.27...foundry-zksync-v0.0.28) (2025-09-15)
+
+
+### Bug Fixes
+
+* trigger binaries gen even if some aux release-please step failed ([#1161](https://github.com/matter-labs/foundry-zksync/issues/1161)) ([1444be1](https://github.com/matter-labs/foundry-zksync/commit/1444be108de16681fcdc6b0c0a7506a14486bb8b))
+
 ## [0.0.27](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.26...foundry-zksync-v0.0.27) (2025-09-12)
 
 
