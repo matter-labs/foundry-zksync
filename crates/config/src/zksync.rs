@@ -39,6 +39,9 @@ pub struct ZkSyncConfig {
     /// Start VM in zkVM mode
     pub startup: bool,
 
+    /// Whether to use EVM interpreter.
+    pub evm_interpreter: bool,
+
     /// The zkSolc instance to use if any.
     pub zksolc: Option<SolcReq>,
 
@@ -87,6 +90,7 @@ impl Default for ZkSyncConfig {
         Self {
             compile: false,
             startup: false,
+            evm_interpreter: false,
             zksolc: Default::default(),
             solc_path: Default::default(),
             hash_type: Default::default(),
@@ -108,6 +112,11 @@ impl ZkSyncConfig {
     /// Returns true if zk mode is enabled and it if tests should be run in zk mode
     pub fn run_in_zk_mode(&self) -> bool {
         self.compile && self.startup
+    }
+
+    /// Returns true if zk mode is enabled, if tests should be run in zk mode, and if EVM interpreter is enabled.
+    pub fn run_in_zk_evm_interpreter_mode(&self) -> bool {
+        self.run_in_zk_mode() && self.evm_interpreter
     }
 
     /// Returns true if contracts should be compiled for zk

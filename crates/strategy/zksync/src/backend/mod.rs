@@ -10,14 +10,17 @@ pub use self::{context::ZksyncBackendStrategyContext, runner::ZksyncBackendStrat
 /// Create ZKsync strategy for [BackendStrategy].
 pub trait ZksyncBackendStrategyBuilder {
     /// Create new zksync strategy.
-    fn new_zksync() -> Self;
+    fn new_zksync(evm_interpreter: bool) -> Self;
 }
 
 impl ZksyncBackendStrategyBuilder for BackendStrategy {
-    fn new_zksync() -> Self {
+    fn new_zksync(evm_interpreter: bool) -> Self {
         Self {
             runner: &ZksyncBackendStrategyRunner,
-            context: Box::new(ZksyncBackendStrategyContext::default()),
+            context: Box::new(ZksyncBackendStrategyContext{
+                evm_interpreter,
+                ..Default::default()
+            }),
         }
     }
 }

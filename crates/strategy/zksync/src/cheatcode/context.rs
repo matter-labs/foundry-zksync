@@ -59,10 +59,13 @@ pub struct ZksyncCheatcodeInspectorStrategyContext {
     /// Mark the last recorded account access for removal, on CALL/CREATE-end.
     /// This is a record inserted by revm's cheatcode inspector on CALL/CREATE-begin.
     pub remove_recorded_access_at: Option<usize>,
+
+    /// Whether to use EVM interpreter.
+    pub evm_interpreter: bool,
 }
 
 impl ZksyncCheatcodeInspectorStrategyContext {
-    pub fn new(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv) -> Self {
+    pub fn new(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv, evm_interpreter: bool) -> Self {
         // We add the empty bytecode manually so it is correctly translated in zk mode.
         // This is used in many places in foundry, e.g. in cheatcode contract's account code.
         let empty_bytes = Bytes::from_static(&[0]);
@@ -120,6 +123,7 @@ impl ZksyncCheatcodeInspectorStrategyContext {
             set_deployer_call_input_factory_deps: Default::default(),
             zk_env,
             remove_recorded_access_at: Default::default(),
+            evm_interpreter,
         }
     }
 }

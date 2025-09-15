@@ -13,6 +13,9 @@ pub struct ZksyncBackendStrategyContext {
     pub(super) persistent_immutable_keys: HashMap<Address, HashSet<U256>>,
     /// Store persisted factory dependencies.
     pub(super) persisted_factory_deps: HashMap<H256, Vec<u8>>,
+    /// Whether to use EVM interpreter
+    #[allow(dead_code)]
+    pub(super) evm_interpreter: bool,
 }
 
 impl BackendStrategyContext for ZksyncBackendStrategyContext {
@@ -40,4 +43,6 @@ pub(crate) struct ZksyncInspectContext {
     pub paymaster_data: Option<PaymasterParams>,
     /// Zksync environment.
     pub zk_env: ZkEnv,
+    /// Use EVM interpreter.
+    pub  evm_interpreter: bool,
 }

@@ -5,21 +5,20 @@ use alloy_primitives::{Address, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Ok, Result};
 use foundry_evm::{
-    Env, InspectorExt,
     backend::{
-        Backend, DatabaseExt, JournaledState,
         strategy::{BackendStrategyContext, BackendStrategyRunnerExt},
-        update_state,
+        update_state, Backend, DatabaseExt, JournaledState,
     },
+    Env, InspectorExt,
 };
 use foundry_evm_core::{
-    AsEnvMut as _,
     backend::{
-        BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
         strategy::{BackendStrategyForkInfo, BackendStrategyRunner, EvmBackendStrategyRunner},
+        BackendInner, Fork, ForkDB, FoundryEvmInMemoryDB,
     },
+    AsEnvMut as _,
 };
-use revm::{DatabaseCommit, context::result::ResultAndState, primitives::HashSet};
+use revm::{context::result::ResultAndState, primitives::HashSet, DatabaseCommit};
 use serde::{Deserialize, Serialize};
 
 use crate::backend::{
@@ -56,6 +55,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             env.tx.clone(),
             &inspect_ctx.zk_env,
             backend,
+            inspect_ctx.evm_interpreter,
         );
 
         let ctx = get_context(backend.strategy.context.as_mut());
@@ -170,6 +170,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
                 env.tx.clone(),
                 &inspect_ctx.zk_env,
                 backend,
+                inspect_ctx.evm_interpreter,
             );
 
             let ctx = get_context(backend.strategy.context.as_mut());

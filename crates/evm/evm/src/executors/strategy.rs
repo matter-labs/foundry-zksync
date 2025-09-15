@@ -9,16 +9,16 @@ use foundry_cheatcodes::strategy::{
 use foundry_compilers::ProjectCompileOutput;
 use foundry_config::Config;
 use foundry_evm_core::{
-    Env,
-    backend::{Backend, BackendResult, CowBackend, strategy::BackendStrategy},
+    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
+    Env,
 };
 use foundry_linking::LinkerError;
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::DualCompiledContracts,
 };
-use revm::{DatabaseRef, context::result::ResultAndState};
+use revm::{context::result::ResultAndState, DatabaseRef};
 
 use crate::inspectors::InspectorStack;
 
@@ -81,7 +81,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
     fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256>;
 
     fn set_nonce(&self, executor: &mut Executor, address: Address, nonce: u64)
-    -> BackendResult<()>;
+        -> BackendResult<()>;
 
     fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64>;
 
@@ -124,7 +124,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState>;
 
-    fn new_backend_strategy(&self) -> BackendStrategy;
+    fn new_backend_strategy(&self, ctx: &dyn ExecutorStrategyContext) -> BackendStrategy;
     fn new_cheatcode_inspector_strategy(
         &self,
         ctx: &dyn ExecutorStrategyContext,
@@ -260,7 +260,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         backend.inspect(env, inspector, Box::new(()))
     }
 
-    fn new_backend_strategy(&self) -> BackendStrategy {
+    fn new_backend_strategy(&self, _ctx: &dyn ExecutorStrategyContext) -> BackendStrategy {
         BackendStrategy::new_evm()
     }
 

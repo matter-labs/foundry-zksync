@@ -14041,7 +14041,7 @@ name = "zkevm_opcode_defs"
 version = "0.152.3"
 source = "git+https://github.com/Moonsong-Labs/zksync-protocol?branch=sha2-v0.152.3#5b5ba7fe13d6df186dc476aec99e1ee6f9299bff"
 dependencies = [
- "bitflags 2.9.3",
+ "bitflags 2.9.4",
  "blake2",
  "ethereum-types",
  "k256 0.13.4 (registry+https://github.com/rust-lang/crates.io-index)",

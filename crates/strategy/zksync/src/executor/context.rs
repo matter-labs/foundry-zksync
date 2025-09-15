@@ -13,6 +13,7 @@ pub struct ZksyncExecutorStrategyContext {
     pub(super) compilation_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
     pub(super) dual_compiled_contracts: DualCompiledContracts,
     pub(super) zk_env: ZkEnv,
+    pub(super) evm_interpreter: bool,
 }
 
 impl ExecutorStrategyContext for ZksyncExecutorStrategyContext {

@@ -1,18 +1,18 @@
-use alloy_evm::{EvmEnv, eth::EthEvmContext};
+use alloy_evm::{eth::EthEvmContext, EvmEnv};
 use alloy_primitives::{hex, map::HashMap};
 use itertools::Itertools;
 use revm::{
-    Database, Journal,
     context::{CreateScheme, JournalTr, TransactTo, TxEnv},
     context_interface::result::ResultAndState,
     interpreter::{CallInputs, CallScheme, CallValue},
     primitives::{Address, B256, U256 as rU256},
+    Database, Journal,
 };
 use tracing::{debug, info};
 use zksync_basic_types::H256;
 use zksync_types::{
-    CONTRACT_DEPLOYER_ADDRESS, CREATE2_FACTORY_ADDRESS, U256, ethabi, fee::Fee, l2::L2Tx,
-    transaction_request::PaymasterParams,
+    ethabi, fee::Fee, l2::L2Tx, transaction_request::PaymasterParams, CONTRACT_DEPLOYER_ADDRESS,
+    CREATE2_FACTORY_ADDRESS, U256,
 };
 use zksync_vm_interface::Call;
 
@@ -23,7 +23,7 @@ use crate::{
     convert::{ConvertAddress, ConvertH160, ConvertRU256, ConvertU256},
     vm::{
         db::ZKVMData,
-        inspect::{ZKVMExecutionResult, ZKVMResult, gas_params, inspect, inspect_as_batch},
+        inspect::{gas_params, inspect, inspect_as_batch, ZKVMExecutionResult, ZKVMResult},
         tracers::cheatcode::{CallContext, CheatcodeTracerContext},
     },
 };
@@ -39,6 +39,7 @@ pub fn transact<'a, DB>(
     tx: TxEnv,
     zk_env: &ZkEnv,
     db: &'a mut DB,
+    evm_interpreter: bool,
 ) -> eyre::Result<(ResultAndState, Vec<Call>)>
 where
     DB: Database + ?Sized,
@@ -103,6 +104,7 @@ where
         is_create,
         is_static: false,
         record_storage_accesses: false,
+        evm_interpreter,
     };
 
     let mut ccx = CheatcodeTracerContext {
@@ -201,21 +203,42 @@ where
     let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
-    let tx = L2Tx::new(
-        Some(CONTRACT_DEPLOYER_ADDRESS),
-        create_input,
-        (nonce as u32).into(),
-        Fee {
-            gas_limit,
-            max_fee_per_gas,
-            max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
-            gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
-        },
-        caller.to_h160(),
-        value,
-        factory_deps,
-        paymaster_params,
-    );
+    let tx = if ccx.evm_interpreter {
+        let mut tx = L2Tx::new(
+            None,
+            create_input,
+            (nonce as u32).into(),
+            Fee {
+                gas_limit,
+                max_fee_per_gas,
+                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
+            },
+            caller.to_h160(),
+            value,
+            Default::default(),
+            Default::default(),
+        );
+        tx.common_data.transaction_type = zksync_types::l2::TransactionType::EIP1559Transaction;
+
+        tx
+    } else {
+        L2Tx::new(
+            Some(CONTRACT_DEPLOYER_ADDRESS),
+            create_input,
+            (nonce as u32).into(),
+            Fee {
+                gas_limit,
+                max_fee_per_gas,
+                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
+            },
+            caller.to_h160(),
+            value,
+            factory_deps,
+            paymaster_params,
+        )
+    };
 
     let call_ctx = CallContext {
         tx_caller: ecx.tx.caller,
@@ -230,6 +253,7 @@ where
         is_create: true,
         is_static: false,
         record_storage_accesses: ccx.record_storage_accesses,
+        evm_interpreter: ccx.evm_interpreter,
     };
 
     inspect_as_batch(tx, ecx, &mut ccx, call_ctx)
@@ -265,24 +289,48 @@ where
     let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params);
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
-    let tx = L2Tx::new(
-        Some(call.bytecode_address.to_h160()),
-        input.to_vec(),
-        (nonce as u32).into(),
-        Fee {
-            gas_limit,
-            max_fee_per_gas,
-            max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
-            gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
-        },
-        caller.to_h160(),
-        match call.value {
-            CallValue::Transfer(value) => value.to_u256(),
-            _ => U256::zero(),
-        },
-        factory_deps,
-        paymaster_params,
-    );
+    let tx = if ccx.evm_interpreter {
+        let mut tx = L2Tx::new(
+            Some(call.bytecode_address.to_h160()),
+            input.to_vec(),
+            (nonce as u32).into(),
+            Fee {
+                gas_limit,
+                max_fee_per_gas,
+                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
+            },
+            caller.to_h160(),
+            match call.value {
+                CallValue::Transfer(value) => value.to_u256(),
+                _ => U256::zero(),
+            },
+            Default::default(),
+            Default::default(),
+        );
+        tx.common_data.transaction_type = zksync_types::l2::TransactionType::EIP1559Transaction;
+
+        tx
+    } else {
+        L2Tx::new(
+            Some(call.bytecode_address.to_h160()),
+            input.to_vec(),
+            (nonce as u32).into(),
+            Fee {
+                gas_limit,
+                max_fee_per_gas,
+                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
+            },
+            caller.to_h160(),
+            match call.value {
+                CallValue::Transfer(value) => value.to_u256(),
+                _ => U256::zero(),
+            },
+            factory_deps,
+            paymaster_params,
+        )
+    };
 
     // address and caller are specific to the type of call:
     // Call | StaticCall => { address: to, caller: contract.address }
@@ -304,6 +352,7 @@ where
         is_create: false,
         is_static: call.is_static,
         record_storage_accesses: ccx.record_storage_accesses,
+        evm_interpreter: ccx.evm_interpreter,
     };
 
     inspect(tx, ecx, &mut ccx, call_ctx)

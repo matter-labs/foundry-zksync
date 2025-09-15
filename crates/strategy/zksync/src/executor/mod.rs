@@ -12,14 +12,17 @@ pub use self::{
 /// Create ZKsync strategy for [ExecutorStrategy].
 pub trait ZksyncExecutorStrategyBuilder {
     /// Create new zksync strategy.
-    fn new_zksync() -> Self;
+    fn new_zksync(evm_interpreter: bool) -> Self;
 }
 
 impl ZksyncExecutorStrategyBuilder for ExecutorStrategy {
-    fn new_zksync() -> Self {
+    fn new_zksync(evm_interpreter: bool) -> Self {
         Self {
             runner: &ZksyncExecutorStrategyRunner,
-            context: Box::new(ZksyncExecutorStrategyContext::default()),
+            context: Box::new(ZksyncExecutorStrategyContext{
+                evm_interpreter,
+                ..Default::default()
+            }),
         }
     }
 }

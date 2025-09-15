@@ -1,56 +1,56 @@
 use std::sync::Arc;
 
-use alloy_primitives::{Address, B256, Bytes, TxKind, U256, map::HashMap};
+use alloy_primitives::{map::HashMap, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::{
-    BlobTransactionSidecar,
     request::{TransactionInput, TransactionRequest},
     serde_helpers::WithOtherFields,
+    BlobTransactionSidecar,
 };
 use foundry_cheatcodes::{
-    Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, Result,
-    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
     journaled_account,
     strategy::{
         CheatcodeInspectorStrategyContext, CheatcodeInspectorStrategyExt,
         CheatcodeInspectorStrategyRunner, EvmCheatcodeInspectorStrategyRunner,
     },
+    Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Ecx, Result,
+    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
-    Env,
     backend::{DatabaseError, LocalForkId},
     constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE},
+    Env,
 };
 use foundry_evm_core::backend::DatabaseExt;
 use foundry_zksync_core::{
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, PaymasterParams,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key,
     state::parse_full_nonce,
+    PaymasterParams, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use itertools::Itertools;
 use revm::{
     bytecode::opcode as op,
     context::{
-        CreateScheme, JournalTr,
         result::{ExecutionResult, Output},
+        CreateScheme, JournalTr,
     },
     context_interface::transaction::SignedAuthorization,
     interpreter::{
-        CallInput, CallInputs, CallOutcome, CreateOutcome, Gas, InstructionResult, Interpreter,
-        InterpreterResult, interpreter_types::Jumps,
+        interpreter_types::Jumps, CallInput, CallInputs, CallOutcome, CreateOutcome, Gas,
+        InstructionResult, Interpreter, InterpreterResult,
     },
     primitives::{HashSet, KECCAK_EMPTY},
     state::{AccountInfo, Bytecode, EvmStorageSlot},
 };
 use tracing::{debug, error, info, trace, warn};
 use zksync_types::{
-    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
     block::{pack_block_info, unpack_block_info},
     utils::{decompose_full_nonce, nonces_to_full_nonce},
+    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
 };
 
 use crate::cheatcode::context::ZksyncCheatcodeInspectorStrategyContext;
@@ -580,27 +580,35 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
         info!("running create in zkEVM");
 
-        let find_contract = ctx
-            .dual_compiled_contracts
-            .find_bytecode(&init_code.0)
-            .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
+        let zk_create = if ctx.evm_interpreter {
+            foundry_zksync_core::vm::ZkCreateInputs {
+                value: input.value().to_u256(),
+                msg_sender: input.caller(),
+                create_input: init_code.to_vec(),
+                factory_deps: Default::default(),
+            }
+        } else {
+            let find_contract = ctx
+                .dual_compiled_contracts
+                .find_bytecode(&init_code.0)
+                .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
-        let constructor_args = find_contract.constructor_args();
-        let info = find_contract.info();
-        let contract = find_contract.contract();
+            let constructor_args = find_contract.constructor_args();
+            let info = find_contract.info();
+            let contract = find_contract.contract();
 
-        let zk_create_input = foundry_zksync_core::encode_create_params(
-            &input.scheme().unwrap_or(CreateScheme::Create),
-            contract.zk_bytecode_hash,
-            constructor_args.to_vec(),
-        );
+            let zk_create_input = foundry_zksync_core::encode_create_params(
+                &input.scheme().unwrap_or(CreateScheme::Create),
+                contract.zk_bytecode_hash,
+                constructor_args.to_vec(),
+            );
 
-        let mut factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(contract);
-        let injected_factory_deps = ctx
-            .zk_use_factory_deps
-            .iter()
-            .flat_map(|contract| {
-                let artifact_code = utils::get_artifact_code(
+            let mut factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(contract);
+            let injected_factory_deps =
+                ctx.zk_use_factory_deps
+                    .iter()
+                    .flat_map(|contract| {
+                        let artifact_code = utils::get_artifact_code(
                     &ctx.dual_compiled_contracts,
                     ctx.using_zk_vm,
                     &state.config,
@@ -612,15 +620,25 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     panic!("failed to get bytecode for injected factory deps contract {contract}")
                 })
                 .to_vec();
-                let res = ctx.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
-                ctx.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
-            })
-            .collect_vec();
-        factory_deps.extend(injected_factory_deps);
+                        let res =
+                            ctx.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
+                        ctx.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
+                    })
+                    .collect_vec();
+            factory_deps.extend(injected_factory_deps);
 
-        // NOTE(zk): Clear injected factory deps so that they are not sent on further transactions
-        ctx.zk_use_factory_deps.clear();
-        tracing::debug!(contract = info.name, "using dual compiled contract");
+            // NOTE(zk): Clear injected factory deps so that they are not sent on further
+            // transactions
+            ctx.zk_use_factory_deps.clear();
+            tracing::debug!(contract = info.name, "using dual compiled contract");
+
+            foundry_zksync_core::vm::ZkCreateInputs {
+                value: input.value().to_u256(),
+                msg_sender: input.caller(),
+                create_input: zk_create_input,
+                factory_deps,
+            }
+        };
 
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
@@ -630,13 +648,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
             record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
-        };
-
-        let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
-            value: input.value().to_u256(),
-            msg_sender: input.caller(),
-            create_input: zk_create_input,
-            factory_deps,
+            evm_interpreter: ctx.evm_interpreter,
         };
 
         let mut gas = Gas::new(input.gas_limit());
@@ -826,6 +838,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
             record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
+            evm_interpreter: ctx.evm_interpreter,
         };
 
         let mut gas = Gas::new(call.gas_limit);
