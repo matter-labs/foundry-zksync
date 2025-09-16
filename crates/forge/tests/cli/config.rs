@@ -1964,8 +1964,7 @@ contract Simple {
     uint public value = 42;
 }
 "#,
-    )
-    .unwrap();
+    );
 
     prj.update_config(|config| {
         config.evm_version = EvmVersion::Cancun;
