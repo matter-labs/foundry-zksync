@@ -745,7 +745,7 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
             sh_println!("{}", serde_json::to_string_pretty(&tx)?)?
         }
         CastSubcommand::RecoverAuthority { auth } => {
-            let auth: SignedAuthorization = serde_json::from_str(&auth).unwrap();
+            let auth: SignedAuthorization = serde_json::from_str(&auth)?;
             sh_println!("{}", auth.recover_authority()?)?;
         }
         CastSubcommand::TxPool { command } => command.run().await?,
