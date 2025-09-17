@@ -2625,23 +2625,6 @@ fn disallowed_mem_write(
     ));
 }
 
-<<<<<<< HEAD
-// Determines if the gas limit on a given call was manually set in the script and should therefore
-// not be overwritten by later estimations
-pub fn check_if_fixed_gas_limit(ecx: &Ecx, call_gas_limit: u64) -> bool {
-    // If the gas limit was not set in the source code it is set to the estimated gas left at the
-    // time of the call, which should be rather close to configured gas limit.
-    // TODO: Find a way to reliably make this determination.
-    // For example by generating it in the compilation or EVM simulation process
-    ecx.tx.gas_limit > ecx.block.gas_limit &&
-        call_gas_limit <= ecx.block.gas_limit
-        // Transfers in forge scripts seem to be estimated at 2300 by revm leading to "Intrinsic
-        // gas too low" failure when simulated on chain
-        && call_gas_limit > 2300
-}
-
-=======
->>>>>>> 03e16d8df4 (fix(forge): determine if broadcasted tx is fixed gas limit using opcodes (#11599))
 /// Returns true if the kind of account access is a call.
 fn access_is_call(kind: crate::Vm::AccountAccessKind) -> bool {
     matches!(
