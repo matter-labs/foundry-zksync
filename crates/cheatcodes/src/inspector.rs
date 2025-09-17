@@ -1231,13 +1231,13 @@ impl Cheatcodes {
                     let (gas_seen, call_seen) =
                         self.dynamic_gas_limit_sequence.take().unwrap_or_default();
                     // Transaction has fixed gas limit if no GAS opcode seen before CALL opcode.
-                    let mut is_fixed_gas_limit = !(gas_seen && call_seen);
+                    let mut _is_fixed_gas_limit = !(gas_seen && call_seen);
                     // Additional check as transfers in forge scripts seem to be estimated at 2300
                     // by revm leading to "Intrinsic gas too low" failure when simulated on chain.
                     if call.gas_limit < 21_000 {
-                        is_fixed_gas_limit = false;
+                        _is_fixed_gas_limit = false;
                     }
-                    let input = TransactionInput::new(call.input.bytes(ecx));
+                    let _input = TransactionInput::new(call.input.bytes(ecx));
                     // Ensure account is touched.
                     ecx.journaled_state.touch(broadcast.new_origin);
 

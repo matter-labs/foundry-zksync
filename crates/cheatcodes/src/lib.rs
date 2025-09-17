@@ -51,7 +51,7 @@ pub use evm::{DealRecord, mock::mock_call};
 mod fs;
 
 mod inspector;
-pub use inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit};
+pub use inspector::{CommonCreateInput, Ecx};
 
 mod json;
 

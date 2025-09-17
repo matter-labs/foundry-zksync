@@ -1258,6 +1258,7 @@ impl CastSubcommand {
             Self::DAEstimate(_) => "da-estimate",
             Self::RecoverAuthority { .. } => "recover-authority",
             Self::Pad { .. } => "pad",
+            Self::AbiEncodeEvent { .. } => "abi-encode-event",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()
     }

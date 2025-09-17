@@ -10,7 +10,7 @@ use crate::{
 };
 use alloy_primitives::{Address, Bytes, U256, map::HashMap};
 use clap::{Parser, ValueEnum, ValueHint};
-use eyre::{Context, Result};
+use eyre::Result;
 use foundry_cli::utils::{self, LoadConfig, STATIC_FUZZ_SEED};
 use foundry_common::{compile::ProjectCompiler, errors::convert_solar_errors};
 use foundry_compilers::{

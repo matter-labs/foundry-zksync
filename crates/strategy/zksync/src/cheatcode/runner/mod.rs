@@ -193,8 +193,14 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let ctx = ctx_zk;
 
-        let is_fixed_gas_limit =
-            foundry_cheatcodes::check_if_fixed_gas_limit(&ecx_inner, input.gas_limit());
+        // Use same logic as upstream removed function
+        let is_fixed_gas_limit = if input.gas_limit() < 21_000 {
+            false
+        } else {
+            ecx_inner.tx.gas_limit > ecx_inner.block.gas_limit &&
+                input.gas_limit() <= ecx_inner.block.gas_limit &&
+                input.gas_limit() > 2300
+        };
 
         let init_code = input.init_code();
         let to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
@@ -323,8 +329,19 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let ctx = ctx_zk;
 
-        let is_fixed_gas_limit =
-            foundry_cheatcodes::check_if_fixed_gas_limit(&ecx_inner, call.gas_limit);
+        // Calculate gas limit type using opcode-based approach (similar to upstream)
+        // This logic matches what was moved from check_if_fixed_gas_limit to opcode detection
+        // For ZKsync we need this information for transaction building
+        let is_fixed_gas_limit = if call.gas_limit < 21_000 {
+            false
+        } else {
+            // In the upstream this would be determined by dynamic_gas_limit_sequence opcodes
+            // but that information isn't passed to the strategy, so we use the old heuristic
+            // as a fallback for ZKsync compatibility
+            ecx_inner.tx.gas_limit > ecx_inner.block.gas_limit &&
+                call.gas_limit <= ecx_inner.block.gas_limit &&
+                call.gas_limit > 2300
+        };
 
         let tx_nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner);
 
