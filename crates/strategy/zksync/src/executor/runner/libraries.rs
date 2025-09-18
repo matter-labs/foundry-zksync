@@ -222,6 +222,7 @@ impl ZksyncExecutorStrategyRunner {
 
         let ctx = get_context(executor.strategy.context.as_mut());
 
+        // TODO(zk): adapt this to conditionally use EVM interpreter?
         let (code, create_scheme, to) = match kind {
             DeployLibKind::Create(bytes) => {
                 (bytes, CreateScheme::Create, CONTRACT_DEPLOYER_ADDRESS)
@@ -254,7 +255,7 @@ impl ZksyncExecutorStrategyRunner {
         // persist existing paymaster data (TODO(zk): is this needed?)
         let paymaster_data =
             ctx.transaction_context.take().and_then(|metadata| metadata.paymaster_data);
-        let metadata = ZkTransactionMetadata { factory_deps, paymaster_data };
+        let metadata = ZkTransactionMetadata { factory_deps, paymaster_data, force_evm_interpreter: None };
         ctx.transaction_context = Some(metadata.clone());
 
         let result = executor.transact_raw(from, to, create_params.clone(), value)?;

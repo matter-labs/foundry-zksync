@@ -112,6 +112,10 @@ pub struct RunArgs {
     #[arg(long = "zksync")]
     zk_force: bool,
 
+    /// Use ZKsync EVM interpreter.
+    #[arg(long = "zk-evm-interpreter")]
+    zk_evm_interpreter: bool,
+
     /// Disables storage caching entirely.
     /// NOTE(zk) This is needed so tests don't cache anvil-zksync responses, could also be useful
     /// upstream.
@@ -130,6 +134,7 @@ impl RunArgs {
         let evm_opts = figment.extract::<EvmOpts>()?;
         let mut config = Config::from_provider(figment)?.sanitized();
         config.zksync.compile = self.zk_force;
+        config.zksync.evm_interpreter = self.zk_evm_interpreter;
         config.no_storage_caching = self.no_storage_caching;
         let strategy = utils::get_executor_strategy(&config);
 
@@ -311,10 +316,11 @@ impl RunArgs {
                         })?;
                     } else {
                         trace!(tx=?tx.tx_hash(), "executing previous create transaction");
-                        if let Err(error) = executor.deploy_with_env(env.clone(), None) {
+                        // if let Err(error) = executor.deploy_with_env(env.clone(), None) {
+                        if let Err(error) = executor.call_with_env(env.clone()) {
                             match error {
                                 // Reverted transactions should be skipped
-                                EvmError::Execution(_) => (),
+                                // EvmError::Execution(_) => (),
                                 error => {
                                     return Err(error).wrap_err_with(|| {
                                         format!(
@@ -372,7 +378,11 @@ impl RunArgs {
                 TraceResult::try_from(executor.transact_with_env(env))?
             } else {
                 trace!(tx=?tx.tx_hash(), "executing create transaction");
-                TraceResult::try_from(executor.deploy_with_env(env, None))?
+                if self.zk_force {
+                    TraceResult::try_from(executor.transact_with_env(env))?
+                }       else {
+                    TraceResult::try_from(executor.deploy_with_env(env, None))?
+                }
             }
         };
 
@@ -474,8 +484,11 @@ pub fn configure_zksync_tx_env(
     // Set basic transaction fields
     env.tx.caller = outer_tx.initiator_account().to_address();
 
+    let recipient_account = outer_tx.recipient_account();
+    let use_evm_interpreter = Some(recipient_account.is_none());
+
     env.tx.kind = TxKind::Call(
-        outer_tx.recipient_account().expect("recipient_account not found in execute").to_address(),
+        recipient_account.unwrap_or_default().to_address(),
     );
     env.tx.gas_limit = match &outer_tx.common_data {
         ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
@@ -493,10 +506,12 @@ pub fn configure_zksync_tx_env(
         ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
             factory_deps: outer_tx.execute.factory_deps.clone(),
             paymaster_data: Some(common_data.paymaster_params.clone()),
+            force_evm_interpreter: use_evm_interpreter,
         },
         _ => foundry_zksync_core::ZkTransactionMetadata {
             factory_deps: outer_tx.execute.factory_deps.clone(),
             paymaster_data: None,
+            force_evm_interpreter: use_evm_interpreter,
         },
     }
 }

@@ -111,12 +111,14 @@ pub struct ZkTransactionMetadata {
     pub factory_deps: Vec<Vec<u8>>,
     /// Paymaster data for ZK transactions.
     pub paymaster_data: Option<PaymasterParams>,
+    /// Use EVM interpreter overriding the strategy configuration.
+    pub force_evm_interpreter: Option<bool>,
 }
 
 impl ZkTransactionMetadata {
     /// Create a new [`ZkTransactionMetadata`] with the given factory deps
     pub fn new(factory_deps: Vec<Vec<u8>>, paymaster_data: Option<PaymasterParams>) -> Self {
-        Self { factory_deps, paymaster_data }
+        Self { factory_deps, paymaster_data, force_evm_interpreter: None }   // TODO(zk): make it configurable
     }
 }
 /// Estimated gas from a ZK network.
