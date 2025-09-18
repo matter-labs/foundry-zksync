@@ -502,7 +502,6 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env, system_env, storage.clone());
 
-    println!("FINAL TX {l2_tx:?}");
     let tx: Transaction = l2_tx.into();
 
     let call_tracer_result = Arc::default();
