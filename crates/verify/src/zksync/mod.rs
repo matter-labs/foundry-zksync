@@ -297,8 +297,9 @@ impl ZkVerificationProvider {
         if let Some(ref args) = args.constructor_args {
             // Note(zk): Form-encoded API expects constructor args without "0x" prefix
             // Strip "0x" prefix if present for form encoding compatibility
-            if args.starts_with("0x") {
-                return Ok(Some(args[2..].to_string()));
+
+            if let Some(args) = args.strip_prefix("0x") {
+                return Ok(Some(args.to_string()));
             } else {
                 return Ok(Some(args.clone()));
             }
