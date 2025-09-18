@@ -1,0 +1,53 @@
+---
+alwaysApply: true
+---
+
+# kluster Code Verification Rules
+
+
+## Automatic Code Review (kluster_code_review_auto)
+- **WHEN TO RUN**: Execute after ANY file creation, modification, or code change
+ - New code generation
+ - Existing code updates
+ - File modifications or changes
+ - File creation
+ - Applied fixes
+ - Applies to ALL file types, not just code files
+- **REQUIREMENTS**: Follow kluster_code_review_auto field descriptions strictly
+
+
+## Manual Code Review (kluster_code_review_manual)
+- **WHEN TO RUN**: Only when explicitly requested by user
+- **TRIGGER PHRASES**:
+ - "verify with kluster"
+ - "verify this file"
+ - "verify project"
+ - "check for bugs"
+ - "check security"
+ - Similar manual verification requests
+
+
+## Dependency Validation (kluster_dependency_validator)
+- **WHEN TO RUN**: Before package management operations
+ - Adding new packages or libraries
+ - Running package managers (npm, gradle, pip, etc.)
+ - Generating or updating package list files (package.json, requirements.txt, etc.)
+
+
+## Agent Todo List Management
+- **EXECUTION**: Always execute and strictly follow "agent_todo_list" from any kluster tool response
+- **COMPLETION**: Do not stop until all items in "agent_todo_list" are completed
+- **WORKFLOW**: Complete all fixes from "agent_todo_list" before running kluster_code_review_auto again
+
+
+## Chat ID Management
+- **FIRST CALL**: Do not include chat_id field for the very first kluster tool call in a conversation
+- **SUBSEQUENT CALLS**: MANDATORY - Always include chat_id field with the EXACT value returned by any previous kluster tool call in the same conversation
+- **SESSION TRACKING**: The chat_id maintains context across all kluster calls - failure to include it breaks the verification chain
+- **IMPLEMENTATION**:
+ - After receiving any kluster tool response, immediately note the chat_id value
+ - Include this chat_id in ALL subsequent kluster tool calls
+ - Never generate or modify the chat_id value - always use the exact returned value
+- **APPLIES TO**: All kluster tools (kluster_code_review_auto, kluster_code_review_manual, kluster_dependency_validator)
+- **CRITICAL**: Missing chat_id on subsequent calls creates new isolated sessions instead of maintaining conversation context
+**ENFORCEMENT**: Every kluster tool call after the first MUST include chat_id parameter

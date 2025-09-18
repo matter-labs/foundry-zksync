@@ -340,9 +340,14 @@ impl TestArgs {
             .sender(evm_opts.sender)
             .with_fork(evm_opts.get_fork(&config, env.clone()))
             .enable_isolation(evm_opts.isolate)
+            .networks(evm_opts.networks)
             .fail_fast(self.fail_fast)
+<<<<<<< HEAD
             .odyssey(evm_opts.odyssey)
             .build::<MultiCompiler>(project_root, &output, zk_output, env, evm_opts, strategy)?;
+=======
+            .build::<MultiCompiler>(project_root, &output, env, evm_opts)?;
+>>>>>>> 86d5c5b1cd (feat(forge): introduce network custom features, sunset Odyssey (#11675))
 
         let libraries = runner.libraries.clone();
         let mut outcome = self.run_tests(runner, config, verbosity, &filter, &output).await?;

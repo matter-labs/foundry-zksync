@@ -1163,6 +1163,7 @@ dependencies = [
  "foundry-config",
  "foundry-evm",
  "foundry-evm-core",
+ "foundry-evm-networks",
  "foundry-test-utils",
  "futures 0.3.31",
  "hyper 1.7.0",
@@ -4781,6 +4782,8 @@ dependencies = [
  "foundry-debugger",
  "foundry-evm",
  "foundry-evm-core",
+ "foundry-evm-networks",
+ "foundry-linking",
  "foundry-solang-parser",
  "foundry-test-utils",
  "foundry-wallets",
@@ -5429,6 +5432,7 @@ dependencies = [
  "foundry-evm-core",
  "foundry-evm-coverage",
  "foundry-evm-fuzz",
+ "foundry-evm-networks",
  "foundry-evm-traces",
  "foundry-linking",
  "foundry-zksync-compilers",
@@ -5480,6 +5484,7 @@ dependencies = [
  "foundry-common",
  "foundry-config",
  "foundry-evm-abi",
+ "foundry-evm-networks",
  "foundry-fork-db",
  "foundry-test-utils",
  "futures 0.3.31",
@@ -5535,6 +5540,17 @@ dependencies = [
  "serde",
  "thiserror 2.0.16",
  "tracing",
+]
+
+[[package]]
+name = "foundry-evm-networks"
+version = "0.0.29"
+dependencies = [
+ "alloy-evm",
+ "alloy-primitives",
+ "clap",
+ "revm",
+ "serde",
 ]
 
 [[package]]

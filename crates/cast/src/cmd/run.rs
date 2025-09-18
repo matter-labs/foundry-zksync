@@ -96,10 +96,6 @@ pub struct RunArgs {
     #[arg(long, value_name = "NO_RATE_LIMITS", visible_alias = "no-rpc-rate-limit")]
     pub no_rate_limit: bool,
 
-    /// Enables Odyssey features.
-    #[arg(long, alias = "alphanet")]
-    pub odyssey: bool,
-
     /// Use current project artifacts for trace decoding.
     #[arg(long, visible_alias = "la")]
     pub with_local_artifacts: bool,
@@ -189,7 +185,7 @@ impl RunArgs {
         config.fork_block_number = Some(tx_block_number - 1);
 
         let create2_deployer = evm_opts.create2_deployer;
-        let (mut env, fork, chain, odyssey) =
+        let (mut env, fork, chain, networks) =
             TracingExecutor::get_fork_material(&config, evm_opts).await?;
         let mut evm_version = self.evm_version;
 
@@ -236,7 +232,7 @@ impl RunArgs {
             fork,
             evm_version,
             trace_mode,
-            odyssey,
+            networks,
             create2_deployer,
             None,
             strategy,
@@ -453,10 +449,6 @@ impl figment::Provider for RunArgs {
 
     fn data(&self) -> Result<Map<Profile, Dict>, figment::Error> {
         let mut map = Map::new();
-
-        if self.odyssey {
-            map.insert("odyssey".into(), self.odyssey.into());
-        }
 
         if let Some(api_key) = &self.etherscan.key {
             map.insert("etherscan_api_key".into(), api_key.as_str().into());
