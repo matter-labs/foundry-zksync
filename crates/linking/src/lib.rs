@@ -11,6 +11,7 @@ use foundry_compilers::{
     artifacts::{CompactContractBytecodeCow, Libraries},
     contracts::ArtifactContracts,
 };
+use rayon::prelude::*;
 use semver::Version;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -178,7 +179,7 @@ impl<'a> Linker<'a> {
 
         // Link and collect bytecodes for `libs_to_deploy`.
         let libs_to_deploy = libs_to_deploy
-            .into_iter()
+            .into_par_iter()
             .map(|(id, _)| {
                 Ok(self.link(id, &libraries)?.get_bytecode_bytes().unwrap().into_owned())
             })
@@ -202,7 +203,7 @@ impl<'a> Linker<'a> {
         self.collect_dependencies(target, &mut needed_libraries)?;
 
         let mut needed_libraries = needed_libraries
-            .into_iter()
+            .into_par_iter()
             .filter(|id| {
                 // Filter out already provided libraries.
                 let (file, name) = self.convert_artifact_id_to_lib_path(id);
@@ -237,9 +238,9 @@ impl<'a> Linker<'a> {
 
             let (file, name) = self.convert_artifact_id_to_lib_path(id);
 
-            for (_, bytecode) in &mut needed_libraries {
+            needed_libraries.par_iter_mut().for_each(|(_, bytecode)| {
                 bytecode.to_mut().link(&file.to_string_lossy(), &name, address);
-            }
+            });
 
             libraries.libs.entry(file).or_default().insert(name, address.to_checksum(None));
         }
@@ -299,14 +300,18 @@ impl<'a> Linker<'a> {
         &self,
         libraries: &Libraries,
     ) -> Result<ArtifactContracts, LinkerError> {
-        self.contracts.keys().map(|id| Ok((id.clone(), self.link(id, libraries)?))).collect()
+        self.get_linked_artifacts_cow(libraries).map(ArtifactContracts::from_iter)
     }
 
     pub fn get_linked_artifacts_cow(
         &self,
         libraries: &Libraries,
     ) -> Result<ArtifactContracts<CompactContractBytecodeCow<'a>>, LinkerError> {
-        self.contracts.keys().map(|id| Ok((id.clone(), self.link(id, libraries)?))).collect()
+        self.contracts
+            .par_iter()
+            .map(|(id, _)| Ok((id.clone(), self.link(id, libraries)?)))
+            .collect::<Result<_, _>>()
+            .map(ArtifactContracts)
     }
 }
 
