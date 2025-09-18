@@ -14,11 +14,19 @@ pub use self::{
 /// Create ZKsync strategy for [CheatcodeInspectorStrategy].
 pub trait ZksyncCheatcodeInspectorStrategyBuilder {
     /// Create new ZKsync strategy.
-    fn new_zksync(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv, evm_interpreter: bool) -> Self;
+    fn new_zksync(
+        dual_compiled_contracts: DualCompiledContracts,
+        zk_env: ZkEnv,
+        evm_interpreter: bool,
+    ) -> Self;
 }
 
 impl ZksyncCheatcodeInspectorStrategyBuilder for CheatcodeInspectorStrategy {
-    fn new_zksync(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv, evm_interpreter: bool) -> Self {
+    fn new_zksync(
+        dual_compiled_contracts: DualCompiledContracts,
+        zk_env: ZkEnv,
+        evm_interpreter: bool,
+    ) -> Self {
         Self {
             runner: &ZksyncCheatcodeInspectorStrategyRunner,
             context: Box::new(ZksyncCheatcodeInspectorStrategyContext::new(

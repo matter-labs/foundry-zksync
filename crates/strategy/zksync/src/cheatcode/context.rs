@@ -65,7 +65,11 @@ pub struct ZksyncCheatcodeInspectorStrategyContext {
 }
 
 impl ZksyncCheatcodeInspectorStrategyContext {
-    pub fn new(dual_compiled_contracts: DualCompiledContracts, zk_env: ZkEnv, evm_interpreter: bool) -> Self {
+    pub fn new(
+        dual_compiled_contracts: DualCompiledContracts,
+        zk_env: ZkEnv,
+        evm_interpreter: bool,
+    ) -> Self {
         // We add the empty bytecode manually so it is correctly translated in zk mode.
         // This is used in many places in foundry, e.g. in cheatcode contract's account code.
         let empty_bytes = Bytes::from_static(&[0]);

@@ -389,12 +389,12 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
                 let inspect_ctx = {
                     let ctx = get_context(ccx.state.strategy.context.as_mut());
-                    
+
                     ZksyncInspectContext {
                         factory_deps: factory_deps.clone(),
                         paymaster_data: paymaster_data.clone(),
                         zk_env: ctx.zk_env.clone(),
-                        evm_interpreter: ctx.evm_interpreter
+                        evm_interpreter: ctx.evm_interpreter,
                     }
                 };
 

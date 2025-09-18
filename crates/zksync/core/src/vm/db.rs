@@ -7,23 +7,23 @@
 use std::{collections::HashMap as sHashMap, fmt::Debug, sync::LazyLock};
 
 use alloy_evm::eth::EthEvmContext;
-use alloy_primitives::{map::HashMap, Address, U256 as rU256};
+use alloy_primitives::{Address, U256 as rU256, map::HashMap};
 use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
 use foundry_cheatcodes_common::record::RecordAccess;
-use revm::{context::JournalTr, state::Account, Database};
-use zksync_basic_types::{L2ChainId, H160, H256, U256};
+use revm::{Database, context::JournalTr, state::Account};
+use zksync_basic_types::{H160, H256, L2ChainId, U256};
 use zksync_types::{
-    get_code_key, get_nonce_key, get_system_context_init_logs, h256_to_u256,
+    AccountTreeId, CREATE2_FACTORY_ADDRESS, StorageKey, StorageLog, StorageValue, get_code_key,
+    get_nonce_key, get_system_context_init_logs, h256_to_u256,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
-    AccountTreeId, StorageKey, StorageLog, StorageValue, CREATE2_FACTORY_ADDRESS,
 };
 use zksync_vm_interface::storage::ReadStorage;
 
 use crate::{
+    DEFAULT_PROTOCOL_VERSION,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     hash_bytecode,
     state::FullNonce,
-    DEFAULT_PROTOCOL_VERSION,
 };
 use anvil_zksync_core::deps::system_contracts::NON_KERNEL_CONTRACT_LOCATIONS;
 
@@ -169,7 +169,8 @@ where
 
         if evm_interpreter {
             // Enable EVM interpreter mode for ContractDeployer
-            // This is achieved by setting the `allowedBytecodeTypesToDeploy` (slot 1) to value `AllowedBytecodeTypes.EraVmAndEVM` (0x01)
+            // This is achieved by setting the `allowedBytecodeTypesToDeploy` (slot 1) to value
+            // `AllowedBytecodeTypes.EraVmAndEVM` (0x01)
             let contract_deployer_mode_key = StorageKey::new(
                 AccountTreeId::new(CONTRACT_DEPLOYER_ADDRESS.to_h160()),
                 rU256::from(1).to_h256(),

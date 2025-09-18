@@ -31,7 +31,7 @@ pub struct ZkSyncArgs {
     )]
     pub startup: Option<bool>,
 
-     /// Enable zkVM EVM intepreter
+    /// Enable zkVM EVM intepreter
     #[clap(
         long = "zk-evm-interpreter",
         display_order = 0,

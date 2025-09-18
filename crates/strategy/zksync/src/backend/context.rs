@@ -44,5 +44,5 @@ pub(crate) struct ZksyncInspectContext {
     /// Zksync environment.
     pub zk_env: ZkEnv,
     /// Use EVM interpreter.
-    pub  evm_interpreter: bool,
+    pub evm_interpreter: bool,
 }
