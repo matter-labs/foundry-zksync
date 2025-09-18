@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.29](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.28...foundry-zksync-v0.0.29) (2025-09-18)
+
+
+### Features
+
+* Add ast to output selection ([#1154](https://github.com/matter-labs/foundry-zksync/issues/1154)) ([474d305](https://github.com/matter-labs/foundry-zksync/commit/474d305dc046553ebe1c6816ba003f74987f4f56))
+
+
+### Bug Fixes
+
+* **verify:** correct constructor argument format for ZKsync verification ([#1166](https://github.com/matter-labs/foundry-zksync/issues/1166)) ([cd8e505](https://github.com/matter-labs/foundry-zksync/commit/cd8e5054a47de483e75f394996ca36119729b290))
+
 ## [0.0.28](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.27...foundry-zksync-v0.0.28) (2025-09-15)
 
 
