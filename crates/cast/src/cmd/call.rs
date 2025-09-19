@@ -294,6 +294,7 @@ impl CallArgs {
                             paymaster: Default::default(),
                             paymaster_input: data.to_vec(),
                         }),
+                    force_evm_interpreter: None,
                 };
 
                 other_fields.insert(
