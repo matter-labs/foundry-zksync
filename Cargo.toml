@@ -31,7 +31,7 @@ resolver = "2"
 
 [workspace.metadata]
 # NOTE(zk): track upstream version after each merge
-metadata.upstream_version = "1.3.5"
+metadata.upstream_version = "1.3.6"
 
 [workspace.package]
 version = "0.0.28" # x-release-please-version
@@ -231,6 +231,7 @@ solar-sema = { version = "=0.1.7", default-features = false }
 alloy-consensus = { version = "1.0.23", default-features = false }
 alloy-contract = { version = "1.0.23", default-features = false }
 alloy-eips = { version = "1.0.23", default-features = false }
+alloy-eip5792 = { version = "1.0.23", default-features = false }
 alloy-ens = { version = "1.0.23", default-features = false }
 alloy-genesis = { version = "1.0.23", default-features = false }
 alloy-json-rpc = { version = "1.0.23", default-features = false }
@@ -250,8 +251,8 @@ alloy-transport = { version = "1.0.23", default-features = false }
 alloy-transport-http = { version = "1.0.23", default-features = false }
 alloy-transport-ipc = { version = "1.0.23", default-features = false }
 alloy-transport-ws = { version = "1.0.23", default-features = false }
-alloy-hardforks = { version = "0.3.0", default-features = false }
-alloy-op-hardforks = { version = "0.3.0", default-features = false }
+alloy-hardforks = { version = "0.3.2", default-features = false }
+alloy-op-hardforks = { version = "0.3.2", default-features = false }
 
 ## alloy-core
 alloy-dyn-abi = "1.3.1"

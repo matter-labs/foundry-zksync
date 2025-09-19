@@ -12,7 +12,7 @@ use revm::{
 use crate::{
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
     CheatsConfig, CheatsCtxt, DynCheatcode, Result,
-    inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit},
+    inspector::{CommonCreateInput, Ecx},
     script::Broadcast,
 };
 
@@ -190,7 +190,10 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
     ) {
-        let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx, input.gas_limit());
+        // Use same logic as upstream removed function
+        let is_fixed_gas_limit = ecx.tx.gas_limit > ecx.block.gas_limit &&
+            input.gas_limit() <= ecx.block.gas_limit &&
+            input.gas_limit() > 2300;
 
         let to = None;
         let nonce: u64 = ecx.journaled_state.state()[&broadcast.new_origin].info.nonce;
@@ -225,7 +228,10 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         active_blob_sidecar: Option<BlobTransactionSidecar>,
     ) {
         let input = TransactionInput::new(call.input.bytes(ecx));
-        let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx, call.gas_limit);
+        // Use same logic as upstream removed function
+        let is_fixed_gas_limit = ecx.tx.gas_limit > ecx.block.gas_limit &&
+            call.gas_limit <= ecx.block.gas_limit &&
+            call.gas_limit > 2300;
 
         let account = ecx.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
         let nonce = account.info.nonce;
