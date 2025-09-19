@@ -115,8 +115,13 @@ pub fn get_provider(config: &Config) -> Result<RetryProvider> {
 
 pub fn get_executor_strategy(config: &Config) -> ExecutorStrategy {
     if config.zksync.should_compile() {
-        info!("using zksync strategy");
-        ExecutorStrategy::new_zksync()
+        if config.zksync.evm_interpreter {
+            info!("using zksync strategy (EVM-interpreter)");
+        } else {
+            info!("using zksync strategy");
+        }
+
+        ExecutorStrategy::new_zksync(config.zksync.evm_interpreter)
     } else {
         info!("using evm strategy");
         ExecutorStrategy::new_evm()

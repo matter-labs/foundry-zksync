@@ -580,27 +580,35 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
 
         info!("running create in zkEVM");
 
-        let find_contract = ctx
-            .dual_compiled_contracts
-            .find_bytecode(&init_code.0)
-            .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
+        let zk_create = if ctx.evm_interpreter {
+            foundry_zksync_core::vm::ZkCreateInputs {
+                value: input.value().to_u256(),
+                msg_sender: input.caller(),
+                create_input: init_code.to_vec(),
+                factory_deps: Default::default(),
+            }
+        } else {
+            let find_contract = ctx
+                .dual_compiled_contracts
+                .find_bytecode(&init_code.0)
+                .unwrap_or_else(|| panic!("failed finding contract for {init_code:?}"));
 
-        let constructor_args = find_contract.constructor_args();
-        let info = find_contract.info();
-        let contract = find_contract.contract();
+            let constructor_args = find_contract.constructor_args();
+            let info = find_contract.info();
+            let contract = find_contract.contract();
 
-        let zk_create_input = foundry_zksync_core::encode_create_params(
-            &input.scheme().unwrap_or(CreateScheme::Create),
-            contract.zk_bytecode_hash,
-            constructor_args.to_vec(),
-        );
+            let zk_create_input = foundry_zksync_core::encode_create_params(
+                &input.scheme().unwrap_or(CreateScheme::Create),
+                contract.zk_bytecode_hash,
+                constructor_args.to_vec(),
+            );
 
-        let mut factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(contract);
-        let injected_factory_deps = ctx
-            .zk_use_factory_deps
-            .iter()
-            .flat_map(|contract| {
-                let artifact_code = utils::get_artifact_code(
+            let mut factory_deps = ctx.dual_compiled_contracts.fetch_all_factory_deps(contract);
+            let injected_factory_deps =
+                ctx.zk_use_factory_deps
+                    .iter()
+                    .flat_map(|contract| {
+                        let artifact_code = utils::get_artifact_code(
                     &ctx.dual_compiled_contracts,
                     ctx.using_zk_vm,
                     &state.config,
@@ -612,15 +620,25 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     panic!("failed to get bytecode for injected factory deps contract {contract}")
                 })
                 .to_vec();
-                let res = ctx.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
-                ctx.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
-            })
-            .collect_vec();
-        factory_deps.extend(injected_factory_deps);
+                        let res =
+                            ctx.dual_compiled_contracts.find_bytecode(&artifact_code).unwrap();
+                        ctx.dual_compiled_contracts.fetch_all_factory_deps(res.contract())
+                    })
+                    .collect_vec();
+            factory_deps.extend(injected_factory_deps);
 
-        // NOTE(zk): Clear injected factory deps so that they are not sent on further transactions
-        ctx.zk_use_factory_deps.clear();
-        tracing::debug!(contract = info.name, "using dual compiled contract");
+            // NOTE(zk): Clear injected factory deps so that they are not sent on further
+            // transactions
+            ctx.zk_use_factory_deps.clear();
+            tracing::debug!(contract = info.name, "using dual compiled contract");
+
+            foundry_zksync_core::vm::ZkCreateInputs {
+                value: input.value().to_u256(),
+                msg_sender: input.caller(),
+                create_input: zk_create_input,
+                factory_deps,
+            }
+        };
 
         let ccx = foundry_zksync_core::vm::CheatcodeTracerContext {
             mocked_calls: state.mocked_calls.clone(),
@@ -630,13 +648,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
             record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
-        };
-
-        let zk_create = foundry_zksync_core::vm::ZkCreateInputs {
-            value: input.value().to_u256(),
-            msg_sender: input.caller(),
-            create_input: zk_create_input,
-            factory_deps,
+            evm_interpreter: ctx.evm_interpreter,
         };
 
         let mut gas = Gas::new(input.gas_limit());
@@ -826,6 +838,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             paymaster_data: ctx.paymaster_params.take(),
             zk_env: ctx.zk_env.clone(),
             record_storage_accesses: state.recorded_account_diffs_stack.is_some(),
+            evm_interpreter: ctx.evm_interpreter,
         };
 
         let mut gas = Gas::new(call.gas_limit);

@@ -8,12 +8,13 @@ use std::{collections::HashMap as sHashMap, fmt::Debug, sync::LazyLock};
 
 use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, U256 as rU256, map::HashMap};
+use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
 use foundry_cheatcodes_common::record::RecordAccess;
 use revm::{Database, context::JournalTr, state::Account};
 use zksync_basic_types::{H160, H256, L2ChainId, U256};
 use zksync_types::{
-    CREATE2_FACTORY_ADDRESS, StorageKey, StorageLog, StorageValue, get_code_key, get_nonce_key,
-    get_system_context_init_logs, h256_to_u256,
+    AccountTreeId, CREATE2_FACTORY_ADDRESS, StorageKey, StorageLog, StorageValue, get_code_key,
+    get_nonce_key, get_system_context_init_logs, h256_to_u256,
     utils::{decompose_full_nonce, storage_key_for_eth_balance},
 };
 use zksync_vm_interface::storage::ReadStorage;
@@ -125,7 +126,11 @@ where
     }
 
     /// Create a new instance of [ZKEVMData] with system contracts.
-    pub fn new_with_system_contracts(ecx: &'a mut EthEvmContext<DB>, chain_id: L2ChainId) -> Self {
+    pub fn new_with_system_contracts(
+        ecx: &'a mut EthEvmContext<DB>,
+        chain_id: L2ChainId,
+        evm_interpreter: bool,
+    ) -> Self {
         let system_context_init_log = get_system_context_init_logs(chain_id);
 
         let mut override_keys = HashMap::default();
@@ -161,6 +166,17 @@ where
             .chain(state_to_factory_deps)
             .chain([(empty_code_hash, empty_code)])
             .collect();
+
+        if evm_interpreter {
+            // Enable EVM interpreter mode for ContractDeployer
+            // This is achieved by setting the `allowedBytecodeTypesToDeploy` (slot 1) to value
+            // `AllowedBytecodeTypes.EraVmAndEVM` (0x01)
+            let contract_deployer_mode_key = StorageKey::new(
+                AccountTreeId::new(CONTRACT_DEPLOYER_ADDRESS.to_h160()),
+                rU256::from(1).to_h256(),
+            );
+            override_keys.insert(contract_deployer_mode_key, rU256::from(1).to_h256());
+        }
 
         Self {
             ecx,

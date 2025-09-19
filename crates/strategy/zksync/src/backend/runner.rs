@@ -56,6 +56,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             env.tx.clone(),
             &inspect_ctx.zk_env,
             backend,
+            inspect_ctx.evm_interpreter,
         );
 
         let ctx = get_context(backend.strategy.context.as_mut());
@@ -170,6 +171,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
                 env.tx.clone(),
                 &inspect_ctx.zk_env,
                 backend,
+                inspect_ctx.evm_interpreter,
             );
 
             let ctx = get_context(backend.strategy.context.as_mut());

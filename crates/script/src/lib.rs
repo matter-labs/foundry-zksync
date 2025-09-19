@@ -644,7 +644,10 @@ impl ScriptConfig {
                 Some(db) => db.clone(),
                 None => {
                     let fork = self.evm_opts.get_fork(&self.config, env.clone());
-                    let backend = Backend::spawn(fork, strategy.runner.new_backend_strategy())?;
+                    let backend = Backend::spawn(
+                        fork,
+                        strategy.runner.new_backend_strategy(strategy.context.as_ref()),
+                    )?;
                     self.backends.insert(fork_url.clone(), backend.clone());
                     backend
                 }
@@ -653,7 +656,7 @@ impl ScriptConfig {
             // It's only really `None`, when we don't pass any `--fork-url`. And if so, there is
             // no need to cache it, since there won't be any onchain simulation that we'd need
             // to cache the backend for.
-            Backend::spawn(None, strategy.runner.new_backend_strategy())?
+            Backend::spawn(None, strategy.runner.new_backend_strategy(strategy.context.as_ref()))?
         };
 
         // We need to enable tracing to decode contract names: local or external.

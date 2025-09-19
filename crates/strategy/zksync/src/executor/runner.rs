@@ -137,8 +137,12 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         self.deploy_library_impl(executor, from, kind, value, rd)
     }
 
-    fn new_backend_strategy(&self) -> foundry_evm_core::backend::strategy::BackendStrategy {
-        foundry_evm_core::backend::strategy::BackendStrategy::new_zksync()
+    fn new_backend_strategy(
+        &self,
+        ctx: &dyn ExecutorStrategyContext,
+    ) -> foundry_evm_core::backend::strategy::BackendStrategy {
+        let ctx = get_context_ref(ctx);
+        foundry_evm_core::backend::strategy::BackendStrategy::new_zksync(ctx.evm_interpreter)
     }
 
     fn new_cheatcode_inspector_strategy(
@@ -149,6 +153,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         foundry_cheatcodes::strategy::CheatcodeInspectorStrategy::new_zksync(
             ctx.dual_compiled_contracts.clone(),
             ctx.zk_env.clone(),
+            ctx.evm_interpreter,
         )
     }
 
@@ -171,6 +176,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                     factory_deps: zk_tx.factory_deps.clone(),
                     paymaster_data: zk_tx.paymaster_data.clone(),
                     zk_env: ctx.zk_env.clone(),
+                    evm_interpreter: ctx.evm_interpreter,
                 }),
             ),
         }
@@ -201,6 +207,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                         factory_deps: zk_tx.factory_deps,
                         paymaster_data: zk_tx.paymaster_data,
                         zk_env: ctx.zk_env.clone(),
+                        evm_interpreter: ctx.evm_interpreter,
                     }),
                 )
             }
