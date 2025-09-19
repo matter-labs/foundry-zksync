@@ -33,7 +33,7 @@ jobs:
 
   # Trigger workflow to generate artifacts
   release:
-    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    if: ${{ always() && needs.release-please.outputs.releases_created == 'true' }}
     needs: release-please
     uses: ./.github/workflows/release.yml
     with:

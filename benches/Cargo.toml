@@ -1,6 +1,6 @@
 [package]
 name = "foundry-bench"
-version = "0.0.25"
+version = "0.0.28"
 edition = "2024"
 license = "Apache-2.0 OR MIT"
 

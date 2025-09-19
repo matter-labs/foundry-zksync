@@ -289,18 +289,25 @@ impl ZkVerificationProvider {
                 )?,
             )?;
             let encoded_args = hex::encode(encoded_args);
-            return Ok(Some(format!("0x{}", &encoded_args[8..])));
+            // Note(zk): Form-encoded API expects constructor args without "0x" prefix
+            // Strip first 8 chars (function selector) and don't add "0x" prefix
+            return Ok(Some(encoded_args[8..].to_string()));
         }
 
         if let Some(ref args) = args.constructor_args {
-            if args.starts_with("0x") {
-                return Ok(Some(args.clone()));
+            // Note(zk): Form-encoded API expects constructor args without "0x" prefix
+            // Strip "0x" prefix if present for form encoding compatibility
+
+            if let Some(args) = args.strip_prefix("0x") {
+                return Ok(Some(args.to_string()));
             } else {
-                return Ok(Some(format!("0x{args}")));
+                return Ok(Some(args.clone()));
             }
         }
 
-        Ok(None)
+        // Note(zk): Form-encoded API expects empty string for contracts with no constructor args,
+        // not "0x". The JSON API used to expect "0x", but form encoding expects empty string.
+        Ok(Some(String::new()))
     }
     /// Retry logic for checking the verification status
     async fn retry_verification_status(

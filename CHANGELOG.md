@@ -1,5 +1,63 @@
 # Changelog
 
+## [0.0.28](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.27...foundry-zksync-v0.0.28) (2025-09-15)
+
+
+### Bug Fixes
+
+* trigger binaries gen even if some aux release-please step failed ([#1161](https://github.com/matter-labs/foundry-zksync/issues/1161)) ([1444be1](https://github.com/matter-labs/foundry-zksync/commit/1444be108de16681fcdc6b0c0a7506a14486bb8b))
+
+## [0.0.27](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.26...foundry-zksync-v0.0.27) (2025-09-12)
+
+
+### Features
+
+* **`invariants`:** use `SlotIdentifier` for identifying complex types and sampling them ([#11450](https://github.com/matter-labs/foundry-zksync/issues/11450)) ([8a710a0](https://github.com/matter-labs/foundry-zksync/commit/8a710a02163de0e61fc5ea34d4031fef57026049))
+* Adapt zksync verification to etherscan compatible api ([#1114](https://github.com/matter-labs/foundry-zksync/issues/1114)) ([6408a7e](https://github.com/matter-labs/foundry-zksync/commit/6408a7e8d6207df484d84775d0b3d9ac71af14f9))
+* add method_identifiers and legacy_assembly fields to ZkContractArtifact ([#1145](https://github.com/matter-labs/foundry-zksync/issues/1145)) ([d592610](https://github.com/matter-labs/foundry-zksync/commit/d592610122174a1370129f2cb74d3d9102b3dfb6))
+* add missing eip7702 support ([#11490](https://github.com/matter-labs/foundry-zksync/issues/11490)) ([0c7e1b8](https://github.com/matter-labs/foundry-zksync/commit/0c7e1b8d228fa186388024594b74f0d5b3d996e1))
+* **anvil:** support celo transfer precompile ([#11491](https://github.com/matter-labs/foundry-zksync/issues/11491)) ([81b65df](https://github.com/matter-labs/foundry-zksync/commit/81b65df3e2adc0e77e8a4af52a83129688593a36))
+* **cast:** support base + offset for storage slot calc ([#11566](https://github.com/matter-labs/foundry-zksync/issues/11566)) ([d334c99](https://github.com/matter-labs/foundry-zksync/commit/d334c99ee2dbdb1d9d0685c18d6153d21b120b2b)), closes [#11531](https://github.com/matter-labs/foundry-zksync/issues/11531)
+* **cheatcodes:** vm.getStorageSlots ([#11537](https://github.com/matter-labs/foundry-zksync/issues/11537)) ([5dc5891](https://github.com/matter-labs/foundry-zksync/commit/5dc58917bb3c8cb59fc1b7f683a19b6d7bc0c35c))
+* **common:** identify bytes and string slots using storageLayout ([#11476](https://github.com/matter-labs/foundry-zksync/issues/11476)) ([1b3b9b4](https://github.com/matter-labs/foundry-zksync/commit/1b3b9b469196115bc15c9fdef2fd1691361ab135))
+* **forge verify-contract:** update Sourcify integration to support API v2 ([#11438](https://github.com/matter-labs/foundry-zksync/issues/11438)) ([3f0ec87](https://github.com/matter-labs/foundry-zksync/commit/3f0ec879574c5a78c8b71d28e1f5575aaf04295e))
+* **forge:** add --empty to forge init ([#11554](https://github.com/matter-labs/foundry-zksync/issues/11554)) ([05d4a02](https://github.com/matter-labs/foundry-zksync/commit/05d4a02f95ca0d3c5b2017ec925dfd0380bc3ab7))
+* **forge:** add md flag to support markdown table styling ([#11478](https://github.com/matter-labs/foundry-zksync/issues/11478)) ([db91bd4](https://github.com/matter-labs/foundry-zksync/commit/db91bd443963186d167ab03026561ba386f55ec9))
+* **forge:** add params natspec for enums ([#10022](https://github.com/matter-labs/foundry-zksync/issues/10022)) ([3d47818](https://github.com/matter-labs/foundry-zksync/commit/3d47818abb3a14ca3d4e883e0175ee7a367693fd))
+* **lint:** impl erc20 transfer check using HIR ([#11552](https://github.com/matter-labs/foundry-zksync/issues/11552)) ([a131c31](https://github.com/matter-labs/foundry-zksync/commit/a131c31255c3f87c9828eb43bec3d80d2b23fe62))
+* make `find_by_deployed_code_exact` smarter ([#11560](https://github.com/matter-labs/foundry-zksync/issues/11560)) ([83b904f](https://github.com/matter-labs/foundry-zksync/commit/83b904fd532d183cbc17d136511168eb983a0172))
+* **npm:** publish forge to `npm` for each arch ([#11047](https://github.com/matter-labs/foundry-zksync/issues/11047)) ([592d09d](https://github.com/matter-labs/foundry-zksync/commit/592d09d5c562d0d38392c95d69b369a4c1113d25))
+* switch solar_project to use cache ([#11481](https://github.com/matter-labs/foundry-zksync/issues/11481)) ([a02c14b](https://github.com/matter-labs/foundry-zksync/commit/a02c14bdbe7c1f80aa6d922a8d8ffbb714d77dbb))
+
+
+### Bug Fixes
+
+* **`forge lint`:** add `URI` (e.g. `tokenURI` from ERC721 / ERC6909) as exception to `mixed-case-function` ([#11533](https://github.com/matter-labs/foundry-zksync/issues/11533)) ([6aee7f5](https://github.com/matter-labs/foundry-zksync/commit/6aee7f5aca77d8e1a8566be9044b653442d4fa3b))
+* bump version v1.3.4 ([#11514](https://github.com/matter-labs/foundry-zksync/issues/11514)) ([e4c4b97](https://github.com/matter-labs/foundry-zksync/commit/e4c4b97fce540bb98c79b20040fad0bc69fe2e30))
+* **cast:** allow comma-separated values for overrides ([#11553](https://github.com/matter-labs/foundry-zksync/issues/11553)) ([3396cc7](https://github.com/matter-labs/foundry-zksync/commit/3396cc7796627325c27c7c2c3585ffd54bb431d6))
+* **cast:** correct error message for --ends-with hex parsing ([#11549](https://github.com/matter-labs/foundry-zksync/issues/11549)) ([c732ea3](https://github.com/matter-labs/foundry-zksync/commit/c732ea38473cc7cd5e169120c4fbe08e40c85ef8))
+* find_git_root allows any .git ([#11525](https://github.com/matter-labs/foundry-zksync/issues/11525)) ([8cd97db](https://github.com/matter-labs/foundry-zksync/commit/8cd97db7281d1bf64617699359596f553bbf88c4))
+* **forge:** custom verifiers should not throw on unknown etherscan chains ([#11442](https://github.com/matter-labs/foundry-zksync/issues/11442)) ([f60a1d8](https://github.com/matter-labs/foundry-zksync/commit/f60a1d88e5b04400232aba3056917665c49857ef))
+* **forge:** persist corpus per test suite ([#11469](https://github.com/matter-labs/foundry-zksync/issues/11469)) ([30cc56e](https://github.com/matter-labs/foundry-zksync/commit/30cc56efce344ef02529d064b81d098079d46ede))
+* **forge:** show logs and coverage for table tests ([#11575](https://github.com/matter-labs/foundry-zksync/issues/11575)) ([124f134](https://github.com/matter-labs/foundry-zksync/commit/124f134ab286da5d0939de14378573cf24121e1e))
+* **forge:** skip scripts in get_sources_to_compile ([#11540](https://github.com/matter-labs/foundry-zksync/issues/11540)) ([3232263](https://github.com/matter-labs/foundry-zksync/commit/3232263b10bf812b2f2173526f1e334079df8323))
+* **forge:** update only the specific dep ([#11588](https://github.com/matter-labs/foundry-zksync/issues/11588)) ([3f7885a](https://github.com/matter-labs/foundry-zksync/commit/3f7885ac1bddd9160a6a636186b39a7637bd1963))
+* invalid tx input error in anvil component ([#11488](https://github.com/matter-labs/foundry-zksync/issues/11488)) ([d80fcf6](https://github.com/matter-labs/foundry-zksync/commit/d80fcf6019a91164c10eda0a1b851c789d67ce45))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70a6f77](https://github.com/matter-labs/foundry-zksync/commit/70a6f7774a9578e267edd1596335b2488b9865e1))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70a6f77](https://github.com/matter-labs/foundry-zksync/commit/70a6f7774a9578e267edd1596335b2488b9865e1))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70a6f77](https://github.com/matter-labs/foundry-zksync/commit/70a6f7774a9578e267edd1596335b2488b9865e1))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([70ebee1](https://github.com/matter-labs/foundry-zksync/commit/70ebee193f186f5bb16acdd3af58c9fcb00be07d))
+* **lint:** 'unwrapped-modifier-logic' incorrectly marked with Severity::Gas ([8a710a0](https://github.com/matter-labs/foundry-zksync/commit/8a710a02163de0e61fc5ea34d4031fef57026049))
+* **lint:** avoid ANSI chars with JSON emitter ([#11470](https://github.com/matter-labs/foundry-zksync/issues/11470)) ([56aadcb](https://github.com/matter-labs/foundry-zksync/commit/56aadcb20c7edfe2c17525df1a5a7c6e5ffe7a5a))
+* persist auth items during simulation ([#11601](https://github.com/matter-labs/foundry-zksync/issues/11601)) ([d4c2d8e](https://github.com/matter-labs/foundry-zksync/commit/d4c2d8e5ee03bd22d67b225c2a2614d4b80336a5))
+* Shell deadlock 2 ([#11535](https://github.com/matter-labs/foundry-zksync/issues/11535)) ([a1534da](https://github.com/matter-labs/foundry-zksync/commit/a1534da6e572f4bbfe2f6bd7ac4c6bedd25dc2ea))
+* workflow event conclusion ([#11544](https://github.com/matter-labs/foundry-zksync/issues/11544)) ([961241c](https://github.com/matter-labs/foundry-zksync/commit/961241c02fb06143608d5b985a1bae793ac8f172))
+
+
+### Performance Improvements
+
+* parallelize remappings provider ([#11536](https://github.com/matter-labs/foundry-zksync/issues/11536)) ([02f07d4](https://github.com/matter-labs/foundry-zksync/commit/02f07d4af139042255dff135c43d6c1284ff0e39))
+
 ## [0.0.26](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.25...foundry-zksync-v0.0.26) (2025-08-28)
 
 
