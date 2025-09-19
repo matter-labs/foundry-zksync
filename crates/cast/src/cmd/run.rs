@@ -1,8 +1,8 @@
 use alloy_consensus::Transaction;
 use alloy_network::{AnyNetwork, TransactionResponse};
 use alloy_primitives::{
-    Address, Bytes, U256,
     map::{HashMap, HashSet},
+    Address, Bytes, U256,
 };
 use alloy_provider::{Provider, RootProvider};
 use alloy_rpc_types::BlockTransactions;
@@ -11,23 +11,24 @@ use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
-    utils::{self, TraceResult, handle_traces, init_progress},
+    utils::{self, handle_traces, init_progress, TraceResult},
 };
-use foundry_common::{SYSTEM_TRANSACTION_TYPE, is_impersonated_tx, is_known_system_sender, shell};
+use foundry_common::{is_impersonated_tx, is_known_system_sender, shell, SYSTEM_TRANSACTION_TYPE};
 use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{
-    Config,
     figment::{
-        self, Metadata, Profile,
+        self,
         value::{Dict, Map},
+        Metadata, Profile,
     },
+    Config,
 };
 use foundry_evm::{
-    Env,
     executors::{EvmError, TracingExecutor},
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode, Traces},
     utils::configure_tx_env,
+    Env,
 };
 use foundry_evm_core::env::AsEnvMut;
 
@@ -316,19 +317,30 @@ impl RunArgs {
                         })?;
                     } else {
                         trace!(tx=?tx.tx_hash(), "executing previous create transaction");
-                        // if let Err(error) = executor.deploy_with_env(env.clone(), None) {
-                        if let Err(error) = executor.call_with_env(env.clone()) {
-                            match error {
-                                // Reverted transactions should be skipped
-                                // EvmError::Execution(_) => (),
-                                error => {
-                                    return Err(error).wrap_err_with(|| {
-                                        format!(
-                                            "Failed to deploy transaction: {:?} in block {}",
-                                            tx.tx_hash(),
-                                            env.evm_env.block_env.number
-                                        )
-                                    });
+                        if self.zk_force {
+                            if let Err(error) = executor.transact_with_env(env) {
+                                return Err(error).wrap_err_with(|| {
+                                    format!(
+                                        "Failed to deploy transaction: {:?} in block {}",
+                                        tx.tx_hash(),
+                                        env.evm_env.block_env.number
+                                    )
+                                });
+                            }
+                        } else {
+                            if let Err(error) = executor.deploy_with_env(env.clone(), None) {
+                                match error {
+                                    // Reverted transactions should be skipped
+                                    EvmError::Execution(_) => (),
+                                    error => {
+                                        return Err(error).wrap_err_with(|| {
+                                            format!(
+                                                "Failed to deploy transaction: {:?} in block {}",
+                                                tx.tx_hash(),
+                                                env.evm_env.block_env.number
+                                            )
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -380,7 +392,7 @@ impl RunArgs {
                 trace!(tx=?tx.tx_hash(), "executing create transaction");
                 if self.zk_force {
                     TraceResult::try_from(executor.transact_with_env(env))?
-                }       else {
+                } else {
                     TraceResult::try_from(executor.deploy_with_env(env, None))?
                 }
             }
@@ -487,9 +499,7 @@ pub fn configure_zksync_tx_env(
     let recipient_account = outer_tx.recipient_account();
     let use_evm_interpreter = Some(recipient_account.is_none());
 
-    env.tx.kind = TxKind::Call(
-        recipient_account.unwrap_or_default().to_address(),
-    );
+    env.tx.kind = TxKind::Call(recipient_account.unwrap_or_default().to_address());
     env.tx.gas_limit = match &outer_tx.common_data {
         ExecuteTransactionCommon::L2(l2) => l2.fee.gas_limit.as_u64(),
         _ => outer_tx.gas_limit().as_u64(),
