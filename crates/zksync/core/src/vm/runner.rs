@@ -76,8 +76,9 @@ where
     let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &paymaster_params);
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = if evm_interpreter {
+        let contract_address = if is_create { None } else { Some(transact_to) };
         let mut tx = L2Tx::new(
-            None,
+            contract_address,
             ecx.tx.data.to_vec(),
             (nonce as u32).into(),
             Fee {
