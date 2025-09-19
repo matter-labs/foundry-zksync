@@ -2,25 +2,25 @@ use std::path::Path;
 
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
-use alloy_zksync::provider::{zksync_provider, ZksyncProvider};
+use alloy_zksync::provider::{ZksyncProvider, zksync_provider};
 use eyre::Result;
 use foundry_linking::LinkerError;
-use revm::{context::result::ResultAndState, Database};
+use revm::{Database, context::result::ResultAndState};
 
 use foundry_compilers::ProjectCompileOutput;
 use foundry_config::Config;
 use foundry_evm::{
+    Env,
     backend::{Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
     executors::{
+        EvmError, Executor,
         strategy::{
             DeployLibKind, DeployLibResult, EvmExecutorStrategyRunner, ExecutorStrategyContext,
             ExecutorStrategyExt, ExecutorStrategyRunner, LinkOutput,
         },
-        EvmError, Executor,
     },
     inspectors::InspectorStack,
-    Env,
 };
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
@@ -31,7 +31,7 @@ use foundry_zksync_core::vm::ZkEnv;
 use crate::{
     backend::{ZksyncBackendStrategyBuilder, ZksyncInspectContext},
     cheatcode::ZksyncCheatcodeInspectorStrategyBuilder,
-    executor::{try_get_zksync_transaction_metadata, ZksyncExecutorStrategyContext},
+    executor::{ZksyncExecutorStrategyContext, try_get_zksync_transaction_metadata},
 };
 
 mod libraries;
@@ -208,7 +208,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                         factory_deps: zk_tx.factory_deps,
                         paymaster_data: zk_tx.paymaster_data,
                         zk_env: ctx.zk_env.clone(),
-                        evm_interpreter: evm_interpreter,
+                        evm_interpreter,
                     }),
                 )
             }

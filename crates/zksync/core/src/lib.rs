@@ -118,7 +118,7 @@ pub struct ZkTransactionMetadata {
 impl ZkTransactionMetadata {
     /// Create a new [`ZkTransactionMetadata`] with the given factory deps
     pub fn new(factory_deps: Vec<Vec<u8>>, paymaster_data: Option<PaymasterParams>) -> Self {
-        Self { factory_deps, paymaster_data, force_evm_interpreter: None }   // TODO(zk): make it configurable
+        Self { factory_deps, paymaster_data, force_evm_interpreter: None } // TODO(zk): make it configurable
     }
 }
 /// Estimated gas from a ZK network.

@@ -1,5 +1,5 @@
 use alloy_evm::eth::EthEvmContext;
-use alloy_primitives::{hex, FixedBytes, Log};
+use alloy_primitives::{FixedBytes, Log, hex};
 use anvil_zksync_config::types::SystemContractsOptions as Options;
 use anvil_zksync_core::{
     formatter::transaction::summary::TransactionSummary, system_contracts::SystemContracts,
@@ -12,16 +12,16 @@ use core::convert::Into;
 use foundry_common::sh_println;
 use itertools::Itertools;
 use revm::{
+    Database,
     bytecode::Bytecode,
     context::{
+        JournalTr,
         result::{
             ExecutionResult as rExecutionResult, HaltReason, OutOfGasError, Output, SuccessReason,
         },
-        JournalTr,
     },
     database::states::StorageSlot,
-    primitives::{Address, Bytes, HashMap as rHashMap, Log as rLog, B256, U256 as rU256},
-    Database,
+    primitives::{Address, B256, Bytes, HashMap as rHashMap, Log as rLog, U256 as rU256},
 };
 use std::{
     collections::HashMap,
@@ -29,7 +29,7 @@ use std::{
     sync::{Arc, LazyLock, RwLock},
 };
 use tracing::{debug, error, info, trace, warn};
-use zksync_basic_types::{ethabi, L2ChainId, Nonce, H160, H256, U256};
+use zksync_basic_types::{H160, H256, L2ChainId, Nonce, U256, ethabi};
 use zksync_multivm::{
     interface::{
         Call, CallType, ExecutionResult, Halt, InspectExecutionMode, VmEvent,
@@ -39,18 +39,19 @@ use zksync_multivm::{
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
 };
 use zksync_types::{
-    bytecode::BytecodeHash, get_nonce_key, h256_to_address, l2::L2Tx,
-    transaction_request::PaymasterParams, PackedEthSignature, StorageKey, Transaction,
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS,
+    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, PackedEthSignature, StorageKey,
+    Transaction, bytecode::BytecodeHash, get_nonce_key, h256_to_address, l2::L2Tx,
+    transaction_request::PaymasterParams,
 };
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
+    DEFAULT_PROTOCOL_VERSION, MAX_L2_GAS_LIMIT,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256},
     fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address,
-    state::{new_full_nonce, parse_full_nonce, FullNonce},
+    state::{FullNonce, new_full_nonce, parse_full_nonce},
     vm::{
-        db::{ZKVMData, DEFAULT_CHAIN_ID},
+        db::{DEFAULT_CHAIN_ID, ZKVMData},
         decoder::CallTraceDecoderBuilder,
         env::{create_l1_batch_env, create_system_env},
         storage_recorder::{AccountAccess, StorageAccessRecorder},
@@ -61,7 +62,6 @@ use crate::{
             error::ErrorTracer,
         },
     },
-    DEFAULT_PROTOCOL_VERSION, MAX_L2_GAS_LIMIT,
 };
 
 use foundry_evm_abi::console::{self, ds::Console};

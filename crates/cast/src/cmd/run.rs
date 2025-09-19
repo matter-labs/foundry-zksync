@@ -1,8 +1,8 @@
 use alloy_consensus::Transaction;
 use alloy_network::{AnyNetwork, TransactionResponse};
 use alloy_primitives::{
-    map::{HashMap, HashSet},
     Address, Bytes, U256,
+    map::{HashMap, HashSet},
 };
 use alloy_provider::{Provider, RootProvider};
 use alloy_rpc_types::BlockTransactions;
@@ -11,24 +11,23 @@ use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
-    utils::{self, handle_traces, init_progress, TraceResult},
+    utils::{self, TraceResult, handle_traces, init_progress},
 };
-use foundry_common::{is_impersonated_tx, is_known_system_sender, shell, SYSTEM_TRANSACTION_TYPE};
+use foundry_common::{SYSTEM_TRANSACTION_TYPE, is_impersonated_tx, is_known_system_sender, shell};
 use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{
-    figment::{
-        self,
-        value::{Dict, Map},
-        Metadata, Profile,
-    },
     Config,
+    figment::{
+        self, Metadata, Profile,
+        value::{Dict, Map},
+    },
 };
 use foundry_evm::{
+    Env,
     executors::{EvmError, TracingExecutor},
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode, Traces},
     utils::configure_tx_env,
-    Env,
 };
 use foundry_evm_core::env::AsEnvMut;
 

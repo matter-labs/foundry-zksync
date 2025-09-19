@@ -17,7 +17,7 @@ impl ZksyncBackendStrategyBuilder for BackendStrategy {
     fn new_zksync(evm_interpreter: bool) -> Self {
         Self {
             runner: &ZksyncBackendStrategyRunner,
-            context: Box::new(ZksyncBackendStrategyContext{
+            context: Box::new(ZksyncBackendStrategyContext {
                 evm_interpreter,
                 ..Default::default()
             }),

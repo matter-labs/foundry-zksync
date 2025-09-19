@@ -114,7 +114,8 @@ impl ZkSyncConfig {
         self.compile && self.startup
     }
 
-    /// Returns true if zk mode is enabled, if tests should be run in zk mode, and if EVM interpreter is enabled.
+    /// Returns true if zk mode is enabled, if tests should be run in zk mode, and if EVM
+    /// interpreter is enabled.
     pub fn run_in_zk_evm_interpreter_mode(&self) -> bool {
         self.run_in_zk_mode() && self.evm_interpreter
     }

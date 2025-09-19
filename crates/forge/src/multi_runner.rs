@@ -181,7 +181,10 @@ impl MultiContractRunner {
         trace!("running all tests");
 
         // The DB backend that serves all the data.
-        let db = Backend::spawn(self.fork.take(), self.strategy.runner.new_backend_strategy(self.strategy.context.as_ref()))?;
+        let db = Backend::spawn(
+            self.fork.take(),
+            self.strategy.runner.new_backend_strategy(self.strategy.context.as_ref()),
+        )?;
 
         let find_timer = Instant::now();
         let contracts = self.matching_contracts(filter).collect::<Vec<_>>();
