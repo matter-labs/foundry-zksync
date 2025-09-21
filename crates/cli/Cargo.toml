@@ -22,7 +22,7 @@ foundry-wallets.workspace = true
 
 foundry-strategy-zksync.workspace = true
 
-foundry-compilers = { workspace = true, features = ["full"] }
+foundry-compilers.workspace = true
 solar.workspace = true
 
 alloy-eips.workspace = true
