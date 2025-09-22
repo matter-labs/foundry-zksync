@@ -140,14 +140,14 @@ fn next_archive_url(is_ws: bool) -> String {
     // Fall back to existing logic (updated to use upstream pattern)
     let domain = next(if is_ws { &WS_ARCHIVE_DOMAINS } else { &HTTP_ARCHIVE_DOMAINS });
     let url = if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") };
-    eprintln!("--- next_archive_url(is_ws={is_ws}) = {url} ---");
+    test_debug!("next_archive_url(is_ws={is_ws}) = {url}");
     url
 }
 
 /// Returns the next etherscan api key.
 pub fn next_etherscan_api_key() -> String {
     let key = next(&ETHERSCAN_KEYS).to_string();
-    eprintln!("--- next_etherscan_api_key() = {key} ---");
+    test_debug!("next_etherscan_api_key() = {key}");
     key
 }
 
@@ -222,7 +222,7 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
     // This part constructs the final URL only if the Alchemy check didn't return early
     let url = if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") };
 
-    eprintln!("--- next_url(is_ws={is_ws}, chain={chain:?}) = {url} ---");
+    test_debug!("next_url(is_ws={is_ws}, chain={chain:?}) = {url}");
     url
 }
 

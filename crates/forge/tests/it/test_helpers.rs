@@ -22,6 +22,7 @@ use foundry_evm::{constants::CALLER, opts::EvmOpts};
 use foundry_test_utils::{
     TestCommand, ZkSyncNode, fd_lock, init_tracing,
     rpc::{next_http_archive_rpc_url, next_rpc_endpoint},
+    test_debug,
     util::OutputExt,
 };
 use foundry_zksync_compilers::{
@@ -430,6 +431,7 @@ pub fn get_vyper() -> Vyper {
         };
         let url = format!("https://github.com/vyperlang/vyper/releases/download/v0.4.3/vyper.0.4.3+commit.bff19ea2.{suffix}");
 
+        test_debug!("downloading vyper from {url}");
         let res = reqwest::Client::builder().build().unwrap().get(url).send().await.unwrap();
 
         assert!(res.status().is_success());
@@ -445,6 +447,7 @@ pub fn get_vyper() -> Vyper {
     })
 }
 
+#[tracing::instrument]
 pub fn get_compiled(project: &mut Project) -> ProjectCompileOutput {
     let lock_file_path = project.sources_path().join(".lock");
     // Compile only once per test run.
@@ -459,13 +462,18 @@ pub fn get_compiled(project: &mut Project) -> ProjectCompileOutput {
     if !project.cache_path().exists() || std::fs::read(&lock_file_path).unwrap() != b"1" {
         drop(read);
         write = Some(lock.write().unwrap());
+        test_debug!("cache miss for {}", lock_file_path.display());
+    } else {
+        test_debug!("cache hit for {}", lock_file_path.display());
     }
 
     if project.compiler.vyper.is_none() {
         project.compiler.vyper = Some(get_vyper());
     }
 
+    test_debug!("compiling {}", lock_file_path.display());
     out = project.compile().unwrap();
+    test_debug!("compiled {}", lock_file_path.display());
 
     if out.has_compiler_errors() {
         panic!("Compiled with errors:\n{out}");
