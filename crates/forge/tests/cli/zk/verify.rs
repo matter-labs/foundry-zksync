@@ -10,20 +10,6 @@ use foundry_test_utils::{
 };
 use std::time::Duration;
 
-fn parse_zk_deployed_address(out: &str) -> Option<String> {
-    for line in out.lines() {
-        if let Some(addr_start) = line.find("Deployed to: 0x") {
-            let addr_part = &line[addr_start + 13..];
-            if let Some(addr_end) = addr_part.find(char::is_whitespace) {
-                return Some(addr_part[..addr_end].to_string());
-            } else if addr_part.len() >= 42 {
-                return Some(addr_part[..42].to_string());
-            }
-        }
-    }
-    None
-}
-
 /// Adds a `Unique` contract to the source directory of the project that can be imported as
 /// `import {Unique} from "./unique.sol";`
 fn add_unique(prj: &TestProject) {
@@ -66,23 +52,6 @@ function doStuff() external {{}}
     );
 
     prj.add_source("Verify.sol", &contract);
-}
-
-fn add_verify_target_with_constructor(prj: &TestProject) {
-    prj.add_source(
-        "Verify.sol",
-        r#"
-import {Unique} from "./unique.sol";
-contract Verify is Unique {
-    struct InitData {
-        uint256 value;
-        string name;
-    }
-    constructor(InitData memory data, address owner) {}
-    function doStuff() external {}
-}
-"#,
-    );
 }
 
 fn add_single_verify_target_with_constructor_file(prj: &TestProject) {
@@ -181,36 +150,6 @@ fn deploy_contract(
         .unwrap_or_else(|| panic!("Failed to parse deployer {output}"))
 }
 
-fn deploy_contract_with_constructor(
-    info: &EnvExternalities,
-    contract_path: &str,
-    constructor_args: &[&str],
-    prj: TestProject,
-    cmd: &mut TestCommand,
-) -> String {
-    add_unique(&prj);
-    add_verify_target_with_constructor(&prj);
-    let mut create_cmd = cmd.forge_fuse();
-    create_cmd
-        .arg("create")
-        .args(create_args(info))
-        .arg(contract_path)
-        .arg("--zksync");
-    
-    if !constructor_args.is_empty() {
-        create_cmd.arg("--constructor-args");
-        create_cmd.args(constructor_args);
-    }
-    
-    let output = create_cmd
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
-    
-    utils::parse_deployed_address(output.as_str())
-        .or_else(|| parse_zk_deployed_address(output.as_str()))
-        .unwrap_or_else(|| panic!("Failed to parse deployed address: {output}"))
-}
 
 #[allow(clippy::disallowed_macros)]
 fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: TestCommand) {
@@ -347,15 +286,17 @@ fn create_verify_with_optimization_runs(
     }
 }
 
-
 // tests `create --verify` with optimization runs on Sepolia testnet if correct env vars are set
 // ZKSYNC_TESTNET_PRIVATE_KEY=0x... (run with --test-threads=1 to avoid nonce conflicts)
 forgetest!(zk_can_create_verify_with_optimization_runs_sepolia, |prj, cmd| {
     create_verify_with_optimization_runs(zk_env_externalities(), prj, cmd);
 });
 
-
-fn deploy_with_constructor_args(info: Option<EnvExternalities>, prj: TestProject, mut cmd: TestCommand) {
+fn deploy_with_constructor_args(
+    info: Option<EnvExternalities>,
+    prj: TestProject,
+    mut cmd: TestCommand,
+) {
     if let Some(info) = info {
         add_single_verify_target_with_constructor_file(&prj);
 
@@ -379,12 +320,16 @@ fn deploy_with_constructor_args(info: Option<EnvExternalities>, prj: TestProject
     }
 }
 
-fn create_then_verify_with_constructor_args(info: Option<EnvExternalities>, prj: TestProject, mut cmd: TestCommand) {
+fn create_then_verify_with_constructor_args(
+    info: Option<EnvExternalities>,
+    prj: TestProject,
+    mut cmd: TestCommand,
+) {
     if let Some(info) = info {
         add_single_verify_target_with_constructor_file(&prj);
 
         let contract_path = "src/Verify.sol:Verify";
-        
+
         let deploy_result = cmd
             .arg("create")
             .args(create_args(&info))
@@ -395,13 +340,13 @@ fn create_then_verify_with_constructor_args(info: Option<EnvExternalities>, prj:
             .arg("(42,TestString)")
             .arg("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
             .execute();
-            
+
         let deploy_stdout = String::from_utf8_lossy(&deploy_result.stdout);
-        
+
         assert!(deploy_result.status.success(), "Deployment should succeed");
         assert!(deploy_stdout.contains("Compiler run successful!"));
         assert!(deploy_stdout.contains("Deployed to:"));
-        
+
         let deployed_address = if let Some(addr_start) = deploy_stdout.find("Deployed to: 0x") {
             let addr_part = &deploy_stdout[addr_start + 13..];
             if let Some(addr_end) = addr_part.find('\n') {
@@ -412,9 +357,9 @@ fn create_then_verify_with_constructor_args(info: Option<EnvExternalities>, prj:
         } else {
             panic!("Could not find deployed contract address in output")
         };
-        
+
         std::thread::sleep(Duration::from_secs(15));
-        
+
         let verify_result = cmd
             .forge_fuse()
             .arg("verify-contract")
@@ -431,13 +376,15 @@ fn create_then_verify_with_constructor_args(info: Option<EnvExternalities>, prj:
             .arg("--verifier")
             .arg("zksync")
             .execute();
-        
+
         let verify_stdout = String::from_utf8_lossy(&verify_result.stdout);
         let verify_stderr = String::from_utf8_lossy(&verify_result.stderr);
-        
-        assert!(verify_stdout.contains("Start verifying contract") || 
-                verify_stderr.contains("Start verifying contract") ||
-                verify_stderr.contains("no deployed contract"));
+
+        assert!(
+            verify_stdout.contains("Start verifying contract")
+                || verify_stderr.contains("Start verifying contract")
+                || verify_stderr.contains("no deployed contract")
+        );
     }
 }
 
