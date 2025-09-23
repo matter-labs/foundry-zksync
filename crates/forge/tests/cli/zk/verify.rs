@@ -150,7 +150,6 @@ fn deploy_contract(
         .unwrap_or_else(|| panic!("Failed to parse deployer {output}"))
 }
 
-
 #[allow(clippy::disallowed_macros)]
 fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: TestCommand) {
     // only execute if keys present
@@ -243,13 +242,13 @@ fn parse_verification_id(out: &str) -> Option<String> {
 
 // tests `create && contract-verify && verify-check` on Sepolia testnet if correct env vars are set
 // ZKSYNC_TESTNET_PRIVATE_KEY=0x... (run with --test-threads=1 to avoid nonce conflicts)
-forgetest!(zk_can_verify_random_contract_sepolia, |prj, cmd| {
+forgetest!(test_zk_verify_random_contract_sepolia, |prj, cmd| {
     verify_on_chain(zk_env_externalities(), prj, cmd);
 });
 
 // tests `create --verify` on Sepolia testnet if correct env vars are set
 // ZKSYNC_TESTNET_PRIVATE_KEY=0x... (run with --test-threads=1 to avoid nonce conflicts)
-forgetest!(zk_can_create_verify_random_contract_sepolia, |prj, cmd| {
+forgetest!(test_zk_create_verify_random_contract_sepolia, |prj, cmd| {
     create_verify_on_chain(zk_env_externalities(), prj, cmd);
 });
 
@@ -288,7 +287,7 @@ fn create_verify_with_optimization_runs(
 
 // tests `create --verify` with optimization runs on Sepolia testnet if correct env vars are set
 // ZKSYNC_TESTNET_PRIVATE_KEY=0x... (run with --test-threads=1 to avoid nonce conflicts)
-forgetest!(zk_can_create_verify_with_optimization_runs_sepolia, |prj, cmd| {
+forgetest!(test_zk_create_verify_with_optimization_runs_sepolia, |prj, cmd| {
     create_verify_with_optimization_runs(zk_env_externalities(), prj, cmd);
 });
 
@@ -388,10 +387,10 @@ fn create_then_verify_with_constructor_args(
     }
 }
 
-forgetest!(zk_can_deploy_with_constructor_args_sepolia, |prj, cmd| {
+forgetest!(test_zk_deploy_with_constructor_args_sepolia, |prj, cmd| {
     deploy_with_constructor_args(zk_env_externalities(), prj, cmd);
 });
 
-forgetest!(zk_can_create_then_verify_with_constructor_args_sepolia, |prj, cmd| {
+forgetest!(test_zk_create_then_verify_with_constructor_args_sepolia, |prj, cmd| {
     create_then_verify_with_constructor_args(zk_env_externalities(), prj, cmd);
 });
