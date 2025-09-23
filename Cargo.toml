@@ -388,6 +388,8 @@ heck = "0.5"
 uuid = "1.17.0"
 flate2 = "1.1"
 snapbox = { version = "0.6", features = ["json", "regex", "term-svg"] }
+# Fix for RUSTSEC-2025-0071: ammonia XSS vulnerability
+ammonia = "4.1.2"
 
 ## Pinned dependencies. Enabled for the workspace in crates/test-utils.
 
