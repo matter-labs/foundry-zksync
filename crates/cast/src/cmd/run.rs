@@ -1,3 +1,4 @@
+use crate::debug::handle_traces;
 use alloy_consensus::Transaction;
 use alloy_network::{AnyNetwork, TransactionResponse};
 use alloy_primitives::{
@@ -11,7 +12,7 @@ use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
-    utils::{self, TraceResult, handle_traces, init_progress},
+    utils::{self, TraceResult, init_progress},
 };
 use foundry_common::{SYSTEM_TRANSACTION_TYPE, is_impersonated_tx, is_known_system_sender, shell};
 use foundry_compilers::artifacts::EvmVersion;
