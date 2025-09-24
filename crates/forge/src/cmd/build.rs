@@ -1,6 +1,6 @@
 use super::{install, watch::WatchArgs};
 use clap::Parser;
-use eyre::{Result, eyre};
+use eyre::{Result, WrapErr};
 use forge_lint::{linter::Linter, sol::SolidityLinter};
 use foundry_cli::{
     opts::BuildOpts,

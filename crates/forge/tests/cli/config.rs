@@ -207,6 +207,8 @@ forgetest!(can_extract_config_values, |prj, cmd| {
     // explicitly set all values
     let input = Config {
         profile: Config::DEFAULT_PROFILE,
+        zksync: Default::default(),
+        forks: Default::default(),
         // `profiles` is not serialized.
         profiles: vec![],
         root: ".".into(),

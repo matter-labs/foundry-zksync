@@ -27,7 +27,7 @@ use forge_script_sequence::{AdditionalContract, NestedValue};
 use forge_verify::{RetryArgs, VerifierArgs};
 use foundry_cli::{
     opts::{BuildOpts, EvmArgs, GlobalArgs},
-    utils::LoadConfig,
+    utils::{self, LoadConfig},
 };
 use foundry_common::{
     CONTRACT_MAX_SIZE, ContractsByArtifact, SELECTOR_LEN,

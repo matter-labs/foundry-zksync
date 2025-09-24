@@ -512,8 +512,8 @@ impl MultiContractRunnerBuilder {
         let LinkOutput {
             deployable_contracts,
             revert_decoder,
-            linked_contracts,
-            known_contracts: _,
+            linked_contracts: _,
+            known_contracts,
             libs_to_deploy,
             libraries,
         } = strategy.runner.link(
@@ -528,10 +528,6 @@ impl MultiContractRunnerBuilder {
             .into_iter()
             .map(|(id, (abi, bytecode))| (id, TestContract { abi, bytecode }))
             .collect();
-
-        // Create known contracts from linked contracts and storage layout information (if any).
-        let known_contracts =
-            ContractsByArtifactBuilder::new(linked_contracts).with_output(output, root).build();
 
         Ok(MultiContractRunner {
             contracts,

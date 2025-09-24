@@ -1233,16 +1233,10 @@ impl Cheatcodes {
                     let has_delegation = !active_delegation.is_empty();
                     let has_blob_sidecar = active_blob_sidecar.is_some();
 
-                    let (gas_seen, call_seen) =
+                    let (_gas_seen, _call_seen) =
                         self.dynamic_gas_limit_sequence.take().unwrap_or_default();
-                    // Transaction has fixed gas limit if no GAS opcode seen before CALL opcode.
-                    let mut is_fixed_gas_limit = !(gas_seen && call_seen);
-                    // Additional check as transfers in forge scripts seem to be estimated at 2300
-                    // by revm leading to "Intrinsic gas too low" failure when simulated on chain.
-                    if call.gas_limit < 21_000 {
-                        is_fixed_gas_limit = false;
-                    }
-                    // Ensure account is touched.
+                    // Gas limit determination is handled at the strategy level via
+                    // check_if_fixed_gas_limit Ensure account is touched.
                     ecx.journaled_state.touch(broadcast.new_origin);
 
                     self.strategy.runner.record_broadcastable_call_transactions(
@@ -1497,7 +1491,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
         if self.strategy.runner.pre_step_end(self.strategy.context.as_mut(), interpreter, ecx) {
             return;
         }
-        
+
         if self.broadcast.is_some() {
             self.set_gas_limit_type(interpreter);
         }
@@ -2755,4 +2749,14 @@ fn will_exit(action: &InterpreterAction) -> bool {
         }
         _ => false,
     }
+}
+
+/// Determines whether the transaction has a fixed gas limit based on the gas limit value.
+/// This is a simplified version for ZKsync compatibility since we can't access the inspector's
+/// dynamic gas limit sequence from external code.
+/// A transaction is considered to have fixed gas limit if the gas limit is reasonable (>= 21,000).
+pub fn check_if_fixed_gas_limit(_ecx: &Ecx, gas_limit: u64) -> bool {
+    // For ZKsync compatibility, we use a simplified check:
+    // If gas limit is very low (< 21,000), it's not fixed
+    gas_limit >= 21_000
 }

@@ -40,13 +40,8 @@ impl TracingExecutor {
             .inspectors(|stack| {
                 stack.trace_mode(trace_mode).networks(networks).create2_deployer(create2_deployer)
             })
-<<<<<<< HEAD
-            .spec_id(evm_spec_id(version.unwrap_or_default(), odyssey))
-            .build(env, db, strategy);
-=======
             .spec_id(evm_spec_id(version.unwrap_or_default()))
-            .build(env, db);
->>>>>>> 86d5c5b1cd (feat(forge): introduce network custom features, sunset Odyssey (#11675))
+            .build(env, db, strategy);
 
         // Apply the state overrides.
         if let Some(state_overrides) = state_overrides {

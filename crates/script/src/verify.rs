@@ -266,6 +266,8 @@ impl VerifyBundle {
                     language: None,            // TODO(zk): vyper is not supported right now
                     zksync: self.zksync,
                     creation_transaction_hash: None,
+                    no_auto_detect: false,
+                    use_solc: None,
                 };
 
                 return Some(verify);

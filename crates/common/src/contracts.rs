@@ -287,7 +287,9 @@ impl ContractsByArtifact {
 
         // Use upstream's builder pattern like in forge/src/multi_runner.rs
         let mut contracts = ContractsByArtifactBuilder::new(linked_contracts_cow)
-            .with_storage_layouts(original_output.clone())
+            .with_storage_layouts(original_output.artifact_ids().filter_map(|(id, artifact)| {
+                artifact.storage_layout.as_ref().map(|layout| (id, layout.clone()))
+            }))
             .build();
 
         // Apply ZKsync-specific flexible path matching for storage layouts
