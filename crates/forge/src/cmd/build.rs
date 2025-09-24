@@ -119,7 +119,7 @@ impl BuildArgs {
             // Only run the `SolidityLinter` if lint on build and no compilation errors.
             if config.lint.lint_on_build && !output.output().errors.iter().any(|e| e.is_error()) {
                 self.lint(&project, &config, self.paths.as_deref(), &mut output)
-                    .map_err(|err| eyre!("Lint failed: {err}"))?;
+                    .wrap_err("Lint failed")?;
             }
 
             // NOTE(zk): We skip returning output because currently there's no way to return from

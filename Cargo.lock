@@ -5614,6 +5614,7 @@ dependencies = [
  "foundry-compilers",
  "foundry-zksync-compilers",
  "foundry-zksync-core",
+ "rayon",
  "semver 1.0.27",
  "thiserror 2.0.16",
  "tracing",
