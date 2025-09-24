@@ -28,9 +28,11 @@ forge::cli:
     zk::ext_integration::test_zk_zkemail_zk_email_verify
     zk::inspect::test_zk_inspect
     zk::script::test_zk_can_execute_script_with_arguments
-    zk::verify::zk_can_create_verify_random_contract_sepolia
-    zk::verify::zk_can_create_verify_with_optimization_runs_sepolia
-    zk::verify::zk_can_verify_random_contract_sepolia
+    zk::verify::test_zk_create_then_verify_with_constructor_args_sepolia
+    zk::verify::test_zk_create_verify_random_contract_sepolia
+    zk::verify::test_zk_create_verify_with_optimization_runs_sepolia
+    zk::verify::test_zk_deploy_with_constructor_args_sepolia
+    zk::verify::test_zk_verify_random_contract_sepolia
     zk::verify_bytecode::zk_verify_bytecode
     zk::verify_bytecode::zk_verify_bytecode_error_diff
     zk::verify_bytecode::zk_verify_bytecode_ipfs
