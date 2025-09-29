@@ -119,12 +119,22 @@ impl<'a> ContractsByArtifactBuilder<'a> {
         Self { artifacts: artifacts.into_iter().collect(), storage_layouts: BTreeMap::new() }
     }
 
-    /// Adds storage layouts from `ProjectCompileOutput` to known artifacts.
-    pub fn with_storage_layouts(mut self, output: ProjectCompileOutput) -> Self {
-        self.storage_layouts = output
-            .into_artifacts()
-            .filter_map(|(id, artifact)| artifact.storage_layout.map(|layout| (id, layout)))
-            .collect();
+    /// Add storage layouts from the given `ProjectCompileOutput` to known artifacts.
+    pub fn with_output(self, output: &ProjectCompileOutput, base: &Path) -> Self {
+        self.with_storage_layouts(output.artifact_ids().filter_map(|(id, artifact)| {
+            artifact
+                .storage_layout
+                .as_ref()
+                .map(|layout| (id.with_stripped_file_prefixes(base), layout.clone()))
+        }))
+    }
+
+    /// Add storage layouts.
+    pub fn with_storage_layouts(
+        mut self,
+        layouts: impl IntoIterator<Item = (ArtifactId, StorageLayout)>,
+    ) -> Self {
+        self.storage_layouts.extend(layouts);
         self
     }
 
@@ -261,6 +271,7 @@ impl ContractsByArtifact {
     pub fn zksync_new_with_storage_layouts(
         linked_contracts: impl IntoIterator<Item = (ArtifactId, CompactContractBytecode)>,
         original_output: ProjectCompileOutput,
+        base: &Path,
     ) -> Self {
         // Convert CompactContractBytecode to CompactContractBytecodeCow for builder compatibility
         let linked_contracts_cow = linked_contracts.into_iter().map(|(id, bytecode)| {
@@ -277,7 +288,7 @@ impl ContractsByArtifact {
 
         // Use upstream's builder pattern like in forge/src/multi_runner.rs
         let mut contracts = ContractsByArtifactBuilder::new(linked_contracts_cow)
-            .with_storage_layouts(original_output.clone())
+            .with_output(&original_output, base)
             .build();
 
         // Apply ZKsync-specific flexible path matching for storage layouts

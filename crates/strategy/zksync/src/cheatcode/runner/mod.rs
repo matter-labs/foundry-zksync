@@ -176,6 +176,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         config: Arc<CheatsConfig>,
         input: &dyn CommonCreateInput,
         ecx_inner: Ecx<'_, '_, '_>,
+        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
     ) {
@@ -186,15 +187,13 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 config,
                 input,
                 ecx_inner,
+                is_fixed_gas_limit,
                 broadcast,
                 broadcastable_transactions,
             );
         }
 
         let ctx = ctx_zk;
-
-        let is_fixed_gas_limit =
-            foundry_cheatcodes::check_if_fixed_gas_limit(&ecx_inner, input.gas_limit());
 
         let init_code = input.init_code();
         let to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
@@ -301,6 +300,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         config: Arc<CheatsConfig>,
         call: &CallInputs,
         ecx_inner: Ecx<'_, '_, '_>,
+        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
         active_delegations: Vec<SignedAuthorization>,
@@ -314,6 +314,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 config,
                 call,
                 ecx_inner,
+                is_fixed_gas_limit,
                 broadcast,
                 broadcastable_transactions,
                 active_delegations,
@@ -323,8 +324,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let ctx = ctx_zk;
 
-        let is_fixed_gas_limit =
-            foundry_cheatcodes::check_if_fixed_gas_limit(&ecx_inner, call.gas_limit);
+        // `is_fixed_gas_limit` is computed by the caller and passed in.
 
         let tx_nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner);
 

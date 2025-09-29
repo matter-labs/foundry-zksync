@@ -8,7 +8,7 @@ use forge::{
 use foundry_cli::utils::{self, install_crypto_provider};
 use foundry_compilers::{
     Project, ProjectCompileOutput, SolcConfig, Vyper,
-    artifacts::{EvmVersion, Libraries, Settings, output_selection::ContractOutputSelection},
+    artifacts::{EvmVersion, Settings, output_selection::ContractOutputSelection},
     compilers::multi::MultiCompiler,
     utils::RuntimeOrHandle,
 };
@@ -22,6 +22,7 @@ use foundry_evm::{constants::CALLER, opts::EvmOpts};
 use foundry_test_utils::{
     TestCommand, ZkSyncNode, fd_lock, init_tracing,
     rpc::{next_http_archive_rpc_url, next_rpc_endpoint},
+    test_debug,
     util::OutputExt,
 };
 use foundry_zksync_compilers::{
@@ -32,6 +33,7 @@ use revm::primitives::hardfork::SpecId;
 use semver::Version;
 use std::{
     env, fmt,
+    fs::{self, File},
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, LazyLock},
@@ -41,7 +43,6 @@ type ZkProject = Project<ZkSolcCompiler, ZkArtifactOutput>;
 
 pub const RE_PATH_SEPARATOR: &str = "/";
 const TESTDATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../testdata");
-static VYPER: LazyLock<PathBuf> = LazyLock::new(|| std::env::temp_dir().join("vyper"));
 
 /// Profile for the tests group. Used to configure separate configurations for test runs.
 pub enum ForgeTestProfile {
@@ -72,11 +73,7 @@ impl ForgeTestProfile {
 
     /// Configures the solc settings for the test profile.
     pub fn solc_config(&self) -> SolcConfig {
-        let libs =
-            ["fork/Fork.t.sol:DssExecLib:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4".to_string()];
-
-        let mut settings =
-            Settings { libraries: Libraries::parse(&libs).unwrap(), ..Default::default() };
+        let mut settings = Settings::default();
 
         if matches!(self, Self::Paris) {
             settings.evm_version = Some(EvmVersion::Paris);
@@ -112,9 +109,6 @@ impl ForgeTestProfile {
         config.src = self.root().join(self.to_string());
         config.out = self.root().join("out").join(self.to_string());
         config.cache_path = self.root().join("cache").join(self.to_string());
-        config.libraries = vec![
-            "fork/Fork.t.sol:DssExecLib:0xfD88CeE74f7D78697775aBDAE53f9Da1559728E4".to_string(),
-        ];
 
         config.prompt_timeout = 0;
 
@@ -409,15 +403,30 @@ impl ForgeTestData {
 
 /// Installs Vyper if it's not already present.
 pub fn get_vyper() -> Vyper {
+    static VYPER: LazyLock<PathBuf> = LazyLock::new(|| std::env::temp_dir().join("vyper"));
+
     if let Ok(vyper) = Vyper::new("vyper") {
         return vyper;
     }
     if let Ok(vyper) = Vyper::new(&*VYPER) {
         return vyper;
     }
-    RuntimeOrHandle::new().block_on(async {
+    return RuntimeOrHandle::new().block_on(install());
+
+    async fn install() -> Vyper {
         #[cfg(target_family = "unix")]
         use std::{fs::Permissions, os::unix::fs::PermissionsExt};
+
+        let path = VYPER.as_path();
+        let mut file = File::create(path).unwrap();
+        if let Err(e) = file.try_lock() {
+            if let fs::TryLockError::WouldBlock = e {
+                file.lock().unwrap();
+                assert!(path.exists());
+                return Vyper::new(path).unwrap();
+            }
+            file.lock().unwrap();
+        }
 
         let suffix = match svm::platform() {
             svm::Platform::MacOsAarch64 => "darwin",
@@ -428,21 +437,24 @@ pub fn get_vyper() -> Vyper {
                  install it manually and add it to $PATH"
             ),
         };
-        let url = format!("https://github.com/vyperlang/vyper/releases/download/v0.4.3/vyper.0.4.3+commit.bff19ea2.{suffix}");
+        let url = format!(
+            "https://github.com/vyperlang/vyper/releases/download/v0.4.3/vyper.0.4.3+commit.bff19ea2.{suffix}"
+        );
 
+        test_debug!("downloading vyper from {url}");
         let res = reqwest::Client::builder().build().unwrap().get(url).send().await.unwrap();
 
         assert!(res.status().is_success());
 
         let bytes = res.bytes().await.unwrap();
 
-        std::fs::write(&*VYPER, bytes).unwrap();
+        file.write_all(&bytes).unwrap();
 
         #[cfg(target_family = "unix")]
-        std::fs::set_permissions(&*VYPER, Permissions::from_mode(0o755)).unwrap();
+        file.set_permissions(Permissions::from_mode(0o755)).unwrap();
 
-        Vyper::new(&*VYPER).unwrap()
-    })
+        Vyper::new(path).unwrap()
+    }
 }
 
 pub fn get_compiled(project: &mut Project) -> ProjectCompileOutput {

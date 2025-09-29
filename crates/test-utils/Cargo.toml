@@ -39,6 +39,8 @@ ui_test = "0.30.2"
 httptest.workspace = true
 tower-http = { version = "0.6.2", features = ["cors"] }
 anyhow = "1.0"
+reqwest.workspace = true
+svm.workspace = true
 
 # zk
 zksync_types.workspace = true

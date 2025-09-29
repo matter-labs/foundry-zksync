@@ -41,9 +41,6 @@ pub struct ProjectCompiler {
     /// The root of the project.
     project_root: PathBuf,
 
-    /// Whether we are going to verify the contracts after compilation.
-    verify: Option<bool>,
-
     /// Whether to also print contract names.
     print_names: Option<bool>,
 
@@ -59,7 +56,7 @@ pub struct ProjectCompiler {
     /// Whether to ignore the contract initcode size limit introduced by EIP-3860.
     ignore_eip_3860: bool,
 
-    /// Extra files to include, that are not necessarily in the project's source dir.
+    /// Extra files to include, that are not necessarily in the project's source directory.
     files: Vec<PathBuf>,
 
     /// Set zksync specific settings based on context
@@ -82,7 +79,6 @@ impl ProjectCompiler {
     pub fn new() -> Self {
         Self {
             project_root: PathBuf::new(),
-            verify: None,
             print_names: None,
             print_sizes: None,
             quiet: Some(crate::shell::is_quiet()),
@@ -92,13 +88,6 @@ impl ProjectCompiler {
             zksync: false,
             dynamic_test_linking: false,
         }
-    }
-
-    /// Sets whether we are going to verify the contracts after compilation.
-    #[inline]
-    pub fn verify(mut self, yes: bool) -> Self {
-        self.verify = Some(yes);
-        self
     }
 
     /// Sets whether to print contract names.
@@ -193,15 +182,6 @@ impl ProjectCompiler {
     }
 
     /// Compiles the project with the given closure
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use foundry_common::compile::ProjectCompiler;
-    /// let config = foundry_config::Config::load().unwrap();
-    /// let prj = config.project().unwrap();
-    /// ProjectCompiler::new().compile_with(|| Ok(prj.compile()?)).unwrap();
-    /// ```
     fn compile_with<C: Compiler<CompilerContract = Contract>, F>(
         self,
         f: F,
@@ -212,7 +192,7 @@ impl ProjectCompiler {
         let quiet = self.quiet.unwrap_or(false);
         let bail = self.bail.unwrap_or(true);
 
-        let output = with_compilation_reporter(quiet, || {
+        let output = with_compilation_reporter(quiet, Some(self.project_root.clone()), || {
             tracing::debug!("compiling project");
 
             let timer = Instant::now();
@@ -529,8 +509,6 @@ pub struct ContractInfo {
 ///
 /// If `quiet` no solc related output will be emitted to stdout.
 ///
-/// If `verify` and it's a standalone script, throw error. Only allowed for projects.
-///
 /// **Note:** this expects the `target_path` to be absolute
 pub fn compile_target<C: Compiler<CompilerContract = Contract>>(
     target_path: &Path,
@@ -596,13 +574,17 @@ pub fn etherscan_project(metadata: &Metadata, target_path: &Path) -> Result<Proj
 }
 
 /// Configures the reporter and runs the given closure.
-pub fn with_compilation_reporter<O>(quiet: bool, f: impl FnOnce() -> O) -> O {
+pub fn with_compilation_reporter<O>(
+    quiet: bool,
+    project_root: Option<PathBuf>,
+    f: impl FnOnce() -> O,
+) -> O {
     #[expect(clippy::collapsible_else_if)]
     let reporter = if quiet || shell::is_json() {
         Report::new(NoReporter::default())
     } else {
         if std::io::stdout().is_terminal() {
-            Report::new(SpinnerReporter::spawn())
+            Report::new(SpinnerReporter::spawn(project_root))
         } else {
             Report::new(BasicStdoutReporter::default())
         }
