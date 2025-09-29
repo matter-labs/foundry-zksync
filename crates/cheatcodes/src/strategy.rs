@@ -77,6 +77,7 @@ pub trait CheatcodeInspectorStrategyRunner:
     fn base_contract_deployed(&self, _ctx: &mut dyn CheatcodeInspectorStrategyContext) {}
 
     /// Record broadcastable transaction during CREATE.
+    #[allow(clippy::too_many_arguments)]
     fn record_broadcastable_create_transactions(
         &self,
         _ctx: &mut dyn CheatcodeInspectorStrategyContext,
