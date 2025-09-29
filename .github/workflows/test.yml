@@ -1,7 +1,5 @@
 name: test
 
-permissions: {}
-
 on:
   push:
     branches:
@@ -20,13 +18,10 @@ env:
   CARGO_TERM_COLOR: always
   TARGET_RUST_VERSION: "stable"
   RUST_BACKTRACE: full
-  RUSTC_WRAPPER: "sccache"
 
 jobs:
   nextest:
     uses: ./.github/workflows/nextest.yml
-    permissions:
-      contents: read
     with:
       profile: default
     secrets: inherit
@@ -51,15 +46,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
         with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
-        with:
-          toolchain: nightly
-          components: clippy
-      - uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+          cache-on-failure: true
       - run: cargo clippy --workspace --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
@@ -69,6 +59,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly-2025-03-19 # Required for unstable features in rustfmt
           components: rustfmt
@@ -79,14 +70,10 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master
-        with:
-          toolchain: stable
-      - uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
+          cache-on-failure: true
       - name: forge fmt
         shell: bash
         run: ./.github/scripts/format.sh --check
@@ -94,8 +81,6 @@ jobs:
   codespell:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: codespell-project/actions-codespell@v2
@@ -161,9 +146,7 @@ jobs:
           ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --no-fail-fast --package '*' --lib --test '*' -E '(test(~zk) or package(~zksync)) and not test(~test_zk_aave_di)'
 
   deny:
-    uses: ithacaxyz/ci/.github/workflows/deny.yml@9c8d0dc20e7ad02455d3fdab2378a05f29907630 # main
-    permissions:
-      contents: read
+    uses: ithacaxyz/ci/.github/workflows/deny.yml@main
 
   check-ci-install:
     name: CI install
