@@ -34,7 +34,7 @@ resolver = "2"
 metadata.upstream_version = "1.3.5"
 
 [workspace.package]
-version = "0.0.28" # x-release-please-version
+version = "0.0.29" # x-release-please-version
 edition = "2024"
 # Remember to update clippy.toml as well
 rust-version = "1.89"
@@ -266,7 +266,7 @@ alloy-sol-macro-expander = "1.3.1"
 alloy-sol-macro-input = "1.3.1"
 alloy-sol-types = "1.3.1"
 
-alloy-chains = "0.2"
+alloy-chains = "=0.2.9"
 alloy-rlp = "0.3"
 alloy-zksync = { version = "1.0.11-alpha.1", git = "https://github.com/matter-labs/alloy-zksync", branch = "popzxc-1.0.0-alpha.2" }
 
@@ -388,6 +388,8 @@ heck = "0.5"
 uuid = "1.17.0"
 flate2 = "1.1"
 snapbox = { version = "0.6", features = ["json", "regex", "term-svg"] }
+# Fix for RUSTSEC-2025-0071: ammonia XSS vulnerability
+ammonia = "4.1.2"
 
 ## Pinned dependencies. Enabled for the workspace in crates/test-utils.
 
