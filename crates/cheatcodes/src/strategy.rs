@@ -12,7 +12,7 @@ use revm::{
 use crate::{
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
     CheatsConfig, CheatsCtxt, DynCheatcode, Result,
-    inspector::{CommonCreateInput, Ecx},
+    inspector::{CommonCreateInput, Ecx, check_if_fixed_gas_limit},
     script::Broadcast,
 };
 
@@ -77,14 +77,12 @@ pub trait CheatcodeInspectorStrategyRunner:
     fn base_contract_deployed(&self, _ctx: &mut dyn CheatcodeInspectorStrategyContext) {}
 
     /// Record broadcastable transaction during CREATE.
-    #[allow(clippy::too_many_arguments)]
     fn record_broadcastable_create_transactions(
         &self,
         _ctx: &mut dyn CheatcodeInspectorStrategyContext,
         config: Arc<CheatsConfig>,
         input: &dyn CommonCreateInput,
         ecx: Ecx,
-        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
     );
@@ -190,10 +188,14 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         _config: Arc<CheatsConfig>,
         input: &dyn CommonCreateInput,
         ecx: Ecx,
-        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
     ) {
+        let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx, input.gas_limit());
+
+        info!(target: "cheatcodes", "CREATE: is_fixed_gas_limit={}, will set gas={:?}", 
+            is_fixed_gas_limit, if is_fixed_gas_limit { Some(input.gas_limit()) } else { None });
+
         let to = None;
         let nonce: u64 = ecx.journaled_state.state()[&broadcast.new_origin].info.nonce;
         //drop the mutable borrow of account

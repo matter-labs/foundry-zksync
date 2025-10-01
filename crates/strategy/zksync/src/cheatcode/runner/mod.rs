@@ -176,7 +176,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         config: Arc<CheatsConfig>,
         input: &dyn CommonCreateInput,
         ecx_inner: Ecx<'_, '_, '_>,
-        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
     ) {
@@ -187,7 +186,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 config,
                 input,
                 ecx_inner,
-                is_fixed_gas_limit,
                 broadcast,
                 broadcastable_transactions,
             );
@@ -280,7 +278,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             value: Some(input.value()),
             input: TransactionInput::new(call_init_code),
             nonce: Some(nonce),
-            gas: if is_fixed_gas_limit { Some(input.gas_limit()) } else { None },
             ..Default::default()
         });
         tx.other.insert(

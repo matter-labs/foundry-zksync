@@ -831,14 +831,12 @@ impl Cheatcodes {
 
             if curr_depth == broadcast.depth {
                 input.set_caller(broadcast.new_origin);
-                let is_fixed_gas_limit = true;
 
                 self.strategy.runner.record_broadcastable_create_transactions(
                     self.strategy.context.as_mut(),
                     self.config.clone(),
                     &input,
                     ecx,
-                    is_fixed_gas_limit,
                     broadcast,
                     &mut self.broadcastable_transactions,
                 );
@@ -2610,6 +2608,20 @@ impl Cheatcodes {
         // Reset dynamic gas limit sequence if GAS opcode was not followed by a CALL opcode.
         self.dynamic_gas_limit_sequence = None;
     }
+}
+
+// Determines if the gas limit on a given call was manually set in the script and should therefore
+// not be overwritten by later estimations
+pub fn check_if_fixed_gas_limit(ecx: &Ecx, call_gas_limit: u64) -> bool {
+    // If the gas limit was not set in the source code it is set to the estimated gas left at the
+    // time of the call, which should be rather close to configured gas limit.
+    // TODO: Find a way to reliably make this determination.
+    // For example by generating it in the compilation or EVM simulation process
+    ecx.tx.gas_limit > ecx.block.gas_limit &&
+        call_gas_limit <= ecx.block.gas_limit
+        // Transfers in forge scripts seem to be estimated at 2300 by revm leading to "Intrinsic
+        // gas too low" failure when simulated on chain
+        && call_gas_limit > 2300
 }
 
 /// Helper that expands memory, stores a revert string pertaining to a disallowed memory write,
