@@ -31,6 +31,7 @@ use crate::{
 use super::ZkEnv;
 
 /// Transacts
+#[allow(clippy::too_many_arguments)]
 pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,

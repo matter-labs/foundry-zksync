@@ -223,8 +223,6 @@ where
         "gas usage",
     );
 
-    println!("OUT CreateOutcom: {create_outcome:?}");
-
     let account_accesses = era_db.get_account_accesses();
 
     // TODO(zk): adapt this to use account_accesses as well
@@ -257,10 +255,6 @@ where
                 .unwrap_or_default();
             info!("zk vm decoded result {}", hex::encode(&result));
 
-            println!(
-                "call_ctx.is_create={} | create-outcome{:?}",
-                call_ctx.is_create, create_outcome
-            );
             let output = if call_ctx.is_create {
                 match create_outcome {
                     Some(outcome) => Output::Create(
@@ -269,12 +263,9 @@ where
                     ),
                     None => Output::Create(Default::default(), Default::default()),
                 }
-                // Output::Create(Bytes::from(create_result), create_outcome.map(|o| o.address))
             } else {
                 Output::Call(Bytes::from(result))
             };
-
-            println!("OUTPUTx {output:?}");
 
             ZKVMExecutionResult {
                 logs: logs.clone(),
@@ -354,12 +345,6 @@ where
 
     for (k, v) in modified_storage {
         let address = k.address().to_address();
-
-        println!("{:?} {:?} {:?}", k.address(), k.key(), v);
-
-        if address == alloy_primitives::address!("0x0000000000000000000000000000000000008005") {
-            println!("IMM {:?} {:?} = {:?} | {:?}", k.address(), k.key(), v, k.hashed_key());
-        }
 
         let index = k.key().to_ru256();
         era_db.load_account(address);
@@ -517,7 +502,6 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 
     let mut vm: Vm<_, HistoryDisabled> = Vm::new(batch_env, system_env, storage.clone());
 
-    println!("FINAL TX {l2_tx:?}");
     let tx: Transaction = l2_tx.into();
 
     let call_tracer_result = Arc::default();
@@ -544,18 +528,6 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         )
         .into_tracer_pointer(),
     ];
-
-    // vm.push_transaction(anvil_zksync_types::L2TxBuilder::new(
-    //             anvil_zksync_config::constants::PSEUDO_CALLER,
-    //             Nonce(0),
-    //             U256::from(300_000),
-    //             U256::from(u32::MAX),
-    //             chain_id,
-    //         )
-    //         .with_to(CONTRACT_DEPLOYER_ADDRESS)
-    //         .with_calldata(Bytes::from_static(anvil_zksync_config::constants::EVM_EMULATOR_ENABLER_CALLDATA).to_vec())
-    //         .build_impersonated()
-    //     .into());
 
     let compressed_bytecodes = vm.push_transaction(tx.clone()).compressed_bytecodes.into_owned();
     let mut tx_result = vm.inspect(&mut tracers.into(), InspectExecutionMode::OneTx);
@@ -647,8 +619,6 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
                 Some(zksync_types::InputData { hash: Default::default(), data: Default::default() })
         }
 
-        println!("TX_RES {tx_result:?}");
-
         let tx_results_pretty = TransactionSummary::new(l2_gas_price, &tx, &tx_result, None);
         let resolve_hashes = get_env_var::<bool>("ZK_DEBUG_RESOLVE_HASHES");
         let trace_verbosity = get_env_var_or::<u8>("ZK_DEBUG_TRACE_VERBOSITY", 2);
@@ -683,19 +653,14 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
         }
     }
 
-    println!("LEN COMPRESSED CODE {}", compressed_bytecodes.len());
-    println!("COMPRESSED CODE {:?}", compressed_bytecodes);
     let bytecodes = compressed_bytecodes
         .into_iter()
         .map(|b| {
             zksync_types::bytecode::validate_bytecode(&b.original).expect("invalid bytecode");
             let hash = BytecodeHash::for_bytecode(&b.original).value();
-
-            println!("BYT {:?} {}", hash, hex::encode(&b.original[..20]));
-
             (hash, b.original)
         })
-        .chain(tx_result.dynamic_factory_deps.clone().into_iter())
+        .chain(tx_result.dynamic_factory_deps.clone())
         .collect::<HashMap<_, _>>();
     let modified_storage = storage.borrow().modified_storage_keys().clone();
 
@@ -706,43 +671,23 @@ fn inspect_inner<S: ReadStorage + StorageAccessRecorder>(
 
     // define a CREATE outcome that contains the additional data necessary for upstream to set up
     // the output result.
-    println!("RESULT {:#?}", tx_result.result);
-    println!("is create: {is_create}");
     let create_outcome = if is_create {
-        println!("tx res: {:?}", tx_result.result);
         match &tx_result.result {
-            ExecutionResult::Success { .. } => {
-                // let result = ethabi::decode(&[ethabi::ParamType::Bytes], output)
-                //     .ok()
-                //     .and_then(|result| result.first().cloned())
-                //     .and_then(|result| result.into_bytes())
-                //     .unwrap_or_default();
-
-                let addr = contract_address_from_tx_result(&tx_result);
-                println!("addr {addr:?}");
-                contract_address_from_tx_result(&tx_result)
-                    .map(|address| {
-                        println!("get code for {address:?}");
-                        deployed_bytecode_hashes.get(&address).cloned().and_then(|hash| {
-                            println!("hash {hash:?}");
-                            let x = bytecodes
-                                .get(&hash)
-                                .cloned()
-                                .or_else(|| storage.borrow_mut().load_factory_dep(hash))
-                                .map(|bytecode| InnerCreateOutcome { address, hash, bytecode });
-                            println!("with factory dep {x:?}");
-
-                            x
-                        })
+            ExecutionResult::Success { .. } => contract_address_from_tx_result(&tx_result)
+                .and_then(|address| {
+                    deployed_bytecode_hashes.get(&address).cloned().and_then(|hash| {
+                        bytecodes
+                            .get(&hash)
+                            .cloned()
+                            .or_else(|| storage.borrow_mut().load_factory_dep(hash))
+                            .map(|bytecode| InnerCreateOutcome { address, hash, bytecode })
                     })
-                    .flatten()
-            }
+                }),
             _ => None,
         }
     } else {
         None
     };
-    println!("CREATE OUTCOME {create_outcome:?}");
 
     if is_static {
         InnerZkVmResult {
