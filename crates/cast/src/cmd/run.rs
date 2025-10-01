@@ -317,7 +317,7 @@ impl RunArgs {
                     } else {
                         trace!(tx=?tx.tx_hash(), "executing previous create transaction");
                         if self.zk_force {
-                            if let Err(error) = executor.transact_with_env(env) {
+                            if let Err(error) = executor.transact_with_env(env.clone()) {
                                 return Err(error).wrap_err_with(|| {
                                     format!(
                                         "Failed to deploy transaction: {:?} in block {}",
