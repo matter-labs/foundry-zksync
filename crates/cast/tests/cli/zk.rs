@@ -929,6 +929,39 @@ casttest!(test_zk_cast_run_with_evm_interpreter, async |prj, cmd| {
         output_with.contains("Traces:"),
         "EVM interpreter mode didn't produce traces, got:\n{output_with}"
     );
+
+    // Extract gas usage from both outputs
+    let gas_regex = Regex::new(r"Gas used: (\d+)").expect("invalid regex");
+
+    let gas_without_caps = gas_regex
+        .captures(&output_without)
+        .expect("failed to extract gas usage from zkVM mode output");
+    let gas_without: u64 = gas_without_caps
+        .get(1)
+        .expect("failed getting gas value")
+        .as_str()
+        .parse()
+        .expect("failed parsing gas value");
+
+    let gas_with_caps = gas_regex
+        .captures(&output_with)
+        .expect("failed to extract gas usage from EVM interpreter mode output");
+    let gas_with: u64 = gas_with_caps
+        .get(1)
+        .expect("failed getting gas value")
+        .as_str()
+        .parse()
+        .expect("failed parsing gas value");
+
+    // Verify that EVM interpreter uses more gas than zkVM mode
+    assert!(
+        gas_with > gas_without,
+        "EVM interpreter gas usage ({}) should be greater than zkVM gas usage ({}), but it's not. zkVM output:\n{}\nEVM interpreter output:\n{}",
+        gas_with,
+        gas_without,
+        output_without,
+        output_with
+    );
 });
 
 casttest!(test_zk_cast_run_with_create_transaction_on_sepolia, async |_prj, cmd| {
