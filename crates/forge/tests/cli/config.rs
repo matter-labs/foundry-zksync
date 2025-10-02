@@ -1189,7 +1189,7 @@ ignored_error_codes = [
     "transient-storage",
 ]
 ignored_warnings_from = []
-deny_warnings = false
+deny = "never"
 test_failures_file = "cache/test-failures"
 show_progress = false
 ffi = false
@@ -1228,7 +1228,7 @@ create2_library_salt = "0x000000000000000000000000000000000000000000000000000000
 create2_deployer = "0x4e59b44847b379578588920ca78fbf26c0b4956c"
 assertions_revert = true
 legacy_assertions = false
-odyssey = false
+celo = false
 transaction_timeout = 120
 additional_compiler_profiles = []
 compilation_restrictions = []
@@ -1270,6 +1270,8 @@ wrap_comments = false
 ignore = []
 contract_new_lines = false
 sort_imports = false
+pow_no_space = false
+call_compact_args = true
 
 [lint]
 severity = []
