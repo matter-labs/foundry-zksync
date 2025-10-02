@@ -296,7 +296,7 @@ impl RunArgs {
                             .unwrap()
                             .get(index)
                             .expect("Failed to get transaction");
-                        let metadata = configure_zksync_tx_env(&mut env, raw_tx, false);
+                        let metadata = configure_zksync_tx_env(&mut env, raw_tx);
                         let mut other_fields = OtherFields::default();
                         other_fields.insert(
                             foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
@@ -337,20 +337,18 @@ impl RunArgs {
                                     )
                                 });
                             }
-                        } else {
-                            if let Err(error) = executor.deploy_with_env(env.clone(), None) {
-                                match error {
-                                    // Reverted transactions should be skipped
-                                    EvmError::Execution(_) => (),
-                                    error => {
-                                        return Err(error).wrap_err_with(|| {
-                                            format!(
-                                                "Failed to deploy transaction: {:?} in block {}",
-                                                tx.tx_hash(),
-                                                env.evm_env.block_env.number
-                                            )
-                                        });
-                                    }
+                        } else if let Err(error) = executor.deploy_with_env(env.clone(), None) {
+                            match error {
+                                // Reverted transactions should be skipped
+                                EvmError::Execution(_) => (),
+                                error => {
+                                    return Err(error).wrap_err_with(|| {
+                                        format!(
+                                            "Failed to deploy transaction: {:?} in block {}",
+                                            tx.tx_hash(),
+                                            env.evm_env.block_env.number
+                                        )
+                                    });
                                 }
                             }
                         }
@@ -376,7 +374,7 @@ impl RunArgs {
                     .find(|raw_tx| raw_tx.hash() == zksync_types::H256::from(tx.tx_hash().0))
                     .ok_or_else(|| eyre::eyre!("Could not find target transaction in raw block"))?;
 
-                let metadata = configure_zksync_tx_env(&mut env, raw_tx, self.zk_evm_interpreter);
+                let metadata = configure_zksync_tx_env(&mut env, raw_tx);
                 let mut other_fields = OtherFields::default();
                 other_fields.insert(
                     foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
@@ -496,7 +494,6 @@ impl figment::Provider for RunArgs {
 pub fn configure_zksync_tx_env(
     env: &mut Env,
     outer_tx: &ZkTransaction,
-    use_evm_interpreter_override: bool,
 ) -> foundry_zksync_core::ZkTransactionMetadata {
     use alloy_primitives::TxKind;
     use foundry_zksync_core::convert::{ConvertH160, ConvertU256};
@@ -508,10 +505,6 @@ pub fn configure_zksync_tx_env(
     env.tx.caller = outer_tx.initiator_account().to_address();
 
     let recipient_account = outer_tx.recipient_account();
-
-    // Note: If the user explicitly requested EVM interpreter via flag, use that.
-    // Otherwise, set to None to let the config/context decide.
-    let use_evm_interpreter = if use_evm_interpreter_override { Some(true) } else { None };
 
     env.tx.kind = TxKind::Call(recipient_account.unwrap_or_default().to_address());
     env.tx.gas_limit = match &outer_tx.common_data {
@@ -530,12 +523,12 @@ pub fn configure_zksync_tx_env(
         ExecuteTransactionCommon::L2(common_data) => foundry_zksync_core::ZkTransactionMetadata {
             factory_deps: outer_tx.execute.factory_deps.clone(),
             paymaster_data: Some(common_data.paymaster_params.clone()),
-            force_evm_interpreter: use_evm_interpreter,
+            force_evm_interpreter: None,
         },
         _ => foundry_zksync_core::ZkTransactionMetadata {
             factory_deps: outer_tx.execute.factory_deps.clone(),
             paymaster_data: None,
-            force_evm_interpreter: use_evm_interpreter,
+            force_evm_interpreter: None,
         },
     }
 }

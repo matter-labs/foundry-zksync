@@ -884,84 +884,19 @@ casttest!(test_zk_cast_run_with_evm_interpreter, async |prj, cmd| {
     let caps = re.captures(&output).expect("failed getting capture");
     let tx_hash = caps.get(1).expect("failed getting tx hash").as_str();
 
-    // Run without EVM interpreter flag
-    let output_without = cmd
+    let output = cmd
         .cast_fuse()
         .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
         .assert_success()
         .get_output()
         .stdout_lossy();
 
-    // Run with EVM interpreter flag
-    let output_with = cmd
-        .cast_fuse()
-        .args([
-            "run",
-            "--rpc-url",
-            &url,
-            "--zksync",
-            "--zk-evm-interpreter",
-            tx_hash,
-            "--no-storage-caching",
-        ])
-        .assert_success()
-        .get_output()
-        .stdout_lossy();
-
     assert!(
-        output_without.contains(&format!("{deployed_addr}::increment()"))
-            && output_without.contains("Return"),
-        "trace without EVM interpreter flag missing or incomplete, got:\n{output_without}"
+        output.contains(&format!("{deployed_addr}::increment()")) && output.contains("Return"),
+        "trace missing or incomplete, got:\n{output}"
     );
 
-    assert!(
-        output_with.contains(&format!("{deployed_addr}::increment()"))
-            && output_with.contains("Return"),
-        "trace with EVM interpreter flag missing or incomplete, got:\n{output_with}"
-    );
-
-    assert!(
-        output_without.contains("Traces:"),
-        "zkVM mode didn't produce traces, got:\n{output_without}"
-    );
-
-    assert!(
-        output_with.contains("Traces:"),
-        "EVM interpreter mode didn't produce traces, got:\n{output_with}"
-    );
-
-    // Extract gas usage from both outputs
-    let gas_regex = Regex::new(r"Gas used: (\d+)").expect("invalid regex");
-
-    let gas_without_caps = gas_regex
-        .captures(&output_without)
-        .expect("failed to extract gas usage from zkVM mode output");
-    let gas_without: u64 = gas_without_caps
-        .get(1)
-        .expect("failed getting gas value")
-        .as_str()
-        .parse()
-        .expect("failed parsing gas value");
-
-    let gas_with_caps = gas_regex
-        .captures(&output_with)
-        .expect("failed to extract gas usage from EVM interpreter mode output");
-    let gas_with: u64 = gas_with_caps
-        .get(1)
-        .expect("failed getting gas value")
-        .as_str()
-        .parse()
-        .expect("failed parsing gas value");
-
-    // Verify that EVM interpreter uses more gas than zkVM mode
-    assert!(
-        gas_with > gas_without,
-        "EVM interpreter gas usage ({}) should be greater than zkVM gas usage ({}), but it's not. zkVM output:\n{}\nEVM interpreter output:\n{}",
-        gas_with,
-        gas_without,
-        output_without,
-        output_with
-    );
+    assert!(output.contains("Traces:"), "trace missing, got:\n{output}");
 });
 
 casttest!(test_zk_cast_run_with_create_transaction_on_sepolia, async |_prj, cmd| {
