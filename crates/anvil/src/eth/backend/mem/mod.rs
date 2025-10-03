@@ -99,6 +99,7 @@ use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use foundry_evm::{
     backend::{DatabaseError, DatabaseResult, RevertStateSnapshotAction},
     constants::DEFAULT_CREATE2_DEPLOYER_RUNTIME_CODE,
+    core::{either_evm::EitherEvm, precompiles::EC_RECOVER},
     decode::RevertDecoder,
     inspectors::AccessListInspector,
     traces::{
@@ -107,7 +108,6 @@ use foundry_evm::{
     },
     utils::{get_blob_base_fee_update_fraction, get_blob_base_fee_update_fraction_by_spec_id},
 };
-use foundry_evm_core::{either_evm::EitherEvm, precompiles::EC_RECOVER};
 use futures::channel::mpsc::{UnboundedSender, unbounded};
 use op_alloy_consensus::DEPOSIT_TX_TYPE_ID;
 use op_revm::{
@@ -2093,7 +2093,7 @@ impl Backend {
         hash: B256,
     ) -> Result<Vec<Log>, BlockchainError> {
         if let Some(block) = self.blockchain.get_block_by_hash(&hash) {
-            return Ok(self.mined_logs_for_block(filter, block));
+            return Ok(self.mined_logs_for_block(filter, block, hash));
         }
 
         if let Some(fork) = self.get_fork() {
@@ -2104,9 +2104,8 @@ impl Backend {
     }
 
     /// Returns all `Log`s mined by the node that were emitted in the `block` and match the `Filter`
-    fn mined_logs_for_block(&self, filter: Filter, block: Block) -> Vec<Log> {
+    fn mined_logs_for_block(&self, filter: Filter, block: Block, block_hash: B256) -> Vec<Log> {
         let mut all_logs = Vec::new();
-        let block_hash = block.header.hash_slow();
         let mut block_log_index = 0u32;
 
         let storage = self.blockchain.storage.read();
@@ -2167,8 +2166,12 @@ impl Backend {
         }
 
         for number in from..=to {
-            if let Some(block) = self.get_block(number) {
-                all_logs.extend(self.mined_logs_for_block(filter.clone(), block));
+            let storage = self.blockchain.storage.read();
+            if let Some(&block_hash) = storage.hashes.get(&number)
+                && let Some(block) = storage.blocks.get(&block_hash).cloned()
+            {
+                drop(storage);
+                all_logs.extend(self.mined_logs_for_block(filter.clone(), block, block_hash));
             }
         }
 

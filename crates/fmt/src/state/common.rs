@@ -147,7 +147,7 @@ impl<'ast> State<'_, 'ast> {
         let quote = match self.config.quote_style {
             config::QuoteStyle::Double => '\"',
             config::QuoteStyle::Single => '\'',
-            config::QuoteStyle::Preserve => self.char_at(quote_pos),
+            config::QuoteStyle::Preserve => self.char_at(quote_pos).unwrap_or_default(),
         };
         debug_assert!(matches!(quote, '\"' | '\''), "{quote:?}");
         let s = solar::parse::interface::data_structures::fmt::from_fn(move |f| {
@@ -212,7 +212,7 @@ impl<'ast> State<'_, 'ast> {
         format: ListFormat,
     ) where
         P: FnMut(&mut Self, &'a T),
-        S: FnMut(&T) -> Option<Span> + Copy,
+        S: FnMut(&T) -> Span,
     {
         if self.handle_span(Span::new(pos_lo, pos_hi), true) {
             return;
@@ -232,26 +232,24 @@ impl<'ast> State<'_, 'ast> {
         }
 
         // Format single-item inline lists directly without boxes
-        self.print_inside_parens(|state| match get_span(&values[0]) {
-            Some(span) => {
-                state.s.cbox(state.ind);
-                let mut skip_break = true;
-                if state.peek_comment_before(span.hi()).is_some() {
-                    state.hardbreak();
-                    skip_break = false;
-                }
-
-                state.print_comments(span.lo(), CommentConfig::skip_ws().mixed_prev_space());
-                print(state, &values[0]);
-
-                if !state.print_trailing_comment(span.hi(), None) && skip_break {
-                    state.neverbreak();
-                } else {
-                    state.break_offset_if_not_bol(0, -state.ind, false);
-                }
-                state.end();
+        self.print_inside_parens(|state| {
+            let span = get_span(&values[0]);
+            state.s.cbox(state.ind);
+            let mut skip_break = true;
+            if state.peek_comment_before(span.hi()).is_some() {
+                state.hardbreak();
+                skip_break = false;
             }
-            None => print(state, &values[0]),
+
+            state.print_comments(span.lo(), CommentConfig::skip_ws().mixed_prev_space());
+            print(state, &values[0]);
+
+            if !state.print_trailing_comment(span.hi(), None) && skip_break {
+                state.neverbreak();
+            } else {
+                state.break_offset_if_not_bol(0, -state.ind, false);
+            }
+            state.end();
         });
     }
 
@@ -263,7 +261,7 @@ impl<'ast> State<'_, 'ast> {
         get_span: S,
     ) where
         P: FnMut(&mut Self, &'a T),
-        S: FnMut(&T) -> Option<Span>,
+        S: FnMut(&T) -> Span,
     {
         if self.handle_span(span, false) {
             return;
@@ -281,9 +279,9 @@ impl<'ast> State<'_, 'ast> {
         format: ListFormat,
     ) -> bool
     where
-        S: FnMut(&T) -> Option<Span>,
+        S: FnMut(&T) -> Span,
     {
-        let Some(span) = values.first().and_then(&mut get_span) else {
+        let Some(span) = values.first().map(&mut get_span) else {
             return false;
         };
 
@@ -357,7 +355,7 @@ impl<'ast> State<'_, 'ast> {
         format: ListFormat,
     ) where
         P: FnMut(&mut Self, &'a T),
-        S: FnMut(&T) -> Option<Span>,
+        S: FnMut(&T) -> Span,
     {
         if values.is_empty() {
             return;
@@ -366,8 +364,8 @@ impl<'ast> State<'_, 'ast> {
         let first = get_span(&values[0]);
         // we can't simply check `peek_comment_before(pos_hi)` cause we would also account for
         // comments in the child expression, and those don't matter.
-        let has_comments = self.peek_comment_before(first.map_or(pos_hi, |s| s.lo())).is_some()
-            || self.peek_comment_between(first.map_or(pos_hi, |s| s.hi()), pos_hi).is_some();
+        let has_comments = self.peek_comment_before(first.lo()).is_some()
+            || self.peek_comment_between(first.hi(), pos_hi).is_some();
         let is_single_without_cmnts = values.len() == 1 && !format.break_single && !has_comments;
 
         let skip_first_break = if format.with_delimiters || format.is_inline() {
@@ -399,10 +397,9 @@ impl<'ast> State<'_, 'ast> {
             is_single_without_cmnts || !format.with_delimiters || format.is_inline();
         for (i, value) in values.iter().enumerate() {
             let is_last = i == values.len() - 1;
-            if let Some(span) = get_span(value)
-                && self
-                    .print_comments(span.lo(), CommentConfig::skip_ws().mixed_prev_space())
-                    .is_some_and(|cmnt| cmnt.is_mixed())
+            if self
+                .print_comments(get_span(value).lo(), CommentConfig::skip_ws().mixed_prev_space())
+                .is_some_and(|cmnt| cmnt.is_mixed())
                 && format.breaks_cmnts
             {
                 self.hardbreak(); // trailing and isolated comments already hardbreak
@@ -410,18 +407,32 @@ impl<'ast> State<'_, 'ast> {
 
             print(self, value);
 
+            let next_span = if is_last { None } else { Some(get_span(&values[i + 1])) };
+            let next_pos = next_span.map(Span::lo).unwrap_or(pos_hi);
+            let cmnt_before_next =
+                self.peek_comment_before(next_pos).map(|cmnt| (cmnt.span, cmnt.style));
+
             if !is_last {
+                // Handle disabled lines with comments after the value, but before the comma.
+                if cmnt_before_next.is_some_and(|(cmnt_span, _)| {
+                    let span = self.cursor.span(cmnt_span.lo());
+                    self.inline_config.is_disabled(span)
+                        // NOTE: necessary workaround to patch this edgecase due to lack of spans for the commas.
+                        && self.sm.span_to_snippet(span).is_ok_and(|snip| !snip.contains(','))
+                }) {
+                    self.print_comments(
+                        next_pos,
+                        CommentConfig::skip_ws().mixed_no_break().mixed_prev_space(),
+                    );
+                }
                 self.print_word(",");
             }
 
-            let next_span = if is_last { None } else { get_span(&values[i + 1]) };
-            let next_pos = next_span.map(Span::lo).unwrap_or(pos_hi);
-
             if !is_last
                 && format.breaks_cmnts
-                && self.peek_comment_before(next_pos).is_some_and(|cmnt| {
-                    let disabled = self.inline_config.is_disabled(cmnt.span);
-                    (cmnt.style.is_mixed() && !disabled) || (cmnt.style.is_isolated() && disabled)
+                && cmnt_before_next.is_some_and(|(cmnt_span, cmnt_style)| {
+                    let disabled = self.inline_config.is_disabled(cmnt_span);
+                    (cmnt_style.is_mixed() && !disabled) || (cmnt_style.is_isolated() && disabled)
                 })
             {
                 self.hardbreak(); // trailing and isolated comments already hardbreak
@@ -447,7 +458,12 @@ impl<'ast> State<'_, 'ast> {
                 && !self.is_bol_or_only_ind()
                 && !self.inline_config.is_disabled(next_span)
             {
-                format.print_break(false, values.len(), &mut self.s);
+                if next_span.is_dummy() && !matches!(format.kind, ListFormatKind::AlwaysBreak) {
+                    // Don't add spaces between uninformed items (commas)
+                    self.zerobreak();
+                } else {
+                    format.print_break(false, values.len(), &mut self.s);
+                }
             }
         }
 
@@ -529,8 +545,10 @@ impl<'ast> State<'_, 'ast> {
             BlockFormat::NoBraces(Some(offset)) => {
                 let enabled =
                     !self.inline_config.is_disabled(Span::new(block_lo, block_lo + BytePos(1)))
-                        && !self.handle_span(self.cursor.span(block_lo), false);
-                match self.peek_comment_before(block_lo).map(|cmnt| (cmnt.span, cmnt.style)) {
+                        && !self.handle_span(self.cursor.span(block_lo), true);
+                match self.peek_comment().and_then(|cmnt| {
+                    if cmnt.span.hi() < block_lo { Some((cmnt.span, cmnt.style)) } else { None }
+                }) {
                     Some((span, style)) => {
                         if enabled {
                             // Inline config is not disabled and span not handled
@@ -538,15 +556,16 @@ impl<'ast> State<'_, 'ast> {
                                 self.cursor.advance_to(span.lo(), true);
                                 self.break_offset(SIZE_INFINITY as usize, offset);
                             }
-                            if let Some(cmnt) = self
-                                .print_comments(block_lo, CommentConfig::default().offset(offset))
-                                && !cmnt.is_mixed()
+                            if let Some(cmnt) = self.print_comments(
+                                block_lo,
+                                CommentConfig::skip_leading_ws(false).offset(offset),
+                            ) && !cmnt.is_mixed()
                                 && !cmnt.is_blank()
                             {
                                 self.s.offset(offset);
                             }
                         } else if style.is_isolated() {
-                            Separator::Space.print(&mut self.s, &mut self.cursor);
+                            self.print_sep_unhandled(Separator::Space);
                             self.s.offset(offset);
                         }
                     }
@@ -555,7 +574,7 @@ impl<'ast> State<'_, 'ast> {
                             self.zerobreak();
                             self.s.offset(offset);
                         } else if self.cursor.enabled {
-                            Separator::Space.print(&mut self.s, &mut self.cursor);
+                            self.print_sep_unhandled(Separator::Space);
                             self.s.offset(offset);
                             self.cursor.advance_to(block_lo, true);
                         }
@@ -766,10 +785,6 @@ impl ListFormat {
         matches!(self.kind, ListFormatKind::Inline)
     }
 
-    pub(crate) fn has_indentation(&self) -> bool {
-        !self.no_ind
-    }
-
     pub(crate) fn breaks_with_comments(&self) -> bool {
         self.breaks_cmnts
     }
@@ -861,6 +876,7 @@ impl ListFormat {
 
 /// Formatting style for code blocks
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(dead_code)]
 pub(crate) enum BlockFormat {
     Regular,
     /// Attempts to fit all elements in one line, before breaking consistently. Flags whether to
