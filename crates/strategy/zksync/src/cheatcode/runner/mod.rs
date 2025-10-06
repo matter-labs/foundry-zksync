@@ -321,8 +321,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let ctx = ctx_zk;
 
-        // `is_fixed_gas_limit` is computed by the caller and passed in.
-
         let tx_nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner);
 
         let factory_deps = &mut ctx.set_deployer_call_input_factory_deps;
