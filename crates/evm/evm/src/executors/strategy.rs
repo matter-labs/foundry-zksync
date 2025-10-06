@@ -124,7 +124,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         inspector: &mut InspectorStack,
     ) -> Result<ResultAndState>;
 
-    fn new_backend_strategy(&self) -> BackendStrategy;
+    fn new_backend_strategy(&self, ctx: &dyn ExecutorStrategyContext) -> BackendStrategy;
     fn new_cheatcode_inspector_strategy(
         &self,
         ctx: &dyn ExecutorStrategyContext,
@@ -260,7 +260,7 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
         backend.inspect(env, inspector, Box::new(()))
     }
 
-    fn new_backend_strategy(&self) -> BackendStrategy {
+    fn new_backend_strategy(&self, _ctx: &dyn ExecutorStrategyContext) -> BackendStrategy {
         BackendStrategy::new_evm()
     }
 

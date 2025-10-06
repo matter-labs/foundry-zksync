@@ -31,6 +31,18 @@ pub struct ZkSyncArgs {
     )]
     pub startup: Option<bool>,
 
+    /// Enable zkVM EVM intepreter
+    #[clap(
+        long = "zk-evm-interpreter",
+        display_order = 0,
+        value_name = "ENABLE_ZKVM_EVM_INTERPRETER",
+        num_args = 0..=1,
+        require_equals = true,
+        default_missing_value = "false",
+        requires = "startup",
+    )]
+    pub evm_interpreter: Option<bool>,
+
     #[clap(
         help = "Solc compiler path to use when compiling with zksolc",
         long = "zk-solc-path",
@@ -156,6 +168,7 @@ impl ZkSyncArgs {
 
         set_if_some!(self.compile, zksync.compile);
         set_if_some!(self.startup, zksync.startup);
+        set_if_some!(self.evm_interpreter, zksync.evm_interpreter);
         set_if_some!(self.solc_path.clone(), zksync.solc_path);
         set_if_some!(self.enable_eravm_extensions, zksync.enable_eravm_extensions);
         set_if_some!(self.llvm_options.clone(), zksync.llvm_options);

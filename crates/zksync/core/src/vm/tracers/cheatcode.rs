@@ -108,6 +108,8 @@ pub struct CheatcodeTracerContext<'a> {
     pub zk_env: ZkEnv,
     /// Whether to record storage accesses.
     pub record_storage_accesses: bool,
+    /// Whether to use EVM interpreter.
+    pub evm_interpreter: bool,
 }
 
 /// Tracer result to return back to foundry.
@@ -148,6 +150,8 @@ pub struct CallContext {
     pub block_hashes: HashMap<rU256, FixedBytes<32>>, // TODO(zk): change to u64
     /// Whether to record storage accesses.
     pub record_storage_accesses: bool,
+    /// Whether to use EVM interpreter.
+    pub evm_interpreter: bool,
 }
 
 /// A tracer to allow for foundry-specific functionality.

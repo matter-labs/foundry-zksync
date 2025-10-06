@@ -7,6 +7,7 @@ mod contracts;
 mod create;
 mod create2;
 mod deploy;
+mod evm_interpreter;
 mod factory;
 mod factory_deps;
 mod fork;
