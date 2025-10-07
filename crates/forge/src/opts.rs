@@ -113,12 +113,8 @@ pub enum ForgeSubcommand {
     #[command(visible_alias = "com")]
     Completions {
         #[arg(value_enum)]
-        shell: foundry_common::clap::Shell,
+        shell: foundry_cli::clap::Shell,
     },
-
-    /// Generate Fig autocompletion spec.
-    #[command(visible_alias = "fig")]
-    GenerateFigSpec,
 
     /// Remove the build artifacts and cache directories.
     #[command(visible_alias = "cl")]
@@ -177,6 +173,7 @@ pub enum ForgeSubcommand {
     },
 
     /// Generate scaffold files.
+    #[command(hide = true)]
     Generate(generate::GenerateArgs),
 
     /// Compiler utilities.
@@ -215,7 +212,6 @@ impl ForgeSubcommand {
             Self::Remappings(_) => ("remappings", None),
             Self::Init(_) => ("init", None),
             Self::Completions { shell: _ } => ("completions", None),
-            Self::GenerateFigSpec => ("generate-fig-spec", None),
             Self::Clean { root: _ } => ("clean", None),
             Self::Snapshot(_) => ("snapshot", None),
             Self::Fmt(_) => ("fmt", None),

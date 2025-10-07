@@ -95,6 +95,7 @@ pub trait CheatcodeInspectorStrategyRunner:
         config: Arc<CheatsConfig>,
         input: &CallInputs,
         ecx: Ecx,
+        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
         active_delegations: Vec<SignedAuthorization>,
@@ -192,6 +193,9 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
     ) {
         let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx, input.gas_limit());
 
+        info!(target: "cheatcodes", "CREATE: is_fixed_gas_limit={}, will set gas={:?}", 
+            is_fixed_gas_limit, if is_fixed_gas_limit { Some(input.gas_limit()) } else { None });
+
         let to = None;
         let nonce: u64 = ecx.journaled_state.state()[&broadcast.new_origin].info.nonce;
         //drop the mutable borrow of account
@@ -219,13 +223,13 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         _config: Arc<CheatsConfig>,
         call: &CallInputs,
         ecx: Ecx,
+        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
         active_delegation: Vec<SignedAuthorization>,
         active_blob_sidecar: Option<BlobTransactionSidecar>,
     ) {
         let input = TransactionInput::new(call.input.bytes(ecx));
-        let is_fixed_gas_limit = check_if_fixed_gas_limit(&ecx, call.gas_limit);
 
         let account = ecx.journaled_state.state().get_mut(&broadcast.new_origin).unwrap();
         let nonce = account.info.nonce;

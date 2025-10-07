@@ -27,6 +27,7 @@ use foundry_evm::{
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
+use foundry_evm_networks::NetworkConfigs;
 use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
 use std::{
@@ -51,6 +52,7 @@ pub type DeployableContracts = BTreeMap<ArtifactId, TestContract>;
 
 /// A multi contract runner receives a set of contracts deployed in an EVM instance and proceeds
 /// to run all test functions in these contracts.
+#[derive(Clone, Debug)]
 pub struct MultiContractRunner {
     /// Mapping of contract name to JsonAbi, creation bytecode and library bytecode which
     /// needs to be deployed & linked against
@@ -286,7 +288,7 @@ impl MultiContractRunner {
 /// Configuration for the test runner.
 ///
 /// This is modified after instantiation through inline config.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TestRunnerConfig {
     /// Project config.
     pub config: Arc<Config>,
@@ -310,8 +312,8 @@ pub struct TestRunnerConfig {
     pub decode_internal: InternalTraceMode,
     /// Whether to enable call isolation.
     pub isolation: bool,
-    /// Whether to enable Odyssey features.
-    pub odyssey: bool,
+    /// Networks with enabled features.
+    pub networks: NetworkConfigs,
     /// Whether to exit early on test failure.
     pub fail_fast: FailFast,
 }
@@ -324,7 +326,7 @@ impl TestRunnerConfig {
 
         self.spec_id = config.evm_spec_id();
         self.sender = config.sender;
-        self.odyssey = config.odyssey;
+        self.networks.celo = config.celo;
         self.isolation = config.isolate;
 
         // Specific to Forge, not present in config.
@@ -350,7 +352,7 @@ impl TestRunnerConfig {
         inspector.tracing(self.trace_mode());
         inspector.collect_line_coverage(self.line_coverage);
         inspector.enable_isolation(self.isolation);
-        inspector.odyssey(self.odyssey);
+        inspector.networks(self.networks);
         // inspector.set_create2_deployer(self.evm_opts.create2_deployer);
 
         // executor.env_mut().clone_from(&self.env);
@@ -382,7 +384,7 @@ impl TestRunnerConfig {
                     .trace_mode(self.trace_mode())
                     .line_coverage(self.line_coverage)
                     .enable_isolation(self.isolation)
-                    .odyssey(self.odyssey)
+                    .networks(self.networks)
                     .create2_deployer(self.evm_opts.create2_deployer)
             })
             .spec_id(self.spec_id)
@@ -423,8 +425,8 @@ pub struct MultiContractRunnerBuilder {
     pub decode_internal: InternalTraceMode,
     /// Whether to enable call isolation
     pub isolation: bool,
-    /// Whether to enable Odyssey features.
-    pub odyssey: bool,
+    /// Networks with enabled features.
+    pub networks: NetworkConfigs,
     /// Whether to exit early on test failure.
     pub fail_fast: bool,
 }
@@ -441,7 +443,7 @@ impl MultiContractRunnerBuilder {
             debug: Default::default(),
             isolation: Default::default(),
             decode_internal: Default::default(),
-            odyssey: Default::default(),
+            networks: Default::default(),
             fail_fast: false,
         }
     }
@@ -491,8 +493,8 @@ impl MultiContractRunnerBuilder {
         self
     }
 
-    pub fn odyssey(mut self, enable: bool) -> Self {
-        self.odyssey = enable;
+    pub fn networks(mut self, networks: NetworkConfigs) -> Self {
+        self.networks = networks;
         self
     }
 
@@ -550,7 +552,7 @@ impl MultiContractRunnerBuilder {
                 decode_internal: self.decode_internal,
                 inline_config: Arc::new(InlineConfig::new_parsed(output, &self.config)?),
                 isolation: self.isolation,
-                odyssey: self.odyssey,
+                networks: self.networks,
                 config: self.config,
                 fail_fast: FailFast::new(self.fail_fast),
             },

@@ -76,27 +76,15 @@ targets = [t_linux_x86] if is_pr else [t_linux_x86, t_macos]
 
 config = [
     Case(
-        name="unit",
-        filter="!kind(test)",
+        name="all",
+        filter="!test(/\\bext_integration/)",
         n_partitions=1,
         pr_cross_platform=True,
     ),
     Case(
-        name="integration",
-        filter="kind(test) & !test(/\\b(issue|ext_integration)/)",
-        n_partitions=3,
-        pr_cross_platform=True,
-    ),
-    Case(
-        name="integration / issue-repros",
-        filter="package(=forge) & test(/\\bissue/)",
-        n_partitions=2,
-        pr_cross_platform=False,
-    ),
-    Case(
-        name="integration / external",
+        name="external",
         filter="package(=forge) & test(/\\bext_integration/)",
-        n_partitions=2,
+        n_partitions=1,
         pr_cross_platform=False,
     ),
 ]

@@ -2,16 +2,12 @@
 
 name: dependencies
 
+permissions: {}
+
 on:
   schedule:
-    # Run weekly
-    - cron: "0 0 * * SUN"
-  workflow_dispatch:
-# Needed so we can run it manually
-
-permissions:
-  contents: write
-  pull-requests: write
+    - cron: "0 0 * * SUN" # Run weekly on Sundays at midnight UTC
+  workflow_dispatch: # Needed so we can run it manually
 
 jobs:
     update:
