@@ -29,7 +29,7 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run anvil-zksync
-        uses: dutterbutter/anvil-zksync-action@v1.1.0
+        uses: dutterbutter/anvil-zksync-action@v1.3.0
         with:
           mode: fork
           forkUrl: mainnet
