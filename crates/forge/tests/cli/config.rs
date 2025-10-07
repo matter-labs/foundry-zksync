@@ -1245,6 +1245,7 @@ path = "out"
 [profile.default.zksync]
 compile = false
 startup = false
+evm_interpreter = false
 size_fallback = false
 enable_eravm_extensions = false
 force_evmla = false
@@ -1559,6 +1560,7 @@ exclude = []
   "zksync": {
     "compile": false,
     "startup": false,
+    "evm_interpreter": false,
     "zksolc": null,
     "solc_path": null,
     "hash_type": null,

@@ -212,7 +212,10 @@ impl SessionSource {
             Some(backend) => backend,
             None => {
                 let fork = self.config.evm_opts.get_fork(&self.config.foundry_config, env.clone());
-                let backend = Backend::spawn(fork, strategy.runner.new_backend_strategy())?;
+                let backend = Backend::spawn(
+                    fork,
+                    strategy.runner.new_backend_strategy(strategy.context.as_ref()),
+                )?;
                 self.config.backend = Some(backend.clone());
                 backend
             }
