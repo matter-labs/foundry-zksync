@@ -25,7 +25,7 @@ jobs:
       test-matrix: ${{ steps.gen.outputs.test-matrix }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Generate matrices
@@ -70,7 +70,7 @@ jobs:
         with:
           bun-version: latest
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: 3.11
       - name: Install Vyper
