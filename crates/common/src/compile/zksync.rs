@@ -65,9 +65,10 @@ impl ProjectCompiler {
                     "Compiling with zksolc v{zksolc_current_version} which is still not supported and may lead to unexpected errors. Specifying an unsupported version is deprecated and will return an error in future versions of foundry-zksync. Latest version supported is v{zksolc_latest_supported_version}"
                 )?;
             }
-            Report::new(SpinnerReporter::spawn_with(format!(
-                "Using zksolc-{zksolc_current_version}"
-            )));
+            Report::new(SpinnerReporter::spawn_with_message(
+                Some(self.project_root.clone()),
+                format!("Using zksolc-{zksolc_current_version}"),
+            ));
         }
 
         self.zksync_compile_with(|| {
@@ -95,7 +96,10 @@ impl ProjectCompiler {
             Report::new(NoReporter::default())
         } else {
             if std::io::stdout().is_terminal() {
-                Report::new(SpinnerReporter::spawn_with("Compiling (zksync)"))
+                Report::new(SpinnerReporter::spawn_with_message(
+                    Some(self.project_root.clone()),
+                    "Compiling (zksync)",
+                ))
             } else {
                 Report::new(BasicStdoutReporter::default())
             }

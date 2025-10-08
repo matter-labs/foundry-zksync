@@ -39,6 +39,7 @@ pub struct ZkSyncArgs {
         num_args = 0..=1,
         require_equals = true,
         default_missing_value = "false",
+        requires = "startup",
     )]
     pub evm_interpreter: Option<bool>,
 

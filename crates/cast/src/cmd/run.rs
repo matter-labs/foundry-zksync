@@ -1,3 +1,4 @@
+use crate::debug::handle_traces;
 use alloy_consensus::Transaction;
 use alloy_network::{AnyNetwork, TransactionResponse};
 use alloy_primitives::{
@@ -11,7 +12,7 @@ use clap::Parser;
 use eyre::{Result, WrapErr};
 use foundry_cli::{
     opts::{EtherscanOpts, RpcOpts},
-    utils::{self, TraceResult, handle_traces, init_progress},
+    utils::{self, TraceResult, init_progress},
 };
 use foundry_common::{SYSTEM_TRANSACTION_TYPE, is_impersonated_tx, is_known_system_sender, shell};
 use foundry_compilers::artifacts::EvmVersion;
@@ -95,10 +96,6 @@ pub struct RunArgs {
     /// See also, <https://docs.alchemy.com/reference/compute-units#what-are-cups-compute-units-per-second>
     #[arg(long, value_name = "NO_RATE_LIMITS", visible_alias = "no-rpc-rate-limit")]
     pub no_rate_limit: bool,
-
-    /// Enables Odyssey features.
-    #[arg(long, alias = "alphanet")]
-    pub odyssey: bool,
 
     /// Use current project artifacts for trace decoding.
     #[arg(long, visible_alias = "la")]
@@ -194,8 +191,8 @@ impl RunArgs {
         config.fork_block_number = Some(tx_block_number - 1);
 
         let create2_deployer = evm_opts.create2_deployer;
-        let (mut env, fork, chain, odyssey) =
-            TracingExecutor::get_fork_material(&config, evm_opts).await?;
+        let (mut env, fork, chain, networks) =
+            TracingExecutor::get_fork_material(&mut config, evm_opts).await?;
         let mut evm_version = self.evm_version;
 
         env.evm_env.cfg_env.disable_block_gas_limit = self.disable_block_gas_limit;
@@ -241,7 +238,7 @@ impl RunArgs {
             fork,
             evm_version,
             trace_mode,
-            odyssey,
+            networks,
             create2_deployer,
             None,
             strategy,
@@ -472,10 +469,6 @@ impl figment::Provider for RunArgs {
 
     fn data(&self) -> Result<Map<Profile, Dict>, figment::Error> {
         let mut map = Map::new();
-
-        if self.odyssey {
-            map.insert("odyssey".into(), self.odyssey.into());
-        }
 
         if let Some(api_key) = &self.etherscan.key {
             map.insert("etherscan_api_key".into(), api_key.as_str().into());

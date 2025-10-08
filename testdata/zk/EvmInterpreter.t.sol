@@ -26,10 +26,7 @@ contract EvmInterpreterTest is DSTest {
 
         // uses EVM address derivation
         // 0xB5c1DF089600415B21FB76bf89900Adb575947c8 in eraVM.
-        assertEq(
-            address(0x7D8CB8F412B3ee9AC79558791333F41d2b1ccDAC),
-            address(counter)
-        );
+        assertEq(address(0x7D8CB8F412B3ee9AC79558791333F41d2b1ccDAC), address(counter));
     }
 
     function testCall() public {
@@ -37,10 +34,7 @@ contract EvmInterpreterTest is DSTest {
 
         // uses EVM address derivation
         // 0xB5c1DF089600415B21FB76bf89900Adb575947c8 in eraVM.
-        assertEq(
-            address(0x7D8CB8F412B3ee9AC79558791333F41d2b1ccDAC),
-            address(counter)
-        );
+        assertEq(address(0x7D8CB8F412B3ee9AC79558791333F41d2b1ccDAC), address(counter));
 
         assertEq(1, counter.get());
         counter.inc();

@@ -193,9 +193,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let ctx = ctx_zk;
 
-        let is_fixed_gas_limit =
-            foundry_cheatcodes::check_if_fixed_gas_limit(&ecx_inner, input.gas_limit());
-
         let init_code = input.init_code();
         let to = Some(TxKind::Call(CONTRACT_DEPLOYER_ADDRESS.to_address()));
         let mut nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner) as u64;
@@ -281,7 +278,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             value: Some(input.value()),
             input: TransactionInput::new(call_init_code),
             nonce: Some(nonce),
-            gas: if is_fixed_gas_limit { Some(input.gas_limit()) } else { None },
             ..Default::default()
         });
         tx.other.insert(
@@ -301,6 +297,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         config: Arc<CheatsConfig>,
         call: &CallInputs,
         ecx_inner: Ecx<'_, '_, '_>,
+        is_fixed_gas_limit: bool,
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
         active_delegations: Vec<SignedAuthorization>,
@@ -314,6 +311,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 config,
                 call,
                 ecx_inner,
+                is_fixed_gas_limit,
                 broadcast,
                 broadcastable_transactions,
                 active_delegations,
@@ -322,9 +320,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         }
 
         let ctx = ctx_zk;
-
-        let is_fixed_gas_limit =
-            foundry_cheatcodes::check_if_fixed_gas_limit(&ecx_inner, call.gas_limit);
 
         let tx_nonce = foundry_zksync_core::tx_nonce(broadcast.new_origin, ecx_inner);
 

@@ -219,7 +219,7 @@ impl BuildArgs {
 
             if !input_files.is_empty() {
                 let compiler = output.parser_mut().solc_mut().compiler_mut();
-                linter.lint(&input_files, compiler)?;
+                linter.lint(&input_files, config.deny, compiler)?;
             }
         }
 

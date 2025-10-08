@@ -3,7 +3,7 @@
 //! Core EVM abstractions.
 
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use crate::constants::DEFAULT_CREATE2_DEPLOYER;
 use alloy_evm::eth::EthEvmContext;
@@ -27,6 +27,8 @@ pub mod abi {
 
 pub mod env;
 pub use env::*;
+use foundry_evm_networks::NetworkConfigs;
+
 pub mod backend;
 pub mod buffer;
 pub mod constants;
@@ -63,9 +65,9 @@ pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>
         let _ = msg;
     }
 
-    /// Returns `true` if the current network is Odyssey.
-    fn is_odyssey(&self) -> bool {
-        false
+    /// Returns configured networks.
+    fn get_networks(&self) -> NetworkConfigs {
+        NetworkConfigs::default()
     }
 
     /// Returns the CREATE2 deployer address.

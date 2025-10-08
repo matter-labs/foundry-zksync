@@ -911,11 +911,7 @@ contract ZkStateDiffTest is DSTest {
         out[1] = b;
     }
 
-    function filterCallOrCreate(Vm.AccountAccess[] memory inArr)
-        internal
-        pure
-        returns (Vm.AccountAccess[] memory out)
-    {
+    function filterCallOrCreate(Vm.AccountAccess[] memory inArr) internal pure returns (Vm.AccountAccess[] memory out) {
         // allocate max length for out array
         out = new Vm.AccountAccess[](inArr.length);
         // track end size
