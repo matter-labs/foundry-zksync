@@ -11,6 +11,7 @@ use foundry_config::{Chain, Config};
 use foundry_evm::executors::strategy::ExecutorStrategy;
 use foundry_strategy_zksync::ZksyncExecutorStrategyBuilder;
 use itertools::Itertools;
+use path_slash::PathExt;
 use regex::Regex;
 use serde::de::DeserializeOwned;
 use std::{
@@ -742,13 +743,9 @@ ignore them in the `.gitignore` file."
     }
 
     /// Get the URL of a submodule from git config
-    pub fn submodule_url(self, path: impl AsRef<OsStr>) -> Result<Option<String>> {
+    pub fn submodule_url(self, path: &Path) -> Result<Option<String>> {
         self.cmd()
-            .args([
-                "config",
-                "--get",
-                &format!("submodule.{}.url", path.as_ref().to_string_lossy()),
-            ])
+            .args(["config", "--get", &format!("submodule.{}.url", path.to_slash_lossy())])
             .get_stdout_lossy()
             .map(|url| Some(url.trim().to_string()))
     }

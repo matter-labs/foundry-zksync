@@ -56,6 +56,7 @@ foundry-zksync-compilers.workspace = true
 path-slash = "0.2"
 
 [dev-dependencies]
+snapbox.workspace = true
 similar-asserts.workspace = true
 figment = { workspace = true, features = ["test"] }
 tempfile.workspace = true

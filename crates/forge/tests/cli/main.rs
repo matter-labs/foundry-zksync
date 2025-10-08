@@ -21,6 +21,7 @@ mod eip712;
 mod failure_assertions;
 mod inline_config;
 mod install;
+mod json;
 mod lint;
 mod multi_script;
 mod precompiles;
@@ -33,5 +34,7 @@ mod verify_bytecode;
 mod version;
 
 mod ext_integration;
+mod fmt;
+mod fmt_integration;
 mod test_optimizer;
 mod zk;

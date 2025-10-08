@@ -10,21 +10,30 @@ use crate::{
 };
 use foundry_common::{comments::Comment, iter::IterDelimited};
 use foundry_config::fmt::{self as config, MultilineFuncHeaderStyle};
-use solar::parse::{
-    ast::{self, Span},
-    interface::BytePos,
+use solar::{
+    ast::BoxSlice,
+    interface::SpannedOption,
+    parse::{
+        ast::{self, Span},
+        interface::BytePos,
+    },
 };
 use std::{collections::HashMap, fmt::Debug};
 
 #[rustfmt::skip]
 macro_rules! get_span {
-    () => { |value| Some(value.span) };
-    (()) => { |value| Some(value.span()) };
+    () => { |value| value.span };
+    (()) => { |value| value.span() };
 }
 
 /// Language-specific pretty printing: Solidity.
 impl<'ast> State<'_, 'ast> {
     pub(crate) fn print_source_unit(&mut self, source_unit: &'ast ast::SourceUnit<'ast>) {
+        // Figure out if the cursor needs to check for CR (`\r`).
+        if let Some(item) = source_unit.items.first() {
+            self.check_crlf(item.span.to(source_unit.items.last().unwrap().span));
+        }
+
         let mut items = source_unit.items.iter().peekable();
         let mut is_first = true;
         while let Some(item) = items.next() {
@@ -71,7 +80,7 @@ impl<'ast> State<'_, 'ast> {
             }
         }
 
-        self.print_remaining_comments();
+        self.print_remaining_comments(is_first);
     }
 
     /// Prints a hardbreak if the item needs an isolated line break.
@@ -150,7 +159,7 @@ impl<'ast> State<'_, 'ast> {
         self.print_comments(span.hi(), CommentConfig::default());
         self.print_trailing_comment(span.hi(), None);
         self.hardbreak_if_not_bol();
-        self.cursor.advance(1);
+        self.cursor.next_line(self.is_at_crlf());
     }
 
     fn print_pragma(&mut self, pragma: &'ast ast::PragmaDirective<'ast>) {
@@ -451,7 +460,7 @@ impl<'ast> State<'_, 'ast> {
         self.s.cbox(-self.ind);
         let header_style = self.config.multiline_func_header;
         let params_format = match header_style {
-            MultilineFuncHeaderStyle::ParamsFirst => ListFormat::always_break(),
+            MultilineFuncHeaderStyle::ParamsAlways => ListFormat::always_break(),
             MultilineFuncHeaderStyle::AllParams
                 if !header.parameters.is_empty() && !self.can_header_be_inlined(header) =>
             {
@@ -681,7 +690,10 @@ impl<'ast> State<'_, 'ast> {
         // 1. exactly matches the name of a base contract as declared in the `contract is`;
         // this does not account for inheritance;
         let is_contract_base = self.contract.is_some_and(|contract| {
-            contract.bases.iter().any(|contract_base| contract_base.name == modifier.name)
+            contract
+                .bases
+                .iter()
+                .any(|contract_base| contract_base.name.to_string() == modifier.name.to_string())
         });
         // 2. assume that title case names in constructors are bases.
         // LEGACY: constructors used to also be `function NameOfContract...`; not checked.
@@ -821,7 +833,7 @@ impl<'ast> State<'_, 'ast> {
                 self.end();
             } else if is_binary_expr(&init.kind) {
                 if !self.is_bol_or_only_ind() {
-                    Separator::Space.print(&mut self.s, &mut self.cursor);
+                    self.print_sep_unhandled(Separator::Space);
                 }
                 if matches!(ty.kind, ast::TypeKind::Elementary(..) | ast::TypeKind::Mapping(..)) {
                     self.s.offset(self.ind);
@@ -864,7 +876,7 @@ impl<'ast> State<'_, 'ast> {
                     }
                 } else {
                     if !self.is_bol_or_only_ind() {
-                        Separator::Space.print(&mut self.s, &mut self.cursor);
+                        self.print_sep_unhandled(Separator::Space);
                     }
                     if matches!(ty.kind, ast::TypeKind::Elementary(..) | ast::TypeKind::Mapping(..))
                     {
@@ -1211,12 +1223,17 @@ impl<'ast> State<'_, 'ast> {
                 exprs,
                 span.lo(),
                 span.hi(),
-                |this, expr| {
-                    if let Some(expr) = expr {
-                        this.print_expr(expr);
+                |this, expr| match expr.as_ref() {
+                    SpannedOption::Some(expr) => this.print_expr(expr),
+                    SpannedOption::None(span) => {
+                        this.print_comments(span.hi(), CommentConfig::skip_ws().no_breaks());
                     }
                 },
-                |e| e.as_deref().map(|e| e.span),
+                |expr| match expr.as_ref() {
+                    SpannedOption::Some(expr) => expr.span,
+                    // Manually handled by printing the comment when `None`
+                    SpannedOption::None(..) => Span::DUMMY,
+                },
                 ListFormat::compact().break_single(is_binary_expr(&expr.kind)),
             ),
             ast::ExprKind::TypeCall(ty) => {
@@ -1664,7 +1681,7 @@ impl<'ast> State<'_, 'ast> {
                 s.print_expr(arg.value);
                 s.end();
             },
-            |arg| Some(arg.name.span.until(arg.value.span)),
+            |arg| arg.name.span.until(arg.value.span),
             list_format.break_cmnts().break_single(true).without_ind(self.call_stack.is_chain()),
         );
         self.word("}");
@@ -1792,7 +1809,7 @@ impl<'ast> State<'_, 'ast> {
     fn print_multi_decl_stmt(
         &mut self,
         span: Span,
-        vars: &'ast [Option<ast::VariableDefinition<'ast>>],
+        vars: &'ast BoxSlice<'ast, SpannedOption<ast::VariableDefinition<'ast>>>,
         init_expr: &'ast ast::Expr<'ast>,
     ) {
         let space_left = self.space_left();
@@ -1803,24 +1820,26 @@ impl<'ast> State<'_, 'ast> {
             vars,
             span.lo(),
             init_expr.span.lo(),
-            |this, var| {
-                // NOTE(rusowsky): unless we add more spans to solar, it is not possible to print
-                // comments between the commas of unhandled vars
-                if let Some(var) = var {
-                    this.print_var(var, true);
+            |this, var| match var {
+                SpannedOption::Some(var) => this.print_var(var, true),
+                SpannedOption::None(span) => {
+                    this.print_comments(span.hi(), CommentConfig::skip_ws().no_breaks());
                 }
             },
-            |v| v.as_ref().map(|v| v.span),
+            |var| match var {
+                SpannedOption::Some(var) => var.span,
+                // Manually handled by printing the comment when `None`
+                SpannedOption::None(..) => Span::DUMMY,
+            },
             ListFormat::consistent(),
         );
         self.end();
         self.word(" =");
 
         // '(' + var + ', ' + var + ')' + ' ='
-        let vars_size = vars
-            .iter()
-            .fold(0, |acc, v| acc + v.as_ref().map_or(0, |v| self.estimate_size(v.span)) + 2)
-            + 2;
+        let vars_size = vars.iter().fold(0, |acc, var| {
+            acc + var.as_ref().unspan().map_or(0, |v| self.estimate_size(v.span)) + 2
+        }) + 2;
         self.call_stack.add_precall(vars_size);
 
         if self.estimate_size(init_expr.span) + self.config.tab_width
@@ -2149,7 +2168,7 @@ impl<'ast> State<'_, 'ast> {
 
     fn print_if_cond(&mut self, kw: &'static str, cond: &'ast ast::Expr<'ast>, pos_hi: BytePos) {
         self.print_word(kw);
-        Separator::Nbsp.print(&mut self.s, &mut self.cursor);
+        self.print_sep_unhandled(Separator::Nbsp);
         self.print_tuple(
             std::slice::from_ref(cond),
             cond.span.lo(),
@@ -2499,6 +2518,7 @@ impl MemberOrCallArgs {
 }
 
 #[derive(Debug, Clone)]
+#[expect(dead_code)]
 enum AttributeKind<'ast> {
     Visibility(ast::Visibility),
     StateMutability(ast::StateMutability),
@@ -2508,32 +2528,6 @@ enum AttributeKind<'ast> {
 }
 
 type AttributeCommentMap = HashMap<BytePos, (Vec<Comment>, Vec<Comment>, Vec<Comment>)>;
-
-impl<'ast> AttributeKind<'ast> {
-    fn is_visibility(&self) -> bool {
-        matches!(self, Self::Visibility(_))
-    }
-
-    fn is_state_mutability(&self) -> bool {
-        matches!(self, Self::StateMutability(_))
-    }
-
-    fn is_non_payable(&self) -> bool {
-        matches!(self, Self::StateMutability(ast::StateMutability::NonPayable))
-    }
-
-    fn is_virtual(&self) -> bool {
-        matches!(self, Self::Virtual)
-    }
-
-    fn is_override(&self) -> bool {
-        matches!(self, Self::Override(_))
-    }
-
-    fn is_modifier(&self) -> bool {
-        matches!(self, Self::Modifier(_))
-    }
-}
 
 #[derive(Debug, Clone)]
 struct AttributeInfo<'ast> {
@@ -2546,7 +2540,6 @@ struct AttributeCommentMapper<'ast> {
     limit_pos: BytePos,
     comments: Vec<Comment>,
     attributes: Vec<AttributeInfo<'ast>>,
-    empty_returns: bool,
 }
 
 impl<'ast> AttributeCommentMapper<'ast> {
@@ -2554,7 +2547,6 @@ impl<'ast> AttributeCommentMapper<'ast> {
         Self {
             comments: Vec::new(),
             attributes: Vec::new(),
-            empty_returns: returns.is_none(),
             limit_pos: returns.as_ref().map_or(body_pos, |ret| ret.span.lo()),
         }
     }
@@ -2712,32 +2704,6 @@ fn is_binary_expr(expr_kind: &ast::ExprKind<'_>) -> bool {
     matches!(expr_kind, ast::ExprKind::Binary(..))
 }
 
-fn is_comp_op(op_kind: ast::BinOpKind) -> bool {
-    match op_kind {
-        ast::BinOpKind::BitOr
-        | ast::BinOpKind::BitXor
-        | ast::BinOpKind::BitAnd
-        | ast::BinOpKind::Shl
-        | ast::BinOpKind::Shr
-        | ast::BinOpKind::Sar
-        | ast::BinOpKind::Add
-        | ast::BinOpKind::Sub
-        | ast::BinOpKind::Mul
-        | ast::BinOpKind::Div
-        | ast::BinOpKind::Rem
-        | ast::BinOpKind::Pow => false,
-
-        ast::BinOpKind::Lt
-        | ast::BinOpKind::Le
-        | ast::BinOpKind::Gt
-        | ast::BinOpKind::Ge
-        | ast::BinOpKind::Eq
-        | ast::BinOpKind::Ne
-        | ast::BinOpKind::Or
-        | ast::BinOpKind::And => true,
-    }
-}
-
 fn has_complex_successor(expr_kind: &ast::ExprKind<'_>, left: bool) -> bool {
     match expr_kind {
         ast::ExprKind::Binary(lhs, _, rhs) => {
@@ -2753,24 +2719,8 @@ fn has_complex_successor(expr_kind: &ast::ExprKind<'_>, left: bool) -> bool {
     }
 }
 
-/// Traverses a nested Member/Call expression chain to find the lowest-level expression.
-fn get_chain_bottom<'a>(mut expr: &'a ast::Expr<'a>) -> &'a ast::Expr<'a> {
-    loop {
-        match &expr.kind {
-            ast::ExprKind::Member(child, ..) | ast::ExprKind::Call(child, ..) => {
-                expr = child;
-            }
-            _ => return expr,
-        }
-    }
-}
-
 fn is_call(expr_kind: &ast::ExprKind<'_>) -> bool {
     matches!(expr_kind, ast::ExprKind::Call(..))
-}
-
-fn is_call_or_type(expr_kind: &ast::ExprKind<'_>) -> bool {
-    matches!(expr_kind, ast::ExprKind::Call(..) | ast::ExprKind::Type(..))
 }
 
 fn is_call_chain(expr_kind: &ast::ExprKind<'_>, must_have_child: bool) -> bool {
@@ -2778,17 +2728,6 @@ fn is_call_chain(expr_kind: &ast::ExprKind<'_>, must_have_child: bool) -> bool {
         is_call_chain(&child.kind, false)
     } else {
         !must_have_child && is_call(expr_kind)
-    }
-}
-
-fn is_call_chain_traverse_bin_ops(expr_kind: &ast::ExprKind<'_>, must_have_child: bool) -> bool {
-    match expr_kind {
-        ast::ExprKind::Binary(lhs, _, rhs) => {
-            is_call_chain_traverse_bin_ops(&lhs.kind, false)
-                || is_call_chain_traverse_bin_ops(&rhs.kind, false)
-        }
-        ast::ExprKind::Member(child, ..) => is_call_chain_traverse_bin_ops(&child.kind, false),
-        _ => !must_have_child && is_call(expr_kind),
     }
 }
 

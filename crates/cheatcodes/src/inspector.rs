@@ -28,11 +28,10 @@ use foundry_cheatcodes_common::{
 };
 use foundry_common::{
     SELECTOR_LEN, TransactionMaybeSigned,
-    evm::Breakpoints,
     mapping_slots::{MappingSlots, step as mapping_step},
 };
 use foundry_evm_core::{
-    InspectorExt,
+    Breakpoints, InspectorExt,
     abi::Vm::stopExpectSafeMemoryCall,
     backend::{DatabaseError, DatabaseExt, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
@@ -70,6 +69,9 @@ use std::{
 
 mod utils;
 pub use utils::CommonCreateInput;
+
+pub mod analysis;
+pub use analysis::CheatcodeAnalysis;
 
 pub type Ecx<'a, 'b, 'c> = &'a mut EthEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 
@@ -372,6 +374,9 @@ pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 ///   allowed to execute cheatcodes
 #[derive(Debug)]
 pub struct Cheatcodes {
+    /// Solar compiler instance, to grant syntactic and semantic analysis capabilities
+    pub analysis: Option<CheatcodeAnalysis>,
+
     /// The block environment
     ///
     /// Used in the cheatcode handler to overwrite the block environment separately from the
@@ -560,6 +565,7 @@ impl Clone for Cheatcodes {
             test_context: self.test_context.clone(),
             signatures_identifier: self.signatures_identifier.clone(),
             dynamic_gas_limit_sequence: self.dynamic_gas_limit_sequence,
+            analysis: self.analysis.clone(),
         }
     }
 }
@@ -577,6 +583,7 @@ impl Cheatcodes {
     /// Creates a new `Cheatcodes` with the given settings.
     pub fn new(config: Arc<CheatsConfig>) -> Self {
         Self {
+            analysis: None,
             fs_commit: true,
             labels: config.labels.clone(),
             strategy: config.strategy.clone(),
@@ -620,6 +627,11 @@ impl Cheatcodes {
             signatures_identifier: Default::default(),
             dynamic_gas_limit_sequence: Default::default(),
         }
+    }
+
+    /// Enables cheatcode analysis capabilities by providing a solar compiler instance.
+    pub fn set_analysis(&mut self, analysis: CheatcodeAnalysis) {
+        self.analysis = Some(analysis);
     }
 
     /// Returns the configured prank at given depth or the first prank configured at a lower depth.
@@ -1238,10 +1250,14 @@ impl Cheatcodes {
 
                     let (gas_seen, call_seen) =
                         self.dynamic_gas_limit_sequence.take().unwrap_or_default();
+                    // Transaction has fixed gas limit if no GAS opcode seen before CALL opcode.
                     let mut is_fixed_gas_limit = !(gas_seen && call_seen);
+                    // Additional check as transfers in forge scripts seem to be estimated at 2300
+                    // by revm leading to "Intrinsic gas too low" failure when simulated on chain.
                     if call.gas_limit < 21_000 {
                         is_fixed_gas_limit = false;
                     }
+                    ecx.journaled_state.touch(broadcast.new_origin);
 
                     // Note(zk): Fixed gas limit check is now computed here and passed to the
                     // strategy
@@ -1417,6 +1433,11 @@ impl Cheatcodes {
             Some(storage) => storage.copies.contains_key(address),
             None => false,
         }
+    }
+
+    /// Returns struct definitions from the analysis, if available.
+    pub fn struct_defs(&self) -> Option<&foundry_common::fmt::StructDefinitions> {
+        self.analysis.as_ref().and_then(|analysis| analysis.struct_defs().ok())
     }
 }
 

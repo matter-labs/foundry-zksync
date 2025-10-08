@@ -2,6 +2,8 @@
 
 name: nextest
 
+permissions: {}
+
 on:
   workflow_call:
     inputs:

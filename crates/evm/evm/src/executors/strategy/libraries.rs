@@ -51,8 +51,9 @@ impl EvmExecutorStrategyRunner {
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
-        let contracts =
-            input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(root), v)).collect();
+        // Don't strip file prefixes here, similar to ZKsync strategy approach.
+        // The linker internally handles path stripping as needed.
+        let contracts = input.artifact_ids().collect();
         let linker = Linker::new(root, contracts);
 
         // Build revert decoder from ABIs of all artifacts.

@@ -316,12 +316,18 @@ impl ForgeTestData {
         let strategy = utils::get_executor_strategy(&config);
         let mut builder = self.base_runner();
         let config = Arc::new(config);
-        let root = self.project.root();
         builder.config = config.clone();
         builder
             .enable_isolation(opts.isolate)
             .sender(config.sender)
-            .build::<MultiCompiler>(root, &self.output, None, opts.local_evm_env(), opts, strategy)
+            .build::<MultiCompiler>(
+                manifest_root(),
+                &self.output,
+                None,
+                opts.local_evm_env(),
+                opts,
+                strategy,
+            )
             .unwrap()
     }
 
