@@ -199,7 +199,6 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                 // since it won't be set by zkEVM
                 env.evm_env.block_env = executor_env.evm_env.block_env.clone();
                 env.tx.gas_price = executor_env.tx.gas_price;
-                let evm_interpreter = zk_tx.force_evm_interpreter.unwrap_or(ctx.evm_interpreter);
 
                 backend.inspect(
                     env,
@@ -208,7 +207,7 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
                         factory_deps: zk_tx.factory_deps,
                         paymaster_data: zk_tx.paymaster_data,
                         zk_env: ctx.zk_env.clone(),
-                        evm_interpreter,
+                        evm_interpreter: ctx.evm_interpreter,
                     }),
                 )
             }

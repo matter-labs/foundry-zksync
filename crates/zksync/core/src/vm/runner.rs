@@ -76,43 +76,21 @@ where
 
     let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &paymaster_params);
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
-    let tx = if evm_interpreter {
-        let contract_address = if is_create { None } else { Some(transact_to) };
-        let mut tx = L2Tx::new(
-            contract_address,
-            ecx.tx.data.to_vec(),
-            (nonce as u32).into(),
-            Fee {
-                gas_limit,
-                max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
-                gas_per_pubdata_limit: zk_env.gas_per_pubdata().into(),
-            },
-            caller.to_h160(),
-            ecx.tx.value.to_u256(),
-            Default::default(),
-            Default::default(),
-        );
-        tx.common_data.transaction_type = zksync_types::l2::TransactionType::EIP1559Transaction;
-
-        tx
-    } else {
-        L2Tx::new(
-            Some(transact_to),
-            ecx.tx.data.to_vec(),
-            (nonce as u32).into(),
-            Fee {
-                gas_limit,
-                max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
-                gas_per_pubdata_limit: zk_env.gas_per_pubdata().into(),
-            },
-            caller.to_h160(),
-            ecx.tx.value.to_u256(),
-            factory_deps.unwrap_or_default(),
-            paymaster_params,
-        )
-    };
+    let tx = L2Tx::new(
+        Some(transact_to),
+        ecx.tx.data.to_vec(),
+        (nonce as u32).into(),
+        Fee {
+            gas_limit,
+            max_fee_per_gas,
+            max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+            gas_per_pubdata_limit: zk_env.gas_per_pubdata().into(),
+        },
+        caller.to_h160(),
+        ecx.tx.value.to_u256(),
+        factory_deps.unwrap_or_default(),
+        paymaster_params,
+    );
 
     let call_ctx = CallContext {
         tx_caller: ecx.tx.caller,
