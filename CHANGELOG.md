@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.30](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.29...foundry-zksync-v0.0.30) (2025-10-08)
+
+
+### Features
+
+* add ZKsync contract verification tests with constructor arguments ([#1169](https://github.com/matter-labs/foundry-zksync/issues/1169)) ([9a3a6b7](https://github.com/matter-labs/foundry-zksync/commit/9a3a6b7fb65ea9fb9589c7e4b3a5416ad8c742fa))
+* **cast:** apply precompiles for cast run and call ([11d2203](https://github.com/matter-labs/foundry-zksync/commit/11d22031571ec19f7f68f958f1d0d37efc231721))
+* enable evm interpreter ([#1167](https://github.com/matter-labs/foundry-zksync/issues/1167)) ([8419488](https://github.com/matter-labs/foundry-zksync/commit/8419488b1573d78f01158cb79420b01a17573a21))
+* **forge:** no warning on external sections ([11d2203](https://github.com/matter-labs/foundry-zksync/commit/11d22031571ec19f7f68f958f1d0d37efc231721))
+* support EVM interpreter for cast run ([#1168](https://github.com/matter-labs/foundry-zksync/issues/1168)) ([b57c83b](https://github.com/matter-labs/foundry-zksync/commit/b57c83b3945aca5dbdc5958ba75f80403c9f6ef7))
+
+
+### Bug Fixes
+
+* **forge:** color bug in `Display` impl for   `TestResult` ([11d2203](https://github.com/matter-labs/foundry-zksync/commit/11d22031571ec19f7f68f958f1d0d37efc231721))
+* **forge:** support broadcast from vm.deployCode ([11d2203](https://github.com/matter-labs/foundry-zksync/commit/11d22031571ec19f7f68f958f1d0d37efc231721))
+* **release:** build docker x86_64 using host cross ([11d2203](https://github.com/matter-labs/foundry-zksync/commit/11d22031571ec19f7f68f958f1d0d37efc231721))
+* use fee blob basefee for missing blob fee ([11d2203](https://github.com/matter-labs/foundry-zksync/commit/11d22031571ec19f7f68f958f1d0d37efc231721))
+
 ## [0.0.29](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.28...foundry-zksync-v0.0.29) (2025-09-18)
 
 
