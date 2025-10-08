@@ -11,6 +11,7 @@ cast::cli:
     zk::test_zk_cast_run_with_call_transaction_on_sepolia
     zk::test_zk_cast_run_with_create
     zk::test_zk_cast_run_with_create_transaction_on_sepolia
+    zk::test_zk_cast_run_with_evm_interpreter
     zk::test_zk_cast_using_paymaster
     zk::test_zk_cast_without_paymaster
 forge:
