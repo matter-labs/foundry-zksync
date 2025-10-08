@@ -816,6 +816,89 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
     );
 });
 
+casttest!(test_zk_cast_run_with_evm_interpreter, async |prj, cmd| {
+    let node = ZkSyncNode::start().await;
+    let url = node.url();
+
+    let (_, private_key) = ZkSyncNode::rich_wallets()
+        .next()
+        .map(|(addr, pk, _)| (addr, pk))
+        .expect("No rich wallets available");
+
+    prj.add_script(
+        "Counter",
+        r#"
+        contract Counter {
+            uint256 public number;
+
+            function increment() public {
+                number++;
+            }
+        }
+
+       "#,
+    );
+
+    // Deploy the contract
+    let output = cmd
+        .forge_fuse()
+        .args([
+            "create",
+            "Counter",
+            "--rpc-url",
+            &url,
+            "--private-key",
+            private_key,
+            "--zksync",
+            "--broadcast",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    let output = output.trim().parse::<String>().unwrap();
+    assert!(output.contains("success"));
+
+    let re = Regex::new(r"Deployed to: (\w+)\nTransaction hash: (\w+)").expect("invalid regex");
+    let caps = re.captures(&output).expect("failed getting captures");
+    let deployed_addr = caps.get(1).expect("failed getting deployed address").as_str();
+
+    // Call a function to generate a transaction
+    let output = cmd
+        .cast_fuse()
+        .args([
+            "send",
+            deployed_addr,
+            "increment()",
+            "--rpc-url",
+            &url,
+            "--private-key",
+            private_key,
+            "--zksync",
+        ])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    let re = Regex::new(r"transactionHash\s+(\w+)").expect("invalid regex");
+    let caps = re.captures(&output).expect("failed getting capture");
+    let tx_hash = caps.get(1).expect("failed getting tx hash").as_str();
+
+    let output = cmd
+        .cast_fuse()
+        .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
+        .assert_success()
+        .get_output()
+        .stdout_lossy();
+
+    assert!(
+        output.contains(&format!("{deployed_addr}::increment()")) && output.contains("Return"),
+        "trace missing or incomplete, got:\n{output}"
+    );
+
+    assert!(output.contains("Traces:"), "trace missing, got:\n{output}");
+});
+
 casttest!(test_zk_cast_run_with_create_transaction_on_sepolia, async |_prj, cmd| {
     let node =
         ZkSyncNode::start_with_fork(Fork::new("https://sepolia.era.zksync.dev".to_string())).await;
