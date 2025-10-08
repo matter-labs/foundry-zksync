@@ -27,6 +27,8 @@ foundry-linking.workspace = true
 foundry-zksync-compilers.workspace = true
 foundry-zksync-inspectors.workspace = true
 
+solar.workspace = true
+
 alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
 alloy-evm.workspace = true
 alloy-json-abi.workspace = true

@@ -132,6 +132,7 @@ hex_underscore = "remove"
 single_line_statement_blocks = "preserve"
 override_spacing = false
 wrap_comments = false
+docs_style = "preserve"
 ignore = []
 contract_new_lines = false
 sort_imports = false
@@ -1506,6 +1507,7 @@ exclude = []
     "single_line_statement_blocks": "preserve",
     "override_spacing": false,
     "wrap_comments": false,
+    "docs_style": "preserve",
     "ignore": [],
     "contract_new_lines": false,
     "sort_imports": false,
@@ -2160,6 +2162,29 @@ forgetest!(no_warnings_on_external_sections, |prj, cmd| {
 
     fs::write(prj.root().join("foundry.toml"), toml).unwrap();
     cmd.forge_fuse().args(["config"]).assert_success().stderr_eq(str![[r#"
+
+"#]]);
+});
+
+// <https://github.com/foundry-rs/foundry/issues/10550>
+forgetest!(config_warnings_on_unknown_keys, |prj, cmd| {
+    cmd.git_init();
+
+    let faulty_toml = r"[profile.default]
+    src = 'src'
+    out = 'out'
+    solc_version = '0.8.18'
+    foo = 'unknown'
+
+    [profile.another]
+    src = 'src'
+    out = 'out'
+    bar = 'another_unknown'";
+
+    fs::write(prj.root().join("foundry.toml"), faulty_toml).unwrap();
+    cmd.forge_fuse().args(["config"]).assert_success().stderr_eq(str![[r#"
+Warning: Found unknown `bar` config for profile `another` defined in foundry.toml.
+Warning: Found unknown `foo` config for profile `default` defined in foundry.toml.
 
 "#]]);
 });

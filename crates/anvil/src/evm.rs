@@ -4,7 +4,7 @@ use alloy_evm::{
     precompiles::{DynPrecompile, PrecompileInput, PrecompilesMap},
 };
 
-use foundry_evm_core::either_evm::EitherEvm;
+use foundry_evm::core::either_evm::EitherEvm;
 use op_revm::OpContext;
 use revm::Inspector;
 use std::fmt::Debug;

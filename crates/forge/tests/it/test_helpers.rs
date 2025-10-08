@@ -7,10 +7,9 @@ use forge::{
 };
 use foundry_cli::utils::{self, install_crypto_provider};
 use foundry_compilers::{
-    Project, ProjectCompileOutput, SolcConfig, Vyper,
+    Project, ProjectCompileOutput, SolcConfig, Vyper, utils::RuntimeOrHandle,
     artifacts::{EvmVersion, Settings, output_selection::ContractOutputSelection},
     compilers::multi::MultiCompiler,
-    utils::RuntimeOrHandle,
 };
 use foundry_config::{
     Config, FsPermissions, FuzzConfig, FuzzCorpusConfig, FuzzDictionaryConfig, InvariantConfig,
@@ -316,12 +315,11 @@ impl ForgeTestData {
         let strategy = utils::get_executor_strategy(&config);
         let mut builder = self.base_runner();
         let config = Arc::new(config);
-        let root = self.project.root();
         builder.config = config.clone();
         builder
             .enable_isolation(opts.isolate)
             .sender(config.sender)
-            .build::<MultiCompiler>(root, &self.output, None, opts.local_evm_env(), opts, strategy)
+            .build::<MultiCompiler>(manifest_root(), &self.output, None, opts.local_evm_env(), opts, strategy)
             .unwrap()
     }
 

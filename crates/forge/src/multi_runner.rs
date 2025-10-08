@@ -7,11 +7,11 @@ use crate::{
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
+use foundry_cli::opts::configure_pcx_from_compile_output;
 use foundry_common::{ContractsByArtifact, TestFunctionExt, get_contract_name, shell::verbosity};
 use foundry_compilers::{
-    ArtifactId, ProjectCompileOutput,
+    ArtifactId, Compiler, ProjectCompileOutput,
     artifacts::{Contract, Libraries},
-    compilers::Compiler,
 };
 use foundry_config::{Config, InlineConfig};
 use foundry_evm::{
@@ -32,7 +32,6 @@ use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
 use std::{
     collections::BTreeMap,
-    fmt::Debug,
     path::Path,
     sync::{Arc, mpsc},
     time::Instant,
@@ -65,6 +64,8 @@ pub struct MultiContractRunner {
     pub libs_to_deploy: Vec<Bytes>,
     /// Library addresses used to link contracts.
     pub libraries: Libraries,
+    /// Solar compiler instance, to grant syntactic and semantic analysis capabilities
+    pub analysis: Arc<solar::sema::Compiler>,
 
     /// The fork to use at launch
     pub fork: Option<CreateFork>,
@@ -264,6 +265,7 @@ impl MultiContractRunner {
 
         let executor = self.tcfg.executor(
             self.known_contracts.clone(),
+            self.analysis.clone(),
             artifact_id,
             db.clone(),
             self.strategy.clone(),
@@ -365,6 +367,7 @@ impl TestRunnerConfig {
     pub fn executor(
         &self,
         known_contracts: ContractsByArtifact,
+        analysis: Arc<solar::sema::Compiler>,
         artifact_id: &ArtifactId,
         db: Backend,
         strategy: ExecutorStrategy,
@@ -386,6 +389,7 @@ impl TestRunnerConfig {
                     .enable_isolation(self.isolation)
                     .networks(self.networks)
                     .create2_deployer(self.evm_opts.create2_deployer)
+                    .set_analysis(analysis)
             })
             .spec_id(self.spec_id)
             .gas_limit(self.evm_opts.gas_limit())
@@ -403,7 +407,7 @@ impl TestRunnerConfig {
 }
 
 /// Builder used for instantiating the multi-contract runner
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[must_use = "builders do nothing unless you call `build` on them"]
 pub struct MultiContractRunnerBuilder {
     /// The address which will be used to deploy the initial contracts and send all
@@ -533,14 +537,44 @@ impl MultiContractRunnerBuilder {
             .map(|(id, (abi, bytecode))| (id, TestContract { abi, bytecode }))
             .collect();
 
+        // Initialize and configure the solar compiler.
+        let mut analysis = solar::sema::Compiler::new(
+            solar::interface::Session::builder().with_stderr_emitter().build(),
+        );
+        let dcx = analysis.dcx_mut();
+        dcx.set_emitter(Box::new(
+            solar::interface::diagnostics::HumanEmitter::stderr(Default::default())
+                .source_map(Some(dcx.source_map().unwrap())),
+        ));
+        dcx.set_flags_mut(|f| f.track_diagnostics = false);
+
+        // Populate solar's global context by parsing and lowering the sources.
+        let files: Vec<_> =
+            output.output().sources.as_ref().keys().map(|path| path.to_path_buf()).collect();
+
+        analysis.enter_mut(|compiler| -> Result<()> {
+            let mut pcx = compiler.parse();
+            configure_pcx_from_compile_output(
+                &mut pcx,
+                &self.config,
+                output,
+                if files.is_empty() { None } else { Some(&files) },
+            )?;
+            pcx.parse();
+            // Check if any sources exist, to avoid logging `error: no files found`
+            if !compiler.sess().source_map().is_empty() {
+                let _ = compiler.lower_asts();
+            }
+            Ok(())
+        })?;
+
         Ok(MultiContractRunner {
             contracts,
             revert_decoder,
             known_contracts,
             libs_to_deploy,
             libraries,
-
-            fork: self.fork,
+            analysis: Arc::new(analysis),
 
             tcfg: TestRunnerConfig {
                 evm_opts,
@@ -557,6 +591,7 @@ impl MultiContractRunnerBuilder {
                 fail_fast: FailFast::new(self.fail_fast),
             },
             strategy,
+            fork: self.fork,
         })
     }
 }
