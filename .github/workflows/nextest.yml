@@ -73,6 +73,7 @@ jobs:
       - uses: taiki-e/install-action@522492a8c115f1b6d4d318581f09638e9442547b # v2
         with:
           tool: nextest
+      - uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
 
       # External tests dependencies
       - name: Setup Node.js
