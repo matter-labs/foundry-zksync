@@ -132,11 +132,12 @@ pub use compilation::{CompilationRestrictions, SettingsOverrides};
 
 pub mod zksync;
 use zksync::ZkSyncConfig;
-pub mod extend;
-use extend::Extends;
 
 use foundry_evm_networks::NetworkConfigs;
 pub use semver;
+
+// NOTE(zk): `configure_pcx` functionality is moved here to be used in strategies.
+pub mod build;
 
 /// Foundry configuration
 ///
@@ -576,101 +577,6 @@ pub struct Config {
 
     /// @zkSync zkSolc configuration and settings
     pub zksync: ZkSyncConfig,
-}
-
-/// Diagnostic level (minimum) at which the process should finish with a non-zero exit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum, Default, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum DenyLevel {
-    /// Always exit with zero code.
-    #[default]
-    Never,
-    /// Exit with a non-zero code if any warnings are found.
-    Warnings,
-    /// Exit with a non-zero code if any notes or warnings are found.
-    Notes,
-}
-
-// Custom deserialization to make `DenyLevel` parsing case-insensitive and backwards compatible with
-// booleans.
-impl<'de> Deserialize<'de> for DenyLevel {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct DenyLevelVisitor;
-
-        impl<'de> de::Visitor<'de> for DenyLevelVisitor {
-            type Value = DenyLevel;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("one of the following strings: `never`, `warnings`, `notes`")
-            }
-
-            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                Ok(DenyLevel::from(value))
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-            where
-                E: de::Error,
-            {
-                DenyLevel::from_str(value).map_err(de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_any(DenyLevelVisitor)
-    }
-}
-
-impl FromStr for DenyLevel {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "warnings" | "warning" | "w" => Ok(Self::Warnings),
-            "notes" | "note" | "n" => Ok(Self::Notes),
-            "never" | "false" | "f" => Ok(Self::Never),
-            _ => Err(format!(
-                "unknown variant: found `{s}`, expected one of `never`, `warnings`, `notes`"
-            )),
-        }
-    }
-}
-
-impl From<bool> for DenyLevel {
-    fn from(deny: bool) -> Self {
-        if deny { Self::Warnings } else { Self::Never }
-    }
-}
-
-impl DenyLevel {
-    /// Returns `true` if the deny level includes warnings.
-    pub fn warnings(&self) -> bool {
-        match self {
-            Self::Never => false,
-            Self::Warnings | Self::Notes => true,
-        }
-    }
-
-    /// Returns `true` if the deny level includes notes.
-    pub fn notes(&self) -> bool {
-        match self {
-            Self::Never | Self::Warnings => false,
-            Self::Notes => true,
-        }
-    }
-
-    /// Returns `true` if the deny level is set to never (only errors).
-    pub fn never(&self) -> bool {
-        match self {
-            Self::Never => true,
-            Self::Warnings | Self::Notes => false,
-        }
-    }
 }
 
 /// Diagnostic level (minimum) at which the process should finish with a non-zero exit.

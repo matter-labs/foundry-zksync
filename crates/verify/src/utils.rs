@@ -20,8 +20,7 @@ use foundry_common::{
 use foundry_compilers::artifacts::{BytecodeHash, CompactContractBytecode, EvmVersion};
 use foundry_config::Config;
 use foundry_evm::{
-    Env, EnvMut, constants::DEFAULT_CREATE2_DEPLOYER, core::AsEnvMut, executors::TracingExecutor,
-    opts::EvmOpts, traces::TraceMode, utils::apply_chain_and_block_specific_env_changes,
+    constants::DEFAULT_CREATE2_DEPLOYER, core::AsEnvMut, executors::{strategy::ExecutorStrategy, TracingExecutor}, opts::EvmOpts, traces::TraceMode, utils::apply_chain_and_block_specific_env_changes, Env, EnvMut
 };
 use foundry_evm_networks::NetworkConfigs;
 use reqwest::Url;

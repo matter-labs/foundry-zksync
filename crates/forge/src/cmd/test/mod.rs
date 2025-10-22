@@ -366,7 +366,7 @@ impl TestArgs {
             .networks(evm_opts.networks)
             .fail_fast(self.fail_fast)
             .set_coverage(coverage)
-            .build::<MultiCompiler>(output, env, evm_opts, strategy)?;
+            .build::<MultiCompiler>(output, zk_output, env, evm_opts, strategy)?;
 
         let libraries = runner.libraries.clone();
         let mut outcome = self.run_tests_inner(runner, config, verbosity, filter, output).await?;

@@ -1,49 +1,49 @@
 //! Contains various definitions and items related to deploy-time linking
 //! for zksync
 
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
-use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256};
+use alloy_primitives::{keccak256, Address, Bytes, TxKind, B256, U256};
 use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
 use foundry_common::{ContractsByArtifact, TransactionMaybeSigned};
 use foundry_compilers::{
-    Artifact, ProjectCompileOutput, artifacts::CompactContractBytecodeCow,
-    contracts::ArtifactContracts, info::ContractInfo,
+    artifacts::CompactContractBytecodeCow, contracts::ArtifactContracts, info::ContractInfo,
+    Artifact, ProjectCompileOutput,
 };
 use foundry_config::Config;
 use foundry_evm::{
     backend::DatabaseExt,
     decode::RevertDecoder,
     executors::{
-        DeployResult, EvmError, Executor,
         strategy::{
             DeployLibKind, DeployLibResult, EvmExecutorStrategyRunner, ExecutorStrategyContext,
             ExecutorStrategyRunner, LinkOutput,
         },
+        DeployResult, EvmError, Executor,
     },
 };
 use foundry_linking::{
-    DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION, LinkerError, ZkLinker, ZkLinkerError,
+    LinkerError, ZkLinker, ZkLinkerError, DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
 };
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
-    encode_create_params, hash_bytecode,
+    encode_create_params, hash_bytecode, ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
+    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
-use revm::context::{CreateScheme, result::Output};
+use revm::context::{result::Output, CreateScheme};
 
-use super::{ZksyncExecutorStrategyRunner, get_context};
+use super::{get_context, ZksyncExecutorStrategyRunner};
 
 impl ZksyncExecutorStrategyRunner {
     pub(super) fn link_impl(
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         config: &Config,
-        root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
-        let evm_link = EvmExecutorStrategyRunner.link(ctx, config, root, input, deployer)?;
+        let root = &config.root;
+        let evm_link = EvmExecutorStrategyRunner.link(ctx, config, input, deployer)?;
 
         let ctx = get_context(ctx);
         let Some(input) = ctx.compilation_output.as_ref() else {
@@ -190,6 +190,11 @@ impl ZksyncExecutorStrategyRunner {
             .chain(evm_link.linked_contracts)
             .collect();
 
+        // NOTE(zk): Currently unsupported, so we initialize it with the empty solar compiler.
+        let analysis = solar::sema::Compiler::new(
+            solar::interface::Session::builder().with_stderr_emitter().build(),
+        );
+
         Ok(LinkOutput {
             deployable_contracts: evm_link.deployable_contracts,
             revert_decoder: evm_link.revert_decoder,
@@ -197,6 +202,7 @@ impl ZksyncExecutorStrategyRunner {
             linked_contracts,
             libs_to_deploy: evm_link.libs_to_deploy,
             libraries: evm_link.libraries,
+            analysis,
         })
     }
 

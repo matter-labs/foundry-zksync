@@ -1,9 +1,7 @@
 //! Cheatcode EVM inspector.
 
 use crate::{
-    CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
-    Vm::{self, AccountAccess},
-    evm::{DealRecord, GasRecord, prank::Prank},
+    evm::{journaled_account, prank::Prank, DealRecord, GasRecord},
     script::{Broadcast, Wallets},
     strategy::CheatcodeInspectorStrategy,
     test::{
@@ -12,14 +10,17 @@ use crate::{
         revert_handlers,
     },
     utils::IgnoredTraces,
+    CheatsConfig, CheatsCtxt, DynCheatcode, Error, Result,
+    Vm::{self, AccountAccess},
 };
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{
-    Address, B256, Bytes, Log, TxKind, U256, hex,
+    hex,
     map::{AddressHashMap, HashMap, HashSet},
+    Address, Bytes, Log, TxKind, B256, U256,
 };
-use alloy_rpc_types::{AccessList, TransactionInput, TransactionRequest};
+use alloy_rpc_types::AccessList;
 use alloy_sol_types::{SolCall, SolInterface, SolValue};
 use foundry_cheatcodes_common::{
     expect::{ExpectedCallData, ExpectedCallTracker, ExpectedCallType},
@@ -27,35 +28,35 @@ use foundry_cheatcodes_common::{
     record::RecordAccess,
 };
 use foundry_common::{
-    SELECTOR_LEN, TransactionMaybeSigned,
-    mapping_slots::{MappingSlots, step as mapping_step},
+    mapping_slots::{step as mapping_step, MappingSlots},
+    TransactionMaybeSigned, SELECTOR_LEN,
 };
 use foundry_evm_core::{
-    Breakpoints, InspectorExt,
     abi::Vm::stopExpectSafeMemoryCall,
     backend::{DatabaseError, DatabaseExt, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
-    evm::{FoundryEvm, new_evm_with_existing_context},
+    evm::{new_evm_with_existing_context, FoundryEvm},
+    Breakpoints, InspectorExt,
 };
-use foundry_evm_traces::{TracingInspectorConfig, identifier::SignaturesIdentifier};
+use foundry_evm_traces::{identifier::SignaturesIdentifier, TracingInspectorConfig};
 use foundry_wallets::multi_wallet::MultiWallet;
 use foundry_zksync_inspectors::TraceCollector;
 use itertools::Itertools;
 use proptest::test_runner::{RngAlgorithm, TestRng, TestRunner};
 use rand::Rng;
 use revm::{
-    Inspector, Journal,
     bytecode::opcode as op,
-    context::{BlockEnv, JournalTr, LocalContext, TransactionType, result::EVMError},
-    context_interface::{CreateScheme, transaction::SignedAuthorization},
+    context::{result::EVMError, BlockEnv, JournalTr, LocalContext, TransactionType},
+    context_interface::{transaction::SignedAuthorization, CreateScheme},
     handler::FrameResult,
     interpreter::{
+        interpreter_types::{Jumps, LoopControl, MemoryTr},
         CallInputs, CallOutcome, CallScheme, CallValue, CreateInputs, CreateOutcome, FrameInput,
         Gas, Host, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
-        interpreter_types::{Jumps, LoopControl, MemoryTr},
     },
     primitives::hardfork::SpecId,
     state::EvmStorageSlot,
+    Inspector, Journal,
 };
 use serde_json::Value;
 use std::{
@@ -373,7 +374,7 @@ pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 ///   contract deployed on the live network is able to execute cheatcodes by simply calling the
 ///   cheatcode address: by default, the caller, test contract and newly deployed contracts are
 ///   allowed to execute cheatcodes
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Cheatcodes {
     /// Solar compiler instance, to grant syntactic and semantic analysis capabilities
     pub analysis: Option<CheatcodeAnalysis>,
@@ -712,8 +713,12 @@ impl Cheatcodes {
     where
         Input: CommonCreateInput,
     {
-        let gas = Gas::new(input.gas_limit());
+        // Apply custom execution evm version.
+        if let Some(spec_id) = self.execution_evm_version {
+            ecx.cfg.spec = spec_id;
+        }
 
+        let gas = Gas::new(input.gas_limit());
         // Check if we should intercept this create
         if self.intercept_next_create_call {
             // Reset the flag
@@ -740,26 +745,10 @@ impl Cheatcodes {
 
             // At the target depth we set `msg.sender`
             if curr_depth == prank.depth {
-                // Load the pranked account to ensure its state is properly tracked
-                // This ensures the account exists in the journal and its nonce is tracked
-                if let Err(err) = ecx.journaled_state.load_account(prank.new_caller) {
-                    // This will only err out on a database issue.
-                    return Some(CreateOutcome {
-                        result: InterpreterResult {
-                            result: InstructionResult::Revert,
-                            output: Error::encode(err),
-                            gas,
-                        },
-                        address: None,
-                    });
-                }
-
+                // Ensure new caller is loaded and touched
+                let _ = journaled_account(ecx, prank.new_caller);
                 input.set_caller(prank.new_caller);
                 prank_applied = true;
-
-                // IMPORTANT: Ensure the pranked account's state is committed to the journal
-                // This ensures nonce increments persist even after stopPrank is called
-                ecx.journaled_state.touch(prank.new_caller);
             }
 
             // At the target depth, or deeper, we set `tx.origin`
@@ -830,14 +819,14 @@ impl Cheatcodes {
                 initialized: true,
                 oldBalance: U256::ZERO, // updated on create_end
                 newBalance: U256::ZERO, // updated on create_end
+                oldNonce: 0,            // new contract starts with nonce 0
+                newNonce: 1,            // updated on create_end (contracts start with nonce 1)
                 value: input.value(),
                 data: input.init_code(),
                 reverted: false,
                 deployedCode: Bytes::new(), // updated on create_end
                 storageAccesses: vec![],    // updated on create_end
                 depth: curr_depth as u64,
-                oldNonce: 0,
-                newNonce: 1,
             }]);
         }
 
@@ -1216,7 +1205,6 @@ impl Cheatcodes {
                     if call.gas_limit < 21_000 {
                         is_fixed_gas_limit = false;
                     }
-                    let input = TransactionInput::new(call.input.bytes(ecx));
 
                     // Note(zk): Fixed gas limit check is now computed here and passed to the
                     // strategy
@@ -1757,7 +1745,11 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
                         },
                     };
 
-                    if count != expected.count { Some((expected, count)) } else { None }
+                    if count != expected.count {
+                        Some((expected, count))
+                    } else {
+                        None
+                    }
                 })
                 .collect::<Vec<_>>();
 
@@ -1920,128 +1912,10 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
         }
     }
 
-    fn create(&mut self, ecx: Ecx, mut input: &mut CreateInputs) -> Option<CreateOutcome> {
-        // Apply custom execution evm version.
-        if let Some(spec_id) = self.execution_evm_version {
-            ecx.cfg.spec = spec_id;
-        }
-
-        let gas = Gas::new(input.gas_limit());
-        // Check if we should intercept this create
-        if self.intercept_next_create_call {
-            // Reset the flag
-            self.intercept_next_create_call = false;
-
-            // Get initcode from the input
-            let output = input.init_code();
-
-            // Return a revert with the initcode as error data
-            return Some(CreateOutcome {
-                result: InterpreterResult { result: InstructionResult::Revert, output, gas },
-                address: None,
-            });
-        }
-
-        let curr_depth = ecx.journaled_state.depth();
-
-        // Apply our prank
-        if let Some(prank) = &self.get_prank(curr_depth)
-            && curr_depth >= prank.depth
-            && input.caller() == prank.prank_caller
-        {
-            let mut prank_applied = false;
-
-            // At the target depth we set `msg.sender`
-            if curr_depth == prank.depth {
-                input.set_caller(prank.new_caller);
-                prank_applied = true;
-            }
-
-            // At the target depth, or deeper, we set `tx.origin`
-            if let Some(new_origin) = prank.new_origin {
-                ecx.tx.caller = new_origin;
-                prank_applied = true;
-            }
-
-            // If prank applied for first time, then update
-            if prank_applied && let Some(applied_prank) = prank.first_time_applied() {
-                self.pranks.insert(curr_depth, applied_prank);
-            }
-        }
-
-        // Apply EIP-2930 access list
-        self.apply_accesslist(ecx);
-
-        // Apply our broadcast
-        if let Some(broadcast) = &mut self.broadcast
-            && curr_depth >= broadcast.depth
-            && input.caller() == broadcast.original_caller
-        {
-            if let Err(err) = ecx.journaled_state.load_account(broadcast.new_origin) {
-                return Some(CreateOutcome {
-                    result: InterpreterResult {
-                        result: InstructionResult::Revert,
-                        output: Error::encode(err),
-                        gas,
-                    },
-                    address: None,
-                });
-            }
-
-            ecx.tx.caller = broadcast.new_origin;
-
-            if curr_depth == broadcast.depth || broadcast.deploy_from_code {
-                // Reset deploy from code flag for upcoming calls;
-                broadcast.deploy_from_code = false;
-
-                input.set_caller(broadcast.new_origin);
-
-                let account = &ecx.journaled_state.inner.state()[&broadcast.new_origin];
-                self.broadcastable_transactions.push_back(BroadcastableTransaction {
-                    rpc: ecx.journaled_state.database.active_fork_url(),
-                    transaction: TransactionRequest {
-                        from: Some(broadcast.new_origin),
-                        to: None,
-                        value: Some(input.value()),
-                        input: TransactionInput::new(input.init_code()),
-                        nonce: Some(account.info.nonce),
-                        ..Default::default()
-                    }
-                    .into(),
-                });
-
-                input.log_debug(self, &input.scheme().unwrap_or(CreateScheme::Create));
-            }
-        }
-
-        // Allow cheatcodes from the address of the new contract
-        let address = input.allow_cheatcodes(self, ecx);
-
-        // If `recordAccountAccesses` has been called, record the create
-        if let Some(recorded_account_diffs_stack) = &mut self.recorded_account_diffs_stack {
-            recorded_account_diffs_stack.push(vec![AccountAccess {
-                chainInfo: crate::Vm::ChainInfo {
-                    forkId: ecx.journaled_state.db().active_fork_id().unwrap_or_default(),
-                    chainId: U256::from(ecx.cfg.chain_id),
-                },
-                accessor: input.caller(),
-                account: address,
-                kind: crate::Vm::AccountAccessKind::Create,
-                initialized: true,
-                oldBalance: U256::ZERO, // updated on create_end
-                newBalance: U256::ZERO, // updated on create_end
-                oldNonce: 0,            // new contract starts with nonce 0
-                newNonce: 1,            // updated on create_end (contracts start with nonce 1)
-                value: input.value(),
-                data: input.init_code(),
-                reverted: false,
-                deployedCode: Bytes::new(), // updated on create_end
-                storageAccesses: vec![],    // updated on create_end
-                depth: curr_depth as u64,
-            }]);
-        }
-
-        None
+    fn create(&mut self, ecx: Ecx, input: &mut CreateInputs) -> Option<CreateOutcome> {
+        // NOTE(zk): We've abstracted away `fn create` in `fn create_common`. All changes need to go
+        // there
+        self.create_common(ecx, input, &mut TransparentCheatcodesExecutor)
     }
 
     fn create_end(&mut self, ecx: Ecx, call: &CreateInputs, outcome: &mut CreateOutcome) {

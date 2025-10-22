@@ -22,7 +22,6 @@ foundry-wallets.workspace = true
 foundry-strategy-zksync.workspace = true
 
 foundry-compilers.workspace = true
-solar.workspace = true
 
 alloy-eips.workspace = true
 alloy-dyn-abi.workspace = true
@@ -57,7 +56,6 @@ tracing-subscriber = { workspace = true, features = ["registry", "env-filter"] }
 tracing.workspace = true
 yansi.workspace = true
 rustls = { workspace = true, features = ["ring"] }
-dunce.workspace = true
 
 tracing-tracy = { version = "0.11", optional = true, features = ["demangle"] }
 

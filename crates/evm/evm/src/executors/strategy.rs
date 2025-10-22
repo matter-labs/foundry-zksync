@@ -1,4 +1,4 @@
-use std::{any::Any, fmt::Debug, path::Path};
+use std::{any::Any, fmt::Debug};
 
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
@@ -9,16 +9,16 @@ use foundry_cheatcodes::strategy::{
 use foundry_compilers::ProjectCompileOutput;
 use foundry_config::Config;
 use foundry_evm_core::{
-    Env,
-    backend::{Backend, BackendResult, CowBackend, strategy::BackendStrategy},
+    backend::{strategy::BackendStrategy, Backend, BackendResult, CowBackend},
     decode::RevertDecoder,
+    Env,
 };
 use foundry_linking::LinkerError;
 use foundry_zksync_compilers::{
     compilers::{artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler},
     dual_compiled_contracts::DualCompiledContracts,
 };
-use revm::{DatabaseRef, context::result::ResultAndState};
+use revm::{context::result::ResultAndState, DatabaseRef};
 
 use crate::inspectors::InspectorStack;
 
@@ -81,7 +81,7 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
     fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256>;
 
     fn set_nonce(&self, executor: &mut Executor, address: Address, nonce: u64)
-    -> BackendResult<()>;
+        -> BackendResult<()>;
 
     fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64>;
 
@@ -89,7 +89,6 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         config: &Config,
-        root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError>;
@@ -218,12 +217,11 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
     fn link(
         &self,
         _: &mut dyn ExecutorStrategyContext,
-        _: &Config,
-        root: &Path,
+        config: &Config,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
-        self.link_impl(root, input, deployer)
+        self.link_impl(config, input, deployer)
     }
 
     /// Deploys a library, applying state changes

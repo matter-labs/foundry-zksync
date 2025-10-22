@@ -1,43 +1,38 @@
 //! Forge test runner for multiple contracts.
 
 use crate::{
-    ContractRunner, TestFilter, progress::TestsProgress, result::SuiteResult,
-    runner::LIBRARY_DEPLOYER,
+    progress::TestsProgress, result::SuiteResult, runner::LIBRARY_DEPLOYER, ContractRunner,
+    TestFilter,
 };
 use alloy_json_abi::{Function, JsonAbi};
 use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
-use foundry_cli::opts::configure_pcx_from_compile_output;
-use foundry_common::{
-    ContractsByArtifact, ContractsByArtifactBuilder, TestFunctionExt, get_contract_name,
-    shell::verbosity,
-};
+use foundry_common::{get_contract_name, shell::verbosity, ContractsByArtifact, TestFunctionExt};
 use foundry_compilers::{
-    Artifact, ArtifactId, Compiler, ProjectCompileOutput,
     artifacts::{Contract, Libraries},
+    ArtifactId, Compiler, ProjectCompileOutput,
 };
 use foundry_config::{Config, InlineConfig};
 use foundry_evm::{
-    Env,
     backend::Backend,
     decode::RevertDecoder,
     executors::{
+        strategy::{ExecutorStrategy, LinkOutput as StrategyLinkOutput},
         Executor, ExecutorBuilder, FailFast,
-        strategy::{ExecutorStrategy, LinkOutput},
     },
     fork::CreateFork,
     inspectors::CheatsConfig,
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
+    Env,
 };
 use foundry_evm_networks::NetworkConfigs;
-use foundry_linking::{LinkOutput, Linker};
 use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
 use std::{
     collections::BTreeMap,
     path::Path,
-    sync::{Arc, mpsc},
+    sync::{mpsc, Arc},
     time::Instant,
 };
 
@@ -522,87 +517,27 @@ impl MultiContractRunnerBuilder {
         if let Some(zk_output) = zk_output {
             strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk_output);
         }
-        
-        let root = &self.config.root;
-        let contracts = output
-            .artifact_ids()
-            .map(|(id, v)| (id.with_stripped_file_prefixes(root), v))
-            .collect();
-        let linker = Linker::new(root, contracts);
 
-        // Build revert decoder from ABIs of all artifacts.
-        let abis = linker
-            .contracts
-            .iter()
-            .filter_map(|(_, contract)| contract.abi.as_ref().map(|abi| abi.borrow()));
-        let revert_decoder = RevertDecoder::new().with_abis(abis);
-
-        let LinkOutput { libraries, libs_to_deploy } = linker.link_with_nonce_or_address(
-            Default::default(),
+        // NOTE(zk): we've moved the linking to the strategy.
+        let StrategyLinkOutput {
+            deployable_contracts,
+            revert_decoder,
+            linked_contracts: _,
+            known_contracts,
+            libs_to_deploy,
+            libraries,
+            analysis,
+        } = strategy.runner.link(
+            strategy.context.as_mut(),
+            &self.config,
+            output,
             LIBRARY_DEPLOYER,
-            0,
-            linker.contracts.keys(),
         )?;
 
-        let linked_contracts = linker.get_linked_artifacts_cow(&libraries)?;
-
-        // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
-        let mut deployable_contracts = DeployableContracts::default();
-
-        for (id, contract) in linked_contracts.iter() {
-            let Some(abi) = contract.abi.as_ref() else { continue };
-
-            // if it's a test, link it and add to deployable contracts
-            if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true)
-                && abi.functions().any(|func| func.name.is_any_test())
-            {
-                linker.ensure_linked(contract, id)?;
-
-                let Some(bytecode) =
-                    contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
-                else {
-                    continue;
-                };
-
-                deployable_contracts
-                    .insert(id.clone(), TestContract { abi: abi.clone().into_owned(), bytecode });
-            }
-        }
-
-        // Create known contracts from linked contracts and storage layout information (if any).
-        let known_contracts =
-            ContractsByArtifactBuilder::new(linked_contracts).with_output(output, root).build();
-
-        // Initialize and configure the solar compiler.
-        let mut analysis = solar::sema::Compiler::new(
-            solar::interface::Session::builder().with_stderr_emitter().build(),
-        );
-        let dcx = analysis.dcx_mut();
-        dcx.set_emitter(Box::new(
-            solar::interface::diagnostics::HumanEmitter::stderr(Default::default())
-                .source_map(Some(dcx.source_map().unwrap())),
-        ));
-        dcx.set_flags_mut(|f| f.track_diagnostics = false);
-
-        // Populate solar's global context by parsing and lowering the sources.
-        let files: Vec<_> =
-            output.output().sources.as_ref().keys().map(|path| path.to_path_buf()).collect();
-
-        analysis.enter_mut(|compiler| -> Result<()> {
-            let mut pcx = compiler.parse();
-            configure_pcx_from_compile_output(
-                &mut pcx,
-                &self.config,
-                output,
-                if files.is_empty() { None } else { Some(&files) },
-            )?;
-            pcx.parse();
-            // Check if any sources exist, to avoid logging `error: no files found`
-            if !compiler.sess().source_map().is_empty() {
-                let _ = compiler.lower_asts();
-            }
-            Ok(())
-        })?;
+        let contracts = deployable_contracts
+            .into_iter()
+            .map(|(id, (abi, bytecode))| (id, TestContract { abi, bytecode }))
+            .collect();
 
         Ok(MultiContractRunner {
             contracts,
