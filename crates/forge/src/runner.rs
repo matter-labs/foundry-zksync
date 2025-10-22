@@ -1,36 +1,36 @@
 //! The Forge test runner.
 
 use crate::{
+    MultiContractRunner, TestFilter,
     coverage::HitMaps,
     fuzz::{BaseCounterExample, FuzzTestResult},
     multi_runner::{TestContract, TestRunnerConfig},
-    progress::{start_fuzz_progress, TestsProgress},
+    progress::{TestsProgress, start_fuzz_progress},
     result::{SuiteResult, TestResult, TestSetup},
-    MultiContractRunner, TestFilter,
 };
 use alloy_dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_primitives::{address, map::HashMap, Address, Bytes, U256};
+use alloy_primitives::{Address, Bytes, U256, address, map::HashMap};
 use eyre::Result;
-use foundry_common::{contracts::ContractsByAddress, TestFunctionExt, TestFunctionKind};
+use foundry_common::{TestFunctionExt, TestFunctionKind, contracts::ContractsByAddress};
 use foundry_compilers::utils::canonicalized;
 use foundry_config::{Config, FuzzCorpusConfig};
 use foundry_evm::{
     constants::CALLER,
     decode::RevertDecoder,
     executors::{
+        CallResult, EvmError, Executor, ITest, RawCallResult,
         fuzz::FuzzedExecutor,
         invariant::{
-            check_sequence, replay_error, replay_run, InvariantExecutor, InvariantFuzzError,
+            InvariantExecutor, InvariantFuzzError, check_sequence, replay_error, replay_run,
         },
         strategy::DeployLibKind,
-        CallResult, EvmError, Executor, ITest, RawCallResult,
     },
     fuzz::{
-        fixture_name, invariant::InvariantContract, BasicTxDetails, CallDetails, CounterExample,
-        FuzzFixtures,
+        BasicTxDetails, CallDetails, CounterExample, FuzzFixtures, fixture_name,
+        invariant::InvariantContract,
     },
-    traces::{load_contracts, TraceKind, TraceMode},
+    traces::{TraceKind, TraceMode, load_contracts},
 };
 use itertools::Itertools;
 use proptest::test_runner::{RngAlgorithm, TestError, TestRng, TestRunner};
@@ -133,8 +133,9 @@ impl<'a> ContractRunner<'a> {
 
         let mut result = TestSetup::default();
         for code in &self.mcr.libs_to_deploy {
-            // NOTE(zk): library deployments now return multiple results owing to the multiple libs that might require being deployed.
-            
+            // NOTE(zk): library deployments now return multiple results owing to the multiple libs
+            // that might require being deployed.
+
             let deploy_result = self.executor.deploy_library(
                 LIBRARY_DEPLOYER,
                 DeployLibKind::Create(code.clone()),

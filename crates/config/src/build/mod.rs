@@ -1,3 +1,4 @@
+use crate::{Config, semver::Version};
 use eyre::Result;
 use foundry_compilers::{
     CompilerInput, Graph, Project, ProjectCompileOutput, ProjectPathsConfig,
@@ -5,7 +6,6 @@ use foundry_compilers::{
     multi::{MultiCompilerLanguage, MultiCompilerParser},
     solc::{SOLC_EXTENSIONS, SolcLanguage, SolcVersionedInput},
 };
-use crate::{Config, semver::Version};
 use rayon::prelude::*;
 use solar::sema::ParsingContext;
 use std::{

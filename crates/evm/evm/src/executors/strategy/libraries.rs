@@ -1,18 +1,15 @@
 //! Contains various definitions and items related to deploy-time linking
 
-use std::{
-    borrow::Borrow,
-    collections::BTreeMap,
-};
+use std::{borrow::Borrow, collections::BTreeMap};
 
 use alloy_json_abi::JsonAbi;
-use alloy_primitives::{Address, Bytes, TxKind, B256, U256};
+use alloy_primitives::{Address, B256, Bytes, TxKind, U256};
 use eyre::{Context, Result};
 use foundry_common::{ContractsByArtifact, TestFunctionExt, TransactionMaybeSigned};
 use foundry_compilers::{
-    artifacts::Libraries, contracts::ArtifactContracts, Artifact, ArtifactId, ProjectCompileOutput
+    Artifact, ArtifactId, ProjectCompileOutput, artifacts::Libraries, contracts::ArtifactContracts,
 };
-use foundry_config::{build::configure_pcx_from_compile_output, Config};
+use foundry_config::{Config, build::configure_pcx_from_compile_output};
 use foundry_evm_core::decode::RevertDecoder;
 use foundry_linking::{Linker, LinkerError};
 
@@ -70,7 +67,6 @@ impl From<DeployLibResult> for RawCallResult {
         d.result.raw
     }
 }
-
 
 impl EvmExecutorStrategyRunner {
     pub(super) fn link_impl(

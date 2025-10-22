@@ -3,36 +3,36 @@
 
 use std::collections::HashMap;
 
-use alloy_primitives::{keccak256, Address, Bytes, TxKind, B256, U256};
+use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256};
 use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
 use foundry_common::{ContractsByArtifact, TransactionMaybeSigned};
 use foundry_compilers::{
-    artifacts::CompactContractBytecodeCow, contracts::ArtifactContracts, info::ContractInfo,
-    Artifact, ProjectCompileOutput,
+    Artifact, ProjectCompileOutput, artifacts::CompactContractBytecodeCow,
+    contracts::ArtifactContracts, info::ContractInfo,
 };
 use foundry_config::Config;
 use foundry_evm::{
     backend::DatabaseExt,
     decode::RevertDecoder,
     executors::{
+        DeployResult, EvmError, Executor,
         strategy::{
             DeployLibKind, DeployLibResult, EvmExecutorStrategyRunner, ExecutorStrategyContext,
             ExecutorStrategyRunner, LinkOutput,
         },
-        DeployResult, EvmError, Executor,
     },
 };
 use foundry_linking::{
-    LinkerError, ZkLinker, ZkLinkerError, DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION,
+    DEPLOY_TIME_LINKING_ZKSOLC_MIN_VERSION, LinkerError, ZkLinker, ZkLinkerError,
 };
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{
-    encode_create_params, hash_bytecode, ZkTransactionMetadata, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
+    encode_create_params, hash_bytecode,
 };
-use revm::context::{result::Output, CreateScheme};
+use revm::context::{CreateScheme, result::Output};
 
-use super::{get_context, ZksyncExecutorStrategyRunner};
+use super::{ZksyncExecutorStrategyRunner, get_context};
 
 impl ZksyncExecutorStrategyRunner {
     pub(super) fn link_impl(

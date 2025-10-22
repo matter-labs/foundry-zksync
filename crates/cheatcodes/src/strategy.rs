@@ -10,10 +10,10 @@ use revm::{
 };
 
 use crate::{
-    inspector::{CommonCreateInput, Ecx},
-    script::Broadcast,
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
     CheatsConfig, CheatsCtxt, DynCheatcode, Result,
+    inspector::{CommonCreateInput, Ecx},
+    script::Broadcast,
 };
 
 /// Represents the context for [CheatcodeInspectorStrategy].

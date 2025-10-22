@@ -7,10 +7,14 @@ use alloy_rpc_types::{
     serde_helpers::WithOtherFields,
 };
 use foundry_cheatcodes::{
-    journaled_account, strategy::{
+    Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Result,
+    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
+    journaled_account,
+    strategy::{
         CheatcodeInspectorStrategyContext, CheatcodeInspectorStrategyExt,
         CheatcodeInspectorStrategyRunner, EvmCheatcodeInspectorStrategyRunner,
-    }, Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor, CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Result, Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess}
+    },
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
@@ -18,7 +22,7 @@ use foundry_evm::{
     backend::{DatabaseError, LocalForkId},
     constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE},
 };
-use foundry_evm_core::{backend::DatabaseExt, Ecx};
+use foundry_evm_core::{Ecx, backend::DatabaseExt};
 use foundry_zksync_core::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
     KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, PaymasterParams,

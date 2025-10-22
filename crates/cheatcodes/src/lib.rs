@@ -51,8 +51,7 @@ pub use evm::{DealRecord, mock::mock_call};
 mod fs;
 
 mod inspector;
-pub use inspector::CheatcodeAnalysis;
-pub use inspector::CommonCreateInput;
+pub use inspector::{CheatcodeAnalysis, CommonCreateInput};
 
 mod json;
 

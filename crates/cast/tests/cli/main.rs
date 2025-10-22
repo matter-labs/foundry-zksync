@@ -1254,8 +1254,8 @@ casttest!(
     |_prj, cmd| {
         let eth_rpc_url = next_http_rpc_endpoint();
 
-    // Call `echo "\n[\n\"0x123\",\nfalse\n]\n" | cast rpc eth_getBlockByNumber --raw
-    cmd.args(["rpc", "--rpc-url", eth_rpc_url.as_str(), "eth_getBlockByNumber", "--raw"]).stdin(
+        // Call `echo "\n[\n\"0x123\",\nfalse\n]\n" | cast rpc eth_getBlockByNumber --raw
+        cmd.args(["rpc", "--rpc-url", eth_rpc_url.as_str(), "eth_getBlockByNumber", "--raw"]).stdin(
         b"\n[\n\"0x123\",\nfalse\n]\n"
     )
     .assert_json_stdout(str![[r#"
