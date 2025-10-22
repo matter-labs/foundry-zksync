@@ -21,7 +21,7 @@ foundry-wallets.workspace = true
 
 foundry-strategy-zksync.workspace = true
 
-foundry-compilers = { workspace = true, features = ["full"] }
+foundry-compilers.workspace = true
 solar.workspace = true
 
 alloy-eips.workspace = true
@@ -45,6 +45,7 @@ futures.workspace = true
 indicatif.workspace = true
 itertools.workspace = true
 mimalloc = { workspace = true, optional = true }
+path-slash.workspace = true
 rayon.workspace = true
 regex = { workspace = true, default-features = false }
 serde_json.workspace = true

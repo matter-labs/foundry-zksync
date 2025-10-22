@@ -111,7 +111,8 @@ impl CreateArgs {
     pub async fn run(mut self) -> Result<()> {
         let mut config = self.load_config()?;
         // Install missing dependencies.
-        if install::install_missing_dependencies(&mut config) && config.auto_detect_remappings {
+        if install::install_missing_dependencies(&mut config).await && config.auto_detect_remappings
+        {
             // need to re-configure here to also catch additional remappings
             config = self.load_config()?;
         }

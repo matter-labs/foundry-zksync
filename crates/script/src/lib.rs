@@ -27,12 +27,11 @@ use forge_script_sequence::{AdditionalContract, NestedValue};
 use forge_verify::{RetryArgs, VerifierArgs};
 use foundry_cli::{
     opts::{BuildOpts, EvmArgs, GlobalArgs},
-    utils::{self, LoadConfig},
+    utils::LoadConfig,
 };
 use foundry_common::{
     CONTRACT_MAX_SIZE, ContractsByArtifact, SELECTOR_LEN,
     abi::{encode_function_args, get_func},
-    evm::Breakpoints,
     shell,
 };
 use foundry_compilers::ArtifactId;
@@ -45,6 +44,7 @@ use foundry_config::{
 };
 use foundry_evm::{
     backend::Backend,
+    core::Breakpoints,
     executors::ExecutorBuilder,
     inspectors::{
         CheatsConfig,

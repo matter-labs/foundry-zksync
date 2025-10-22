@@ -37,7 +37,7 @@ use foundry_compilers::{
     },
     error::SolcError,
     multi::{MultiCompilerParser, MultiCompilerRestrictions},
-    solc::{CliSettings, SolcSettings},
+    solc::{CliSettings, SolcLanguage, SolcSettings},
 };
 use regex::Regex;
 use revm::primitives::hardfork::SpecId;
@@ -132,6 +132,11 @@ pub use compilation::{CompilationRestrictions, SettingsOverrides};
 
 pub mod zksync;
 use zksync::ZkSyncConfig;
+pub mod extend;
+use extend::Extends;
+
+use foundry_evm_networks::NetworkConfigs;
+pub use semver;
 
 /// Foundry configuration
 ///
@@ -535,9 +540,9 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extra_args: Vec<String>,
 
-    /// Whether to enable Celo precompiles.
-    #[serde(default)]
-    pub celo: bool,
+    /// Networks with enabled features.
+    #[serde(flatten)]
+    pub networks: NetworkConfigs,
 
     /// Timeout for transactions in seconds.
     pub transaction_timeout: u64,
@@ -571,6 +576,101 @@ pub struct Config {
 
     /// @zkSync zkSolc configuration and settings
     pub zksync: ZkSyncConfig,
+}
+
+/// Diagnostic level (minimum) at which the process should finish with a non-zero exit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum, Default, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DenyLevel {
+    /// Always exit with zero code.
+    #[default]
+    Never,
+    /// Exit with a non-zero code if any warnings are found.
+    Warnings,
+    /// Exit with a non-zero code if any notes or warnings are found.
+    Notes,
+}
+
+// Custom deserialization to make `DenyLevel` parsing case-insensitive and backwards compatible with
+// booleans.
+impl<'de> Deserialize<'de> for DenyLevel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct DenyLevelVisitor;
+
+        impl<'de> de::Visitor<'de> for DenyLevelVisitor {
+            type Value = DenyLevel;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("one of the following strings: `never`, `warnings`, `notes`")
+            }
+
+            fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Ok(DenyLevel::from(value))
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                DenyLevel::from_str(value).map_err(de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_any(DenyLevelVisitor)
+    }
+}
+
+impl FromStr for DenyLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "warnings" | "warning" | "w" => Ok(Self::Warnings),
+            "notes" | "note" | "n" => Ok(Self::Notes),
+            "never" | "false" | "f" => Ok(Self::Never),
+            _ => Err(format!(
+                "unknown variant: found `{s}`, expected one of `never`, `warnings`, `notes`"
+            )),
+        }
+    }
+}
+
+impl From<bool> for DenyLevel {
+    fn from(deny: bool) -> Self {
+        if deny { Self::Warnings } else { Self::Never }
+    }
+}
+
+impl DenyLevel {
+    /// Returns `true` if the deny level includes warnings.
+    pub fn warnings(&self) -> bool {
+        match self {
+            Self::Never => false,
+            Self::Warnings | Self::Notes => true,
+        }
+    }
+
+    /// Returns `true` if the deny level includes notes.
+    pub fn notes(&self) -> bool {
+        match self {
+            Self::Never | Self::Warnings => false,
+            Self::Notes => true,
+        }
+    }
+
+    /// Returns `true` if the deny level is set to never (only errors).
+    pub fn never(&self) -> bool {
+        match self {
+            Self::Never => true,
+            Self::Warnings | Self::Notes => false,
+        }
+    }
 }
 
 /// Diagnostic level (minimum) at which the process should finish with a non-zero exit.
@@ -928,6 +1028,7 @@ impl Config {
         self.broadcast = p(&root, &self.broadcast);
         self.cache_path = p(&root, &self.cache_path);
         self.snapshots = p(&root, &self.snapshots);
+        self.test_failures_file = p(&root, &self.test_failures_file);
 
         if let Some(build_info_path) = self.build_info_path {
             self.build_info_path = Some(p(&root, &build_info_path));
@@ -1162,7 +1263,15 @@ impl Config {
             .settings(settings)
             .paths(paths)
             .ignore_error_codes(self.ignored_error_codes.iter().copied().map(Into::into))
-            .ignore_paths(self.ignored_file_paths.clone())
+            .ignore_paths(
+                self.ignored_file_paths
+                    .iter()
+                    .map(|path| {
+                        // Strip "./" prefix for consistent path matching
+                        path.strip_prefix("./").unwrap_or(path).to_path_buf()
+                    })
+                    .collect::<Vec<_>>(),
+            )
             .set_compiler_severity_filter(if self.deny.warnings() {
                 Severity::Warning
             } else {
@@ -1185,6 +1294,28 @@ impl Config {
         }
 
         Ok(project)
+    }
+
+    /// Disables optimizations and enables viaIR with minimum optimization if `ir_minimum` is true.
+    pub fn disable_optimizations(&self, project: &mut Project, ir_minimum: bool) {
+        if ir_minimum {
+            // Enable viaIR with minimum optimization: https://github.com/ethereum/solidity/issues/12533#issuecomment-1013073350
+            // And also in new releases of Solidity: https://github.com/ethereum/solidity/issues/13972#issuecomment-1628632202
+            project.settings.solc.settings = std::mem::take(&mut project.settings.solc.settings)
+                .with_via_ir_minimum_optimization();
+
+            // Sanitize settings for solc 0.8.4 if version cannot be detected: https://github.com/foundry-rs/foundry/issues/9322
+            // But keep the EVM version: https://github.com/ethereum/solidity/issues/15775
+            let evm_version = project.settings.solc.evm_version;
+            let version = self.solc_version().unwrap_or_else(|| Version::new(0, 8, 4));
+            project.settings.solc.settings.sanitize(&version, SolcLanguage::Solidity);
+            project.settings.solc.evm_version = evm_version;
+        } else {
+            project.settings.solc.optimizer.disable();
+            project.settings.solc.optimizer.runs = None;
+            project.settings.solc.optimizer.details = None;
+            project.settings.solc.via_ir = None;
+        }
     }
 
     /// Cleans the project.
@@ -1386,7 +1517,7 @@ impl Config {
     /// # }
     /// ```
     pub fn get_rpc_url(&self) -> Option<Result<Cow<'_, str>, UnresolvedEnvVarError>> {
-        let maybe_alias = self.eth_rpc_url.as_ref().or(self.etherscan_api_key.as_ref())?;
+        let maybe_alias = self.eth_rpc_url.as_deref()?;
         if let Some(alias) = self.get_rpc_url_with_alias(maybe_alias) {
             Some(alias)
         } else {
@@ -2573,7 +2704,7 @@ impl Default for Config {
             legacy_assertions: false,
             warnings: vec![],
             extra_args: vec![],
-            celo: false,
+            networks: Default::default(),
             transaction_timeout: 120,
             additional_compiler_profiles: Default::default(),
             compilation_restrictions: Default::default(),
@@ -6348,6 +6479,25 @@ mod tests {
 
             // Assert that the deprecated flag is correctly interpreted
             assert_eq!(config.deny, DenyLevel::Warnings);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn warns_on_unknown_keys_in_profile() {
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "foundry.toml",
+                r#"
+                [profile.default]
+                unknown_key_xyz = 123
+                "#,
+            )?;
+
+            let cfg = Config::load().unwrap();
+            assert!(cfg.warnings.iter().any(
+                |w| matches!(w, crate::Warning::UnknownKey { key, .. } if key == "unknown_key_xyz")
+            ));
             Ok(())
         });
     }

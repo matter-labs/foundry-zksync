@@ -145,20 +145,12 @@ impl<'a> ContractRunner<'a> {
                 Ok(deployments) => deployments.into_iter().map(Ok).collect(),
             };
 
-            for deploy_result in
-                deployments.into_iter().map(|result| result.map(|deployment| deployment.result))
-            {
-                // Record deployed library address.
-                if let Ok(deployed) = &deploy_result {
-                    result.deployed_libs.push(deployed.address);
-                }
-
-                let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
-                result.extend(raw, TraceKind::Deployment);
-                if reason.is_some() {
-                    result.reason = reason;
-                    return Ok(result);
-                }
+            let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
+            result.extend(raw, TraceKind::Deployment);
+            if reason.is_some() {
+                debug!(?reason, "deployment of library failed");
+                result.reason = reason;
+                return Ok(result);
             }
         }
 
@@ -189,6 +181,7 @@ impl<'a> ContractRunner<'a> {
         let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
         result.extend(raw, TraceKind::Deployment);
         if reason.is_some() {
+            debug!(?reason, "deployment of test contract failed");
             result.reason = reason;
             return Ok(result);
         }
@@ -406,23 +399,14 @@ impl<'a> ContractRunner<'a> {
             load_contracts(setup.traces.iter().map(|(_, t)| &t.arena), &self.mcr.known_contracts)
         });
 
-        let test_fail_instances = functions
-            .iter()
-            .filter_map(|func| {
-                TestFunctionKind::classify(&func.name, !func.inputs.is_empty())
-                    .is_any_test_fail()
-                    .then_some(func.name.clone())
-            })
-            .collect::<Vec<_>>();
-
-        if !test_fail_instances.is_empty() {
-            let instances = format!(
-                "Found {} instances: {}",
-                test_fail_instances.len(),
-                test_fail_instances.join(", ")
-            );
-            let fail =  TestResult::fail("`testFail*` has been removed. Consider changing to test_Revert[If|When]_Condition and expecting a revert".to_string());
-            return SuiteResult::new(start.elapsed(), [(instances, fail)].into(), warnings);
+        let test_fail_functions =
+            functions.iter().filter(|func| func.test_function_kind().is_any_test_fail());
+        if test_fail_functions.clone().next().is_some() {
+            let fail = || {
+                TestResult::fail("`testFail*` has been removed. Consider changing to test_Revert[If|When]_Condition and expecting a revert".to_string())
+            };
+            let test_results = test_fail_functions.map(|func| (func.signature(), fail())).collect();
+            return SuiteResult::new(start.elapsed(), test_results, warnings);
         }
 
         let fail_fast = &self.tcfg.fail_fast;
@@ -1040,13 +1024,12 @@ impl<'a> FunctionRunner<'a> {
         let address = self.setup.address;
 
         // Apply before test configured functions (if any).
-        if self.cr.contract.abi.functions().filter(|func| func.name.is_before_test_setup()).count()
-            == 1
-        {
+        if self.cr.contract.abi.functions().any(|func| func.name.is_before_test_setup()) {
             for calldata in self.executor.call_sol_default(
                 address,
                 &ITest::beforeTestSetupCall { testSelector: func.selector() },
             ) {
+                debug!(?calldata, spec=%self.executor.spec_id(), "applying before_test_setup");
                 // Apply before test configured calldata.
                 match self.executor.to_mut().transact_raw(
                     self.tcfg.sender,

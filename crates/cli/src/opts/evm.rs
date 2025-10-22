@@ -1,4 +1,9 @@
-//! CLI arguments for configuring the EVM settings.
+//! Common EVM-related types shared across crates.
+
+use alloy_primitives::{Address, map::HashMap};
+
+/// Map keyed by breakpoints char to their location (contract address, pc)
+pub type Breakpoints = HashMap<char, (Address, usize)>;
 
 use alloy_primitives::{Address, B256, U256};
 use clap::Parser;
@@ -136,11 +141,6 @@ pub struct EvmArgs {
     #[arg(long)]
     #[serde(skip)]
     pub isolate: bool,
-
-    /// Whether to enable Celo precompiles.
-    #[arg(long)]
-    #[serde(skip)]
-    pub celo: bool,
 }
 
 // Make this set of options a `figment::Provider` so that it can be merged into the `Config`
@@ -165,10 +165,6 @@ impl Provider for EvmArgs {
 
         if self.isolate {
             dict.insert("isolate".to_string(), self.isolate.into());
-        }
-
-        if self.celo {
-            dict.insert("celo".to_string(), self.celo.into());
         }
 
         if self.always_use_create_2_factory {

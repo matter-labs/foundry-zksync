@@ -1,4 +1,8 @@
-name: test
+# Reusable workflow for running tests via `cargo nextest`
+
+name: nextest
+
+permissions: {}
 
 on:
   push:
@@ -18,6 +22,7 @@ env:
   CARGO_TERM_COLOR: always
   TARGET_RUST_VERSION: "stable"
   RUST_BACKTRACE: full
+  RUSTC_WRAPPER: "sccache"
 
 jobs:
   nextest:
@@ -49,8 +54,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-      - run: cargo clippy --workspace --all-targets --all-features
+          python-version: "3.14"
+      - name: Generate matrices
+        id: gen
         env:
           RUSTFLAGS: -Dwarnings
 
@@ -76,7 +82,10 @@ jobs:
           cache-on-failure: true
       - name: forge fmt
         shell: bash
-        run: ./.github/scripts/format.sh --check
+        run: |
+          output=$(python3 .github/scripts/matrices.py)
+          printf '::debug::test-matrix=%s\n' "$output"
+          printf 'test-matrix=%s\n' "$output" >> "$GITHUB_OUTPUT"
 
   codespell:
     runs-on: ubuntu-22.04

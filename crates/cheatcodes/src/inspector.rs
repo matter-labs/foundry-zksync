@@ -28,11 +28,10 @@ use foundry_cheatcodes_common::{
 };
 use foundry_common::{
     SELECTOR_LEN, TransactionMaybeSigned,
-    evm::Breakpoints,
     mapping_slots::{MappingSlots, step as mapping_step},
 };
 use foundry_evm_core::{
-    InspectorExt,
+    Breakpoints, InspectorExt,
     abi::Vm::stopExpectSafeMemoryCall,
     backend::{DatabaseError, DatabaseExt, RevertDiagnostic},
     constants::{CHEATCODE_ADDRESS, HARDHAT_CONSOLE_ADDRESS, MAGIC_ASSUME},
@@ -55,6 +54,7 @@ use revm::{
         Gas, Host, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
         interpreter_types::{Jumps, LoopControl, MemoryTr},
     },
+    primitives::hardfork::SpecId,
     state::EvmStorageSlot,
 };
 use serde_json::Value;
@@ -70,6 +70,9 @@ use std::{
 
 mod utils;
 pub use utils::CommonCreateInput;
+
+pub mod analysis;
+pub use analysis::CheatcodeAnalysis;
 
 pub type Ecx<'a, 'b, 'c> = &'a mut EthEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 
@@ -372,6 +375,9 @@ pub type BroadcastableTransactions = VecDeque<BroadcastableTransaction>;
 ///   allowed to execute cheatcodes
 #[derive(Debug)]
 pub struct Cheatcodes {
+    /// Solar compiler instance, to grant syntactic and semantic analysis capabilities
+    pub analysis: Option<CheatcodeAnalysis>,
+
     /// The block environment
     ///
     /// Used in the cheatcode handler to overwrite the block environment separately from the
@@ -513,55 +519,8 @@ pub struct Cheatcodes {
     /// If GAS opcode is followed by CALL opcode then both flags are marked true and call
     /// has non-fixed gas limit, otherwise the call is considered to have fixed gas limit.
     pub dynamic_gas_limit_sequence: Option<(bool, bool)>,
-}
-
-impl Clone for Cheatcodes {
-    fn clone(&self) -> Self {
-        Self {
-            block: self.block.clone(),
-            active_delegations: self.active_delegations.clone(),
-            active_blob_sidecar: self.active_blob_sidecar.clone(),
-            gas_price: self.gas_price,
-            labels: self.labels.clone(),
-            pranks: self.pranks.clone(),
-            expected_revert: self.expected_revert.clone(),
-            assume_no_revert: self.assume_no_revert.clone(),
-            fork_revert_diagnostic: self.fork_revert_diagnostic.clone(),
-            accesses: self.accesses.clone(),
-            recorded_account_diffs_stack: self.recorded_account_diffs_stack.clone(),
-            record_debug_steps_info: self.record_debug_steps_info,
-            recorded_logs: self.recorded_logs.clone(),
-            recording_accesses: self.recording_accesses,
-            mocked_calls: self.mocked_calls.clone(),
-            mocked_functions: self.mocked_functions.clone(),
-            expected_calls: self.expected_calls.clone(),
-            expected_emits: self.expected_emits.clone(),
-            expected_creates: self.expected_creates.clone(),
-            allowed_mem_writes: self.allowed_mem_writes.clone(),
-            broadcast: self.broadcast.clone(),
-            broadcastable_transactions: self.broadcastable_transactions.clone(),
-            config: self.config.clone(),
-            fs_commit: self.fs_commit,
-            serialized_jsons: self.serialized_jsons.clone(),
-            eth_deals: self.eth_deals.clone(),
-            gas_metering: self.gas_metering.clone(),
-            gas_snapshots: self.gas_snapshots.clone(),
-            mapping_slots: self.mapping_slots.clone(),
-            pc: self.pc,
-            breakpoints: self.breakpoints.clone(),
-            intercept_next_create_call: self.intercept_next_create_call,
-            test_runner: self.test_runner.clone(),
-            ignored_traces: self.ignored_traces.clone(),
-            arbitrary_storage: self.arbitrary_storage.clone(),
-            deprecated: self.deprecated.clone(),
-            wallets: self.wallets.clone(),
-            strategy: self.strategy.clone(),
-            access_list: self.access_list.clone(),
-            test_context: self.test_context.clone(),
-            signatures_identifier: self.signatures_identifier.clone(),
-            dynamic_gas_limit_sequence: self.dynamic_gas_limit_sequence,
-        }
-    }
+    // Custom execution evm version.
+    pub execution_evm_version: Option<SpecId>,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -577,6 +536,7 @@ impl Cheatcodes {
     /// Creates a new `Cheatcodes` with the given settings.
     pub fn new(config: Arc<CheatsConfig>) -> Self {
         Self {
+            analysis: None,
             fs_commit: true,
             labels: config.labels.clone(),
             strategy: config.strategy.clone(),
@@ -619,7 +579,13 @@ impl Cheatcodes {
             wallets: Default::default(),
             signatures_identifier: Default::default(),
             dynamic_gas_limit_sequence: Default::default(),
+            execution_evm_version: None,
         }
+    }
+
+    /// Enables cheatcode analysis capabilities by providing a solar compiler instance.
+    pub fn set_analysis(&mut self, analysis: CheatcodeAnalysis) {
+        self.analysis = Some(analysis);
     }
 
     /// Returns the configured prank at given depth or the first prank configured at a lower depth.
@@ -1035,6 +1001,11 @@ impl Cheatcodes {
         call: &mut CallInputs,
         executor: &mut dyn CheatcodesExecutor,
     ) -> Option<CallOutcome> {
+        // Apply custom execution evm version.
+        if let Some(spec_id) = self.execution_evm_version {
+            ecx.cfg.spec = spec_id;
+        }
+
         let gas = Gas::new(call.gas_limit);
         let curr_depth = ecx.journaled_state.depth();
 
@@ -1238,10 +1209,14 @@ impl Cheatcodes {
 
                     let (gas_seen, call_seen) =
                         self.dynamic_gas_limit_sequence.take().unwrap_or_default();
+                    // Transaction has fixed gas limit if no GAS opcode seen before CALL opcode.
                     let mut is_fixed_gas_limit = !(gas_seen && call_seen);
+                    // Additional check as transfers in forge scripts seem to be estimated at 2300
+                    // by revm leading to "Intrinsic gas too low" failure when simulated on chain.
                     if call.gas_limit < 21_000 {
                         is_fixed_gas_limit = false;
                     }
+                    let input = TransactionInput::new(call.input.bytes(ecx));
 
                     // Note(zk): Fixed gas limit check is now computed here and passed to the
                     // strategy
@@ -1417,6 +1392,11 @@ impl Cheatcodes {
             Some(storage) => storage.copies.contains_key(address),
             None => false,
         }
+    }
+
+    /// Returns struct definitions from the analysis, if available.
+    pub fn struct_defs(&self) -> Option<&foundry_common::fmt::StructDefinitions> {
+        self.analysis.as_ref().and_then(|analysis| analysis.struct_defs().ok())
     }
 }
 
@@ -1655,7 +1635,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
                         Ok((_, retdata)) => {
                             expected_revert.actual_count += 1;
                             if expected_revert.actual_count < expected_revert.count {
-                                self.expected_revert = Some(expected_revert.clone());
+                                self.expected_revert = Some(expected_revert);
                             }
                             outcome.result.result = InstructionResult::Return;
                             outcome.result.output = retdata;
@@ -1695,7 +1675,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
         if let Some(recorded_account_diffs_stack) = &mut self.recorded_account_diffs_stack {
             // The root call cannot be recorded.
             if ecx.journaled_state.depth() > 0
-                && let Some(last_recorded_depth) = &mut recorded_account_diffs_stack.pop()
+                && let Some(mut last_recorded_depth) = recorded_account_diffs_stack.pop()
             {
                 // Update the reverted status of all deeper calls if this call reverted, in
                 // accordance with EVM behavior
@@ -1727,9 +1707,9 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
                     // vector if higher depths were not recorded. This
                     // preserves ordering of accesses.
                     if let Some(last) = recorded_account_diffs_stack.last_mut() {
-                        last.append(last_recorded_depth);
+                        last.extend(last_recorded_depth);
                     } else {
-                        recorded_account_diffs_stack.push(last_recorded_depth.clone());
+                        recorded_account_diffs_stack.push(last_recorded_depth);
                     }
                 }
             }
@@ -1941,6 +1921,11 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
     }
 
     fn create(&mut self, ecx: Ecx, mut input: &mut CreateInputs) -> Option<CreateOutcome> {
+        // Apply custom execution evm version.
+        if let Some(spec_id) = self.execution_evm_version {
+            ecx.cfg.spec = spec_id;
+        }
+
         let gas = Gas::new(input.gas_limit());
         // Check if we should intercept this create
         if self.intercept_next_create_call {
@@ -2010,9 +1995,6 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
                 broadcast.deploy_from_code = false;
 
                 input.set_caller(broadcast.new_origin);
-
-                // Ensure account is touched.
-                ecx.journaled_state.touch(broadcast.new_origin);
 
                 let account = &ecx.journaled_state.inner.state()[&broadcast.new_origin];
                 self.broadcastable_transactions.push_back(BroadcastableTransaction {
@@ -2611,20 +2593,6 @@ impl Cheatcodes {
         // Reset dynamic gas limit sequence if GAS opcode was not followed by a CALL opcode.
         self.dynamic_gas_limit_sequence = None;
     }
-}
-
-// Determines if the gas limit on a given call was manually set in the script and should therefore
-// not be overwritten by later estimations
-pub fn check_if_fixed_gas_limit(ecx: &Ecx, call_gas_limit: u64) -> bool {
-    // If the gas limit was not set in the source code it is set to the estimated gas left at the
-    // time of the call, which should be rather close to configured gas limit.
-    // TODO: Find a way to reliably make this determination.
-    // For example by generating it in the compilation or EVM simulation process
-    ecx.tx.gas_limit > ecx.block.gas_limit &&
-        call_gas_limit <= ecx.block.gas_limit
-        // Transfers in forge scripts seem to be estimated at 2300 by revm leading to "Intrinsic
-        // gas too low" failure when simulated on chain
-        && call_gas_limit > 2300
 }
 
 /// Helper that expands memory, stores a revert string pertaining to a disallowed memory write,

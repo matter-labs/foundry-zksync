@@ -34,6 +34,7 @@ foundry-evm-core.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compilers.workspace = true
 foundry-evm-networks.workspace = true
+foundry-linking.workspace = true
 
 comfy-table.workspace = true
 eyre.workspace = true

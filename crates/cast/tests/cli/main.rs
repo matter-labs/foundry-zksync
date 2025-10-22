@@ -57,7 +57,7 @@ Options:
 
   -j, --threads <THREADS>
           Number of threads to use. Specifying 0 defaults to the number of logical cores
-          
+...
           [aliases: --jobs]
 
   -V, --version
@@ -83,16 +83,18 @@ Display options:
 
   -v, --verbosity...
           Verbosity level of the log messages.
-          
+...
           Pass multiple times to increase the verbosity (e.g. -v, -vv, -vvv).
-          
+...
           Depending on the context the verbosity levels have different meanings.
-          
+...
           For example, the verbosity levels of the EVM are:
           - 2 (-vv): Print logs for all tests.
           - 3 (-vvv): Print execution traces for failing tests.
           - 4 (-vvvv): Print execution traces for all tests, and setup traces for failing tests.
-          - 5 (-vvvvv): Print execution and setup traces for all tests, including storage changes.
+          - 5 (-vvvvv): Print execution and setup traces for all tests, including storage changes
+          and
+            backtraces with line numbers.
 
 Find more information in the book: https://getfoundry.sh/cast/overview
 
@@ -1252,11 +1254,9 @@ casttest!(
     |_prj, cmd| {
         let eth_rpc_url = next_http_rpc_endpoint();
 
-        // Call `echo "\n[\n\"0x123\",\nfalse\n]\n" | cast rpc  eth_getBlockByNumber --raw
-        cmd.args(["rpc", "--rpc-url", eth_rpc_url.as_str(), "eth_getBlockByNumber", "--raw"]).stdin(
-        |mut stdin| {
-            stdin.write_all(b"\n[\n\"0x123\",\nfalse\n]\n").unwrap();
-        },
+    // Call `echo "\n[\n\"0x123\",\nfalse\n]\n" | cast rpc eth_getBlockByNumber --raw
+    cmd.args(["rpc", "--rpc-url", eth_rpc_url.as_str(), "eth_getBlockByNumber", "--raw"]).stdin(
+        b"\n[\n\"0x123\",\nfalse\n]\n"
     )
     .assert_json_stdout(str![[r#"
 {"number":"0x123","hash":"0xc5dab4e189004a1312e9db43a40abb2de91ad7dd25e75880bf36016d8e9df524","transactions":[],"logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","extraData":"0x476574682f4c5649562f76312e302e302f6c696e75782f676f312e342e32","nonce":"0x29d6547c196e00e0","miner":"0xbb7b8287f3f0a933474a79eae42cbca977791171","difficulty":"0x494433b31","gasLimit":"0x1388","gasUsed":"0x0","uncles":[],"sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347","size":"0x220","transactionsRoot":"0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421","stateRoot":"0x3fe6bd17aa85376c7d566df97d9f2e536f37f7a87abb3a6f9e2891cf9442f2e4","mixHash":"0x943056aa305aa6d22a3c06110942980342d1f4d4b11c17711961436a0f963ea0","parentHash":"0x7abfd11e862ccde76d6ea8ee20978aac26f4bcb55de1188cc0335be13e817017","timestamp":"0x55ba4564"}
@@ -1700,7 +1700,7 @@ casttest!(mktx_raw_unsigned_no_from_missing_nonce, |_prj, cmd| {
         "--chain",
         "1",
         "--gas-limit",
-        "21000", 
+        "21000",
         "--gas-price",
         "20000000000",
         "0x742d35Cc6634C0532925a3b8D6Ac6F67C9c2b7FD",
@@ -1802,22 +1802,19 @@ casttest!(tx_to_request_json, |_prj, cmd| {
 "#]]);
 });
 
-casttest!(
-    #[ignore = "reth is currently slightly broken"]
-    tx_using_sender_and_nonce,
-    |_prj, cmd| {
-        let rpc = next_http_archive_rpc_url();
-        // <https://etherscan.io/tx/0x5bcd22734cca2385dc25b2d38a3d33a640c5961bd46d390dff184c894204b594>
-        let args = vec![
-            "tx",
-            "--from",
-            "0x4648451b5F87FF8F0F7D622bD40574bb97E25980",
-            "--nonce",
-            "113642",
-            "--rpc-url",
-            rpc.as_str(),
-        ];
-        cmd.args(args).assert_success().stdout_eq(str![[r#"
+casttest!(tx_using_sender_and_nonce, |_prj, cmd| {
+    let rpc = next_http_archive_rpc_url();
+    // <https://etherscan.io/tx/0x5bcd22734cca2385dc25b2d38a3d33a640c5961bd46d390dff184c894204b594>
+    let args = vec![
+        "tx",
+        "--from",
+        "0x4648451b5F87FF8F0F7D622bD40574bb97E25980",
+        "--nonce",
+        "113642",
+        "--rpc-url",
+        rpc.as_str(),
+    ];
+    cmd.args(args).assert_success().stdout_eq(str![[r#"
 
 blockHash            0x29518c1cea251b1bda5949a9b039722604ec1fb99bf9d8124cfe001c95a50bdc
 blockNumber          22287055
@@ -1841,8 +1838,7 @@ value                0
 yParity              1
 ...
 "#]]);
-    }
-);
+});
 
 // ensure receipt or code is required
 casttest!(send_requires_to, |_prj, cmd| {
@@ -3604,12 +3600,12 @@ forgetest_async!(cast_send_create_with_constructor_args, |prj, cmd| {
 contract ConstructorContract {
     uint256 public value;
     string public name;
-    
+
     constructor(uint256 _value, string memory _name) {
         value = _value;
         name = _name;
     }
-    
+
     function getValue() public view returns (uint256) {
         return value;
     }
@@ -3683,7 +3679,7 @@ casttest!(cast_estimate_create_with_constructor_args, |prj, cmd| {
 contract EstimateContract {
     uint256 public value;
     string public name;
-    
+
     constructor(uint256 _value, string memory _name) {
         value = _value;
         name = _name;
@@ -3785,13 +3781,13 @@ contract ComplexContract {
     address public owner;
     uint256[] public values;
     bool public active;
-    
+
     constructor(address _owner, uint256[] memory _values, bool _active) {
         owner = _owner;
         values = _values;
         active = _active;
     }
-    
+
     function getValuesLength() public view returns (uint256) {
         return values.length;
     }
@@ -4098,6 +4094,43 @@ casttest!(cast_call_can_override_several_state_diff, |_prj, cmd| {
 "#]]);
 });
 
+casttest!(correct_json_serialization, |_prj, cmd| {
+    let rpc = next_http_archive_rpc_url();
+    // cast calldata "decimals()"
+    let calldata = "0x313ce567";
+    let tokens = [
+        "0xdac17f958d2ee523a2206206994597c13d831ec7", // USDT
+        "0x6b175474e89094c44da98b954eedeac495271d0f", // DAI
+        "0x6b175474e89094c44da98b954eedeac495271d0f", // WETH
+    ];
+    let calldata_args = format!(
+        "[{}]",
+        tokens
+            .iter()
+            .map(|token| format!("({token},false,{calldata})"))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let args = vec![
+        "call",
+        "--json",
+        "--rpc-url",
+        rpc.as_str(),
+        "0xcA11bde05977b3631167028862bE2a173976CA11",
+        "aggregate3((address,bool,bytes)[])((bool,bytes)[])",
+        &calldata_args,
+    ];
+    let expected_output = json!([[
+        [true, "0x0000000000000000000000000000000000000000000000000000000000000006"],
+        [true, "0x0000000000000000000000000000000000000000000000000000000000000012"],
+        [true, "0x0000000000000000000000000000000000000000000000000000000000000012"]
+    ]]);
+    let decoded: serde_json::Value =
+        serde_json::from_slice(&cmd.args(args).assert_success().get_output().stdout)
+            .expect("not valid json");
+    assert_eq!(decoded, expected_output);
+});
+
 // Test cast abi-encode-event with indexed parameters
 casttest!(abi_encode_event_indexed, |_prj, cmd| {
     cmd.args([
@@ -4147,9 +4180,12 @@ casttest!(abi_encode_event_dynamic_indexed, |_prj, cmd| {
 });
 
 // Test cast run Celo transfer with precompiles.
-casttest!(run_celo_with_precompiles, |_prj, cmd| {
-    let rpc = next_rpc_endpoint(NamedChain::Celo);
-    cmd.args([
+casttest!(
+    #[ignore = "flaky celo rpc url"]
+    run_celo_with_precompiles,
+    |_prj, cmd| {
+        let rpc = next_rpc_endpoint(NamedChain::Celo);
+        cmd.args([
         "run",
         "0xa652b9f41bb1a617ea6b2835b3316e79f0f21b8264e7bcd20e57c4092a70a0f6",
         "--quick",
@@ -4172,4 +4208,5 @@ Transaction successfully executed.
 [GAS]
 
 "#]]);
-});
+    }
+);

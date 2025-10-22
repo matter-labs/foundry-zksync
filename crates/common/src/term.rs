@@ -104,15 +104,6 @@ impl SpinnerReporter {
     ///
     /// On drop the channel will disconnect and the thread will terminate
     pub fn spawn(project_root: Option<PathBuf>) -> Self {
-        Self::spawn_with_message(project_root, "Compiling...")
-    }
-
-    /// Spawns the [`Spinner`] on a new thread with a custom initial message
-    ///
-    /// The spinner's message will be updated via the `reporter` events
-    ///
-    /// On drop the channel will disconnect and the thread will terminate
-    pub fn spawn_with_message(project_root: Option<PathBuf>, message: impl Into<String>) -> Self {
         let (sender, rx) = mpsc::channel::<SpinnerMsg>();
 
         let initial_message: String = message.into();
