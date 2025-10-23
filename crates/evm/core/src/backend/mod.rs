@@ -2118,8 +2118,13 @@ fn apply_state_changeset(
 
 #[cfg(test)]
 mod tests {
-    use crate::{backend::Backend, fork::CreateFork, opts::EvmOpts};
-    use alloy_primitives::{U256, address};
+    use crate::{
+        backend::{Backend, strategy::BackendStrategy},
+        fork::CreateFork,
+        opts::EvmOpts,
+    };
+    use alloy_network::{AnyRpcHeader, AnyRpcTransaction};
+    use alloy_primitives::{B256, U256, address};
     use alloy_provider::Provider;
     use foundry_common::provider::get_http_provider;
     use foundry_config::{Config, NamedChain};

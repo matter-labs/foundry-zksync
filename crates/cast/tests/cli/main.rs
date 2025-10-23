@@ -16,7 +16,8 @@ use foundry_test_utils::{
     str,
     util::OutputExt,
 };
-use std::{fs, io::Write, path::Path, str::FromStr};
+use serde_json::json;
+use std::{fs, path::Path, str::FromStr};
 mod zk;
 
 #[macro_use]
