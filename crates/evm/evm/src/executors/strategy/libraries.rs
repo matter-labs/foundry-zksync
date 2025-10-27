@@ -137,7 +137,7 @@ impl EvmExecutorStrategyRunner {
                 let mut pcx = compiler.parse();
                 configure_pcx_from_compile_output(
                     &mut pcx,
-                    &config,
+                    config,
                     input,
                     if files.is_empty() { None } else { Some(&files) },
                 )?;
