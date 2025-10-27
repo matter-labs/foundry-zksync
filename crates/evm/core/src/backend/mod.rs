@@ -2194,12 +2194,11 @@ mod tests {
         );
 
         // requests made during Backend::spawn as part of fork creation process
-        mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
         mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
         mock.expect("eth_chainId", None, serde_json::json!("0x01"));
         mock.expect(
             "eth_getBlockByNumber",
-            Some(serde_json::json!(["0x1", false])),
+            Some(serde_json::json!(["latest", false])),
             serde_json::json!(mockblock),
         );
 
