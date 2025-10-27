@@ -54,9 +54,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          python-version: "3.14"
-      - name: Generate matrices
-        id: gen
+          cache-on-failure: true
+      - run: cargo clippy --workspace --all-targets --all-features
         env:
           RUSTFLAGS: -Dwarnings
 
