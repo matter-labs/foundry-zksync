@@ -1,10 +1,10 @@
 //! Contains various tests for `forge test --zksync`.
 
-use foundry_config::{fs_permissions::PathPermission, Config, FsPermissions};
+use foundry_config::{Config, FsPermissions, fs_permissions::PathPermission};
 use foundry_test_utils::{
+    TestCommand, TestProject, ZkSyncNode,
     rpc::rpc_endpoints_zk,
     util::{self, OutputExt},
-    TestCommand, TestProject, ZkSyncNode,
 };
 use std::{
     io::Write,
