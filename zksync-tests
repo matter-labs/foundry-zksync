@@ -17,6 +17,42 @@ cast::cli:
 forge:
     cmd::create::zksync::tests::test_zk_deployer_builds_eip712_transactions
 forge::cli:
+    test_cmd::zksync::cheats::script_zk_broadcast_raw_in_output_json
+    test_cmd::zksync::cheats::test_zk_use_factory_dep
+    test_cmd::zksync::constructor::test_zk_constructor_works_in_script
+    test_cmd::zksync::contracts::test_zk_contract_create2
+    test_cmd::zksync::create2::can_deploy_via_create2
+    test_cmd::zksync::create::forge_zk_can_deploy_contracts_and_cast_a_transaction
+    test_cmd::zksync::create::forge_zk_can_deploy_contracts_with_gas_per_pubdata_and_succeed
+    test_cmd::zksync::create::forge_zk_can_deploy_contracts_with_invalid_gas_per_pubdata_and_fail
+    test_cmd::zksync::create::forge_zk_can_deploy_erc20
+    test_cmd::zksync::create::forge_zk_create_dry_run_without_broadcast
+    test_cmd::zksync::create::forge_zk_create_with_broadcast_flag
+    test_cmd::zksync::deploy::multiple_deployments_of_the_same_contract
+    test_cmd::zksync::factory::script_zk_can_deploy_in_constructor
+    test_cmd::zksync::factory::script_zk_can_deploy_in_method
+    test_cmd::zksync::factory::script_zk_can_use_predeployed_factory
+    test_cmd::zksync::factory_deps::script_zk_can_deploy_large_factory_deps
+    test_cmd::zksync::fork::test_zk_consistent_nonce_migration_after_fork
+    test_cmd::zksync::gas::zk_script_execution_with_gas_multiplier
+    test_cmd::zksync::gas::zk_script_execution_with_gas_per_pubdata
+    test_cmd::zksync::gas::zk_script_execution_with_gas_price_specified_by_user
+    test_cmd::zksync::linking::create_zk_using_unlinked_fails
+    test_cmd::zksync::linking::script_zk_deploy_time_linking
+    test_cmd::zksync::linking::script_zk_fails_indirect_reference_to_unlinked
+    test_cmd::zksync::nft::script_zk_can_deploy_nft
+    test_cmd::zksync::nonce::setup_block_on_script_test
+    test_cmd::zksync::nonce::setup_broadcast_in_setup_test
+    test_cmd::zksync::paymaster::paymaster_script_test
+    test_cmd::zksync::paymaster::test_zk_contract_paymaster
+    test_cmd::zksync::paymaster::test_zk_deploy_with_paymaster
+    test_cmd::zksync::proxy::script_zk_can_deploy_proxy
+    test_cmd::zksync::script::test_zk_can_broadcast_with_keystore_account
+    test_cmd::zksync::test_zk_core
+    test_cmd::zksync::test_zk_evm_interpreter
+    test_cmd::zksync::test_zk_failures
+    test_cmd::zksync::test_zk_repros
+    test_cmd::zksync::test_zk_traces
     zk::build::test_zk_build_sizes
     zk::cmd::test_zk_calling_empty_code_with_zero_value_issues_warning
     zk::cmd::test_zk_can_detect_call_to_empty_contract
