@@ -1,12 +1,12 @@
 //! Contains various tests for `forge test`.
 
 use alloy_primitives::U256;
-use anvil::{NodeConfig, spawn};
+use anvil::{spawn, NodeConfig};
 use foundry_test_utils::{
-    TestCommand,
     rpc::{self, rpc_endpoints},
     str,
-    util::{OTHER_SOLC_VERSION, OutputExt, SOLC_VERSION},
+    util::{OutputExt, OTHER_SOLC_VERSION, SOLC_VERSION},
+    TestCommand,
 };
 use similar_asserts::assert_eq;
 use std::{io::Write, path::PathBuf, str::FromStr};
@@ -19,6 +19,7 @@ mod repros;
 mod spec;
 mod table;
 mod trace;
+mod zksync;
 
 // Run `forge test` on `/testdata`.
 forgetest!(testdata, |_prj, cmd| {

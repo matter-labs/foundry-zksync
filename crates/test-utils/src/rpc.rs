@@ -8,8 +8,8 @@ use foundry_config::{
 };
 use rand::seq::SliceRandom;
 use std::sync::{
-    LazyLock,
     atomic::{AtomicUsize, Ordering},
+    LazyLock,
 };
 
 macro_rules! shuffled_list {
@@ -109,6 +109,29 @@ pub fn rpc_endpoints() -> RpcEndpoints {
     ])
 }
 
+/// the RPC endpoints used during tests
+pub fn rpc_endpoints_zk() -> RpcEndpoints {
+    // use mainnet url from env to avoid rate limiting in CI
+    let mainnet_url =
+        std::env::var("TEST_MAINNET_URL").unwrap_or("https://mainnet.era.zksync.io".to_string()); // trufflehog:ignore
+    RpcEndpoints::new([
+        ("mainnet", RpcEndpointUrl::Url(mainnet_url)),
+        (
+            "rpcAlias",
+            RpcEndpointUrl::Url(
+                "https://eth-mainnet.alchemyapi.io/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H".to_string(), /* trufflehog:ignore */
+            ),
+        ),
+        (
+            "rpcAliasSepolia",
+            RpcEndpointUrl::Url(
+                "https://eth-sepolia.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H".to_string(), /* trufflehog:ignore */
+            ),
+        ),
+        ("rpcEnvAlias", RpcEndpointUrl::Env("${RPC_ENV_ALIAS}".to_string())),
+    ])
+}
+
 /// Returns the next _mainnet_ rpc URL in inline
 ///
 /// This will rotate all available rpc endpoints
@@ -197,7 +220,11 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
         &format!("lb.drpc.org/ogrpc?network={network}&dkey={key}")
     };
 
-    if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") }
+    if is_ws {
+        format!("wss://{domain}")
+    } else {
+        format!("https://{domain}")
+    }
 }
 
 /// Basic redaction for debugging RPC URLs.
