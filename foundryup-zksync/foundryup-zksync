@@ -350,7 +350,7 @@ main() {
 
     for bin in "${BINS[@]}"; do
       bin_path="$FOUNDRY_BIN_DIR/$bin"
-      cp $FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG/$bin $bin_path
+      cp $FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG/$bin $bin_path
 
       # Print installed msg
       say "installed - $(ensure "$bin_path" --version)"
