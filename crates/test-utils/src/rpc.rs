@@ -8,8 +8,8 @@ use foundry_config::{
 };
 use rand::seq::SliceRandom;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     LazyLock,
+    atomic::{AtomicUsize, Ordering},
 };
 
 macro_rules! shuffled_list {
@@ -220,11 +220,7 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
         &format!("lb.drpc.org/ogrpc?network={network}&dkey={key}")
     };
 
-    if is_ws {
-        format!("wss://{domain}")
-    } else {
-        format!("https://{domain}")
-    }
+    if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") }
 }
 
 /// Basic redaction for debugging RPC URLs.
