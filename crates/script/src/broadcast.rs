@@ -136,7 +136,18 @@ pub async fn send_transaction(
             if let Some(zk_tx_meta) = zk_tx_meta {
                 let mut inner = tx.inner.clone();
                 inner.transaction_type = Some(TxType::Eip712 as u8);
+                
+                // Store value before conversion as it might not be preserved (Issue #1191)
+                let tx_value = inner.value;
+                
                 let mut zk_tx: ZkTransactionRequest = inner.into();
+                
+                // Restore value if it was set (fix for issue #1191)
+                // The From trait in alloy-zksync doesn't preserve the value field
+                if let Some(value) = tx_value {
+                    zk_tx.set_value(value);
+                }
+                
                 if !zk_tx_meta.factory_deps.is_empty() {
                     zk_tx.set_factory_deps(
                         zk_tx_meta.factory_deps.iter().map(Bytes::from_iter).collect(),

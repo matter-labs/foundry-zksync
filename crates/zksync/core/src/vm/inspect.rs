@@ -115,6 +115,7 @@ where
             ecx,
             tx.common_data.initiator_address.to_address(),
             &tx.common_data.paymaster_params,
+            Some(tx.execute.value),
         );
         tx.common_data.fee.gas_limit = new_gas_limit;
 
@@ -401,27 +402,32 @@ where
 }
 
 /// Assign gas parameters that satisfy zkSync's fee model.
+/// 
+/// # Arguments
+/// * `ecx` - The EVM context
+/// * `caller` - The address making the call/transaction
+/// * `paymaster_params` - Paymaster parameters
+/// * `call_value` - Optional value being transferred in this call (for CALLs with value)
+///                  If None, uses ecx.tx.value (for top-level transactions)
 pub fn gas_params<DB>(
     ecx: &mut EthEvmContext<DB>,
     caller: Address,
     paymaster_params: &PaymasterParams,
+    call_value: Option<U256>,
 ) -> (U256, U256)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let value = ecx.tx.value.to_u256();
+    // Use call_value if provided (for CALL opcodes), otherwise use tx value (for top-level transactions)
+    let value = call_value.unwrap_or_else(|| ecx.tx.value.to_u256());
     let gas_price = U256::from(ecx.tx.gas_price);
     let gas_limit = U256::from(ecx.tx.gas_limit);
 
     let dev_mode = gas_price.is_zero();
-    if !dev_mode {
-        // return the original gas limit (subject to max tx gas limit in zkEVM) and gas price. If
-        // not limited, causes not enough funds error in bootloader.
-        let gas_limit = gas_limit.min(MAX_L2_GAS_LIMIT.into());
-        return (gas_limit, gas_price);
-    }
-
+    
+    // In both dev and non-dev mode, we need to limit gas based on balance
+    // to avoid bootloader validation errors when local state balance is 0 (Issue #1191)
     let use_paymaster = !paymaster_params.paymaster.is_zero();
     let payer = if use_paymaster {
         Address::from_slice(paymaster_params.paymaster.as_bytes())
@@ -429,11 +435,19 @@ where
         caller
     };
     let balance = ZKVMData::new(ecx).get_balance(payer);
-
-    let max_fee_per_gas = fix_l2_gas_price(gas_price);
+    
+    let max_fee_per_gas = if dev_mode {
+        fix_l2_gas_price(gas_price)
+    } else {
+        gas_price
+    };
+    
+    // Apply balance-based gas limiting (Issue #1191)
     let gas_limit = fix_l2_gas_limit(gas_limit, max_fee_per_gas, value, balance);
-
+    let gas_limit = gas_limit.min(MAX_L2_GAS_LIMIT.into());
+    
     (gas_limit, max_fee_per_gas)
+
 }
 
 #[allow(dead_code)]

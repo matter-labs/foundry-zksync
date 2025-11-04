@@ -74,7 +74,7 @@ where
         TransactTo::Create => (CONTRACT_DEPLOYER_ADDRESS, true),
     };
 
-    let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &paymaster_params);
+    let (gas_limit, max_fee_per_gas) = gas_params(&mut ecx, caller, &paymaster_params, None);
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         Some(transact_to),
@@ -201,7 +201,7 @@ where
         PaymasterParams::default()
     };
 
-    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params);
+    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params, Some(value));
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     let tx = if ccx.evm_interpreter {
@@ -287,7 +287,13 @@ where
         PaymasterParams::default()
     };
 
-    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params);
+    // Extract call value for gas calculation
+    let call_value = match call.value {
+        CallValue::Transfer(value) => value.to_u256(),
+        _ => U256::zero(),
+    };
+
+    let (gas_limit, max_fee_per_gas) = gas_params(ecx, caller, &paymaster_params, Some(call_value));
     info!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
 
     let tx = if ccx.evm_interpreter {
@@ -302,10 +308,7 @@ where
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
-            match call.value {
-                CallValue::Transfer(value) => value.to_u256(),
-                _ => U256::zero(),
-            },
+            call_value,
             Default::default(),
             Default::default(),
         );
@@ -324,10 +327,7 @@ where
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
-            match call.value {
-                CallValue::Transfer(value) => value.to_u256(),
-                _ => U256::zero(),
-            },
+            call_value,
             factory_deps,
             paymaster_params,
         )

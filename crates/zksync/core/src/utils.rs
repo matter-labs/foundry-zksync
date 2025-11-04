@@ -125,9 +125,21 @@ pub fn fix_l2_gas_limit(
     value: U256,
     balance: U256,
 ) -> U256 {
-    let gas_limit = if gas_price.is_zero() || balance <= value {
+    let gas_limit = if gas_price.is_zero() {
+        // In dev mode with zero gas price, just use proposed limit
+        proposed_gas_limit
+    } else if balance.is_zero() {
+        // If balance is 0, we're likely in a fork with unfunded local state.
+        // Use a reasonable default gas limit instead of the huge proposed_gas_limit
+        // to avoid bootloader validation errors (Issue #1191).
+        // 10M gas is reasonable for most transactions including value transfers.
+        U256::from(10_000_000)
+    } else if balance <= value {
+        // Account doesn't have enough balance even for the value transfer.
+        // Let it proceed with proposed limit and let bootloader handle it.
         proposed_gas_limit
     } else {
+        // Normal case: limit gas based on available balance after value transfer
         let max_gas_limit = balance.saturating_sub(value).div_mod(gas_price).0;
         U256::min(proposed_gas_limit, max_gas_limit)
     };
