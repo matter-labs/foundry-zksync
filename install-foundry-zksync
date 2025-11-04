@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -xe
 
 # URLs to the raw files on GitHub
 INSTALL_SCRIPT_URL="https://raw.githubusercontent.com/matter-labs/foundry-zksync/main/foundryup-zksync/install"
