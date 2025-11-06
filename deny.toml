@@ -126,7 +126,7 @@ allow-git = [
     "https://github.com/alloy-rs/alloy",
     "https://github.com/foundry-rs/compilers",
     "https://github.com/foundry-rs/foundry-fork-db",
-    "https://github.com/nbaztec/zksync-telemetry",
+    "https://github.com/matter-labs/zksync-telemetry",
     "https://github.com/matter-labs/anvil-zksync",
     "https://github.com/Romsters/posthog-rs",
     "https://github.com/paradigmxyz/revm-inspectors",
