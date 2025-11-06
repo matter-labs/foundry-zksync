@@ -18,6 +18,8 @@ ignore = [
     "RUSTSEC-2025-0021",
     # https://rustsec.org/advisories/RUSTSEC-2025-0047 Out-of-bounds access in `get_disjoint_mut` due to incorrect bounds check
     "RUSTSEC-2025-0047",
+    # https://rustsec.org/advisories/RUSTSEC-2025-0098 unic-ucd-version is unmaintained (from anvil-zksync -> zksync-error -> tera)
+    "RUSTSEC-2025-0098",
 ]
 
 # This section is considered when running `cargo deny check bans`.
