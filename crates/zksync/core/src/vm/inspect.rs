@@ -46,7 +46,7 @@ use zksync_types::{
 use zksync_vm_interface::storage::{ReadStorage, StoragePtr, WriteStorage};
 
 use crate::{
-    DEFAULT_PROTOCOL_VERSION, MAX_L2_GAS_LIMIT,
+    DEFAULT_PROTOCOL_VERSION,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256},
     fix_l2_gas_limit, fix_l2_gas_price, increment_tx_nonce, is_system_address,
     state::{FullNonce, new_full_nonce, parse_full_nonce},
@@ -413,15 +413,6 @@ where
     let value = ecx.tx.value.to_u256();
     let gas_price = U256::from(ecx.tx.gas_price);
     let gas_limit = U256::from(ecx.tx.gas_limit);
-
-    let dev_mode = gas_price.is_zero();
-    if !dev_mode {
-        // return the original gas limit (subject to max tx gas limit in zkEVM) and gas price. If
-        // not limited, causes not enough funds error in bootloader.
-        let gas_limit = gas_limit.min(MAX_L2_GAS_LIMIT.into());
-        return (gas_limit, gas_price);
-    }
-
     let use_paymaster = !paymaster_params.paymaster.is_zero();
     let payer = if use_paymaster {
         Address::from_slice(paymaster_params.paymaster.as_bytes())
@@ -429,11 +420,10 @@ where
         caller
     };
     let balance = ZKVMData::new(ecx).get_balance(payer);
-
-    let max_fee_per_gas = fix_l2_gas_price(gas_price);
-    let gas_limit = fix_l2_gas_limit(gas_limit, max_fee_per_gas, value, balance);
-
-    (gas_limit, max_fee_per_gas)
+    let dev_mode = gas_price.is_zero();
+    let effective_gas_price = if dev_mode { fix_l2_gas_price(gas_price) } else { gas_price };
+    let gas_limit = fix_l2_gas_limit(gas_limit, effective_gas_price, value, balance);
+    (gas_limit, effective_gas_price)
 }
 
 #[allow(dead_code)]
