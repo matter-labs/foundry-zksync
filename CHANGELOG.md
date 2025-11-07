@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.31](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.30...foundry-zksync-v0.0.31) (2025-11-07)
+
+
+### Bug Fixes
+
+* Cap gas limit by balance in gas_params ([#1192](https://github.com/matter-labs/foundry-zksync/issues/1192)) ([763bbd3](https://github.com/matter-labs/foundry-zksync/commit/763bbd3304a4b3cd25119640d94d6fe69f0cbd1c))
+
 ## [0.0.30](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.29...foundry-zksync-v0.0.30) (2025-10-08)
 
 
