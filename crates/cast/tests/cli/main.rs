@@ -3382,10 +3382,8 @@ contract WETH9 {
 
 // <https://github.com/foundry-rs/foundry/issues/10553>
 // <https://basescan.org/tx/0x17b2de59ebd7dfd2452a3638a16737b6b65ae816c1c5571631dc0d80b63c41de>
-casttest!(
-    osaka_can_run_p256_precompile,
-    |_prj, cmd| {
-        cmd.args([
+casttest!(osaka_can_run_p256_precompile, |_prj, cmd| {
+    cmd.args([
         "run",
         "0x17b2de59ebd7dfd2452a3638a16737b6b65ae816c1c5571631dc0d80b63c41de",
         "--rpc-url",
@@ -3460,8 +3458,7 @@ Transaction successfully executed.
 [GAS]
 
 "#]]);
-    }
-);
+});
 
 // tests cast send gas estimate execution failure message contains decoded custom error
 // <https://github.com/foundry-rs/foundry/issues/9789>
