@@ -166,9 +166,44 @@ pub fn next_ws_archive_rpc_url() -> String {
     next_archive_url(true)
 }
 
+static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(|| {
+    ShuffledList::new(
+        std::env::var("HTTP_ARCHIVE_URLS")
+            .ok()
+            .unwrap()
+            .split(",")
+            .map(String::from)
+            .collect::<Vec<_>>(),
+    )
+});
+
+static CUSTOM_WS_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(|| {
+    ShuffledList::new(
+        std::env::var("WS_ARCHIVE_URLS")
+            .ok()
+            .unwrap()
+            .split(",")
+            .map(String::from)
+            .collect::<Vec<_>>(),
+    )
+});
+
 /// Returns a URL that has access to archive state.
 fn next_archive_url(is_ws: bool) -> String {
-    let domain = if is_ws { &WS_ARCHIVE_DOMAINS } else { &HTTP_ARCHIVE_DOMAINS }.next();
+    // NOTE(zk): we try to incorporate our own custom URLs to avoid rate limiting
+    let domain = if is_ws {
+        if !CUSTOM_WS_ARCHIVE_URLS.list.is_empty() {
+            CUSTOM_WS_ARCHIVE_URLS.next().as_str()
+        } else {
+            WS_ARCHIVE_DOMAINS.next()
+        }
+    } else {
+        if !CUSTOM_HTTP_ARCHIVE_URLS.list.is_empty() {
+            CUSTOM_HTTP_ARCHIVE_URLS.next().as_str()
+        } else {
+            HTTP_ARCHIVE_DOMAINS.next()
+        }
+    };
     let url = if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") };
     test_debug!("next_archive_url(is_ws={is_ws}) = {}", debug_url(&url));
     url
@@ -206,7 +241,22 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
 
     let reth_works = true;
     let domain = if reth_works && matches!(chain, Mainnet) {
-        *(if is_ws { &WS_DOMAINS } else { &HTTP_DOMAINS }).next()
+        // NOTE(zk): we try to incorporate our own custom URLs to avoid rate limiting
+        let domain = if is_ws {
+            if !CUSTOM_WS_ARCHIVE_URLS.list.is_empty() {
+                CUSTOM_WS_ARCHIVE_URLS.next().as_str()
+            } else {
+                WS_DOMAINS.next()
+            }
+        } else {
+            if !CUSTOM_HTTP_ARCHIVE_URLS.list.is_empty() {
+                CUSTOM_HTTP_ARCHIVE_URLS.next().as_str()
+            } else {
+                HTTP_DOMAINS.next()
+            }
+        };
+
+        domain
     } else {
         // DRPC for other networks used in tests.
         let key = DRPC_KEYS.next();
