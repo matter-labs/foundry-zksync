@@ -177,6 +177,7 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(
             .ok()
             .unwrap()
             .split(",")
+            .filter(|s| !s.is_empty())
             .map(String::from)
             .collect::<Vec<_>>(),
     );
@@ -186,6 +187,7 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(
             .ok()
             .unwrap()
             .split(",")
+            .filter(|s| !s.is_empty())
             .map(String::from)
             .collect::<Vec<_>>(),
     );
@@ -201,6 +203,7 @@ static CUSTOM_WS_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(||
             .ok()
             .unwrap()
             .split(",")
+            .filter(|s| !s.is_empty())
             .map(String::from)
             .collect::<Vec<_>>(),
     )
