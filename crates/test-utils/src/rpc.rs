@@ -172,14 +172,27 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(
 
     println!("FOODEBUG {a:?} | {b:?}");
 
-    ShuffledList::new(
+    let x = ShuffledList::new(
         std::env::var("HTTP_ARCHIVE_URLS")
             .ok()
             .unwrap()
             .split(",")
             .map(String::from)
             .collect::<Vec<_>>(),
-    )
+    );
+
+    let y = ShuffledList::new(
+        std::env::var("WS_ARCHIVE_URLS")
+            .ok()
+            .unwrap()
+            .split(",")
+            .map(String::from)
+            .collect::<Vec<_>>(),
+    );
+
+    println!("X {:?} {}", x.list, x.list.is_empty());
+    println!("Y {:?} {}", y.list, y.list.is_empty());
+    x
 });
 
 static CUSTOM_WS_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(|| {
