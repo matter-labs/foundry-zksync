@@ -167,6 +167,11 @@ pub fn next_ws_archive_rpc_url() -> String {
 }
 
 static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<ShuffledList<String>> = LazyLock::new(|| {
+    let a = std::env::var("HTTP_ARCHIVE_URLS");
+    let b = std::env::var("WS_ARCHIVE_URLS");
+
+    println!("FOODEBUG {a:?} | {b:?}");
+
     ShuffledList::new(
         std::env::var("HTTP_ARCHIVE_URLS")
             .ok()
