@@ -182,7 +182,7 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLo
             .map(String::from)
             .collect::<Vec<_>>(),
     )
-    .filter(|list| list.is_empty())
+    .filter(|list| !list.is_empty())
     .map(ShuffledList::new);
 
     let y = Some(
@@ -194,7 +194,7 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLo
             .map(String::from)
             .collect::<Vec<_>>(),
     )
-    .filter(|list| list.is_empty())
+    .filter(|list| !list.is_empty())
     .map(ShuffledList::new);
 
     println!("X {x:?}");
