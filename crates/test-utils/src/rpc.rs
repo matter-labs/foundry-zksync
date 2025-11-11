@@ -8,8 +8,8 @@ use foundry_config::{
 };
 use rand::seq::SliceRandom;
 use std::sync::{
-    LazyLock,
     atomic::{AtomicUsize, Ordering},
+    LazyLock,
 };
 
 macro_rules! shuffled_list {
@@ -42,30 +42,34 @@ shuffled_list!(
     HTTP_ARCHIVE_DOMAINS,
     vec![
         //
-        "reth-ethereum.ithaca.xyz/rpc",
+        // "reth-ethereum.ithaca.xyz/rpc",
+        "https://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 shuffled_list!(
     HTTP_DOMAINS,
     vec![
+        "https://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
         //
-        "reth-ethereum.ithaca.xyz/rpc",
-        "reth-ethereum-full.ithaca.xyz/rpc",
+        // "reth-ethereum.ithaca.xyz/rpc",
+        // "reth-ethereum-full.ithaca.xyz/rpc",
     ],
 );
 shuffled_list!(
     WS_ARCHIVE_DOMAINS,
     vec![
         //
-        "reth-ethereum.ithaca.xyz/ws",
+        // "reth-ethereum.ithaca.xyz/ws",
+        "wss://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 shuffled_list!(
     WS_DOMAINS,
     vec![
         //
-        "reth-ethereum.ithaca.xyz/ws",
-        "reth-ethereum-full.ithaca.xyz/ws",
+        // "reth-ethereum.ithaca.xyz/ws",
+        // "reth-ethereum-full.ithaca.xyz/ws",
+        "wss://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 
@@ -271,7 +275,11 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
         &format!("lb.drpc.org/ogrpc?network={network}&dkey={key}")
     };
 
-    if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") }
+    if is_ws {
+        format!("wss://{domain}")
+    } else {
+        format!("https://{domain}")
+    }
 }
 
 /// Basic redaction for debugging RPC URLs.
