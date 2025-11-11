@@ -175,7 +175,7 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLo
     Some(
         std::env::var("HTTP_ARCHIVE_URLS")
             .ok()
-            .unwrap()
+            .unwrap_or_default()
             .split(",")
             .filter(|s| !s.is_empty())
             .map(String::from)
@@ -189,7 +189,7 @@ static CUSTOM_WS_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLock
     Some(
         std::env::var("WS_ARCHIVE_URLS")
             .ok()
-            .unwrap()
+            .unwrap_or_default()
             .split(",")
             .filter(|s| !s.is_empty())
             .map(String::from)
@@ -232,6 +232,7 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
 }
 
 fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
+    println!("NEXT");
     if matches!(chain, Base) {
         return "https://mainnet.base.org".to_string();
     }
