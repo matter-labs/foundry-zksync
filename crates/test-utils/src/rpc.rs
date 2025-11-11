@@ -43,13 +43,13 @@ shuffled_list!(
     vec![
         //
         // "reth-ethereum.ithaca.xyz/rpc",
-        "https://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
+        "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 shuffled_list!(
     HTTP_DOMAINS,
     vec![
-        "https://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
+        "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
         //
         // "reth-ethereum.ithaca.xyz/rpc",
         // "reth-ethereum-full.ithaca.xyz/rpc",
@@ -60,7 +60,7 @@ shuffled_list!(
     vec![
         //
         // "reth-ethereum.ithaca.xyz/ws",
-        "wss://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
+        "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 shuffled_list!(
@@ -69,7 +69,7 @@ shuffled_list!(
         //
         // "reth-ethereum.ithaca.xyz/ws",
         // "reth-ethereum-full.ithaca.xyz/ws",
-        "wss://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
+        "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 
