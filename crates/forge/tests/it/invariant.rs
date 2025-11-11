@@ -762,6 +762,7 @@ contract AssumeTest is Test {
 
 // Test too many inputs rejected for `assumePrecompile`/`assumeForgeAddress`.
 // <https://github.com/foundry-rs/foundry/issues/9054>
+// NOTE(zk): runs and calls values differ from upstream due to gas limit being capped by balance
 forgetest_init!(should_revert_with_assume_code, |prj, cmd| {
     prj.update_config(|config| {
         config.invariant.fail_on_revert = true;
@@ -806,7 +807,7 @@ contract BalanceAssumeTest is Test {
 
     cmd.args(["test", "--mt", "invariant_balance"]).assert_failure().stdout_eq(str![[r#"
 ...
-[FAIL: `vm.assume` rejected too many inputs (10 allowed)] invariant_balance() (runs: 5, calls: 2500, reverts: 0)
+[FAIL: `vm.assume` rejected too many inputs (10 allowed)] invariant_balance() (runs: 2, calls: 1000, reverts: 0)
 ...
 "#]]);
 });

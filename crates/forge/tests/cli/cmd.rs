@@ -2984,6 +2984,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 });
 
 // <https://github.com/foundry-rs/foundry/issues/9300>
+// NOTE(zk): gas values differ slightly from upstream due to fork-specific differences
 forgetest_init!(gas_report_size_for_nested_create, |prj, cmd| {
     prj.add_test(
         "NestedDeployTest.sol",
@@ -3053,7 +3054,7 @@ contract NestedDeploy is Test {
 +============================================================================================+
 | Deployment Cost                           | Deployment Size |     |        |     |         |
 |-------------------------------------------+-----------------+-----+--------+-----+---------|
-| 328949                                    | 1163            |     |        |     |         |
+| 328961                                    | 1163            |     |        |     |         |
 |-------------------------------------------+-----------------+-----+--------+-----+---------|
 |                                           |                 |     |        |     |         |
 |-------------------------------------------+-----------------+-----+--------+-----+---------|
@@ -3108,7 +3109,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
   {
     "contract": "test/NestedDeployTest.sol:Parent",
     "deployment": {
-      "gas": 328949,
+      "gas": 328961,
       "size": 1163
     },
     "functions": {
