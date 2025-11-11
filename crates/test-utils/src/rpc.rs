@@ -197,8 +197,8 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLo
     .filter(|list| list.is_empty())
     .map(ShuffledList::new);
 
-    println!("X {:?}", x);
-    println!("Y {:?}", y);
+    println!("X {x:?}");
+    println!("Y {y:?}");
     x
 });
 
