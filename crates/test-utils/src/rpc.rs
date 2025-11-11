@@ -8,8 +8,8 @@ use foundry_config::{
 };
 use rand::seq::SliceRandom;
 use std::sync::{
-    LazyLock,
     atomic::{AtomicUsize, Ordering},
+    LazyLock,
 };
 
 macro_rules! shuffled_list {
@@ -168,12 +168,7 @@ pub fn next_ws_archive_rpc_url() -> String {
 }
 
 static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLock::new(|| {
-    let a = std::env::var("HTTP_ARCHIVE_URLS");
-    let b = std::env::var("WS_ARCHIVE_URLS");
-
-    println!("FOODEBUG {a:?} | {b:?}");
-
-    let x = Some(
+    Some(
         std::env::var("HTTP_ARCHIVE_URLS")
             .ok()
             .unwrap()
@@ -183,23 +178,7 @@ static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLo
             .collect::<Vec<_>>(),
     )
     .filter(|list| !list.is_empty())
-    .map(ShuffledList::new);
-
-    let y = Some(
-        std::env::var("WS_ARCHIVE_URLS")
-            .ok()
-            .unwrap()
-            .split(",")
-            .filter(|s| !s.is_empty())
-            .map(String::from)
-            .collect::<Vec<_>>(),
-    )
-    .filter(|list| !list.is_empty())
-    .map(ShuffledList::new);
-
-    println!("X {x:?}");
-    println!("Y {y:?}");
-    x
+    .map(ShuffledList::new)
 });
 
 static CUSTOM_WS_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLock::new(|| {
@@ -212,7 +191,7 @@ static CUSTOM_WS_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLock
             .map(String::from)
             .collect::<Vec<_>>(),
     )
-    .filter(|list| list.is_empty())
+    .filter(|list| !list.is_empty())
     .map(ShuffledList::new)
 });
 
@@ -292,7 +271,11 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
         &format!("lb.drpc.org/ogrpc?network={network}&dkey={key}")
     };
 
-    if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") }
+    if is_ws {
+        format!("wss://{domain}")
+    } else {
+        format!("https://{domain}")
+    }
 }
 
 /// Basic redaction for debugging RPC URLs.
