@@ -2783,6 +2783,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 });
 
 // <https://github.com/foundry-rs/foundry/issues/9300>
+// NOTE(zk): gas values differ slightly from upstream due to fork-specific differences
 forgetest_init!(gas_report_size_for_nested_create, |prj, cmd| {
     prj.add_test(
         "NestedDeployTest.sol",

@@ -78,6 +78,7 @@ contract AssumeTest is Test {
 
 // Test too many inputs rejected for `assumePrecompile`/`assumeForgeAddress`.
 // <https://github.com/foundry-rs/foundry/issues/9054>
+// NOTE(zk): runs and calls values differ from upstream due to gas limit being capped by balance
 forgetest_init!(should_revert_with_assume_code, |prj, cmd| {
     prj.update_config(|config| {
         config.invariant.fail_on_revert = true;

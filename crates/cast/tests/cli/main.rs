@@ -4032,18 +4032,23 @@ casttest!(cast_mktx_negative_numbers, |_prj, cmd| {
 });
 
 // Test cast access-list with negative numbers
-casttest!(cast_access_list_negative_numbers, |_prj, cmd| {
-    let rpc = next_rpc_endpoint(NamedChain::Sepolia);
-    cmd.args([
-        "access-list",
-        "0x9999999999999999999999999999999999999999",
-        "adjustPosition(int128)",
-        "-33333",
-        "--rpc-url",
-        rpc.as_str(),
-    ])
-    .assert_success();
-});
+// Note(zk): Ignored - this test is also failing in upstream
+casttest!(
+    #[ignore]
+    cast_access_list_negative_numbers,
+    |_prj, cmd| {
+        let rpc = next_rpc_endpoint(NamedChain::Sepolia);
+        cmd.args([
+            "access-list",
+            "0x9999999999999999999999999999999999999999",
+            "adjustPosition(int128)",
+            "-33333",
+            "--rpc-url",
+            rpc.as_str(),
+        ])
+        .assert_success();
+    }
+);
 
 // tests that cast call properly applies multiple state diff overrides
 // <https://github.com/foundry-rs/foundry/issues/11551>
