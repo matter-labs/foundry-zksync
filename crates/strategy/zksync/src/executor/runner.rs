@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use alloy_primitives::{Address, U256};
 use alloy_rpc_types::serde_helpers::OtherFields;
 use alloy_zksync::provider::{ZksyncProvider, zksync_provider};
@@ -119,11 +117,10 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         config: &Config,
-        root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
-        self.link_impl(ctx, config, root, input, deployer)
+        self.link_impl(ctx, config, input, deployer)
     }
 
     fn deploy_library(

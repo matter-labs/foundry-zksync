@@ -1,7 +1,7 @@
 //! Contains various definitions and items related to deploy-time linking
 //! for zksync
 
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256};
 use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
@@ -39,11 +39,11 @@ impl ZksyncExecutorStrategyRunner {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         config: &Config,
-        root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
-        let evm_link = EvmExecutorStrategyRunner.link(ctx, config, root, input, deployer)?;
+        let root = &config.root;
+        let evm_link = EvmExecutorStrategyRunner.link(ctx, config, input, deployer)?;
 
         let ctx = get_context(ctx);
         let Some(input) = ctx.compilation_output.as_ref() else {
@@ -190,6 +190,11 @@ impl ZksyncExecutorStrategyRunner {
             .chain(evm_link.linked_contracts)
             .collect();
 
+        // NOTE(zk): Currently unsupported, so we initialize it with the empty solar compiler.
+        let analysis = solar::sema::Compiler::new(
+            solar::interface::Session::builder().with_stderr_emitter().build(),
+        );
+
         Ok(LinkOutput {
             deployable_contracts: evm_link.deployable_contracts,
             revert_decoder: evm_link.revert_decoder,
@@ -197,6 +202,7 @@ impl ZksyncExecutorStrategyRunner {
             linked_contracts,
             libs_to_deploy: evm_link.libs_to_deploy,
             libraries: evm_link.libraries,
+            analysis,
         })
     }
 

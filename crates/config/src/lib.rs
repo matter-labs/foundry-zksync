@@ -37,7 +37,7 @@ use foundry_compilers::{
     },
     error::SolcError,
     multi::{MultiCompilerParser, MultiCompilerRestrictions},
-    solc::{CliSettings, SolcSettings},
+    solc::{CliSettings, SolcLanguage, SolcSettings},
 };
 use regex::Regex;
 use revm::primitives::hardfork::SpecId;
@@ -132,6 +132,12 @@ pub use compilation::{CompilationRestrictions, SettingsOverrides};
 
 pub mod zksync;
 use zksync::ZkSyncConfig;
+
+use foundry_evm_networks::NetworkConfigs;
+pub use semver;
+
+// NOTE(zk): `configure_pcx` functionality is moved here to be used in strategies.
+pub mod build;
 
 /// Foundry configuration
 ///
@@ -535,9 +541,9 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub extra_args: Vec<String>,
 
-    /// Whether to enable Celo precompiles.
-    #[serde(default)]
-    pub celo: bool,
+    /// Networks with enabled features.
+    #[serde(flatten)]
+    pub networks: NetworkConfigs,
 
     /// Timeout for transactions in seconds.
     pub transaction_timeout: u64,
@@ -928,6 +934,7 @@ impl Config {
         self.broadcast = p(&root, &self.broadcast);
         self.cache_path = p(&root, &self.cache_path);
         self.snapshots = p(&root, &self.snapshots);
+        self.test_failures_file = p(&root, &self.test_failures_file);
 
         if let Some(build_info_path) = self.build_info_path {
             self.build_info_path = Some(p(&root, &build_info_path));
@@ -1162,7 +1169,15 @@ impl Config {
             .settings(settings)
             .paths(paths)
             .ignore_error_codes(self.ignored_error_codes.iter().copied().map(Into::into))
-            .ignore_paths(self.ignored_file_paths.clone())
+            .ignore_paths(
+                self.ignored_file_paths
+                    .iter()
+                    .map(|path| {
+                        // Strip "./" prefix for consistent path matching
+                        path.strip_prefix("./").unwrap_or(path).to_path_buf()
+                    })
+                    .collect::<Vec<_>>(),
+            )
             .set_compiler_severity_filter(if self.deny.warnings() {
                 Severity::Warning
             } else {
@@ -1185,6 +1200,28 @@ impl Config {
         }
 
         Ok(project)
+    }
+
+    /// Disables optimizations and enables viaIR with minimum optimization if `ir_minimum` is true.
+    pub fn disable_optimizations(&self, project: &mut Project, ir_minimum: bool) {
+        if ir_minimum {
+            // Enable viaIR with minimum optimization: https://github.com/ethereum/solidity/issues/12533#issuecomment-1013073350
+            // And also in new releases of Solidity: https://github.com/ethereum/solidity/issues/13972#issuecomment-1628632202
+            project.settings.solc.settings = std::mem::take(&mut project.settings.solc.settings)
+                .with_via_ir_minimum_optimization();
+
+            // Sanitize settings for solc 0.8.4 if version cannot be detected: https://github.com/foundry-rs/foundry/issues/9322
+            // But keep the EVM version: https://github.com/ethereum/solidity/issues/15775
+            let evm_version = project.settings.solc.evm_version;
+            let version = self.solc_version().unwrap_or_else(|| Version::new(0, 8, 4));
+            project.settings.solc.settings.sanitize(&version, SolcLanguage::Solidity);
+            project.settings.solc.evm_version = evm_version;
+        } else {
+            project.settings.solc.optimizer.disable();
+            project.settings.solc.optimizer.runs = None;
+            project.settings.solc.optimizer.details = None;
+            project.settings.solc.via_ir = None;
+        }
     }
 
     /// Cleans the project.
@@ -1386,7 +1423,7 @@ impl Config {
     /// # }
     /// ```
     pub fn get_rpc_url(&self) -> Option<Result<Cow<'_, str>, UnresolvedEnvVarError>> {
-        let maybe_alias = self.eth_rpc_url.as_ref().or(self.etherscan_api_key.as_ref())?;
+        let maybe_alias = self.eth_rpc_url.as_deref()?;
         if let Some(alias) = self.get_rpc_url_with_alias(maybe_alias) {
             Some(alias)
         } else {
@@ -2573,7 +2610,7 @@ impl Default for Config {
             legacy_assertions: false,
             warnings: vec![],
             extra_args: vec![],
-            celo: false,
+            networks: Default::default(),
             transaction_timeout: 120,
             additional_compiler_profiles: Default::default(),
             compilation_restrictions: Default::default(),
@@ -6348,6 +6385,25 @@ mod tests {
 
             // Assert that the deprecated flag is correctly interpreted
             assert_eq!(config.deny, DenyLevel::Warnings);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn warns_on_unknown_keys_in_profile() {
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "foundry.toml",
+                r#"
+                [profile.default]
+                unknown_key_xyz = 123
+                "#,
+            )?;
+
+            let cfg = Config::load().unwrap();
+            assert!(cfg.warnings.iter().any(
+                |w| matches!(w, crate::Warning::UnknownKey { key, .. } if key == "unknown_key_xyz")
+            ));
             Ok(())
         });
     }

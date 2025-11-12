@@ -3,20 +3,21 @@
 /*.sol
 out/
 snapshots/
-out.json
+
+# IDEs and extensions
 .idea
 .vscode
 .claude
-CLAUDE.md
+.zed
+
+# NPM
 .env
 node_modules
 dist
 bin
 _
 *.tgz
-.zed
 .vercel
 .vite
 .wrangler
-build
 *.zip

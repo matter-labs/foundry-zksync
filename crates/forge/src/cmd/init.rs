@@ -55,7 +55,7 @@ pub struct InitArgs {
 }
 
 impl InitArgs {
-    pub fn run(self) -> Result<()> {
+    pub async fn run(self) -> Result<()> {
         let Self {
             root,
             template,
@@ -215,10 +215,10 @@ impl InitArgs {
             if !offline {
                 if root.join("lib/forge-std").exists() {
                     sh_warn!("\"lib/forge-std\" already exists, skipping install...")?;
-                    self.install.install(&mut config, vec![])?;
+                    self.install.install(&mut config, vec![]).await?;
                 } else {
                     let dep = "https://github.com/foundry-rs/forge-std".parse()?;
-                    self.install.install(&mut config, vec![dep])?;
+                    self.install.install(&mut config, vec![dep]).await?;
                 }
             }
 
@@ -226,10 +226,10 @@ impl InitArgs {
             if zksync && !offline {
                 if root.join("lib/forge-zksync-std").exists() {
                     sh_println!("\"lib/forge-zksync-std\" already exists, skipping install....")?;
-                    self.install.install(&mut config, vec![])?;
+                    self.install.install(&mut config, vec![]).await?;
                 } else {
                     let dep = "https://github.com/Moonsong-Labs/forge-zksync-std".parse()?;
-                    self.install.install(&mut config, vec![dep])?;
+                    self.install.install(&mut config, vec![dep]).await?;
                 }
 
                 //Add zkout/ to .gitignore under compiler files if it doesn't exist

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -xeo pipefail
 
 # NOTE: if you make modifications to this script, please increment the version number.
 # WARNING: the SemVer pattern: major.minor.patch must be followed as we use it to determine if the script is up to date.
@@ -167,11 +167,107 @@ main() {
     # Compute the URL of the release tarball in the Foundry repository.
     ARCHIVE_TAG=$(echo "$FOUNDRYUP_TAG" | tr '-' '_')
     RELEASE_URL="https://github.com/${FOUNDRYUP_REPO}/releases/download/${FOUNDRYUP_TAG}/"
+    ATTESTATION_URL="${RELEASE_URL}foundry_zksync_${FOUNDRYUP_VERSION}_${PLATFORM}_${ARCHITECTURE}.attestation.txt"
     BIN_ARCHIVE_URL="${RELEASE_URL}${ARCHIVE_TAG}_${PLATFORM}_${ARCHITECTURE}.$EXT"
     MAN_TAG=$(echo "$FOUNDRYUP_TAG" | sed 's/^foundry-zksync-//')
     MAN_TARBALL_URL="${RELEASE_URL}foundry_zksync_man_${MAN_TAG}.tar.gz"
     # TODO(zk): Migrate logic for verification of binaries from upstream script
-    
+
+    ensure mkdir -p "$FOUNDRY_VERSIONS_DIR"
+
+    # If `--force` is set, skip the SHA verification.
+    if [ "$FOUNDRYUP_IGNORE_VERIFICATION" = false ]; then
+      # Check if the version is already installed by downloading the attestation file.
+      say "checking if forge, cast, anvil, and chisel for $FOUNDRYUP_TAG version are already installed"
+
+      # Create a temporary directory to store the attestation link and artifact.
+      tmp_dir="$(mktemp -d 2>/dev/null)" || err "failed to create temp dir"
+      tmp="$tmp_dir/attestation.txt"
+      ensure download "$ATTESTATION_URL" "$tmp"
+      
+      # Read the first line of the attestation file to get the artifact link.
+      # The first line should contain the link to the attestation artifact.
+      attestation_artifact_link="$(head -n1 "$tmp" | tr -d '\r')"
+      attestation_missing=false
+
+      # If the attestation artifact link is empty or the file contains 'Not Found',
+      # we consider the attestation missing and skip the SHA verification.
+      if [ -z "$attestation_artifact_link" ] || grep -q 'Not Found' "$tmp"; then
+        attestation_missing=true
+      fi
+
+      # Clean up the temporary attestation file.
+      rm -f "$tmp"
+
+      if $attestation_missing; then
+        say "no attestation found for this release, skipping SHA verification"
+      else
+        say "found attestation for $FOUNDRYUP_TAG version, downloading attestation artifact, checking..."
+
+        # Download the attestation artifact JSON file.
+        tmp="$tmp_dir/foundry-attestation.sigstore.json"
+        ensure download "${attestation_artifact_link}/download" "$tmp"
+
+        # Extract the payload from the JSON file.
+        payload_b64=$(awk '/"payload":/ {gsub(/[",]/, "", $2); print $2; exit}' "$tmp")
+        payload_json=$(printf '%s' "$payload_b64" | base64 -d 2>/dev/null || printf '%s' "$payload_b64" | base64 -D)
+
+
+        # Extract the names and hashes from the payload JSON.
+        # The payload is expected to be a JSON array of objects with "name" and "sha256" fields.
+        while read -r name_line && read -r sha_line; do
+          name=$(echo "$name_line" | sed -nE 's/.*"name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')
+          sha=$(echo "$sha_line"  | sed -nE 's/.*"sha256"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')
+          if [ -n "$name" ] && [ -n "$sha" ]; then
+            HASH_NAMES+=("$name")
+            HASH_VALUES+=("$sha")
+          fi
+        done < <(echo "$payload_json" | tr '{}' '\n' | grep -E '"name"|sha256')
+
+        # Clean up the temporary attestation artifact.
+        # The hashes are now stored in the HASHES associative array.
+        rm -f "$tmp"
+
+        # Check if the binaries are already installed and match the expected hashes.
+        # If they do, skip the download.
+        version_dir="$FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG"
+        all_match=true
+        for bin in "${BINS[@]}"; do
+          expected=""
+          for i in "${!HASH_NAMES[@]}"; do
+            if [ "${HASH_NAMES[$i]}" = "$bin" ] || [ "${HASH_NAMES[$i]}" = "$bin.exe" ]; then
+              expected="${HASH_VALUES[$i]}"
+              break
+            fi
+          done
+
+          path="$version_dir/$bin"
+
+          if [ -z "$expected" ] || [ ! -x "$path" ]; then
+            all_match=false
+            break
+          fi
+
+          actual=$(compute_sha256 "$path")
+          if [ "$actual" != "$expected" ]; then
+            all_match=false
+            break
+          fi
+        done
+
+        if $all_match; then
+          say "version $FOUNDRYUP_TAG already installed and verified, activating..."
+          FOUNDRYUP_VERSION=$FOUNDRYUP_TAG
+          use
+          say "done!"
+          exit 0
+        fi
+      fi
+
+      # If we reach here, we need to download the binaries.
+      say "binaries not found or do not match expected hashes, downloading new binaries"
+    fi
+
     # Download and extract the binaries archive
     say "downloading latest forge, and cast"
     if [ "$PLATFORM" = "win32" ]; then
@@ -180,8 +276,14 @@ main() {
       ensure unzip "$tmp" -d "$FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG"
       rm -f "$tmp"
     else
-      ensure mkdir -p "$FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG"
-      ensure download "$BIN_ARCHIVE_URL" | ensure tar -xzC "$FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG"
+      tmp="$(mktemp -d 2>/dev/null)" || err "failed to create temp dir"
+      tmp="$tmp/foundry.tar.gz"
+      ensure download "$BIN_ARCHIVE_URL" "$tmp"
+      # Make sure it's a valid tar archive.
+      ensure tar tf "$tmp" 1> /dev/null
+      ensure mkdir -p "$FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG"
+      ensure tar -C "$FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG" -xvf "$tmp"
+      rm -f "$tmp"
     fi
 
     # Optionally download the manuals
@@ -248,7 +350,7 @@ main() {
 
     for bin in "${BINS[@]}"; do
       bin_path="$FOUNDRY_BIN_DIR/$bin"
-      cp $FOUNDRY_VERSIONS_DIR/$ARCHIVE_TAG/$bin $bin_path
+      cp $FOUNDRY_VERSIONS_DIR/$FOUNDRYUP_TAG/$bin $bin_path
 
       # Print installed msg
       say "installed - $(ensure "$bin_path" --version)"

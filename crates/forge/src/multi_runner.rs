@@ -9,9 +9,8 @@ use alloy_primitives::{Address, Bytes, U256};
 use eyre::Result;
 use foundry_common::{ContractsByArtifact, TestFunctionExt, get_contract_name, shell::verbosity};
 use foundry_compilers::{
-    ArtifactId, ProjectCompileOutput,
+    ArtifactId, Compiler, ProjectCompileOutput,
     artifacts::{Contract, Libraries},
-    compilers::Compiler,
 };
 use foundry_config::{Config, InlineConfig};
 use foundry_evm::{
@@ -20,7 +19,7 @@ use foundry_evm::{
     decode::RevertDecoder,
     executors::{
         Executor, ExecutorBuilder, FailFast,
-        strategy::{ExecutorStrategy, LinkOutput},
+        strategy::{ExecutorStrategy, LinkOutput as StrategyLinkOutput},
     },
     fork::CreateFork,
     inspectors::CheatsConfig,
@@ -32,7 +31,6 @@ use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
 use std::{
     collections::BTreeMap,
-    fmt::Debug,
     path::Path,
     sync::{Arc, mpsc},
     time::Instant,
@@ -65,6 +63,8 @@ pub struct MultiContractRunner {
     pub libs_to_deploy: Vec<Bytes>,
     /// Library addresses used to link contracts.
     pub libraries: Libraries,
+    /// Solar compiler instance, to grant syntactic and semantic analysis capabilities
+    pub analysis: Arc<solar::sema::Compiler>,
 
     /// The fork to use at launch
     pub fork: Option<CreateFork>,
@@ -264,6 +264,7 @@ impl MultiContractRunner {
 
         let executor = self.tcfg.executor(
             self.known_contracts.clone(),
+            self.analysis.clone(),
             artifact_id,
             db.clone(),
             self.strategy.clone(),
@@ -326,15 +327,18 @@ impl TestRunnerConfig {
 
         self.spec_id = config.evm_spec_id();
         self.sender = config.sender;
-        self.networks.celo = config.celo;
+        self.networks = config.networks;
         self.isolation = config.isolate;
 
         // Specific to Forge, not present in config.
-        // TODO: self.evm_opts
-        // TODO: self.env
-        // self.coverage = N/A;
+        // self.line_coverage = N/A;
         // self.debug = N/A;
         // self.decode_internal = N/A;
+
+        // TODO: self.evm_opts
+        self.evm_opts.always_use_create_2_factory = config.always_use_create_2_factory;
+
+        // TODO: self.env
 
         self.config = config;
     }
@@ -365,6 +369,7 @@ impl TestRunnerConfig {
     pub fn executor(
         &self,
         known_contracts: ContractsByArtifact,
+        analysis: Arc<solar::sema::Compiler>,
         artifact_id: &ArtifactId,
         db: Backend,
         strategy: ExecutorStrategy,
@@ -386,6 +391,7 @@ impl TestRunnerConfig {
                     .enable_isolation(self.isolation)
                     .networks(self.networks)
                     .create2_deployer(self.evm_opts.create2_deployer)
+                    .set_analysis(analysis)
             })
             .spec_id(self.spec_id)
             .gas_limit(self.evm_opts.gas_limit())
@@ -403,7 +409,7 @@ impl TestRunnerConfig {
 }
 
 /// Builder used for instantiating the multi-contract runner
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 #[must_use = "builders do nothing unless you call `build` on them"]
 pub struct MultiContractRunnerBuilder {
     /// The address which will be used to deploy the initial contracts and send all
@@ -502,7 +508,6 @@ impl MultiContractRunnerBuilder {
     /// against that evm
     pub fn build<C: Compiler<CompilerContract = Contract>>(
         self,
-        root: &Path,
         output: &ProjectCompileOutput,
         zk_output: Option<ProjectCompileOutput<ZkSolcCompiler, ZkArtifactOutput>>,
         env: Env,
@@ -513,17 +518,18 @@ impl MultiContractRunnerBuilder {
             strategy.runner.zksync_set_compilation_output(strategy.context.as_mut(), zk_output);
         }
 
-        let LinkOutput {
+        // NOTE(zk): we've moved the linking to the strategy.
+        let StrategyLinkOutput {
             deployable_contracts,
             revert_decoder,
             linked_contracts: _,
             known_contracts,
             libs_to_deploy,
             libraries,
+            analysis,
         } = strategy.runner.link(
             strategy.context.as_mut(),
             &self.config,
-            root,
             output,
             LIBRARY_DEPLOYER,
         )?;
@@ -539,8 +545,7 @@ impl MultiContractRunnerBuilder {
             known_contracts,
             libs_to_deploy,
             libraries,
-
-            fork: self.fork,
+            analysis: Arc::new(analysis),
 
             tcfg: TestRunnerConfig {
                 evm_opts,
@@ -556,6 +561,7 @@ impl MultiContractRunnerBuilder {
                 config: self.config,
                 fail_fast: FailFast::new(self.fail_fast),
             },
+            fork: self.fork,
             strategy,
         })
     }

@@ -58,6 +58,7 @@ alloy-primitives.workspace = true
 alloy-eips.workspace = true
 alloy-consensus.workspace = true
 alloy-zksync.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

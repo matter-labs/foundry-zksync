@@ -21,8 +21,7 @@ foundry-wallets.workspace = true
 
 foundry-strategy-zksync.workspace = true
 
-foundry-compilers = { workspace = true, features = ["full"] }
-solar.workspace = true
+foundry-compilers.workspace = true
 
 alloy-eips.workspace = true
 alloy-dyn-abi.workspace = true
@@ -45,6 +44,7 @@ futures.workspace = true
 indicatif.workspace = true
 itertools.workspace = true
 mimalloc = { workspace = true, optional = true }
+path-slash.workspace = true
 rayon.workspace = true
 regex = { workspace = true, default-features = false }
 serde_json.workspace = true
@@ -56,7 +56,6 @@ tracing-subscriber = { workspace = true, features = ["registry", "env-filter"] }
 tracing.workspace = true
 yansi.workspace = true
 rustls = { workspace = true, features = ["ring"] }
-dunce.workspace = true
 
 tracing-tracy = { version = "0.11", optional = true, features = ["demangle"] }
 

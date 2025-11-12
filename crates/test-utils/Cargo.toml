@@ -32,15 +32,16 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
 rand.workspace = true
-snapbox = { version = "0.6", features = ["json", "regex", "term-svg"] }
-tokio.workspace = true
+snapbox.workspace = true
 tempfile.workspace = true
 ui_test = "0.30.2"
-httptest.workspace = true
-tower-http = { version = "0.6.2", features = ["cors"] }
-anyhow = "1.0"
 reqwest.workspace = true
 svm.workspace = true
+
+anyhow = "1.0"
+tokio.workspace = true
+httptest.workspace = true
+tower-http = { version = "0.6.2", features = ["cors"] }
 
 # zk
 zksync_types.workspace = true
@@ -56,5 +57,4 @@ anvil_zksync_l1_sidecar.workspace = true
 idna_adapter.workspace = true
 
 [dev-dependencies]
-tokio.workspace = true
 foundry-block-explorers.workspace = true

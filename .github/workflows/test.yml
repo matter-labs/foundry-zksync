@@ -130,7 +130,7 @@ jobs:
           log: info
           logFilePath: anvil_zksync.log
           target: x86_64-unknown-linux-gnu
-          releaseTag: v0.6.10
+          releaseTag: v0.6.11
 
       - name: Setup Git config
         run: |

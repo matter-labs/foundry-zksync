@@ -1089,7 +1089,7 @@ impl DatabaseExt for Backend {
         let mut env = self
             .forks
             .get_env(fork_id)?
-            .ok_or_else(|| eyre::eyre!("Requested fork `{}` does not exit", id))?;
+            .ok_or_else(|| eyre::eyre!("Requested fork `{}` does not exist", id))?;
 
         // we still need to roll to the transaction, but we only need an empty dummy state since we
         // don't need to update the active journaled state yet
@@ -1147,7 +1147,7 @@ impl DatabaseExt for Backend {
         let fork_env = self
             .forks
             .get_env(fork_id)?
-            .ok_or_else(|| eyre::eyre!("Requested fork `{}` does not exit", id))?;
+            .ok_or_else(|| eyre::eyre!("Requested fork `{}` does not exist", id))?;
 
         // If we're currently in forking mode we need to update the journaled_state to this point,
         // this ensures the changes performed while the fork was active are recorded
@@ -1444,7 +1444,7 @@ impl DatabaseExt for Backend {
             if self.inner.issued_local_fork_ids.contains_key(&id) {
                 return Ok(id);
             }
-            eyre::bail!("Requested fork `{}` does not exit", id)
+            eyre::bail!("Requested fork `{}` does not exist", id)
         }
         if let Some(id) = self.active_fork_id() { Ok(id) } else { eyre::bail!("No fork active") }
     }
@@ -2124,7 +2124,7 @@ mod tests {
         opts::EvmOpts,
     };
     use alloy_network::{AnyRpcHeader, AnyRpcTransaction};
-    use alloy_primitives::{Address, B256, U256};
+    use alloy_primitives::{B256, U256, address};
     use alloy_provider::Provider;
     use foundry_common::provider::get_http_provider;
     use foundry_config::{Config, NamedChain};
@@ -2138,12 +2138,9 @@ mod tests {
 
     use super::CODE_BY_HASH_RETRIES;
 
-    const ENDPOINT: Option<&str> = option_env!("ETH_RPC_URL");
-
     #[tokio::test(flavor = "multi_thread")]
     async fn can_read_write_cache() {
-        let Some(endpoint) = ENDPOINT else { return };
-
+        let endpoint = &*foundry_test_utils::rpc::next_http_rpc_endpoint();
         let provider = get_http_provider(endpoint);
 
         let block_num = provider.get_block_number().await.unwrap();
@@ -2164,15 +2161,11 @@ mod tests {
         let backend = Backend::spawn(Some(fork), BackendStrategy::new_evm()).unwrap();
 
         // some rng contract from etherscan
-        let address: Address = "63091244180ae240c87d1f528f5f269134cb07b3".parse().unwrap();
+        let address = address!("0x63091244180ae240c87d1f528f5f269134cb07b3");
 
-        let idx = U256::from(0u64);
-        let _value = backend.storage_ref(address, idx);
+        let num_slots = 5;
         let _account = backend.basic_ref(address);
-
-        // fill some slots
-        let num_slots = 10u64;
-        for idx in 1..num_slots {
+        for idx in 0..num_slots {
             let _ = backend.storage_ref(address, U256::from(idx));
         }
         drop(backend);
@@ -2201,12 +2194,11 @@ mod tests {
         );
 
         // requests made during Backend::spawn as part of fork creation process
-        mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
         mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
         mock.expect("eth_chainId", None, serde_json::json!("0x01"));
         mock.expect(
             "eth_getBlockByNumber",
-            Some(serde_json::json!(["0x1", false])),
+            Some(serde_json::json!(["latest", false])),
             serde_json::json!(mockblock),
         );
 

@@ -1,0 +1,1 @@
+{"abi":[{"type":"function","name":"transact","inputs":[{"name":"_data","type":"uint8","internalType":"uint8"}],"outputs":[],"stateMutability":"nonpayable"}],"storageLayout":{"storage":[],"types":{}},"userdoc":{},"devdoc":{},"methodIdentifiers":{},"factoryDependencies":{},"factoryDependenciesUnlinked":[],"id":0}

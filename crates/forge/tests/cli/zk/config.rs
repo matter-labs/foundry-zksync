@@ -19,7 +19,7 @@ forgetest!(test_zk_foundry_toml_config_error_does_not_skip_correct_settings, |pr
     suppressed_warnings = ['invalid-warning']
     zksolc='1.5.10'";
 
-    prj.add_source("Greeter.sol", include_str!("../../../../../testdata/zk/Greeter.sol"));
+    prj.add_source("Greeter.sol", include_str!("../../../../../testdata_zk/Greeter.sol"));
 
     fs::write(prj.root().join("foundry.toml"), faulty_toml).unwrap();
 
