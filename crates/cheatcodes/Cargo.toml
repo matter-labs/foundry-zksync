@@ -29,6 +29,8 @@ foundry-zksync-inspectors.workspace = true
 
 solar.workspace = true
 
+solar.workspace = true
+
 alloy-dyn-abi.workspace = true
 alloy-evm.workspace = true
 alloy-json-abi.workspace = true
