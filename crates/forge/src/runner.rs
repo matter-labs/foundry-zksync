@@ -133,6 +133,9 @@ impl<'a> ContractRunner<'a> {
 
         let mut result = TestSetup::default();
         for code in &self.mcr.libs_to_deploy {
+            // NOTE(zk): library deployments now return multiple results owing to the multiple libs
+            // that might require being deployed.
+
             let deploy_result = self.executor.deploy_library(
                 LIBRARY_DEPLOYER,
                 DeployLibKind::Create(code.clone()),
@@ -145,12 +148,21 @@ impl<'a> ContractRunner<'a> {
                 Ok(deployments) => deployments.into_iter().map(Ok).collect(),
             };
 
-            let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
-            result.extend(raw, TraceKind::Deployment);
-            if reason.is_some() {
-                debug!(?reason, "deployment of library failed");
-                result.reason = reason;
-                return Ok(result);
+            for deploy_result in
+                deployments.into_iter().map(|result| result.map(|deployment| deployment.result))
+            {
+                // Record deployed library address.
+                if let Ok(deployed) = &deploy_result {
+                    result.deployed_libs.push(deployed.address);
+                }
+
+                let (raw, reason) = RawCallResult::from_evm_result(deploy_result.map(Into::into))?;
+                result.extend(raw, TraceKind::Deployment);
+                if reason.is_some() {
+                    debug!(?reason, "deployment of library failed");
+                    result.reason = reason;
+                    return Ok(result);
+                }
             }
         }
 

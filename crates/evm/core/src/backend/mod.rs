@@ -2118,8 +2118,13 @@ fn apply_state_changeset(
 
 #[cfg(test)]
 mod tests {
-    use crate::{backend::Backend, fork::CreateFork, opts::EvmOpts};
-    use alloy_primitives::{U256, address};
+    use crate::{
+        backend::{Backend, strategy::BackendStrategy},
+        fork::CreateFork,
+        opts::EvmOpts,
+    };
+    use alloy_network::{AnyRpcHeader, AnyRpcTransaction};
+    use alloy_primitives::{B256, U256, address};
     use alloy_provider::Provider;
     use foundry_common::provider::get_http_provider;
     use foundry_config::{Config, NamedChain};
@@ -2189,12 +2194,11 @@ mod tests {
         );
 
         // requests made during Backend::spawn as part of fork creation process
-        mock.expect("eth_blockNumber", None, serde_json::json!("0x01"));
         mock.expect("eth_gasPrice", None, serde_json::json!("0x01"));
         mock.expect("eth_chainId", None, serde_json::json!("0x01"));
         mock.expect(
             "eth_getBlockByNumber",
-            Some(serde_json::json!(["0x1", false])),
+            Some(serde_json::json!(["latest", false])),
             serde_json::json!(mockblock),
         );
 

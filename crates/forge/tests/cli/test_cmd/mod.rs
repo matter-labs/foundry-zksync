@@ -19,6 +19,7 @@ mod repros;
 mod spec;
 mod table;
 mod trace;
+mod zksync;
 
 // Run `forge test` on `/testdata`.
 forgetest!(testdata, |_prj, cmd| {

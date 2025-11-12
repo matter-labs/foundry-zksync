@@ -1,4 +1,4 @@
-use std::{any::Any, fmt::Debug, path::Path};
+use std::{any::Any, fmt::Debug};
 
 use alloy_primitives::{Address, U256};
 use alloy_serde::OtherFields;
@@ -89,7 +89,6 @@ pub trait ExecutorStrategyRunner: Debug + Send + Sync + ExecutorStrategyExt {
         &self,
         ctx: &mut dyn ExecutorStrategyContext,
         config: &Config,
-        root: &Path,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError>;
@@ -218,12 +217,11 @@ impl ExecutorStrategyRunner for EvmExecutorStrategyRunner {
     fn link(
         &self,
         _: &mut dyn ExecutorStrategyContext,
-        _: &Config,
-        root: &Path,
+        config: &Config,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
-        self.link_impl(root, input, deployer)
+        self.link_impl(config, input, deployer)
     }
 
     /// Deploys a library, applying state changes

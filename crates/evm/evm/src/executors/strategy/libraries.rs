@@ -1,18 +1,19 @@
 //! Contains various definitions and items related to deploy-time linking
 
-use std::{borrow::Borrow, collections::BTreeMap, path::Path};
+use std::{borrow::Borrow, collections::BTreeMap};
 
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256};
-use eyre::Context;
+use eyre::{Context, Result};
 use foundry_common::{ContractsByArtifact, TestFunctionExt, TransactionMaybeSigned};
 use foundry_compilers::{
     Artifact, ArtifactId, ProjectCompileOutput, artifacts::Libraries, contracts::ArtifactContracts,
 };
+use foundry_config::{Config, build::configure_pcx_from_compile_output};
 use foundry_evm_core::decode::RevertDecoder;
 use foundry_linking::{Linker, LinkerError};
 
-use crate::executors::{DeployResult, EvmError, Executor};
+use crate::executors::{DeployResult, EvmError, Executor, RawCallResult};
 
 use super::{EvmExecutorStrategyRunner, ExecutorStrategyRunner};
 
@@ -23,6 +24,7 @@ pub struct LinkOutput {
     pub known_contracts: ContractsByArtifact,
     pub libs_to_deploy: Vec<Bytes>,
     pub libraries: Libraries,
+    pub analysis: solar::sema::Compiler,
 }
 
 /// Type of library deployment
@@ -44,13 +46,36 @@ pub struct DeployLibResult {
     pub tx: Option<TransactionMaybeSigned>,
 }
 
+impl std::ops::Deref for DeployLibResult {
+    type Target = RawCallResult;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.result.raw
+    }
+}
+
+impl std::ops::DerefMut for DeployLibResult {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.result.raw
+    }
+}
+
+impl From<DeployLibResult> for RawCallResult {
+    fn from(d: DeployLibResult) -> Self {
+        d.result.raw
+    }
+}
+
 impl EvmExecutorStrategyRunner {
     pub(super) fn link_impl(
         &self,
-        root: &Path,
+        config: &Config,
         input: &ProjectCompileOutput,
         deployer: Address,
     ) -> Result<LinkOutput, LinkerError> {
+        let root = &config.root;
         let contracts =
             input.artifact_ids().map(|(id, v)| (id.with_stripped_file_prefixes(root), v)).collect();
         let linker = Linker::new(root, contracts);
@@ -92,6 +117,39 @@ impl EvmExecutorStrategyRunner {
             root,
         );
 
+        // Initialize and configure the solar compiler.
+        let mut analysis = solar::sema::Compiler::new(
+            solar::interface::Session::builder().with_stderr_emitter().build(),
+        );
+        let dcx = analysis.dcx_mut();
+        dcx.set_emitter(Box::new(
+            solar::interface::diagnostics::HumanEmitter::stderr(Default::default())
+                .source_map(Some(dcx.source_map().unwrap())),
+        ));
+        dcx.set_flags_mut(|f| f.track_diagnostics = false);
+
+        // Populate solar's global context by parsing and lowering the sources.
+        let files: Vec<_> =
+            input.output().sources.as_ref().keys().map(|path| path.to_path_buf()).collect();
+
+        analysis
+            .enter_mut(|compiler| -> Result<()> {
+                let mut pcx = compiler.parse();
+                configure_pcx_from_compile_output(
+                    &mut pcx,
+                    config,
+                    input,
+                    if files.is_empty() { None } else { Some(&files) },
+                )?;
+                pcx.parse();
+                // Check if any sources exist, to avoid logging `error: no files found`
+                if !compiler.sess().source_map().is_empty() {
+                    let _ = compiler.lower_asts();
+                }
+                Ok(())
+            })
+            .map_err(|err| LinkerError::LinkingFailed { artifact: err.to_string() })?;
+
         Ok(LinkOutput {
             deployable_contracts,
             revert_decoder,
@@ -99,6 +157,7 @@ impl EvmExecutorStrategyRunner {
             known_contracts,
             libs_to_deploy,
             libraries,
+            analysis,
         })
     }
 

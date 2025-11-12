@@ -120,6 +120,19 @@ endpoints = "all"
 access = "read"
 path = "out"
 
+[profile.default.zksync]
+compile = false
+startup = false
+evm_interpreter = false
+size_fallback = false
+enable_eravm_extensions = false
+force_evmla = false
+llvm_options = []
+optimizer = true
+optimizer_mode = "3"
+suppressed_warnings = []
+suppressed_errors = []
+
 [fmt]
 line_length = 120
 tab_width = 4
@@ -172,6 +185,7 @@ corpus_min_mutations = 5
 corpus_min_size = 0
 show_edge_coverage = false
 failure_persist_dir = "cache/fuzz"
+no_zksync_reserved_addresses = false
 show_logs = false
 
 [invariant]
@@ -194,6 +208,7 @@ show_edge_coverage = false
 failure_persist_dir = "cache/invariant"
 show_metrics = true
 show_solidity = false
+no_zksync_reserved_addresses = false
 
 [labels]
 
@@ -203,6 +218,8 @@ show_solidity = false
 out = "utils/JsonBindings.sol"
 include = []
 exclude = []
+
+[forks]
 
 "#;
 

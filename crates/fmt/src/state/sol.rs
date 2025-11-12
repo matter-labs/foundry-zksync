@@ -562,6 +562,7 @@ impl<'ast> State<'_, 'ast> {
                 }
             }
         }
+        #[allow(clippy::nonminimal_bool)]
         if !skip_returns
             && let Some(ret) = returns
             && !ret.is_empty()

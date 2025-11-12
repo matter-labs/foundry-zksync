@@ -19,6 +19,7 @@ macro_rules! shuffled_list {
     };
 }
 
+#[derive(Debug)]
 struct ShuffledList<T> {
     list: Vec<T>,
     index: AtomicUsize,
@@ -42,6 +43,7 @@ shuffled_list!(
     vec![
         //
         "reth-ethereum.ithaca.xyz/rpc",
+        // "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 shuffled_list!(
@@ -50,6 +52,7 @@ shuffled_list!(
         //
         "reth-ethereum.ithaca.xyz/rpc",
         "reth-ethereum-full.ithaca.xyz/rpc",
+        // "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 shuffled_list!(
@@ -57,6 +60,7 @@ shuffled_list!(
     vec![
         //
         "reth-ethereum.ithaca.xyz/ws",
+        // "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 shuffled_list!(
@@ -65,6 +69,7 @@ shuffled_list!(
         //
         "reth-ethereum.ithaca.xyz/ws",
         "reth-ethereum-full.ithaca.xyz/ws",
+        // "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
     ],
 );
 
@@ -109,6 +114,29 @@ pub fn rpc_endpoints() -> RpcEndpoints {
     ])
 }
 
+/// the RPC endpoints used during tests
+pub fn rpc_endpoints_zk() -> RpcEndpoints {
+    // use mainnet url from env to avoid rate limiting in CI
+    let mainnet_url =
+        std::env::var("TEST_MAINNET_URL").unwrap_or("https://mainnet.era.zksync.io".to_string()); // trufflehog:ignore
+    RpcEndpoints::new([
+        ("mainnet", RpcEndpointUrl::Url(mainnet_url)),
+        (
+            "rpcAlias",
+            RpcEndpointUrl::Url(
+                "https://eth-mainnet.alchemyapi.io/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H".to_string(), /* trufflehog:ignore */
+            ),
+        ),
+        (
+            "rpcAliasSepolia",
+            RpcEndpointUrl::Url(
+                "https://eth-sepolia.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H".to_string(), /* trufflehog:ignore */
+            ),
+        ),
+        ("rpcEnvAlias", RpcEndpointUrl::Env("${RPC_ENV_ALIAS}".to_string())),
+    ])
+}
+
 /// Returns the next _mainnet_ rpc URL in inline
 ///
 /// This will rotate all available rpc endpoints
@@ -143,9 +171,48 @@ pub fn next_ws_archive_rpc_url() -> String {
     next_archive_url(true)
 }
 
+static CUSTOM_HTTP_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLock::new(|| {
+    Some(
+        std::env::var("HTTP_ARCHIVE_URLS")
+            .ok()
+            .unwrap_or_default()
+            .split(",")
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect::<Vec<_>>(),
+    )
+    .filter(|list| !list.is_empty())
+    .map(ShuffledList::new)
+});
+
+static CUSTOM_WS_ARCHIVE_URLS: LazyLock<Option<ShuffledList<String>>> = LazyLock::new(|| {
+    Some(
+        std::env::var("WS_ARCHIVE_URLS")
+            .ok()
+            .unwrap_or_default()
+            .split(",")
+            .filter(|s| !s.is_empty())
+            .map(String::from)
+            .collect::<Vec<_>>(),
+    )
+    .filter(|list| !list.is_empty())
+    .map(ShuffledList::new)
+});
+
 /// Returns a URL that has access to archive state.
 fn next_archive_url(is_ws: bool) -> String {
-    let domain = if is_ws { &WS_ARCHIVE_DOMAINS } else { &HTTP_ARCHIVE_DOMAINS }.next();
+    // NOTE(zk): we try to incorporate our own custom URLs to avoid rate limiting
+    let domain = if is_ws {
+        CUSTOM_WS_ARCHIVE_URLS
+            .as_ref()
+            .map(|urls| urls.next().as_str())
+            .unwrap_or_else(|| WS_ARCHIVE_DOMAINS.next())
+    } else {
+        CUSTOM_HTTP_ARCHIVE_URLS
+            .as_ref()
+            .map(|urls| urls.next().as_str())
+            .unwrap_or_else(|| HTTP_ARCHIVE_DOMAINS.next())
+    };
     let url = if is_ws { format!("wss://{domain}") } else { format!("https://{domain}") };
     test_debug!("next_archive_url(is_ws={is_ws}) = {}", debug_url(&url));
     url
@@ -165,6 +232,7 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
 }
 
 fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
+    println!("NEXT");
     if matches!(chain, Base) {
         return "https://mainnet.base.org".to_string();
     }
@@ -183,7 +251,18 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
 
     let reth_works = true;
     let domain = if reth_works && matches!(chain, Mainnet) {
-        *(if is_ws { &WS_DOMAINS } else { &HTTP_DOMAINS }).next()
+        // NOTE(zk): we try to incorporate our own custom URLs to avoid rate limiting
+        if is_ws {
+            CUSTOM_WS_ARCHIVE_URLS
+                .as_ref()
+                .map(|urls| urls.next().as_str())
+                .unwrap_or_else(|| WS_DOMAINS.next())
+        } else {
+            CUSTOM_HTTP_ARCHIVE_URLS
+                .as_ref()
+                .map(|urls| urls.next().as_str())
+                .unwrap_or_else(|| HTTP_DOMAINS.next())
+        }
     } else {
         // DRPC for other networks used in tests.
         let key = DRPC_KEYS.next();
