@@ -2,8 +2,6 @@ name: Release
 
 permissions: {}
 
-permissions: {}
-
 on:
   schedule:
     - cron: "0 6 * * *"
