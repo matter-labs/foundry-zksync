@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.32](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.31...foundry-zksync-v0.0.32) (2025-11-17)
+
+
+### Features
+
+* **forge:** no warning on external sections ([fe9888a](https://github.com/matter-labs/foundry-zksync/commit/fe9888a78694639ddb034d4a32d3630ade7111cf))
+* trigger release ([#1196](https://github.com/matter-labs/foundry-zksync/issues/1196)) ([a3ff87a](https://github.com/matter-labs/foundry-zksync/commit/a3ff87a049e9e4b01a60b1ac6d52a8771c9c2420))
+
+
+### Bug Fixes
+
+* **anvil:** return account info from db when requested block &gt; fork block ([fe9888a](https://github.com/matter-labs/foundry-zksync/commit/fe9888a78694639ddb034d4a32d3630ade7111cf))
+* ci and release pipeline ([#1199](https://github.com/matter-labs/foundry-zksync/issues/1199)) ([b2a1e8d](https://github.com/matter-labs/foundry-zksync/commit/b2a1e8d205b27c27f066fba7a75357ad50d4381b))
+* **fmt:** preserve cmnt possition in disabled lines ([fe9888a](https://github.com/matter-labs/foundry-zksync/commit/fe9888a78694639ddb034d4a32d3630ade7111cf))
+* **fmt:** return diff if source from stdin ([fe9888a](https://github.com/matter-labs/foundry-zksync/commit/fe9888a78694639ddb034d4a32d3630ade7111cf))
+* **forge:** consolidate flatten ([fe9888a](https://github.com/matter-labs/foundry-zksync/commit/fe9888a78694639ddb034d4a32d3630ade7111cf))
+* **forge:** do not warn on backward compatible solc_version key ([fe9888a](https://github.com/matter-labs/foundry-zksync/commit/fe9888a78694639ddb034d4a32d3630ade7111cf))
+* **forge:** support broadcast from vm.deployCode ([fe9888a](https://github.com/matter-labs/foundry-zksync/commit/fe9888a78694639ddb034d4a32d3630ade7111cf))
+
 ## [0.0.31](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.30...foundry-zksync-v0.0.31) (2025-11-07)
 
 
