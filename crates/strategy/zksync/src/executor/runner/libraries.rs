@@ -280,6 +280,20 @@ impl ZksyncExecutorStrategyRunner {
         executor.backend_mut().add_persistent_account(address);
         tracing::debug!(%address, "deployed contract");
 
+        // Persist factory deps deployed during this stage directly in the cheatcode inspector so
+        // they are available during normal execution.
+        if let Some(cheatcodes) = executor.inspector.cheatcodes.as_mut() {
+            let factory_deps = executor
+                .backend
+                .strategy
+                .runner
+                .zksync_get_persisted_factory_deps(executor.backend.strategy.context.as_mut());
+            cheatcodes
+                .strategy
+                .runner
+                .zksync_persist_factory_deps(cheatcodes.strategy.context.as_mut(), factory_deps);
+        }
+
         let mut request = TransactionMaybeSigned::new(Default::default());
         let unsigned = request.as_unsigned_mut().unwrap();
         unsigned.from = Some(from);

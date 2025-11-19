@@ -10,12 +10,14 @@ use crate::{
 
 use super::{Backend, BackendInner, Fork, ForkDB, ForkType, FoundryEvmInMemoryDB};
 use alloy_evm::Evm;
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
 use revm::{
-    DatabaseCommit, DatabaseRef, context_interface::result::ResultAndState, database::CacheDB,
-    primitives::HashSet,
+    DatabaseCommit, DatabaseRef,
+    context_interface::result::ResultAndState,
+    database::CacheDB,
+    primitives::{HashMap, HashSet},
 };
 use serde::{Deserialize, Serialize};
 
@@ -132,6 +134,13 @@ pub trait BackendStrategyRunnerExt {
         _addr: Address,
         _keys: HashSet<U256>,
     ) {
+    }
+
+    fn zksync_get_persisted_factory_deps(
+        &self,
+        _ctx: &mut dyn BackendStrategyContext,
+    ) -> HashMap<B256, Vec<u8>> {
+        Default::default()
     }
 }
 
