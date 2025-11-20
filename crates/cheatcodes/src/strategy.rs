@@ -2,7 +2,7 @@ use std::{any::Any, fmt::Debug, sync::Arc};
 
 use alloy_consensus::BlobTransactionSidecar;
 use alloy_network::TransactionBuilder4844;
-use alloy_primitives::{Address, TxKind};
+use alloy_primitives::{Address, B256, TxKind, map::HashMap};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
 use revm::{
     context_interface::transaction::SignedAuthorization,
@@ -174,6 +174,13 @@ pub trait CheatcodeInspectorStrategyExt {
         _state: &mut Cheatcodes,
         _ecx: Ecx,
         _is_static: bool,
+    ) {
+    }
+
+    fn zksync_persist_factory_deps(
+        &self,
+        _ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        _factory_deps: HashMap<B256, Vec<u8>>,
     ) {
     }
 }

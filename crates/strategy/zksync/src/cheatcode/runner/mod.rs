@@ -48,7 +48,7 @@ use revm::{
 };
 use tracing::{debug, error, info, trace, warn};
 use zksync_types::{
-    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, SYSTEM_CONTEXT_ADDRESS,
+    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, H256, SYSTEM_CONTEXT_ADDRESS,
     block::{pack_block_info, unpack_block_info},
     utils::{decompose_full_nonce, nonces_to_full_nonce},
 };
@@ -992,6 +992,20 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             foundry_zksync_core::increment_tx_nonce(broadcast.new_origin, ecx);
             debug!("incremented zksync nonce after broadcastable create");
         }
+    }
+
+    /// Persist factory deps to make them available at execution time.
+    /// This might be necessary for any factory deps deployed with libraries.
+    fn zksync_persist_factory_deps(
+        &self,
+        ctx: &mut dyn CheatcodeInspectorStrategyContext,
+        factory_deps: HashMap<B256, Vec<u8>>,
+    ) {
+        let ctx = get_context(ctx);
+        ctx.persisted_factory_deps
+            .extend(factory_deps.into_iter().map(|(hash, bytecode)| (H256(hash.0), bytecode)));
+
+        ctx.persisted_factory_deps.keys().for_each(|h| println!("\t{h:?}"));
     }
 }
 
