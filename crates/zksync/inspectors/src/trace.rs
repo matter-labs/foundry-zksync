@@ -128,8 +128,8 @@ where
         self.inner.step_end(interp, context)
     }
 
-    fn log(&mut self, interp: &mut Interpreter, context: &mut CTX, log: Log) {
-        self.inner.log(interp, context, log)
+    fn log(&mut self, context: &mut CTX, log: Log) {
+        self.inner.log(context, log)
     }
 
     fn call(&mut self, context: &mut CTX, inputs: &mut CallInputs) -> Option<CallOutcome> {
@@ -187,6 +187,7 @@ impl InspectorExt for TraceCollector {
                 bytecode_address: call.to.to_address(),
                 is_static: false,
                 return_memory_offset: Default::default(),
+                known_bytecode: None,
             };
             let is_first_non_system_call = if !suppressed_top_call {
                 !foundry_zksync_core::is_system_address(inputs.caller)
@@ -210,6 +211,8 @@ impl InspectorExt for TraceCollector {
                         gas: Gas::new_spent(call.gas_used),
                     },
                     memory_offset: Default::default(),
+                    was_precompile_called: false,
+                    precompile_call_logs: vec![],
                 }
             } else {
                 CallOutcome {
@@ -219,6 +222,8 @@ impl InspectorExt for TraceCollector {
                         gas: Gas::new_spent(call.gas_used),
                     },
                     memory_offset: Default::default(),
+                    was_precompile_called: false,
+                    precompile_call_logs: vec![],
                 }
             };
 

@@ -9,7 +9,7 @@ use crate::{
 };
 use itertools::Itertools;
 use solang_parser::pt::{Base, FunctionDefinition};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// The result of [`AsDoc::as_doc`].
 pub type AsDocResult = Result<String, std::fmt::Error>;
@@ -36,6 +36,14 @@ impl AsDoc for CommentsRef<'_> {
     // TODO: support other tags
     fn as_doc(&self) -> AsDocResult {
         let mut writer = BufWriter::default();
+
+        // Write title tag(s)
+        let titles = self.include_tag(CommentTag::Title);
+        if !titles.is_empty() {
+            writer.write_bold(&format!("Title{}:", if titles.len() == 1 { "" } else { "s" }))?;
+            writer.writeln_raw(titles.iter().map(|t| &t.value).join(", "))?;
+            writer.writeln()?;
+        }
 
         // Write author tag(s)
         let authors = self.include_tag(CommentTag::Author);
@@ -133,9 +141,6 @@ impl AsDoc for Document {
                         if !contract.base.is_empty() {
                             writer.write_bold("Inherits:")?;
 
-                            // we need this to find the _relative_ paths
-                            let src_target_dir = self.target_src_dir();
-
                             let mut bases = vec![];
                             let linked =
                                 read_context!(self, CONTRACT_INHERITANCE_ID, ContractInheritance);
@@ -147,11 +152,11 @@ impl AsDoc for Document {
                                     .as_ref()
                                     .and_then(|link| {
                                         link.get(base_ident).map(|path| {
-                                            let path = Path::new("/").join(
-                                                path.strip_prefix(&src_target_dir)
-                                                    .ok()
-                                                    .unwrap_or(path),
-                                            );
+                                            let path = if cfg!(windows) {
+                                                Path::new("\\").join(path)
+                                            } else {
+                                                Path::new("/").join(path)
+                                            };
                                             Markdown::Link(&base_doc, &path.display().to_string())
                                                 .as_doc()
                                         })
@@ -279,11 +284,6 @@ impl AsDoc for Document {
 }
 
 impl Document {
-    /// Where all the source files are written to
-    fn target_src_dir(&self) -> PathBuf {
-        self.out_target_dir.join("src")
-    }
-
     /// Writes a function to the buffer.
     fn write_function(
         &self,

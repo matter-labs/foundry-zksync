@@ -243,8 +243,13 @@ where
     }
 
     /// Load an account into the journaled state.
-    pub fn load_account(&mut self, address: Address) -> &mut Account {
-        self.ecx.journaled_state.load_account(address).expect("account could not be loaded").data
+    pub fn load_account(&mut self, address: Address) -> Account {
+        self.ecx
+            .journaled_state
+            .load_account(address)
+            .expect("account could not be loaded")
+            .data
+            .clone()
     }
 
     /// Load an storage slot into the journaled state.

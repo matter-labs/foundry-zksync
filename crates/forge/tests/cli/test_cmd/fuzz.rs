@@ -58,8 +58,6 @@ contract FuzzerDictTest is Test {
 
 // tests that inline max-test-rejects config is properly applied
 forgetest_init!(test_inline_max_test_rejects, |prj, cmd| {
-    prj.wipe_contracts();
-
     prj.add_test(
         "Contract.t.sol",
         r#"
@@ -84,8 +82,6 @@ contract InlineMaxRejectsTest is Test {
 // Tests that test timeout config is properly applied.
 // If test doesn't timeout after one second, then test will fail with `rejected too many inputs`.
 forgetest_init!(test_fuzz_timeout, |prj, cmd| {
-    prj.wipe_contracts();
-
     prj.add_test(
         "Contract.t.sol",
         r#"
@@ -116,8 +112,10 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 });
 
 forgetest_init!(test_fuzz_fail_on_revert, |prj, cmd| {
-    prj.wipe_contracts();
-    prj.update_config(|config| config.fuzz.fail_on_revert = false);
+    prj.update_config(|config| {
+        config.fuzz.fail_on_revert = false;
+        config.fuzz.seed = Some(U256::from(100u32));
+    });
     prj.add_source(
         "Counter.sol",
         r#"
@@ -249,12 +247,12 @@ contract CounterTest is Test {
 }
    "#,
     );
-    // Tests should fail and record counterexample with value 2.
+    // Tests should fail and record counterexample with value 200.
     cmd.args(["test"]).assert_failure().stdout_eq(str![[r#"
 ...
 Failing tests:
 Encountered 1 failing test in test/Counter.t.sol:CounterTest
-[FAIL: EvmError: Revert; counterexample: calldata=0x5c7f60d70000000000000000000000000000000000000000000000000000000000000002 args=[2]] testFuzz_SetNumber(uint256) (runs: 19, [AVG_GAS])
+[FAIL: EvmError: Revert; counterexample: calldata=0x5c7f60d700000000000000000000000000000000000000000000000000000000000000c8 args=[200]] testFuzz_SetNumber(uint256) (runs: 6, [AVG_GAS])
 ...
 
 "#]]);
@@ -267,7 +265,7 @@ import {Test} from "forge-std/Test.sol";
 
 contract CounterTest is Test {
     function testFuzz_SetNumber(uint256 x) public pure {
-        vm.assume(x != 2);
+        vm.assume(x != 200);
     }
 }
    "#,
@@ -325,19 +323,18 @@ contract CounterTest is Test {
 }
    "#,
     );
-    // Test should fail with replayed counterexample 2 (0 runs).
+    // Test should fail with replayed counterexample 200 (0 runs).
     cmd.forge_fuse().args(["test"]).assert_failure().stdout_eq(str![[r#"
 ...
 Failing tests:
 Encountered 1 failing test in test/Counter.t.sol:CounterTest
-[FAIL: EvmError: Revert; counterexample: calldata=0x5c7f60d70000000000000000000000000000000000000000000000000000000000000002 args=[2]] testFuzz_SetNumber(uint256) (runs: 0, [AVG_GAS])
+[FAIL: EvmError: Revert; counterexample: calldata=0x5c7f60d700000000000000000000000000000000000000000000000000000000000000c8 args=[200]] testFuzz_SetNumber(uint256) (runs: 0, [AVG_GAS])
 ...
 
 "#]]);
 });
 
 forgetest_init!(fuzz_basic, |prj, cmd| {
-    prj.wipe_contracts();
     prj.add_test(
         "Fuzz.t.sol",
         r#"
@@ -396,7 +393,6 @@ forgetest_init!(
     #[ignore]
     fuzz_collection,
     |prj, cmd| {
-        prj.wipe_contracts();
         prj.update_config(|config| {
             config.invariant.depth = 100;
             config.invariant.runs = 1000;
@@ -474,8 +470,6 @@ contract SampleContractTest is Test {
 );
 
 forgetest_init!(fuzz_failure_persist, |prj, cmd| {
-    prj.wipe_contracts();
-
     let persist_dir = prj.cache().parent().unwrap().join("persist");
     assert!(!persist_dir.exists());
     prj.update_config(|config| {
@@ -552,7 +546,6 @@ Suite result: FAILED. 0 passed; 1 failed; 0 skipped; [ELAPSED]
 // https://github.com/foundry-rs/foundry/pull/735 behavior changed with https://github.com/foundry-rs/foundry/issues/3521
 // random values (instead edge cases) are generated if no fixtures defined
 forgetest_init!(fuzz_int, |prj, cmd| {
-    prj.wipe_contracts();
     prj.add_test(
         "FuzzInt.t.sol",
         r#"
@@ -633,7 +626,6 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 9 failed, 0 skipped (10 total tests)
 });
 
 forgetest_init!(fuzz_positive, |prj, cmd| {
-    prj.wipe_contracts();
     prj.add_test(
         "FuzzPositive.t.sol",
         r#"
@@ -671,7 +663,9 @@ Ran 1 test suite [ELAPSED]: 3 tests passed, 0 failed, 0 skipped (3 total tests)
 // https://github.com/foundry-rs/foundry/pull/735 behavior changed with https://github.com/foundry-rs/foundry/issues/3521
 // random values (instead edge cases) are generated if no fixtures defined
 forgetest_init!(fuzz_uint, |prj, cmd| {
-    prj.wipe_contracts();
+    prj.update_config(|config| {
+        config.fuzz.seed = Some(U256::from(100u32));
+    });
     prj.add_test(
         "FuzzUint.t.sol",
         r#"
@@ -732,4 +726,110 @@ Ran 7 tests for test/FuzzUint.t.sol:FuzzNumbersTest
 Suite result: FAILED. 1 passed; 6 failed; 0 skipped; [ELAPSED]
 ...
 "#]]);
+});
+
+forgetest_init!(should_fuzz_literals, |prj, cmd| {
+    // Add a source with magic (literal) values
+    prj.add_source(
+        "Magic.sol",
+        r#"
+        contract Magic {
+            // plain literals
+            address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+            uint64 constant MAGIC_NUMBER = 1122334455;
+            int32 constant MAGIC_INT = -777;
+            bytes32 constant MAGIC_WORD = "abcd1234";
+            bytes constant MAGIC_BYTES = hex"deadbeef";
+            string constant MAGIC_STRING = "xyzzy";
+
+            function checkAddr(address v) external pure { assert(v != DAI); }
+            function checkWord(bytes32 v) external pure { assert(v != MAGIC_WORD); }
+            function checkNumber(uint64 v) external pure { assert(v != MAGIC_NUMBER); }
+            function checkInteger(int32 v) external pure { assert(v != MAGIC_INT); }
+            function checkString(string memory v) external pure { assert(keccak256(abi.encodePacked(v)) != keccak256(abi.encodePacked(MAGIC_STRING))); }
+            function checkBytesFromHex(bytes memory v) external pure { assert(keccak256(v) != keccak256(MAGIC_BYTES)); }
+            function checkBytesFromString(bytes memory v) external pure { assert(keccak256(v) != keccak256(abi.encodePacked(MAGIC_STRING))); }
+        }
+        "#,
+    );
+
+    prj.add_test(
+        "MagicFuzz.t.sol",
+        r#"
+            import {Test} from "forge-std/Test.sol";
+            import {Magic} from "src/Magic.sol";
+
+            contract MagicTest is Test {
+                Magic public magic;
+                function setUp() public { magic = new Magic(); }
+
+                function testFuzz_Addr(address v) public view { magic.checkAddr(v); }
+                function testFuzz_Number(uint64 v) public view { magic.checkNumber(v); }
+                function testFuzz_Integer(int32 v) public view { magic.checkInteger(v); }
+                function testFuzz_Word(bytes32 v) public view { magic.checkWord(v); }
+                function testFuzz_String(string memory v) public view { magic.checkString(v); }
+                function testFuzz_BytesFromHex(bytes memory v) public view { magic.checkBytesFromHex(v); }
+                function testFuzz_BytesFromString(bytes memory v) public view { magic.checkBytesFromString(v); }
+            }
+        "#,
+    );
+
+    // Helper to create expected output for a test failure
+    let expected_fail = |test_name: &str, type_sig: &str, value: &str, runs: u32| -> String {
+        format!(
+            r#"No files changed, compilation skipped
+
+Ran 1 test for test/MagicFuzz.t.sol:MagicTest
+[FAIL: panic: assertion failed (0x01); counterexample: calldata=[..] args=[{value}]] {test_name}({type_sig}) (runs: {runs}, [AVG_GAS])
+[..]
+
+Ran 1 test suite [ELAPSED]: 0 tests passed, 1 failed, 0 skipped (1 total tests)
+
+Failing tests:
+...
+Encountered a total of 1 failing tests, 0 tests succeeded
+...
+"#
+        )
+    };
+
+    // Test address literal fuzzing
+    let mut test_literal = |seed: u32,
+                            test_name: &'static str,
+                            type_sig: &'static str,
+                            expected_value: &'static str,
+                            expected_runs: u32| {
+        // the fuzzer is UNABLE to find a breaking input (fast) when NOT seeding from the AST
+        prj.update_config(|config| {
+            config.fuzz.runs = 100;
+            config.fuzz.dictionary.max_fuzz_dictionary_literals = 0;
+            config.fuzz.seed = Some(U256::from(seed));
+        });
+        cmd.forge_fuse().args(["test", "--match-test", test_name]).assert_success();
+
+        // the fuzzer is ABLE to find a breaking input when seeding from the AST
+        prj.update_config(|config| {
+            config.fuzz.dictionary.max_fuzz_dictionary_literals = 10_000;
+        });
+
+        let expected_output = expected_fail(test_name, type_sig, expected_value, expected_runs);
+        cmd.forge_fuse()
+            .args(["test", "--match-test", test_name])
+            .assert_failure()
+            .stdout_eq(expected_output);
+    };
+
+    test_literal(100, "testFuzz_Addr", "address", "0x6B175474E89094C44Da98b954EedeAC495271d0F", 28);
+    test_literal(200, "testFuzz_Number", "uint64", "1122334455 [1.122e9]", 5);
+    test_literal(300, "testFuzz_Integer", "int32", "-777", 0);
+    test_literal(
+        400,
+        "testFuzz_Word",
+        "bytes32",
+        "0x6162636431323334000000000000000000000000000000000000000000000000", /* bytes32("abcd1234") */
+        7,
+    );
+    test_literal(500, "testFuzz_BytesFromHex", "bytes", "0xdeadbeef", 5);
+    test_literal(600, "testFuzz_String", "string", "\"xyzzy\"", 35);
+    test_literal(999, "testFuzz_BytesFromString", "bytes", "0x78797a7a79", 19); // abi.encodePacked("xyzzy")
 });

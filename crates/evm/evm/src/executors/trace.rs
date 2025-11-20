@@ -24,7 +24,7 @@ impl TracingExecutor {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         env: Env,
-        fork: Option<CreateFork>,
+        fork: CreateFork,
         version: Option<EvmVersion>,
         trace_mode: TraceMode,
         networks: NetworkConfigs,
@@ -32,8 +32,10 @@ impl TracingExecutor {
         state_overrides: Option<StateOverride>,
         strategy: ExecutorStrategy,
     ) -> eyre::Result<Self> {
-        let db =
-            Backend::spawn(fork, strategy.runner.new_backend_strategy(strategy.context.as_ref()))?;
+        let db = Backend::spawn(
+            Some(fork),
+            strategy.runner.new_backend_strategy(strategy.context.as_ref()),
+        )?;
 
         // configures a bare version of the evm executor: no cheatcode inspector is enabled,
         // tracing will be enabled only for the targeted transaction
@@ -85,17 +87,18 @@ impl TracingExecutor {
     pub async fn get_fork_material(
         config: &mut Config,
         mut evm_opts: EvmOpts,
-    ) -> eyre::Result<(Env, Option<CreateFork>, Option<Chain>, NetworkConfigs)> {
+    ) -> eyre::Result<(Env, CreateFork, Chain, NetworkConfigs)> {
         evm_opts.fork_url = Some(config.get_rpc_url_or_localhost_http()?.into_owned());
         evm_opts.fork_block_number = config.fork_block_number;
 
         let env = evm_opts.evm_env().await?;
 
-        let fork = evm_opts.get_fork(config, env.clone());
+        let fork = evm_opts.get_fork(config, env.clone()).unwrap();
         let networks = evm_opts.networks.with_chain_id(env.evm_env.cfg_env.chain_id);
         config.labels.extend(networks.precompiles_label());
 
-        Ok((env, fork, evm_opts.get_remote_chain_id().await, networks))
+        let chain = env.tx.chain_id.unwrap().into();
+        Ok((env, fork, chain, networks))
     }
 }
 

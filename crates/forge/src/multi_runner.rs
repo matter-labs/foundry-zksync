@@ -18,7 +18,7 @@ use foundry_evm::{
     backend::Backend,
     decode::RevertDecoder,
     executors::{
-        Executor, ExecutorBuilder, FailFast,
+        EarlyExit, Executor, ExecutorBuilder,
         strategy::{ExecutorStrategy, LinkOutput as StrategyLinkOutput},
     },
     fork::CreateFork,
@@ -315,8 +315,8 @@ pub struct TestRunnerConfig {
     pub isolation: bool,
     /// Networks with enabled features.
     pub networks: NetworkConfigs,
-    /// Whether to exit early on test failure.
-    pub fail_fast: FailFast,
+    /// Whether to exit early on test failure or if test run interrupted.
+    pub early_exit: EarlyExit,
 }
 
 impl TestRunnerConfig {
@@ -558,8 +558,8 @@ impl MultiContractRunnerBuilder {
                 inline_config: Arc::new(InlineConfig::new_parsed(output, &self.config)?),
                 isolation: self.isolation,
                 networks: self.networks,
+                early_exit: EarlyExit::new(self.fail_fast || self.config.show_progress),
                 config: self.config,
-                fail_fast: FailFast::new(self.fail_fast),
             },
             fork: self.fork,
             strategy,
