@@ -1,15 +1,15 @@
 use crate::cmd::{
     access_list::AccessListArgs, artifact::ArtifactArgs, b2e_payload::B2EPayloadArgs,
     bind::BindArgs, call::CallArgs, constructor_args::ConstructorArgsArgs, create2::Create2Args,
-    creation_code::CreationCodeArgs, da_estimate::DAEstimateArgs, estimate::EstimateArgs,
-    find_block::FindBlockArgs, interface::InterfaceArgs, logs::LogsArgs, mktx::MakeTxArgs,
-    rpc::RpcArgs, run::RunArgs, send::SendTxArgs, storage::StorageArgs, txpool::TxPoolSubcommands,
-    wallet::WalletSubcommands,
+    creation_code::CreationCodeArgs, da_estimate::DAEstimateArgs, erc20::Erc20Subcommand,
+    estimate::EstimateArgs, find_block::FindBlockArgs, interface::InterfaceArgs, logs::LogsArgs,
+    mktx::MakeTxArgs, rpc::RpcArgs, run::RunArgs, send::SendTxArgs, storage::StorageArgs,
+    txpool::TxPoolSubcommands, wallet::WalletSubcommands,
 };
 use alloy_ens::NameOrAddress;
 use alloy_primitives::{Address, B256, Selector, U256};
 use alloy_rpc_types::BlockId;
-use clap::{Parser, Subcommand, ValueHint};
+use clap::{ArgAction, Parser, Subcommand, ValueHint};
 use eyre::Result;
 use foundry_cli::opts::{EtherscanOpts, GlobalArgs, RpcOpts};
 use foundry_common::version::{LONG_VERSION, SHORT_VERSION};
@@ -381,11 +381,11 @@ pub enum CastSubcommand {
         block: Option<BlockId>,
 
         /// If specified, only get the given field of the block.
-        #[arg(long, short)]
-        field: Option<String>,
+        #[arg(short, long = "field", aliases = ["fields"], num_args = 0.., action = ArgAction::Append, value_delimiter = ',')]
+        fields: Vec<String>,
 
         /// Print the raw RLP encoded block header.
-        #[arg(long, conflicts_with = "field")]
+        #[arg(long, conflicts_with = "fields")]
         raw: bool,
 
         #[arg(long, env = "CAST_FULL_BLOCK")]
@@ -1142,6 +1142,13 @@ pub enum CastSubcommand {
     /// Estimates the data availability size of a given opstack block.
     #[command(name = "da-estimate")]
     DAEstimate(DAEstimateArgs),
+
+    /// ERC20 token operations.
+    #[command(visible_alias = "erc20")]
+    Erc20Token {
+        #[command(subcommand)]
+        command: Erc20Subcommand,
+    },
 }
 
 impl CastSubcommand {
@@ -1195,7 +1202,7 @@ impl CastSubcommand {
             Self::Age { block: _, rpc: _ } => "age",
             Self::Balance { block: _, who: _, ether: _, rpc: _, erc20: _ } => "balance",
             Self::BaseFee { block: _, rpc: _ } => "base-fee",
-            Self::Block { block: _, full: _, field: _, rpc: _, raw: _ } => "block",
+            Self::Block { block: _, full: _, fields: _, rpc: _, raw: _ } => "block",
             Self::BlockNumber { rpc: _, block: _ } => "block-number",
             Self::Chain { rpc: _ } => "chain",
             Self::ChainId { rpc: _ } => "chain-id",
@@ -1260,6 +1267,7 @@ impl CastSubcommand {
             Self::Pad { .. } => "pad",
             Self::B2EPayload(_) => "b2e-payload",
             Self::AbiEncodeEvent { sig: _, args: _ } => "abi-encode-event",
+            Self::Erc20Token { command: _ } => "erc20-token",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()
     }

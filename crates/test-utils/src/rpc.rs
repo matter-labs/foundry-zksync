@@ -7,9 +7,12 @@ use foundry_config::{
     RpcEndpointUrl, RpcEndpoints,
 };
 use rand::seq::SliceRandom;
-use std::sync::{
-    LazyLock,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    env,
+    sync::{
+        LazyLock,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 macro_rules! shuffled_list {
@@ -51,8 +54,7 @@ shuffled_list!(
     vec![
         //
         "reth-ethereum.ithaca.xyz/rpc",
-        "reth-ethereum-full.ithaca.xyz/rpc",
-        // "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
+        // "reth-ethereum-full.ithaca.xyz/rpc",
     ],
 );
 shuffled_list!(
@@ -68,8 +70,7 @@ shuffled_list!(
     vec![
         //
         "reth-ethereum.ithaca.xyz/ws",
-        "reth-ethereum-full.ithaca.xyz/ws",
-        // "eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H",
+        // "reth-ethereum-full.ithaca.xyz/ws",
     ],
 );
 
@@ -220,7 +221,10 @@ fn next_archive_url(is_ws: bool) -> String {
 
 /// Returns the next etherscan api key.
 pub fn next_etherscan_api_key() -> String {
-    let key = ETHERSCAN_KEYS.next().to_string();
+    let mut key = env::var("ETHERSCAN_KEY").unwrap_or_default();
+    if key.is_empty() {
+        key = ETHERSCAN_KEYS.next().to_string();
+    }
     test_debug!("next_etherscan_api_key() = {}...", &key[..6]);
     key
 }
@@ -249,6 +253,13 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
         return "https://celo.drpc.org".to_string();
     }
 
+    if matches!(chain, Arbitrum) {
+        let rpc_url = env::var("ARBITRUM_RPC").unwrap_or_default();
+        if !rpc_url.is_empty() {
+            return rpc_url;
+        }
+    }
+
     let reth_works = true;
     let domain = if reth_works && matches!(chain, Mainnet) {
         // NOTE(zk): we try to incorporate our own custom URLs to avoid rate limiting
@@ -268,8 +279,8 @@ fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
         let key = DRPC_KEYS.next();
         let network = match chain {
             Mainnet => "ethereum",
-            Arbitrum => "arbitrum",
             Polygon => "polygon",
+            Arbitrum => "arbitrum",
             Sepolia => "sepolia",
             _ => "",
         };

@@ -378,6 +378,7 @@ contract InvariantSelectorsWeightTest is Test {
 // Tests original and new counterexample lengths are displayed on failure.
 // Tests switch from regular sequence output to solidity.
 forgetest_init!(invariant_sequence_len, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.update_config(|config| {
         config.fuzz.seed = Some(U256::from(10u32));
     });
@@ -913,6 +914,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 
 // <https://github.com/foundry-rs/foundry/issues/11453>
 forgetest_init!(corpus_dir, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.update_config(|config| {
         config.invariant.runs = 10;
         config.invariant.depth = 10;

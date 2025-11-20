@@ -1,3 +1,5 @@
+use std::{path::PathBuf, str::FromStr, time::Duration};
+
 use crate::{
     Cast,
     tx::{self, CastTxBuilder},
@@ -17,10 +19,10 @@ use foundry_cli::{
     utils,
     utils::LoadConfig,
 };
-use std::{path::PathBuf, str::FromStr};
 
 mod zksync;
 use zksync::send_zk_transaction;
+
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
 pub struct SendTxArgs {
@@ -41,9 +43,18 @@ pub struct SendTxArgs {
     #[arg(id = "async", long = "async", alias = "cast-async", env = "CAST_ASYNC")]
     cast_async: bool,
 
+    /// Wait for transaction receipt synchronously instead of polling.
+    /// Note: uses `eth_sendTransactionSync` which may not be supported by all clients.
+    #[arg(long, conflicts_with = "async")]
+    sync: bool,
+
     /// The number of confirmations until the receipt is fetched.
     #[arg(long, default_value = "1")]
     confirmations: u64,
+
+    /// Polling interval for transaction receipts (in seconds).
+    #[arg(long, alias = "poll-interval", env = "ETH_POLL_INTERVAL")]
+    poll_interval: Option<u64>,
 
     #[command(subcommand)]
     command: Option<SendTxSubcommands>,
@@ -105,6 +116,7 @@ impl SendTxArgs {
             to,
             mut sig,
             cast_async,
+            sync,
             mut args,
             tx,
             confirmations,
@@ -114,6 +126,7 @@ impl SendTxArgs {
             timeout,
             zk_tx,
             zk_force,
+            poll_interval,
         } = self;
 
         let blob_data = if let Some(path) = path { Some(std::fs::read(path)?) } else { None };
@@ -154,6 +167,10 @@ impl SendTxArgs {
 
         let provider = utils::get_provider(&config)?;
 
+        if let Some(interval) = poll_interval {
+            provider.client().set_poll_interval(Duration::from_secs(interval))
+        }
+
         let builder = CastTxBuilder::new(&provider, tx, &config)
             .await?
             .with_to(to)
@@ -168,7 +185,7 @@ impl SendTxArgs {
         // Default to sending via eth_sendTransaction if the --unlocked flag is passed.
         // This should be the only way this RPC method is used as it requires a local node
         // or remote RPC with unlocked accounts.
-        if unlocked {
+        if unlocked && !eth.wallet.browser {
             // only check current chain id if it was specified in the config
             if let Some(config_chain) = config.chain {
                 let current_chain_id = provider.get_chain_id().await?;
@@ -190,7 +207,7 @@ impl SendTxArgs {
 
             let (tx, _) = builder.build(config.sender).await?;
 
-            cast_send(provider, tx, cast_async, confirmations, timeout).await
+            cast_send(provider, tx, cast_async, sync, confirmations, timeout).await
         // Case 2:
         // An option to use a local signer was provided.
         // If we cannot successfully instantiate a local signer, then we will assume we don't have
@@ -229,7 +246,7 @@ impl SendTxArgs {
                     .wallet(wallet)
                     .connect_provider(&provider);
 
-                cast_send(provider, tx, cast_async, confirmations, timeout).await
+                cast_send(provider, tx, cast_async, sync, confirmations, timeout).await
             }
         }
     }
@@ -239,15 +256,20 @@ async fn cast_send<P: Provider<AnyNetwork>>(
     provider: P,
     tx: WithOtherFields<TransactionRequest>,
     cast_async: bool,
+    sync: bool,
     confs: u64,
     timeout: u64,
 ) -> Result<()> {
-    let cast = Cast::new(provider);
-    let pending_tx = cast.send(tx).await?;
-
-    let tx_hash = pending_tx.inner().tx_hash();
-
-    handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
+    let cast = Cast::new(&provider);
+    if sync {
+        let receipt = cast.send_sync(tx).await?;
+        sh_println!("{receipt}")?;
+        Ok(())
+    } else {
+        let pending_tx = cast.send(tx.clone()).await?;
+        let tx_hash = pending_tx.inner().tx_hash();
+        handle_transaction_result(&cast, &tx_hash, cast_async, confs, timeout).await
+    }
 }
 
 async fn handle_transaction_result<P: Provider<AnyNetwork>>(
@@ -264,6 +286,5 @@ async fn handle_transaction_result<P: Provider<AnyNetwork>>(
             cast.receipt(format!("{tx_hash:#x}"), None, confs, Some(timeout), false).await?;
         sh_println!("{receipt}")?;
     }
-
     Ok(())
 }
