@@ -1,56 +1,56 @@
 use std::sync::Arc;
 
-use alloy_primitives::{Address, B256, Bytes, TxKind, U256, map::HashMap};
+use alloy_primitives::{map::HashMap, Address, Bytes, TxKind, B256, U256};
 use alloy_rpc_types::{
-    BlobTransactionSidecar,
     request::{TransactionInput, TransactionRequest},
     serde_helpers::WithOtherFields,
+    BlobTransactionSidecar,
 };
 use foundry_cheatcodes::{
-    Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Result,
-    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
     journaled_account,
     strategy::{
         CheatcodeInspectorStrategyContext, CheatcodeInspectorStrategyExt,
         CheatcodeInspectorStrategyRunner, EvmCheatcodeInspectorStrategyRunner,
     },
+    Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Result,
+    Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
-    Env,
     backend::{DatabaseError, LocalForkId},
     constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE},
+    Env,
 };
-use foundry_evm_core::{Ecx, backend::DatabaseExt};
+use foundry_evm_core::{backend::DatabaseExt, Ecx};
 use foundry_zksync_core::{
-    ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, PaymasterParams,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key,
     state::parse_full_nonce,
+    PaymasterParams, ZkTransactionMetadata, ACCOUNT_CODE_STORAGE_ADDRESS,
+    CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC, KNOWN_CODES_STORAGE_ADDRESS,
+    L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY,
 };
 use itertools::Itertools;
 use revm::{
     bytecode::opcode as op,
     context::{
-        CreateScheme, JournalTr,
         result::{ExecutionResult, Output},
+        CreateScheme, JournalTr,
     },
     context_interface::transaction::SignedAuthorization,
     interpreter::{
-        CallInput, CallInputs, CallOutcome, CreateOutcome, Gas, InstructionResult, Interpreter,
-        InterpreterResult, interpreter_types::Jumps,
+        interpreter_types::Jumps, CallInput, CallInputs, CallOutcome, CreateOutcome, Gas,
+        InstructionResult, Interpreter, InterpreterResult,
     },
     primitives::{HashSet, KECCAK_EMPTY},
     state::{AccountInfo, Bytecode, EvmStorageSlot},
 };
 use tracing::{debug, error, info, trace, warn};
 use zksync_types::{
-    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, H256, SYSTEM_CONTEXT_ADDRESS,
     block::{pack_block_info, unpack_block_info},
     utils::{decompose_full_nonce, nonces_to_full_nonce},
+    CURRENT_VIRTUAL_BLOCK_INFO_POSITION, H256, SYSTEM_CONTEXT_ADDRESS,
 };
 
 use crate::cheatcode::context::ZksyncCheatcodeInspectorStrategyContext;
@@ -1004,8 +1004,6 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
         let ctx = get_context(ctx);
         ctx.persisted_factory_deps
             .extend(factory_deps.into_iter().map(|(hash, bytecode)| (H256(hash.0), bytecode)));
-
-        ctx.persisted_factory_deps.keys().for_each(|h| println!("\t{h:?}"));
     }
 }
 
