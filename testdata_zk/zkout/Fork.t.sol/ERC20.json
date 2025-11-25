@@ -1,1 +1,0 @@
-{"abi":[{"type":"function","name":"decimals","inputs":[],"outputs":[{"name":"","type":"uint8","internalType":"uint8"}],"stateMutability":"nonpayable"}],"storageLayout":{"storage":[],"types":{}},"userdoc":{},"devdoc":{},"methodIdentifiers":{},"factoryDependencies":{},"factoryDependenciesUnlinked":[],"id":5}

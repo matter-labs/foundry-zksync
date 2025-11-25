@@ -1,1 +1,0 @@
-{"abi":[{"type":"function","name":"call","inputs":[{"name":"_value","type":"uint8","internalType":"uint8"}],"outputs":[],"stateMutability":"nonpayable"}],"storageLayout":{"storage":[],"types":{}},"userdoc":{},"devdoc":{},"methodIdentifiers":{},"factoryDependencies":{},"factoryDependenciesUnlinked":[],"id":4}
