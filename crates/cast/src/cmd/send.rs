@@ -268,7 +268,7 @@ async fn cast_send<P: Provider<AnyNetwork>>(
     } else {
         let pending_tx = cast.send(tx.clone()).await?;
         let tx_hash = pending_tx.inner().tx_hash();
-        handle_transaction_result(&cast, &tx_hash, cast_async, confs, timeout).await
+        handle_transaction_result(&cast, tx_hash, cast_async, confs, timeout).await
     }
 }
 
