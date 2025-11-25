@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use alloy_evm::eth::EthEvmContext;
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Ok, Result};
 use foundry_evm::{
@@ -19,7 +19,11 @@ use foundry_evm_core::{
         strategy::{BackendStrategyForkInfo, BackendStrategyRunner, EvmBackendStrategyRunner},
     },
 };
-use revm::{DatabaseCommit, context::result::ResultAndState, primitives::HashSet};
+use revm::{
+    DatabaseCommit,
+    context::result::ResultAndState,
+    primitives::{HashMap, HashSet},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::backend::{
@@ -251,6 +255,18 @@ impl BackendStrategyRunnerExt for ZksyncBackendStrategyRunner {
             .entry(addr)
             .and_modify(|entry| entry.extend(&keys))
             .or_insert(keys);
+    }
+
+    fn zksync_get_persisted_factory_deps(
+        &self,
+        ctx: &mut dyn BackendStrategyContext,
+    ) -> HashMap<B256, Vec<u8>> {
+        let ctx = get_context(ctx);
+        ctx.persisted_factory_deps
+            .clone()
+            .into_iter()
+            .map(|(hash, code)| (B256::from(hash.0), code))
+            .collect()
     }
 }
 
