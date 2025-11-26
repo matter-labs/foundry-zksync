@@ -1489,9 +1489,6 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
         if self.strategy.runner.pre_step_end(self.strategy.context.as_mut(), interpreter, ecx) {
             return;
         }
-        if self.broadcast.is_some() {
-            self.set_gas_limit_type(interpreter);
-        }
 
         if self.gas_metering.paused {
             self.meter_gas_end(interpreter);

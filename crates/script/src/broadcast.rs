@@ -130,23 +130,6 @@ impl<'a> SendTransactionKind<'a> {
             // gas to be re-estimated right before broadcasting.
             if !is_fixed_gas_limit && estimate_via_rpc && zk_tx_meta.is_none() {
                 estimate_gas(tx, provider, estimate_multiplier).await?;
-            } else if zk_tx_meta.is_none() {
-                // Note(zk): If we are not re-estimating gas via RPC but have a fixed gas limit (for
-                // example because it was set from simulation), ensure it does not exceed the
-                // current block gas limit of the connected node (e.g. Anvil) to avoid
-                // `intrinsic gas too high -- tx.gas_limit > env.block.gas_limit` errors.
-                if let Some(tx_gas) = tx.gas
-                    && let Ok(Some(block)) = provider.get_block(BlockId::latest()).await
-                {
-                    let block_gas_limit = block.header.gas_limit;
-                    if tx_gas > block_gas_limit {
-                        debug!(
-                            tx_gas,
-                            block_gas_limit, "Capping tx gas limit to current block gas limit"
-                        );
-                        tx.set_gas_limit(block_gas_limit);
-                    }
-                }
             }
         }
 
