@@ -1221,7 +1221,9 @@ Ran 1 test suite [ELAPSED]: 0 tests passed, 1 failed, 0 skipped (1 total tests)
 });
 
 forgetest_init!(
-    #[cfg_attr(windows, ignore = "for some reason there's different rng")]
+    // Note(zk): we ignore this test because it fails inconsistently in foundry
+    // zksync and foundry upstream, both locally and on CI.
+    #[ignore]
     invariant_shrink_big_sequence,
     |prj, cmd| {
         prj.update_config(|config| {
