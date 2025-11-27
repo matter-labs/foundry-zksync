@@ -88,7 +88,6 @@ forgetest!(can_clean_non_existing, |prj, cmd| {
 
 // checks that `clean` doesn't output warnings
 forgetest_init!(can_clean_without_warnings, |prj, cmd| {
-    prj.wipe_contracts();
     prj.add_source(
         "Simple.sol",
         r#"
@@ -922,6 +921,7 @@ forgetest!(can_clean_hardhat, PathStyle::HardHat, |prj, cmd| {
 
 // checks that `clean` also works with the "out" value set in Config
 forgetest_init!(can_clean_config, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.update_config(|config| config.out = "custom-out".into());
     cmd.arg("build").assert_success().stdout_eq(str![[r#"
 [COMPILING_FILES] with [SOLC_VERSION]
@@ -940,6 +940,7 @@ Compiler run successful!
 
 // checks that `clean` removes fuzz and invariant cache dirs
 forgetest_init!(can_clean_test_cache, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.update_config(|config| {
         config.fuzz = FuzzConfig::new("cache/fuzz".into());
         config.invariant = InvariantConfig::new("cache/invariant".into());
@@ -960,6 +961,7 @@ forgetest_init!(can_clean_test_cache, |prj, cmd| {
 
 // checks that extra output works
 forgetest_init!(can_emit_extra_output, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.clear();
 
     cmd.args(["build", "--extra-output", "metadata"]).assert_success().stdout_eq(str![[r#"
@@ -992,6 +994,7 @@ Compiler run successful!
 
 // checks that extra output works
 forgetest_init!(can_emit_multiple_extra_output, |prj, cmd| {
+    prj.initialize_default_contracts();
     cmd.args([
         "build",
         "--extra-output",
@@ -2544,6 +2547,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 
 // <https://github.com/foundry-rs/foundry/issues/9115>
 forgetest_init!(gas_report_with_fallback, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.add_test(
         "DelegateProxyTest.sol",
         r#"
@@ -2686,6 +2690,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 
 // <https://github.com/foundry-rs/foundry/issues/9858>
 forgetest_init!(gas_report_fallback_with_calldata, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.add_test(
         "FallbackWithCalldataTest.sol",
         r#"
@@ -2785,6 +2790,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 // <https://github.com/foundry-rs/foundry/issues/9300>
 // NOTE(zk): gas values differ slightly from upstream due to fork-specific differences
 forgetest_init!(gas_report_size_for_nested_create, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.add_test(
         "NestedDeployTest.sol",
         r#"
@@ -2928,6 +2934,7 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 });
 
 forgetest_init!(can_use_absolute_imports, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.update_config(|config| {
         let remapping = prj.paths().libraries[0].join("myDependency");
         config.remappings = vec![
@@ -2973,6 +2980,7 @@ Compiler run successful!
 
 // <https://github.com/foundry-rs/foundry/issues/3440>
 forgetest_init!(can_use_absolute_imports_from_test_and_script, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.add_script(
         "IMyScript.sol",
         r"
@@ -3014,7 +3022,8 @@ Compiler run successful!
 });
 
 // checks `forge inspect <contract> irOptimized works
-forgetest_init!(can_inspect_ir_optimized, |_prj, cmd| {
+forgetest_init!(can_inspect_ir_optimized, |prj, cmd| {
+    prj.initialize_default_contracts();
     cmd.args(["inspect", TEMPLATE_CONTRACT, "irOptimized"]);
     cmd.assert_success().stdout_eq(str![[r#"
 /// @use-src 0:"src/Counter.sol"
@@ -3039,7 +3048,8 @@ object "Counter_21" {
 });
 
 // checks `forge inspect <contract> irOptimized works
-forgetest_init!(can_inspect_ir, |_prj, cmd| {
+forgetest_init!(can_inspect_ir, |prj, cmd| {
+    prj.initialize_default_contracts();
     cmd.args(["inspect", TEMPLATE_CONTRACT, "ir"]);
     cmd.assert_success().stdout_eq(str![[r#"
 
@@ -3065,6 +3075,7 @@ object "Counter_21" {
 
 // checks forge bind works correctly on the default project
 forgetest_init!(can_bind, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.clear();
 
     cmd.arg("bind").assert_success().stdout_eq(str![[r#"
@@ -3079,6 +3090,7 @@ Bindings have been generated to [..]
 
 // checks that extra output works
 forgetest_init!(can_build_skip_contracts, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.clear();
 
     // Only builds the single template contract `src/*`
@@ -3099,6 +3111,7 @@ No files changed, compilation skipped
 });
 
 forgetest_init!(can_build_skip_glob, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.add_test(
         "Foo",
         r"
@@ -3129,8 +3142,7 @@ Compiler run successful!
 "#]]);
 });
 
-forgetest_init!(can_build_specific_paths, |prj, cmd| {
-    prj.wipe();
+forgetest!(can_build_specific_paths, |prj, cmd| {
     prj.add_source(
         "Counter.sol",
         r"
@@ -3203,6 +3215,7 @@ Error: No source files found in specified build paths.
 
 // checks that build --sizes includes all contracts even if unchanged
 forgetest_init!(can_build_sizes_repeatedly, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.clear_cache();
 
     cmd.args(["build", "--sizes"]).assert_success().stdout_eq(str![[r#"
@@ -3242,6 +3255,7 @@ forgetest_init!(can_build_sizes_repeatedly, |prj, cmd| {
 
 // checks that build --names includes all contracts even if unchanged
 forgetest_init!(can_build_names_repeatedly, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.clear_cache();
 
     cmd.args(["build", "--names"]).assert_success().stdout_eq(str![[r#"
@@ -3261,6 +3275,7 @@ Compiler run successful!
 });
 
 forgetest_init!(can_inspect_counter_pretty, |prj, cmd| {
+    prj.initialize_default_contracts();
     cmd.args(["inspect", "src/Counter.sol:Counter", "abi"]).assert_success().stdout_eq(str![[r#"
 
 ╭----------+---------------------------------+------------╮
@@ -3556,6 +3571,7 @@ forgetest!(inspect_custom_counter_very_huge_method_identifiers_unwrapped, |prj, 
 });
 
 forgetest_init!(can_inspect_standard_json, |prj, cmd| {
+    prj.initialize_default_contracts();
     cmd.args(["inspect", "src/Counter.sol:Counter", "standard-json"]).assert_success().stdout_eq(str![[r#"
 {
   "language": "Solidity",
@@ -3603,6 +3619,7 @@ forgetest_init!(can_inspect_standard_json, |prj, cmd| {
 });
 
 forgetest_init!(can_inspect_libraries, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.add_source(
         "Source.sol",
         r#"
@@ -3639,6 +3656,7 @@ Dynamically linked libraries:
 
 // checks that `clean` also works with the "out" value set in Config
 forgetest_init!(gas_report_include_tests, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.update_config(|config| {
         config.gas_reports_include_tests = true;
         config.fuzz.runs = 1;
@@ -3822,6 +3840,7 @@ contract FooBarTest is DSTest {
 
 // <https://github.com/foundry-rs/foundry/issues/5847>
 forgetest_init!(can_bind_enum_modules, |prj, cmd| {
+    prj.initialize_default_contracts();
     prj.clear();
 
     prj.add_source(
@@ -3853,7 +3872,10 @@ Bindings have been generated to [..]"#
 
 // forge bind e2e
 forgetest_init!(can_bind_e2e, |prj, cmd| {
-    cmd.args(["bind"]).assert_success().stdout_eq(str![[r#"No files changed, compilation skipped
+    prj.initialize_default_contracts();
+    cmd.args(["bind"]).assert_success().stdout_eq(str![[r#"[COMPILING_FILES] with [SOLC_VERSION]
+[SOLC_VERSION] [ELAPSED]
+Compiler run successful!
 Generating bindings for 2 contracts
 Bindings have been generated to [..]"#]]);
 
@@ -3865,7 +3887,6 @@ Bindings have been generated to [..]"#]]);
         .current_dir(&bindings_path)
         .output()
         .expect("Failed to run cargo build");
-    // RUn `cargo build`
 
     assert!(out.status.success(), "Cargo build should succeed");
 });

@@ -10,7 +10,7 @@ use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, U256 as rU256, map::HashMap};
 use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
 use foundry_cheatcodes_common::record::RecordAccess;
-use revm::{Database, context::JournalTr, state::Account};
+use revm::{Database, context::JournalTr};
 use zksync_basic_types::{H160, H256, L2ChainId, U256};
 use zksync_types::{
     AccountTreeId, CREATE2_FACTORY_ADDRESS, StorageKey, StorageLog, StorageValue, get_code_key,
@@ -243,8 +243,8 @@ where
     }
 
     /// Load an account into the journaled state.
-    pub fn load_account(&mut self, address: Address) -> &mut Account {
-        self.ecx.journaled_state.load_account(address).expect("account could not be loaded").data
+    pub fn load_account(&mut self, address: Address) {
+        self.ecx.journaled_state.load_account(address).expect("account could not be loaded");
     }
 
     /// Load an storage slot into the journaled state.

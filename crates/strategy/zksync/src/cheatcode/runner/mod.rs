@@ -22,7 +22,7 @@ use foundry_evm::{
     backend::{DatabaseError, LocalForkId},
     constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE},
 };
-use foundry_evm_core::{Ecx, backend::DatabaseExt};
+use foundry_evm_core::{ContextExt, Ecx, backend::DatabaseExt};
 use foundry_zksync_core::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
     KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, PaymasterParams,
@@ -546,14 +546,11 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             return None;
         }
 
+        let (db, journal, _) = ecx.as_db_env_and_journal();
         if let Some(CreateScheme::Create) = input.scheme() {
             let caller = input.caller();
-            let nonce = ecx
-                .journaled_state
-                .load_account(input.caller())
-                .expect("to load caller account")
-                .info
-                .nonce;
+            let nonce =
+                journal.load_account(db, caller).expect("to load caller account").info.nonce;
             let address = caller.create(nonce);
             if ecx
                 .journaled_state
@@ -905,6 +902,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                                     gas,
                                 },
                                 memory_offset: call.return_memory_offset.clone(),
+                                was_precompile_called: false,
+                                precompile_call_logs: vec![],
                             }),
                             _ => Some(CallOutcome {
                                 result: InterpreterResult {
@@ -913,6 +912,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                                     gas,
                                 },
                                 memory_offset: call.return_memory_offset.clone(),
+                                was_precompile_called: false,
+                                precompile_call_logs: vec![],
                             }),
                         }
                     }
@@ -925,6 +926,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                                 gas,
                             },
                             memory_offset: call.return_memory_offset.clone(),
+                            was_precompile_called: false,
+                            precompile_call_logs: vec![],
                         })
                     }
                     ExecutionResult::Halt { .. } => Some(CallOutcome {
@@ -934,6 +937,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                             gas,
                         },
                         memory_offset: call.return_memory_offset.clone(),
+                        was_precompile_called: false,
+                        precompile_call_logs: vec![],
                     }),
                 }
             }
@@ -948,6 +953,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                         gas,
                     },
                     memory_offset: call.return_memory_offset.clone(),
+                    was_precompile_called: false,
+                    precompile_call_logs: vec![],
                 })
             }
         }

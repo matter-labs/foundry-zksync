@@ -7,7 +7,7 @@ use foundry_compilers::{
     solc::{SOLC_EXTENSIONS, SolcLanguage, SolcVersionedInput},
 };
 use rayon::prelude::*;
-use solar::sema::ParsingContext;
+use solar::{interface::MIN_SOLIDITY_VERSION, sema::ParsingContext};
 use std::{
     collections::{HashSet, VecDeque},
     path::{Path, PathBuf},
@@ -192,4 +192,82 @@ fn configure_pcx_from_solc_cli(
         });
     }
     pcx.file_resolver.add_include_paths(cli_settings.include_paths.iter().cloned());
+}
+
+/// Extracts Solar-compatible sources from a [`ProjectCompileOutput`].
+///
+/// # Note:
+/// uses `output.graph().source_files()` and `output.artifact_ids()` rather than `output.sources()`
+/// because sources aren't populated when build is skipped when there are no changes in the source
+/// code. <https://github.com/foundry-rs/foundry/issues/12018>
+pub fn get_solar_sources_from_compile_output(
+    config: &Config,
+    output: &ProjectCompileOutput,
+    target_paths: Option<&[PathBuf]>,
+) -> Result<SolcVersionedInput> {
+    let is_solidity_file = |path: &Path| -> bool {
+        path.extension().and_then(|s| s.to_str()).is_some_and(|ext| SOLC_EXTENSIONS.contains(&ext))
+    };
+
+    // Collect source path targets
+    let mut source_paths: HashSet<PathBuf> = if let Some(targets) = target_paths
+        && !targets.is_empty()
+    {
+        let mut source_paths = HashSet::new();
+        let mut queue: VecDeque<PathBuf> = targets
+            .iter()
+            .filter_map(|path| {
+                is_solidity_file(path).then(|| dunce::canonicalize(path).ok()).flatten()
+            })
+            .collect();
+
+        while let Some(path) = queue.pop_front() {
+            if source_paths.insert(path.clone()) {
+                for import in output.graph().imports(path.as_path()) {
+                    queue.push_back(import.to_path_buf());
+                }
+            }
+        }
+
+        source_paths
+    } else {
+        output
+            .graph()
+            .source_files()
+            .filter_map(|idx| {
+                let path = output.graph().node_path(idx).to_path_buf();
+                is_solidity_file(&path).then_some(path)
+            })
+            .collect()
+    };
+
+    // Read all sources and find the latest version.
+    let (version, sources) = {
+        let (mut max_version, mut sources) = (MIN_SOLIDITY_VERSION, Sources::new());
+        for (id, _) in output.artifact_ids() {
+            if let Ok(path) = dunce::canonicalize(&id.source)
+                && source_paths.remove(&path)
+            {
+                if id.version < MIN_SOLIDITY_VERSION {
+                    continue;
+                } else if max_version < id.version {
+                    max_version = id.version;
+                };
+
+                let source = Source::read(&path)?;
+                sources.insert(path, source);
+            }
+        }
+
+        (max_version, sources)
+    };
+
+    let solc = SolcVersionedInput::build(
+        sources,
+        config.solc_settings()?,
+        SolcLanguage::Solidity,
+        version,
+    );
+
+    Ok(solc)
 }

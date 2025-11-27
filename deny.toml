@@ -25,7 +25,7 @@ ignore = [
     "RUSTSEC-2025-0098",
     # https://rustsec.org/advisories/RUSTSEC-2025-0104 unic-ucd-segment
     "RUSTSEC-2025-0104",
-    # https://rustsec.org/advisories/RUSTSEC-2025-0119 number_prefix unmaintained
+    # https://rustsec.org/advisories/RUSTSEC-2025-0119 number_prefix is unmaintained
     "RUSTSEC-2025-0119",
 ]
 
