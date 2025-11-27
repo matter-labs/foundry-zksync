@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: ${{ env.TARGET_RUST_VERSION }}
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: nightly-2025-03-19 # Required for unstable features in rustfmt
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -82,7 +82,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: codespell-project/actions-codespell@v2
         with:
           skip: "*.json"
@@ -92,7 +92,7 @@ jobs:
     runs-on: ubuntu-24.04-github-hosted-16core
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
         with:
           toolchain: ${{ env.TARGET_RUST_VERSION }}
@@ -109,7 +109,7 @@ jobs:
       ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           ref: ${{ github.event.pull_request.head.sha }}
@@ -152,7 +152,7 @@ jobs:
     name: CI install
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install foundry-zksync
         run: cp ./install-foundry-zksync ./foundryup-zksync/* /tmp/ && cd /tmp && ./install-foundry-zksync
       - name: Verify installation
@@ -162,7 +162,7 @@ jobs:
     name: CI install anvil-zksync
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install foundry-zksync
         run: |
@@ -179,7 +179,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: recursive
           ref: ${{ github.event.pull_request.head.sha }}
