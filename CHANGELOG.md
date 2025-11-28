@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.0](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.32...foundry-zksync-v0.1.0) (2025-11-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **fmt:** PrecompileFactory::precompiles() now returns Vec<(Address, DynPrecompile)> instead of Vec<(Precompile, u64)>
+
+### Features
+
+* **anvil:** add `eth_fillTransaction` support ([#12595](https://github.com/matter-labs/foundry-zksync/issues/12595)) ([16cf9fb](https://github.com/matter-labs/foundry-zksync/commit/16cf9fb60791ae823752a8de9e4c871b7d9c0229))
+* **forge:** exit test gracefully if show progress ([32b52f4](https://github.com/matter-labs/foundry-zksync/commit/32b52f4d71251d23bf0f34db348523b4b030973d))
+
+
+### Bug Fixes
+
+* **`ci`:** ignore `number_prefix` is unmaintained in `cargo deny` ([#12598](https://github.com/matter-labs/foundry-zksync/issues/12598)) ([72e08ef](https://github.com/matter-labs/foundry-zksync/commit/72e08efe9fa21eb97db4a56bc0b5732735a3ddc4))
+* `eth_fillTransaction` response ([#12597](https://github.com/matter-labs/foundry-zksync/issues/12597)) ([005e737](https://github.com/matter-labs/foundry-zksync/commit/005e737318b486da181b31ecbd05b44732f0e344))
+* **common:** spurious detection off-by-one and add threshold test ([32b52f4](https://github.com/matter-labs/foundry-zksync/commit/32b52f4d71251d23bf0f34db348523b4b030973d))
+* **fmt:** asm inline if stmt ([32b52f4](https://github.com/matter-labs/foundry-zksync/commit/32b52f4d71251d23bf0f34db348523b4b030973d))
+* **npm:** forward termination signals to child process ([32b52f4](https://github.com/matter-labs/foundry-zksync/commit/32b52f4d71251d23bf0f34db348523b4b030973d))
+* persist factory_deps when deploying libs ([#1201](https://github.com/matter-labs/foundry-zksync/issues/1201)) ([761ad45](https://github.com/matter-labs/foundry-zksync/commit/761ad450bc425918d7ab70caa1ff10787943713f))
+* update progress on rejected runs ([32b52f4](https://github.com/matter-labs/foundry-zksync/commit/32b52f4d71251d23bf0f34db348523b4b030973d))
+
 ## [0.0.32](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.31...foundry-zksync-v0.0.32) (2025-11-17)
 
 
