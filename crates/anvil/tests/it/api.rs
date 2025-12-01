@@ -456,8 +456,7 @@ async fn can_send_tx_sync() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-// Note(zk): This test is failing on our CI because Alchemy does not support `debug_code_by_hash`
-#[ignore]
+#[ignore = "no debug_"]
 async fn can_get_code_by_hash() {
     let (api, _) =
         spawn(NodeConfig::test().with_eth_rpc_url(Some(rpc::next_http_archive_rpc_url()))).await;
