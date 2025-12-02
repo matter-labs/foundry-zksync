@@ -806,6 +806,8 @@ impl<'a> FunctionRunner<'a> {
                 .map(|seq| {
                     seq.show_solidity = show_solidity;
                     BasicTxDetails {
+                        warp: seq.warp,
+                        roll: seq.roll,
                         sender: seq.sender.unwrap_or_default(),
                         call_details: CallDetails {
                             target: seq.addr.unwrap_or_default(),

@@ -39,8 +39,8 @@ remappings = ["forge-std/=lib/forge-std/src/"]
 auto_detect_remappings = true
 libraries = []
 cache = true
-dynamic_test_linking = false
 cache_path = "cache"
+dynamic_test_linking = false
 snapshots = "snapshots"
 gas_snapshot_check = false
 gas_snapshot_emit = true
@@ -1203,8 +1203,8 @@ forgetest_init!(test_default_config, |prj, cmd| {
   "auto_detect_remappings": true,
   "libraries": [],
   "cache": true,
-  "dynamic_test_linking": false,
   "cache_path": "cache",
+  "dynamic_test_linking": false,
   "snapshots": "snapshots",
   "gas_snapshot_check": false,
   "gas_snapshot_emit": true,
@@ -1296,7 +1296,9 @@ forgetest_init!(test_default_config, |prj, cmd| {
     "show_metrics": true,
     "timeout": null,
     "show_solidity": false,
-    "no_zksync_reserved_addresses": false
+    "no_zksync_reserved_addresses": false,
+    "max_time_delay": null,
+    "max_block_delay": null
   },
   "ffi": false,
   "allow_internal_expect_revert": false,
