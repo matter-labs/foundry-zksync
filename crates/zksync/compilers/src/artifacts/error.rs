@@ -52,17 +52,8 @@ impl fmt::Display for Error {
         // Format the severity level
         styled(f, self.severity.color().bold(), |f| self.fmt_severity(f))?;
 
-        let mut lines = fmtd_msg.lines().peekable();
-
-        // Skip the first line if it contains the same message as severity,
-        // unless it includes a source location (denoted by 3+ colons) something like:
-        // path/to/file:line:column: ErrorType: message
-        if let Some(l) = lines.peek()
-            && l.contains(self.severity.to_string().as_str())
-            && l.bytes().filter(|b| *b == b':').count() < 3
-        {
-            lines.next();
-        }
+        let mut lines =
+            fmtd_msg.trim_start_matches(&format!("{}: ", self.severity)).lines().peekable();
 
         // Format the main source location
         fmt_source_location(f, &mut lines)?;
@@ -254,4 +245,34 @@ where
         style.fmt_suffix(f)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use yansi::Paint;
+
+    use super::*;
+
+    #[test]
+    fn test_error_msg_strips_serverity() {
+        let error = Error {
+            severity: Severity::Error,
+            error_code: Some(3),
+            formatted_message: Some(
+                "Error: Something went wrong\n--> src/lib/Error.sol:10:1".into(),
+            ),
+            message: Default::default(),
+            source_location: Default::default(),
+            component: Default::default(),
+            r#type: Default::default(),
+        };
+
+        let expected = format!(
+            "{}\nSomething went wrong\n--> src/lib/Error.sol:10:1",
+            "Error (3)".red().bold()
+        );
+        let actual = error.to_string();
+
+        assert_eq!(expected, actual);
+    }
 }
