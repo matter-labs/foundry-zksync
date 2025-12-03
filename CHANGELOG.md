@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.0...foundry-zksync-v0.1.1) (2025-12-02)
+
+
+### Bug Fixes
+
+* do not skip first line of error ([#1218](https://github.com/matter-labs/foundry-zksync/issues/1218)) ([3cfad84](https://github.com/matter-labs/foundry-zksync/commit/3cfad8400c3a6496d9020c076e9795e6ebbd02c2))
+
 ## [0.1.0](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.32...foundry-zksync-v0.1.0) (2025-11-28)
 
 
