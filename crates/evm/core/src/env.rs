@@ -26,7 +26,12 @@ impl Env {
         Self { evm_env: ZKsyncEnv { inner: EvmEnv { cfg_env: cfg, block_env: block } }, tx }
     }
 
-    pub fn new_with_spec_id(cfg: CfgEnv<ZkSpecId>, block: BlockEnv, tx: ZKsyncTx<TxEnv>, spec_id: ZkSpecId) -> Self {
+    pub fn new_with_spec_id(
+        cfg: CfgEnv<ZkSpecId>,
+        block: BlockEnv,
+        tx: ZKsyncTx<TxEnv>,
+        spec_id: ZkSpecId,
+    ) -> Self {
         let mut cfg = cfg;
         cfg.spec = spec_id;
 
@@ -45,7 +50,9 @@ impl EnvMut<'_> {
     /// Returns a copy of the environment.
     pub fn to_owned(&self) -> Env {
         Env {
-            evm_env: ZKsyncEnv { inner: EvmEnv { cfg_env: self.cfg.to_owned(), block_env: self.block.to_owned() } },
+            evm_env: ZKsyncEnv {
+                inner: EvmEnv { cfg_env: self.cfg.to_owned(), block_env: self.block.to_owned() },
+            },
             tx: self.tx.to_owned(),
         }
     }
@@ -71,9 +78,7 @@ impl AsEnvMut for Env {
     }
 }
 
-impl<DB: Database, J: JournalTr<Database = DB>, C> AsEnvMut
-    for ZkContext<DB, J, C>
-{
+impl<DB: Database, J: JournalTr<Database = DB>, C> AsEnvMut for ZkContext<DB, J, C> {
     fn as_env_mut(&mut self) -> EnvMut<'_> {
         EnvMut { block: &mut self.block, cfg: &mut self.cfg, tx: &mut self.tx }
     }
@@ -87,9 +92,7 @@ pub trait ContextExt {
     ) -> (&mut Self::DB, &mut JournalInner<JournalEntry>, EnvMut<'_>);
 }
 
-impl<DB: Database, C> ContextExt
-    for ZkContext<DB, Journal<DB, JournalEntry>, C>
-{
+impl<DB: Database, C> ContextExt for ZkContext<DB, Journal<DB, JournalEntry>, C> {
     type DB = DB;
 
     fn as_db_env_and_journal(
@@ -102,7 +105,6 @@ impl<DB: Database, C> ContextExt
         )
     }
 }
-
 
 /*
 

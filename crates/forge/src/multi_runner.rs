@@ -29,13 +29,13 @@ use foundry_evm::{
 use foundry_evm_networks::NetworkConfigs;
 use rayon::prelude::*;
 use revm::primitives::hardfork::SpecId;
-use zksync_revm::ZkSpecId;
 use std::{
     collections::BTreeMap,
     path::Path,
     sync::{Arc, mpsc},
     time::Instant,
 };
+use zksync_revm::ZkSpecId;
 
 use foundry_zksync_compilers::compilers::{
     artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,

@@ -8,7 +8,6 @@ use anvil_zksync_traces::{
     build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
     identifier::SignaturesIdentifier, render_trace_arena_inner,
 };
-use zksync_revm::ZkContext;
 use core::convert::Into;
 use foundry_common::sh_println;
 use itertools::Itertools;
@@ -39,6 +38,7 @@ use zksync_multivm::{
     tracers::CallTracer,
     vm_latest::{HistoryDisabled, ToTracerPointer, Vm},
 };
+use zksync_revm::ZkContext;
 use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, PackedEthSignature, StorageKey,
     Transaction, bytecode::BytecodeHash, get_nonce_key, h256_to_address, l2::L2Tx,

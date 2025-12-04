@@ -213,7 +213,9 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(
+                    ecx.tx.base.gas_priority_fee.unwrap_or_default(),
+                ),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
@@ -232,7 +234,9 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(
+                    ecx.tx.base.gas_priority_fee.unwrap_or_default(),
+                ),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
@@ -299,7 +303,9 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(
+                    ecx.tx.base.gas_priority_fee.unwrap_or_default(),
+                ),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
@@ -321,7 +327,9 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(
+                    ecx.tx.base.gas_priority_fee.unwrap_or_default(),
+                ),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),

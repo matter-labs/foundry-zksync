@@ -21,8 +21,8 @@ use revm::{
     primitives::{HashMap as Map, hardfork::SpecId},
     state::{Account, AccountInfo},
 };
-use zksync_revm::ZkSpecId;
 use std::{any::Any, borrow::Cow, collections::BTreeMap};
+use zksync_revm::ZkSpecId;
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
 ///
@@ -55,7 +55,11 @@ pub struct CowBackend<'a> {
 impl<'a> CowBackend<'a> {
     /// Creates a new `CowBackend` with the given `Backend`.
     pub fn new_borrowed(backend: &'a Backend) -> Self {
-        Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: ZkSpecId::default() }
+        Self {
+            backend: Cow::Borrowed(backend),
+            is_initialized: false,
+            spec_id: ZkSpecId::default(),
+        }
     }
 
     /// Executes the configured transaction of the `env` without committing state changes

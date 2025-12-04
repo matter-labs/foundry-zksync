@@ -11,8 +11,8 @@ use foundry_evm_core::{backend::Backend, fork::CreateFork, opts::EvmOpts};
 use foundry_evm_networks::NetworkConfigs;
 use foundry_evm_traces::TraceMode;
 use revm::{primitives::hardfork::SpecId, state::Bytecode};
-use zksync_revm::{IntoZkSpecId, ZkSpecId};
 use std::ops::{Deref, DerefMut};
+use zksync_revm::{IntoZkSpecId, ZkSpecId};
 
 use super::strategy::ExecutorStrategy;
 

@@ -763,9 +763,10 @@ impl Executor {
                         cfg.spec = self.spec_id();
                         cfg
                     },
-                    // We always set the gas price to 0 so we can execute the transaction regardless of
-                    // network conditions - the actual gas price is kept in `self.block` and is applied
-                    // by the cheatcode handler if it is enabled
+                    // We always set the gas price to 0 so we can execute the transaction regardless
+                    // of network conditions - the actual gas price is kept in
+                    // `self.block` and is applied by the cheatcode handler if
+                    // it is enabled
                     block_env: BlockEnv {
                         basefee: 0,
                         gas_limit: self.gas_limit,

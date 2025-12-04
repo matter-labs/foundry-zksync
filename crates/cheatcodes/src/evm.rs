@@ -37,13 +37,13 @@ use revm::{
     primitives::{KECCAK_EMPTY, hardfork::SpecId},
     state::Account,
 };
-use zksync_revm::IntoZkSpecId;
 use std::{
     collections::{BTreeMap, HashSet, btree_map::Entry},
     fmt::Display,
     path::Path,
     str::FromStr,
 };
+use zksync_revm::IntoZkSpecId;
 mod record_debug_step;
 use foundry_common::fmt::format_token_raw;
 use foundry_config::evm_spec_id;

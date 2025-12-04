@@ -43,7 +43,6 @@ use regex::Regex;
 use revm::primitives::hardfork::SpecId;
 use semver::Version;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
-use zksync_revm::{IntoZkSpecId, ZkSpecId};
 use std::{
     borrow::Cow,
     collections::BTreeMap,
@@ -51,6 +50,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use zksync_revm::{IntoZkSpecId, ZkSpecId};
 
 mod macros;
 

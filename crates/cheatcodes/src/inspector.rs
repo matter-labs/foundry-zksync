@@ -57,7 +57,6 @@ use revm::{
     primitives::hardfork::SpecId,
 };
 use serde_json::Value;
-use zksync_revm::{ZkContext, ZkSpecId};
 use std::{
     cmp::max,
     collections::{BTreeMap, VecDeque},
@@ -67,6 +66,7 @@ use std::{
     path::PathBuf,
     sync::{Arc, OnceLock},
 };
+use zksync_revm::{ZkContext, ZkSpecId};
 
 mod utils;
 pub use utils::CommonCreateInput;

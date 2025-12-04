@@ -216,7 +216,8 @@ impl RunArgs {
             env.evm_env.inner.block_env.timestamp = U256::from(block.header.timestamp);
             env.evm_env.inner.block_env.beneficiary = block.header.beneficiary;
             env.evm_env.inner.block_env.difficulty = block.header.difficulty;
-            env.evm_env.inner.block_env.prevrandao = Some(block.header.mix_hash.unwrap_or_default());
+            env.evm_env.inner.block_env.prevrandao =
+                Some(block.header.mix_hash.unwrap_or_default());
             env.evm_env.inner.block_env.basefee = block.header.base_fee_per_gas.unwrap_or_default();
             env.evm_env.inner.block_env.gas_limit = block.header.gas_limit;
 

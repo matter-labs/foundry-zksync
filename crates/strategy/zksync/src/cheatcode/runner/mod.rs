@@ -1071,8 +1071,12 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
         data.block.timestamp = U256::from(block_timestamp);
 
         let test_contract = data.journaled_state.database.get_test_contract_address();
-        for address in
-            data.journaled_state.database.persistent_accounts().into_iter().chain([data.tx.base.caller])
+        for address in data
+            .journaled_state
+            .database
+            .persistent_accounts()
+            .into_iter()
+            .chain([data.tx.base.caller])
         {
             info!(?address, "importing to evm state");
 
@@ -1160,8 +1164,12 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
         let test_contract = data.journaled_state.database.get_test_contract_address();
 
-        for address in
-            data.journaled_state.database.persistent_accounts().into_iter().chain([data.tx.base.caller])
+        for address in data
+            .journaled_state
+            .database
+            .persistent_accounts()
+            .into_iter()
+            .chain([data.tx.base.caller])
         {
             info!(?address, "importing to zk state");
 

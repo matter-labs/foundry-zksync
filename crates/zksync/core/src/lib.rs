@@ -28,9 +28,9 @@ use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU25
 use eyre::eyre;
 use revm::{Database, context::JournalTr};
 use serde::{Deserialize, Serialize};
-use zksync_revm::ZkContext;
 use std::fmt::Debug;
 use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
+use zksync_revm::ZkContext;
 use zksync_types::{Nonce, ProtocolVersionId, bytecode::BytecodeHash};
 
 pub use utils::{fix_l2_gas_limit, fix_l2_gas_price};

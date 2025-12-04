@@ -54,4 +54,3 @@ pub struct EnvMut<'a> {
 pub trait AsEnvMut {
     fn as_env_mut(&mut self) -> EnvMut<'_>;
 }
-
