@@ -34,6 +34,7 @@ zksync_types.workspace = true
 
 eyre.workspace = true
 revm.workspace = true
+zksync-revm.workspace = true
 itertools.workspace = true
 tracing.workspace = true
 tokio.workspace = true

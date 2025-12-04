@@ -35,6 +35,7 @@ use std::{
     sync::{Arc, mpsc},
     time::Instant,
 };
+use zksync_revm::ZkSpecId;
 
 use foundry_zksync_compilers::compilers::{
     artifact_output::zk::ZkArtifactOutput, zksolc::ZkSolcCompiler,
@@ -301,7 +302,7 @@ pub struct TestRunnerConfig {
     /// EVM environment.
     pub env: Env,
     /// EVM version.
-    pub spec_id: SpecId,
+    pub spec_id: ZkSpecId,
     /// The address which will be used to deploy the initial contracts and send all transactions.
     pub sender: Address,
 
@@ -418,7 +419,7 @@ pub struct MultiContractRunnerBuilder {
     /// The initial balance for each one of the deployed smart contracts
     pub initial_balance: U256,
     /// The EVM spec to use
-    pub evm_spec: Option<SpecId>,
+    pub evm_spec: Option<ZkSpecId>,
     /// The fork to use at launch
     pub fork: Option<CreateFork>,
     /// Project config.
@@ -464,7 +465,7 @@ impl MultiContractRunnerBuilder {
         self
     }
 
-    pub fn evm_spec(mut self, spec: SpecId) -> Self {
+    pub fn evm_spec(mut self, spec: ZkSpecId) -> Self {
         self.evm_spec = Some(spec);
         self
     }

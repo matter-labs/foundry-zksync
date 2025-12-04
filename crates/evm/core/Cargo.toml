@@ -51,6 +51,7 @@ revm = { workspace = true, features = [
     "c-kzg",
     "blst",
 ] }
+zksync-revm.workspace = true
 revm-inspectors.workspace = true
 op-revm.workspace = true
 alloy-op-evm.workspace = true

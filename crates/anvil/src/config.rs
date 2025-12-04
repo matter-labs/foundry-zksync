@@ -3,7 +3,7 @@ use crate::{
     eth::{
         backend::{
             db::{Db, SerializableState},
-            env::Env,
+            env::{AsEnvMut, Env},
             fork::{ClientFork, ClientForkConfig},
             genesis::GenesisConfig,
             mem::fork_db::ForkedDatabase,
@@ -38,9 +38,9 @@ use foundry_common::{
 };
 use foundry_config::Config;
 use foundry_evm::{
+    EnvMut,
     backend::{BlockchainDb, BlockchainDbMeta, SharedBackend},
     constants::DEFAULT_CREATE2_DEPLOYER,
-    core::AsEnvMut,
     utils::{apply_chain_and_block_specific_env_changes, get_blob_base_fee_update_fraction},
 };
 use itertools::Itertools;
@@ -64,6 +64,7 @@ use std::{
 };
 use tokio::sync::RwLock as TokioRwLock;
 use yansi::Paint;
+use zksync_revm::{IntoZkSpecId, ToZKsyncCfgEnv, ZKsyncTx, ZkSpecId};
 
 pub use foundry_common::version::SHORT_VERSION as VERSION_MESSAGE;
 use foundry_evm::{
@@ -1360,11 +1361,17 @@ latest block number: {latest_block}"
         };
         let override_chain_id = self.chain_id;
         // apply changes such as difficulty -> prevrandao and chain specifics for current chain id
-        apply_chain_and_block_specific_env_changes::<AnyNetwork>(
-            env.as_env_mut(),
-            &block,
-            self.networks,
-        );
+
+        // NOTE(zk): We pass the block config as mut since it's the only one changed
+        // so we do not need to update others. If this changes we'd need to pass a new `CfgEnvMut`
+        // and `ZKsyncTxMut` structs with modifiable fields are refs
+        let op_env_mut = env.as_env_mut();
+        let zk_env_mut = EnvMut {
+            block: op_env_mut.block,
+            cfg: &mut op_env_mut.cfg.to_zk_cfg_env(),
+            tx: &mut ZKsyncTx { base: op_env_mut.tx.base.clone(), ..Default::default() },
+        };
+        apply_chain_and_block_specific_env_changes::<AnyNetwork>(zk_env_mut, &block, self.networks);
 
         let meta = BlockchainDbMeta::new(env.evm_env.block_env.clone(), eth_rpc_url.clone());
         let block_chain_db = if self.fork_chain_id.is_some() {

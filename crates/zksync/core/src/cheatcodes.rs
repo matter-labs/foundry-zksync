@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 
-use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{B256, Bytes, hex};
 use revm::{
     Database,
@@ -9,6 +8,7 @@ use revm::{
     primitives::{Address, U256 as rU256},
 };
 use tracing::info;
+use zksync_revm::ZkContext;
 use zksync_types::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CURRENT_VIRTUAL_BLOCK_INFO_POSITION, KNOWN_CODES_STORAGE_ADDRESS,
     L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, SYSTEM_CONTEXT_ADDRESS,
@@ -24,7 +24,7 @@ use crate::{
 };
 
 /// Sets `block.timestamp`.
-pub fn warp<DB>(timestamp: rU256, ecx: &mut EthEvmContext<DB>)
+pub fn warp<DB>(timestamp: rU256, ecx: &mut ZkContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -46,7 +46,7 @@ where
 }
 
 /// Sets `block.number`.
-pub fn roll<DB>(number: rU256, ecx: &mut EthEvmContext<DB>)
+pub fn roll<DB>(number: rU256, ecx: &mut ZkContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -68,7 +68,7 @@ where
 }
 
 /// Sets balance for a specific address.
-pub fn deal<DB>(address: Address, balance: rU256, ecx: &mut EthEvmContext<DB>) -> rU256
+pub fn deal<DB>(address: Address, balance: rU256, ecx: &mut ZkContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -87,7 +87,7 @@ where
 }
 
 /// Sets nonce for a specific address.
-pub fn set_nonce<DB>(address: Address, nonce: rU256, ecx: &mut EthEvmContext<DB>)
+pub fn set_nonce<DB>(address: Address, nonce: rU256, ecx: &mut ZkContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -97,7 +97,7 @@ where
 }
 
 /// Gets nonce for a specific address.
-pub fn get_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> rU256
+pub fn get_nonce<DB>(address: Address, ecx: &mut ZkContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -115,7 +115,7 @@ where
 }
 
 /// Gets the full nonce for a specific address.
-pub fn get_full_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> (rU256, rU256)
+pub fn get_full_nonce<DB>(address: Address, ecx: &mut ZkContext<DB>) -> (rU256, rU256)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -131,7 +131,7 @@ where
 }
 
 /// Sets code for a specific address.
-pub fn etch<DB>(address: Address, bytecode: &[u8], ecx: &mut EthEvmContext<DB>)
+pub fn etch<DB>(address: Address, bytecode: &[u8], ecx: &mut ZkContext<DB>)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -173,7 +173,7 @@ where
 
 /// Sets code for a mocked account. If not done, the mocked call will revert.
 /// The call has no effect if the mocked account already has a bytecode entry.
-pub fn set_mocked_account<DB>(address: Address, ecx: &mut EthEvmContext<DB>, caller: Address)
+pub fn set_mocked_account<DB>(address: Address, ecx: &mut ZkContext<DB>, caller: Address)
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -237,6 +237,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "bytecode length must be divisible by 32")]
     fn test_etch_panics_when_bytecode_not_aligned_on_32_bytes() {
-        etch(Address::ZERO, &[0], &mut EthEvmContext::new(EmptyDB::default(), Default::default()));
+        etch(Address::ZERO, &[0], &mut ZkContext::new(EmptyDB::default(), Default::default()));
     }
 }

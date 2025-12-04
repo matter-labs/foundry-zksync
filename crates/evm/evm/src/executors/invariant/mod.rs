@@ -1037,10 +1037,10 @@ pub(crate) fn call_invariant_function(
 pub(crate) fn execute_tx(executor: &mut Executor, tx: &BasicTxDetails) -> Result<RawCallResult> {
     // Apply pre-call block adjustments.
     if let Some(warp) = tx.warp {
-        executor.env_mut().evm_env.block_env.timestamp += warp;
+        executor.env_mut().evm_env.inner.block_env.timestamp += warp;
     }
     if let Some(roll) = tx.roll {
-        executor.env_mut().evm_env.block_env.number += roll;
+        executor.env_mut().evm_env.inner.block_env.number += roll;
     }
 
     // Perform the raw call.
@@ -1050,10 +1050,10 @@ pub(crate) fn execute_tx(executor: &mut Executor, tx: &BasicTxDetails) -> Result
 
     // Propagate block adjustments to call result which will be committed.
     if let Some(warp) = tx.warp {
-        call_result.env.evm_env.block_env.timestamp += warp;
+        call_result.env.evm_env.inner.block_env.timestamp += warp;
     }
     if let Some(roll) = tx.roll {
-        call_result.env.evm_env.block_env.number += roll;
+        call_result.env.evm_env.inner.block_env.number += roll;
     }
     Ok(call_result)
 }

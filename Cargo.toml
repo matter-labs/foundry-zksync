@@ -234,6 +234,9 @@ foundry-zksync-inspectors = { path = "crates/zksync/inspectors" }
 foundry-strategy-zksync = { path = "crates/strategy/zksync" }
 foundry-primitives = { path = "crates/primitives" }
 
+# zksync-revm = { path = "../zksync-revm" }
+zksync-revm = { git = "https://github.com/nbaztec/zksync-revm", branch = "revm-33.1.0" }
+
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.22.0", default-features = false }
 foundry-compilers = { version = "0.19.6", default-features = false, features = [

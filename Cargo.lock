@@ -1238,6 +1238,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.22",
  "yansi",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -3057,6 +3058,7 @@ dependencies = [
  "tracing-subscriber 0.3.22",
  "walkdir",
  "yansi",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -4986,6 +4988,7 @@ dependencies = [
  "watchexec-events",
  "watchexec-signals",
  "yansi",
+ "zksync-revm",
  "zksync_telemetry",
 ]
 
@@ -5157,6 +5160,7 @@ dependencies = [
  "tokio",
  "tracing",
  "yansi",
+ "zksync-revm",
  "zksync_types",
 ]
 
@@ -5257,6 +5261,7 @@ dependencies = [
  "toml 0.9.8",
  "tracing",
  "walkdir",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5551,6 +5556,7 @@ dependencies = [
  "tracing",
  "walkdir",
  "yansi",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5606,6 +5612,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "uuid 1.18.1",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5658,6 +5665,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5855,6 +5863,7 @@ dependencies = [
  "solar-compiler",
  "tokio",
  "tracing",
+ "zksync-revm",
  "zksync_types",
 ]
 
@@ -5990,6 +5999,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zksync-revm",
  "zksync_basic_types",
  "zksync_contracts",
  "zksync_multivm",
@@ -11923,9 +11933,9 @@ dependencies = [
 
 [[package]]
 name = "svm-rs"
-version = "0.5.21"
+version = "0.5.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "521753eee64c5f03163f631298ca9184ed4bc6e632d101c781075c5bb4ca755f"
+checksum = "909e8ff825120cd2b34ceb236ab72e2a7f74b1d3a86c247936c8ff7a80c5d408"
 dependencies = [
  "const-hex",
  "dirs 6.0.0",
@@ -11942,9 +11952,9 @@ dependencies = [
 
 [[package]]
 name = "svm-rs-builds"
-version = "0.5.21"
+version = "0.5.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c643d522c474be805787a2813b89a179d71afec3540b18d79c5936d9c24bf3e5"
+checksum = "c1ebe77b200f965e8dbec3ef1d8337e974179ca1ecaa9fc28f67288d6b438159"
 dependencies = [
  "const-hex",
  "semver 1.0.27",
@@ -14606,6 +14616,18 @@ dependencies = [
  "derive_more 2.0.1",
  "serde",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "zksync-revm"
+version = "0.1.0"
+source = "git+https://github.com/nbaztec/zksync-revm?branch=revm-33.1.0#0811929929a89704c37f3c6cd2b1216cbb08ff9c"
+dependencies = [
+ "alloy-evm",
+ "alloy-primitives",
+ "auto_impl",
+ "revm",
+ "serde",
 ]
 
 [[package]]
