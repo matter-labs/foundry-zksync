@@ -678,7 +678,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                         foundry_cheatcodes::handle_expect_emit(
                             state,
                             &log,
-                            &mut Default::default(),
+                            Some(&mut Default::default()),
                         );
                     }
                 }
@@ -870,7 +870,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                             foundry_cheatcodes::handle_expect_emit(
                                 state,
                                 &log,
-                                &mut Default::default(),
+                                Some(&mut Default::default()),
                             );
                         }
                     }

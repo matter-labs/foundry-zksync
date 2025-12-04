@@ -22,6 +22,7 @@ use foundry_evm::{
         strategy::{ExecutorStrategy, LinkOutput as StrategyLinkOutput},
     },
     fork::CreateFork,
+    fuzz::strategies::LiteralsDictionary,
     inspectors::CheatsConfig,
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
@@ -65,6 +66,8 @@ pub struct MultiContractRunner {
     pub libraries: Libraries,
     /// Solar compiler instance, to grant syntactic and semantic analysis capabilities
     pub analysis: Arc<solar::sema::Compiler>,
+    /// Literals dictionary for fuzzing.
+    pub fuzz_literals: LiteralsDictionary,
 
     /// The fork to use at launch
     pub fork: Option<CreateFork>,
@@ -539,13 +542,21 @@ impl MultiContractRunnerBuilder {
             .map(|(id, (abi, bytecode))| (id, TestContract { abi, bytecode }))
             .collect();
 
+        let analysis = Arc::new(analysis);
+        let fuzz_literals = LiteralsDictionary::new(
+            Some(analysis.clone()),
+            Some(self.config.project_paths()),
+            self.config.fuzz.dictionary.max_fuzz_dictionary_literals,
+        );
+
         Ok(MultiContractRunner {
             contracts,
             revert_decoder,
             known_contracts,
             libs_to_deploy,
             libraries,
-            analysis: Arc::new(analysis),
+            analysis,
+            fuzz_literals,
 
             tcfg: TestRunnerConfig {
                 evm_opts,
