@@ -93,8 +93,19 @@ pub enum SendTxSubcommands {
 
 impl SendTxArgs {
     pub async fn run(self) -> eyre::Result<()> {
-        let Self { to, mut sig, mut args, data, send_tx, tx, command, unlocked, path, zk_tx, zk_force } =
-            self;
+        let Self {
+            to,
+            mut sig,
+            mut args,
+            data,
+            send_tx,
+            tx,
+            command,
+            unlocked,
+            path,
+            zk_tx,
+            zk_force,
+        } = self;
 
         let blob_data = if let Some(path) = path { Some(std::fs::read(path)?) } else { None };
 
