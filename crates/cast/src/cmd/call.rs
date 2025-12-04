@@ -315,17 +315,17 @@ impl CallArgs {
                 TracingExecutor::get_fork_material(&mut config, evm_opts).await?;
 
             // modify settings that usually set in eth_call
-            env.evm_env.cfg_env.disable_block_gas_limit = true;
-            env.evm_env.cfg_env.tx_gas_limit_cap = Some(u64::MAX);
-            env.evm_env.block_env.gas_limit = if is_zk { MAX_L2_GAS_LIMIT } else { u64::MAX };
+            env.evm_env.inner.cfg_env.disable_block_gas_limit = true;
+            env.evm_env.inner.cfg_env.tx_gas_limit_cap = Some(u64::MAX);
+            env.evm_env.inner.block_env.gas_limit = if is_zk { MAX_L2_GAS_LIMIT } else { u64::MAX };
 
             // Apply the block overrides.
             if let Some(block_overrides) = block_overrides {
                 if let Some(number) = block_overrides.number {
-                    env.evm_env.block_env.number = number.to();
+                    env.evm_env.inner.block_env.number = number.to();
                 }
                 if let Some(time) = block_overrides.time {
-                    env.evm_env.block_env.timestamp = U256::from(time);
+                    env.evm_env.inner.block_env.timestamp = U256::from(time);
                 }
             }
 
@@ -355,45 +355,45 @@ impl CallArgs {
 
             // Set transaction options with --trace
             if let Some(gas_limit) = tx.inner.gas {
-                env_tx.gas_limit = gas_limit;
+                env_tx.base.gas_limit = gas_limit;
             }
 
             if let Some(gas_price) = tx.inner.gas_price {
-                env_tx.gas_price = gas_price;
+                env_tx.base.gas_price = gas_price;
             }
 
             if let Some(max_fee_per_gas) = tx.inner.max_fee_per_gas {
-                env_tx.gas_price = max_fee_per_gas;
+                env_tx.base.gas_price = max_fee_per_gas;
             }
 
             if let Some(max_priority_fee_per_gas) = tx.inner.max_priority_fee_per_gas {
-                env_tx.gas_priority_fee = Some(max_priority_fee_per_gas);
+                env_tx.base.gas_priority_fee = Some(max_priority_fee_per_gas);
             }
 
             if let Some(max_fee_per_blob_gas) = tx.inner.max_fee_per_blob_gas {
-                env_tx.max_fee_per_blob_gas = max_fee_per_blob_gas;
+                env_tx.base.max_fee_per_blob_gas = max_fee_per_blob_gas;
             }
 
             if let Some(nonce) = tx.inner.nonce {
-                env_tx.nonce = nonce;
+                env_tx.base.nonce = nonce;
             }
 
             if let Some(tx_type) = tx.inner.transaction_type {
-                env_tx.tx_type = tx_type;
+                env_tx.base.tx_type = tx_type;
             }
 
             if let Some(access_list) = tx.inner.access_list {
-                env_tx.access_list = access_list;
+                env_tx.base.access_list = access_list;
 
-                if env_tx.tx_type == TransactionType::Legacy as u8 {
-                    env_tx.tx_type = TransactionType::Eip2930 as u8;
+                if env_tx.base.tx_type == TransactionType::Legacy as u8 {
+                    env_tx.base.tx_type = TransactionType::Eip2930 as u8;
                 }
             }
 
             if let Some(auth) = tx.inner.authorization_list {
-                env_tx.authorization_list = auth.into_iter().map(Either::Left).collect();
+                env_tx.base.authorization_list = auth.into_iter().map(Either::Left).collect();
 
-                env_tx.tx_type = TransactionType::Eip7702 as u8;
+                env_tx.base.tx_type = TransactionType::Eip7702 as u8;
             }
 
             let trace = match tx_kind {

@@ -37,6 +37,7 @@ use revm::{
     primitives::{KECCAK_EMPTY, hardfork::SpecId},
     state::Account,
 };
+use zksync_revm::IntoZkSpecId;
 use std::{
     collections::{BTreeMap, HashSet, btree_map::Entry},
     fmt::Display,
@@ -448,7 +449,7 @@ impl Cheatcode for difficultyCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newDifficulty } = self;
         ensure!(
-            ccx.ecx.cfg.spec < SpecId::MERGE,
+            ccx.ecx.cfg.spec.into_eth_spec() < SpecId::MERGE,
             "`difficulty` is not supported after the Paris hard fork, use `prevrandao` instead; \
              see EIP-4399: https://eips.ethereum.org/EIPS/eip-4399"
         );
@@ -470,7 +471,7 @@ impl Cheatcode for prevrandao_0Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newPrevrandao } = self;
         ensure!(
-            ccx.ecx.cfg.spec >= SpecId::MERGE,
+            ccx.ecx.cfg.spec.into_eth_spec() >= SpecId::MERGE,
             "`prevrandao` is not supported before the Paris hard fork, use `difficulty` instead; \
              see EIP-4399: https://eips.ethereum.org/EIPS/eip-4399"
         );
@@ -483,7 +484,7 @@ impl Cheatcode for prevrandao_1Call {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newPrevrandao } = self;
         ensure!(
-            ccx.ecx.cfg.spec >= SpecId::MERGE,
+            ccx.ecx.cfg.spec.into_eth_spec() >= SpecId::MERGE,
             "`prevrandao` is not supported before the Paris hard fork, use `difficulty` instead; \
              see EIP-4399: https://eips.ethereum.org/EIPS/eip-4399"
         );
@@ -496,13 +497,13 @@ impl Cheatcode for blobhashesCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { hashes } = self;
         ensure!(
-            ccx.ecx.cfg.spec >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec.into_eth_spec() >= SpecId::CANCUN,
             "`blobhashes` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
-        ccx.ecx.tx.blob_hashes.clone_from(hashes);
+        ccx.ecx.tx.base.blob_hashes.clone_from(hashes);
         // force this as 4844 txtype
-        ccx.ecx.tx.tx_type = EIP4844_TX_TYPE_ID;
+        ccx.ecx.tx.base.tx_type = EIP4844_TX_TYPE_ID;
         Ok(Default::default())
     }
 }
@@ -511,11 +512,11 @@ impl Cheatcode for getBlobhashesCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {} = self;
         ensure!(
-            ccx.ecx.cfg.spec >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec.into_eth_spec() >= SpecId::CANCUN,
             "`getBlobhashes` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
-        Ok(ccx.ecx.tx.blob_hashes.clone().abi_encode())
+        Ok(ccx.ecx.tx.base.blob_hashes.clone().abi_encode())
     }
 }
 
@@ -538,7 +539,7 @@ impl Cheatcode for txGasPriceCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newGasPrice } = self;
         ensure!(*newGasPrice <= U256::from(u64::MAX), "gas price must be less than 2^64");
-        ccx.ecx.tx.gas_price = newGasPrice.saturating_to();
+        ccx.ecx.tx.base.gas_price = newGasPrice.saturating_to();
         Ok(Default::default())
     }
 }
@@ -562,14 +563,14 @@ impl Cheatcode for blobBaseFeeCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { newBlobBaseFee } = self;
         ensure!(
-            ccx.ecx.cfg.spec >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec.into_eth_spec() >= SpecId::CANCUN,
             "`blobBaseFee` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
 
         ccx.ecx.block.set_blob_excess_gas_and_price(
             (*newBlobBaseFee).to(),
-            get_blob_base_fee_update_fraction_by_spec_id(ccx.ecx.cfg.spec),
+            get_blob_base_fee_update_fraction_by_spec_id(ccx.ecx.cfg.spec.into_eth_spec()),
         );
         Ok(Default::default())
     }
@@ -718,7 +719,7 @@ impl Cheatcode for coolSlotCall {
 impl Cheatcode for readCallersCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self {} = self;
-        read_callers(ccx.state, &ccx.ecx.tx.caller, ccx.ecx.journaled_state.depth())
+        read_callers(ccx.state, &ccx.ecx.tx.base.caller, ccx.ecx.journaled_state.depth())
     }
 }
 
@@ -1109,7 +1110,7 @@ impl Cheatcode for setEvmVersionCall {
             EvmVersion::from_str(evm)
                 .map_err(|_| Error::from(format!("invalid evm version {evm}")))?,
         );
-        ccx.state.execution_evm_version = Some(spec_id);
+        ccx.state.execution_evm_version = Some(spec_id.into_zk_spec_id());
         Ok(Default::default())
     }
 }

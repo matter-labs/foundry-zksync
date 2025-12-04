@@ -10,6 +10,7 @@ use revm::{
 };
 use tracing::{debug, info};
 use zksync_basic_types::H256;
+use zksync_revm::{ZKsyncEnv, ZKsyncTx, ZkContext, ZkSpecId};
 use zksync_types::{
     CONTRACT_DEPLOYER_ADDRESS, CREATE2_FACTORY_ADDRESS, U256, ethabi, fee::Fee, l2::L2Tx,
     transaction_request::PaymasterParams,
@@ -36,8 +37,8 @@ pub fn transact<'a, DB>(
     persisted_factory_deps: Option<&'a mut HashMap<H256, Vec<u8>>>,
     factory_deps: Option<Vec<Vec<u8>>>,
     paymaster_data: Option<PaymasterParams>,
-    evm_env: EvmEnv,
-    tx: TxEnv,
+    evm_env: ZKsyncEnv,
+    tx: ZKsyncTx<TxEnv>,
     zk_env: &ZkEnv,
     db: &'a mut DB,
     evm_interpreter: bool,
@@ -46,7 +47,7 @@ where
     DB: Database + ?Sized,
     <DB as Database>::Error: Debug,
 {
-    info!(calldata = ?tx.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
+    info!(calldata = ?tx.base.data, fdeps = factory_deps.as_ref().map(|deps| deps.iter().map(|dep| dep.len()).join(",")).unwrap_or_default(), "zk transact");
 
     let paymaster_params = PaymasterParams {
         paymaster: paymaster_data.as_ref().map_or_else(Default::default, |data| data.paymaster),
@@ -55,18 +56,18 @@ where
             .map_or_else(Vec::new, |data| data.paymaster_input.to_vec()),
     };
 
-    let mut ecx = EthEvmContext {
-        block: evm_env.block_env,
-        cfg: evm_env.cfg_env,
+    let mut ecx = ZkContext {
+        block: evm_env.inner.block_env,
+        cfg: evm_env.inner.cfg_env,
         tx,
         journaled_state: Journal::new(db),
         local: Default::default(),
         chain: (),
         error: Ok(()),
     };
-    let caller = ecx.tx.caller;
+    let caller = ecx.tx.base.caller;
     let nonce = ZKVMData::new(&mut ecx).get_tx_nonce(caller);
-    let (transact_to, is_create) = match ecx.tx.kind {
+    let (transact_to, is_create) = match ecx.tx.base.kind {
         TransactTo::Call(to) => {
             let to = to.to_h160();
             (to, to == CONTRACT_DEPLOYER_ADDRESS || to == CREATE2_FACTORY_ADDRESS)
@@ -78,25 +79,25 @@ where
     debug!(?gas_limit, ?max_fee_per_gas, "tx gas parameters");
     let tx = L2Tx::new(
         Some(transact_to),
-        ecx.tx.data.to_vec(),
+        ecx.tx.base.data.to_vec(),
         (nonce as u32).into(),
         Fee {
             gas_limit,
             max_fee_per_gas,
-            max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+            max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
             gas_per_pubdata_limit: zk_env.gas_per_pubdata().into(),
         },
         caller.to_h160(),
-        ecx.tx.value.to_u256(),
+        ecx.tx.base.value.to_u256(),
         factory_deps.unwrap_or_default(),
         paymaster_params,
     );
 
     let call_ctx = CallContext {
-        tx_caller: ecx.tx.caller,
-        msg_sender: ecx.tx.caller,
+        tx_caller: ecx.tx.base.caller,
+        msg_sender: ecx.tx.base.caller,
         contract: transact_to.to_address(),
-        input: if is_create { None } else { Some(ecx.tx.data.clone()) },
+        input: if is_create { None } else { Some(ecx.tx.base.data.clone()) },
         delegate_as: None,
         block_number: rU256::from(ecx.block.number),
         block_timestamp: rU256::from(ecx.block.timestamp),
@@ -123,7 +124,7 @@ where
 }
 
 /// Retrieves L2 ETH balance for a given address.
-pub fn balance<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> rU256
+pub fn balance<DB>(address: Address, ecx: &mut ZkContext<DB>) -> rU256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -134,7 +135,7 @@ where
 
 /// Retrieves bytecode hash stored at a given address.
 #[allow(dead_code)]
-pub fn code_hash<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> B256
+pub fn code_hash<DB>(address: Address, ecx: &mut ZkContext<DB>) -> B256
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -143,7 +144,7 @@ where
 }
 
 /// Retrieves transaction nonce for a given address.
-pub fn tx_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> u128
+pub fn tx_nonce<DB>(address: Address, ecx: &mut ZkContext<DB>) -> u128
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -152,7 +153,7 @@ where
 }
 
 /// Retrieves deployment nonce for a given address.
-pub fn deploy_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>) -> u128
+pub fn deploy_nonce<DB>(address: Address, ecx: &mut ZkContext<DB>) -> u128
 where
     DB: Database,
     <DB as Database>::Error: Debug,
@@ -177,7 +178,7 @@ pub struct ZkCreateInputs {
 /// * `call.init_code` should be valid EraVM's ContractDeployer input
 pub fn create<DB, E>(
     inputs: ZkCreateInputs,
-    ecx: &mut EthEvmContext<DB>,
+    ecx: &mut ZkContext<DB>,
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
@@ -189,7 +190,7 @@ where
     info!("create tx {}", hex::encode(&create_input));
     // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
     // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
-    let caller = ecx.tx.caller;
+    let caller = ecx.tx.base.caller;
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
@@ -212,7 +213,7 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
@@ -231,7 +232,7 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
@@ -242,7 +243,7 @@ where
     };
 
     let call_ctx = CallContext {
-        tx_caller: ecx.tx.caller,
+        tx_caller: ecx.tx.base.caller,
         msg_sender,
         contract: CONTRACT_DEPLOYER_ADDRESS.to_address(),
         input: None,
@@ -264,7 +265,7 @@ where
 pub fn call<DB, E>(
     call: &CallInputs,
     factory_deps: Vec<Vec<u8>>,
-    ecx: &mut EthEvmContext<DB>,
+    ecx: &mut ZkContext<DB>,
     mut ccx: CheatcodeTracerContext,
 ) -> ZKVMResult<E>
 where
@@ -275,7 +276,7 @@ where
     info!(?call, "call tx {}", hex::encode(&input));
     // We're using `tx.origin` as the initiator so the zkEVM validation does not fail when using
     // `msg.sender` as it's not EOA. The nonce and balance changes thus need to be adapted.
-    let caller = ecx.tx.caller;
+    let caller = ecx.tx.base.caller;
     let nonce = ZKVMData::new(ecx).get_tx_nonce(caller);
 
     let paymaster_params = if let Some(paymaster_data) = &ccx.paymaster_data {
@@ -298,7 +299,7 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
@@ -320,7 +321,7 @@ where
             Fee {
                 gas_limit,
                 max_fee_per_gas,
-                max_priority_fee_per_gas: U256::from(ecx.tx.gas_priority_fee.unwrap_or_default()),
+                max_priority_fee_per_gas: U256::from(ecx.tx.base.gas_priority_fee.unwrap_or_default()),
                 gas_per_pubdata_limit: ccx.zk_env.gas_per_pubdata().into(),
             },
             caller.to_h160(),
@@ -338,7 +339,7 @@ where
     // CallCode          => { address: contract.address, caller: contract.address }
     // DelegateCall      => { address: contract.address, caller: contract.caller }
     let call_ctx = CallContext {
-        tx_caller: ecx.tx.caller,
+        tx_caller: ecx.tx.base.caller,
         msg_sender: call.caller,
         contract: call.bytecode_address,
         input: Some(input),
@@ -394,7 +395,7 @@ pub fn encode_create_params(
 }
 
 /// Get historical block hashes mapped to block numbers. This excludes the current block.
-fn get_historical_block_hashes<DB: Database>(ecx: &mut EthEvmContext<DB>) -> HashMap<rU256, B256> {
+fn get_historical_block_hashes<DB: Database>(ecx: &mut ZkContext<DB>) -> HashMap<rU256, B256> {
     let mut block_hashes = HashMap::default();
     let num_blocks = get_env_historical_block_count();
     tracing::debug!("fetching last {num_blocks} block hashes");

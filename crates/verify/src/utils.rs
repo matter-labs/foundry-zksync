@@ -34,6 +34,7 @@ use revm::{bytecode::Bytecode, database::Database, primitives::hardfork::SpecId}
 use semver::{BuildMetadata, Version};
 use serde::{Deserialize, Serialize};
 use yansi::Paint;
+use zksync_revm::ZkSpecId;
 
 /// Enum to represent the type of bytecode being verified
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, ValueEnum)]
@@ -307,12 +308,12 @@ pub fn configure_env_block(env: &mut EnvMut<'_>, block: &AnyRpcBlock, config: Ne
 pub fn deploy_contract(
     executor: &mut TracingExecutor,
     env: &Env,
-    spec_id: SpecId,
+    spec_id: ZkSpecId,
     to: Option<TxKind>,
 ) -> Result<Address, eyre::ErrReport> {
     let env = Env::new_with_spec_id(
-        env.evm_env.cfg_env.clone(),
-        env.evm_env.block_env.clone(),
+        env.evm_env.inner.cfg_env.clone(),
+        env.evm_env.inner.block_env.clone(),
         env.tx.clone(),
         spec_id,
     );

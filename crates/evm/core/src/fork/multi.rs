@@ -324,15 +324,15 @@ impl MultiForkHandler {
     /// Update the fork's block entire env
     fn update_env(&mut self, fork_id: ForkId, env: BlockEnv) {
         if let Some(fork) = self.forks.get_mut(&fork_id) {
-            fork.opts.env.evm_env.block_env = env;
+            fork.opts.env.evm_env.inner.block_env = env;
         }
     }
     /// Update fork block number and timestamp. Used to preserve values set by `roll` and `warp`
     /// cheatcodes when new fork selected.
     fn update_block(&mut self, fork_id: ForkId, block_number: U256, block_timestamp: U256) {
         if let Some(fork) = self.forks.get_mut(&fork_id) {
-            fork.opts.env.evm_env.block_env.number = block_number;
-            fork.opts.env.evm_env.block_env.timestamp = block_timestamp;
+            fork.opts.env.evm_env.inner.block_env.number = block_number;
+            fork.opts.env.evm_env.inner.block_env.timestamp = block_timestamp;
         }
     }
 
@@ -541,7 +541,7 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork,
     // Initialise the fork environment.
     let (env, block) = fork.evm_opts.fork_evm_env_with_provider(&fork.url, &provider).await?;
     fork.env = env;
-    let meta = BlockchainDbMeta::new(fork.env.evm_env.block_env.clone(), fork.url.clone());
+    let meta = BlockchainDbMeta::new(fork.env.evm_env.inner.block_env.clone(), fork.url.clone());
 
     // We need to use the block number from the block because the env's number can be different on
     // some L2s (e.g. Arbitrum).
@@ -549,7 +549,7 @@ async fn create_fork(mut fork: CreateFork) -> eyre::Result<(ForkId, CreatedFork,
 
     // Determine the cache path if caching is enabled.
     let cache_path = if fork.enable_caching {
-        Config::foundry_block_cache_dir(fork.env.evm_env.cfg_env.chain_id, number)
+        Config::foundry_block_cache_dir(fork.env.evm_env.inner.cfg_env.chain_id, number)
     } else {
         None
     };

@@ -253,7 +253,7 @@ impl VerifyBytecodeArgs {
             )
             .await?;
 
-            env.evm_env.block_env.number = U256::ZERO;
+            env.evm_env.inner.block_env.number = U256::ZERO;
             let genesis_block = provider.get_block(gen_blk_num.into()).full().await?;
 
             // Setup genesis tx and env.
@@ -473,7 +473,7 @@ impl VerifyBytecodeArgs {
                 strategy.clone(),
             )
             .await?;
-            env.evm_env.block_env.number = U256::from(simulation_block);
+            env.evm_env.inner.block_env.number = U256::from(simulation_block);
             let block = provider.get_block(simulation_block.into()).full().await?;
 
             // Workaround for the NonceTooHigh issue as we're not simulating prior txs of the same
@@ -514,7 +514,7 @@ impl VerifyBytecodeArgs {
                             format!(
                                 "Failed to execute transaction: {:?} in block {}",
                                 tx.tx_hash(),
-                                env.evm_env.block_env.number
+                                env.evm_env.inner.block_env.number
                             )
                         })?;
                     } else if let Err(error) = executor.deploy_with_env(env.clone(), None) {
@@ -526,7 +526,7 @@ impl VerifyBytecodeArgs {
                                     format!(
                                         "Failed to deploy transaction: {:?} in block {}",
                                         tx.tx_hash(),
-                                        env.evm_env.block_env.number
+                                        env.evm_env.inner.block_env.number
                                     )
                                 });
                             }

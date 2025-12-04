@@ -8,6 +8,7 @@ use anvil_zksync_traces::{
     build_call_trace_arena, decode_trace_arena, filter_call_trace_arena,
     identifier::SignaturesIdentifier, render_trace_arena_inner,
 };
+use zksync_revm::ZkContext;
 use core::convert::Into;
 use foundry_common::sh_println;
 use itertools::Itertools;
@@ -94,7 +95,7 @@ pub type ZKVMResult<E> = Result<ZKVMExecutionResult, E>;
 // TODO: should we make this transparent in `inspect` directly?
 pub fn inspect_as_batch<DB, E>(
     tx: L2Tx,
-    ecx: &mut EthEvmContext<DB>,
+    ecx: &mut ZkContext<DB>,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
@@ -169,7 +170,7 @@ where
 /// State changes will be reflected in the given `Env`, `DB`, `JournaledState`.
 pub fn inspect<DB, E>(
     mut tx: L2Tx,
-    ecx: &mut EthEvmContext<DB>,
+    ecx: &mut ZkContext<DB>,
     ccx: &mut CheatcodeTracerContext,
     call_ctx: CallContext,
 ) -> ZKVMResult<E>
@@ -402,7 +403,7 @@ where
 
 /// Assign gas parameters that satisfy zkSync's fee model.
 pub fn gas_params<DB>(
-    ecx: &mut EthEvmContext<DB>,
+    ecx: &mut ZkContext<DB>,
     caller: Address,
     paymaster_params: &PaymasterParams,
 ) -> (U256, U256)
@@ -410,9 +411,9 @@ where
     DB: Database,
     <DB as Database>::Error: Debug,
 {
-    let value = ecx.tx.value.to_u256();
-    let gas_price = U256::from(ecx.tx.gas_price);
-    let gas_limit = U256::from(ecx.tx.gas_limit);
+    let value = ecx.tx.base.value.to_u256();
+    let gas_price = U256::from(ecx.tx.base.gas_price);
+    let gas_limit = U256::from(ecx.tx.base.gas_limit);
     let use_paymaster = !paymaster_params.paymaster.is_zero();
     let payer = if use_paymaster {
         Address::from_slice(paymaster_params.paymaster.as_bytes())

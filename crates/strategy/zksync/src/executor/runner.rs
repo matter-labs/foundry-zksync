@@ -194,8 +194,8 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
             Some(zk_tx) => {
                 // apply fork-related env instead of cheatcode handler
                 // since it won't be set by zkEVM
-                env.evm_env.block_env = executor_env.evm_env.block_env.clone();
-                env.tx.gas_price = executor_env.tx.gas_price;
+                env.evm_env.inner.block_env = executor_env.evm_env.inner.block_env.clone();
+                env.tx.base.gas_price = executor_env.tx.base.gas_price;
 
                 backend.inspect(
                     env,
@@ -240,7 +240,7 @@ impl ExecutorStrategyExt for ZksyncExecutorStrategyRunner {
         let ctx = get_context(ctx);
 
         let provider = zksync_provider().with_recommended_fillers().connect_http(fork_url.parse()?);
-        let block_number = env.evm_env.block_env.number.saturating_to();
+        let block_number = env.evm_env.inner.block_env.number.saturating_to();
         // TODO(zk): switch to getFeeParams call when it is implemented for anvil-zksync
         let maybe_block_details = tokio::task::block_in_place(move || {
             tokio::runtime::Handle::current().block_on(provider.get_block_details(block_number))

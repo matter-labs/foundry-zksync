@@ -1,6 +1,7 @@
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::{Env, backend::Backend};
 use revm::primitives::hardfork::SpecId;
+use zksync_revm::ZkSpecId;
 
 use super::strategy::ExecutorStrategy;
 
@@ -19,7 +20,7 @@ pub struct ExecutorBuilder {
     /// The gas limit.
     gas_limit: Option<u64>,
     /// The spec ID.
-    spec_id: SpecId,
+    spec_id: ZkSpecId,
 
     legacy_assertions: bool,
 }
@@ -30,7 +31,7 @@ impl Default for ExecutorBuilder {
         Self {
             stack: InspectorStackBuilder::new(),
             gas_limit: None,
-            spec_id: SpecId::default(),
+            spec_id: ZkSpecId::default(),
             legacy_assertions: false,
         }
     }
@@ -55,7 +56,7 @@ impl ExecutorBuilder {
 
     /// Sets the EVM spec to use.
     #[inline]
-    pub fn spec_id(mut self, spec: SpecId) -> Self {
+    pub fn spec_id(mut self, spec: ZkSpecId) -> Self {
         self.spec_id = spec;
         self
     }
@@ -79,15 +80,15 @@ impl ExecutorBuilder {
     pub fn build(self, env: Env, db: Backend, strategy: ExecutorStrategy) -> Executor {
         let Self { mut stack, gas_limit, spec_id, legacy_assertions } = self;
         if stack.block.is_none() {
-            stack.block = Some(env.evm_env.block_env.clone());
+            stack.block = Some(env.evm_env.inner.block_env.clone());
         }
         if stack.gas_price.is_none() {
-            stack.gas_price = Some(env.tx.gas_price);
+            stack.gas_price = Some(env.tx.base.gas_price);
         }
-        let gas_limit = gas_limit.unwrap_or(env.evm_env.block_env.gas_limit);
+        let gas_limit = gas_limit.unwrap_or(env.evm_env.inner.block_env.gas_limit);
         let env = Env::new_with_spec_id(
-            env.evm_env.cfg_env.clone(),
-            env.evm_env.block_env.clone(),
+            env.evm_env.inner.cfg_env.clone(),
+            env.evm_env.inner.block_env.clone(),
             env.tx,
             spec_id,
         );

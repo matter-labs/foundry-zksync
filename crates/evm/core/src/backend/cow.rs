@@ -21,6 +21,7 @@ use revm::{
     primitives::{HashMap as Map, hardfork::SpecId},
     state::{Account, AccountInfo},
 };
+use zksync_revm::ZkSpecId;
 use std::{any::Any, borrow::Cow, collections::BTreeMap};
 
 /// A wrapper around `Backend` that ensures only `revm::DatabaseRef` functions are called.
@@ -48,13 +49,13 @@ pub struct CowBackend<'a> {
     /// Keeps track of whether the backed is already initialized
     pub is_initialized: bool,
     /// The [SpecId] of the current backend.
-    pub spec_id: SpecId,
+    pub spec_id: ZkSpecId,
 }
 
 impl<'a> CowBackend<'a> {
     /// Creates a new `CowBackend` with the given `Backend`.
     pub fn new_borrowed(backend: &'a Backend) -> Self {
-        Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::default() }
+        Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: ZkSpecId::default() }
     }
 
     /// Executes the configured transaction of the `env` without committing state changes
@@ -71,7 +72,7 @@ impl<'a> CowBackend<'a> {
         // this is a new call to inspect with a new env, so even if we've cloned the backend
         // already, we reset the initialized state
         self.is_initialized = false;
-        self.spec_id = env.evm_env.cfg_env.spec;
+        self.spec_id = env.evm_env.inner.cfg_env.spec;
 
         self.backend.strategy.runner.inspect(self.backend.to_mut(), env, inspector, inspect_ctx)
     }
@@ -90,7 +91,7 @@ impl<'a> CowBackend<'a> {
         if !self.is_initialized {
             let backend = self.backend.to_mut();
             let mut env = env.to_owned();
-            env.evm_env.cfg_env.spec = self.spec_id;
+            env.evm_env.inner.cfg_env.spec = self.spec_id;
             backend.initialize(&env);
             self.is_initialized = true;
             return backend;

@@ -1072,7 +1072,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
 
         let test_contract = data.journaled_state.database.get_test_contract_address();
         for address in
-            data.journaled_state.database.persistent_accounts().into_iter().chain([data.tx.caller])
+            data.journaled_state.database.persistent_accounts().into_iter().chain([data.tx.base.caller])
         {
             info!(?address, "importing to evm state");
 
@@ -1142,7 +1142,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
         ctx.using_zk_vm = true;
 
         let block_env = match new_env {
-            Some(env) => &env.evm_env.block_env,
+            Some(env) => &env.evm_env.inner.block_env,
             None => &data.block,
         };
 
@@ -1161,7 +1161,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
         let test_contract = data.journaled_state.database.get_test_contract_address();
 
         for address in
-            data.journaled_state.database.persistent_accounts().into_iter().chain([data.tx.caller])
+            data.journaled_state.database.persistent_accounts().into_iter().chain([data.tx.base.caller])
         {
             info!(?address, "importing to zk state");
 

@@ -17,6 +17,7 @@ use foundry_evm::{
     inspectors::CheatsConfig, traces::TraceMode,
 };
 use solang_parser::pt;
+use zksync_revm::IntoZkSpecId;
 use std::ops::ControlFlow;
 use yansi::Paint;
 

@@ -11,7 +11,7 @@ use alloy_evm::{Evm, EvmEnv, eth::EthEvmContext, precompiles::PrecompilesMap};
 use alloy_primitives::{Address, Bytes, U256};
 use foundry_fork_db::DatabaseError;
 use revm::{
-    Context, Journal,
+    Journal,
     context::{
         BlockEnv, CfgEnv, ContextTr, CreateScheme, Evm as RevmEvm, JournalTr, LocalContext,
         LocalContextTr, TxEnv,
@@ -31,19 +31,21 @@ use revm::{
     primitives::hardfork::SpecId,
 };
 
+use zksync_revm::{ZKsyncEvm, ZKsyncTx, ZkContext, ZkSpecId};
+
 pub fn new_evm_with_inspector<'db, I: InspectorExt>(
     db: &'db mut dyn DatabaseExt,
     env: Env,
     inspector: I,
 ) -> FoundryEvm<'db, I> {
-    let mut ctx = EthEvmContext {
+    let mut ctx = ZkContext {
         journaled_state: {
             let mut journal = Journal::new(db);
-            journal.set_spec_id(env.evm_env.cfg_env.spec);
+            journal.set_spec_id(env.evm_env.inner.cfg_env.spec.into_eth_spec());
             journal
         },
-        block: env.evm_env.block_env,
-        cfg: env.evm_env.cfg_env,
+        block: env.evm_env.inner.block_env,
+        cfg: env.evm_env.inner.cfg_env,
         tx: env.tx,
         chain: (),
         local: LocalContext::default(),
@@ -53,11 +55,12 @@ pub fn new_evm_with_inspector<'db, I: InspectorExt>(
     let spec = ctx.cfg.spec;
 
     let mut evm = FoundryEvm {
-        inner: RevmEvm::new_with_inspector(
+        // inner: RevmEvm::new_with_inspector(
+        inner: ZKsyncEvm::new(
             ctx,
             inspector,
-            EthInstructions::default(),
-            get_precompiles(spec),
+            // EthInstructions::default(),
+            // get_precompiles(spec),
         ),
     };
 
@@ -66,17 +69,18 @@ pub fn new_evm_with_inspector<'db, I: InspectorExt>(
 }
 
 pub fn new_evm_with_existing_context<'a>(
-    ctx: EthEvmContext<&'a mut dyn DatabaseExt>,
+    ctx: ZkContext<&'a mut dyn DatabaseExt>,
     inspector: &'a mut dyn InspectorExt,
 ) -> FoundryEvm<'a, &'a mut dyn InspectorExt> {
-    let spec = ctx.cfg.spec;
+    let _spec = ctx.cfg.spec;
 
     let mut evm = FoundryEvm {
-        inner: RevmEvm::new_with_inspector(
+        // inner: RevmEvm::new_with_inspector(
+        inner: ZKsyncEvm::new(
             ctx,
             inspector,
-            EthInstructions::default(),
-            get_precompiles(spec),
+            // EthInstructions::default(),
+            // get_precompiles(spec),
         ),
     };
 
@@ -118,18 +122,19 @@ fn get_create2_factory_call_inputs(
 
 pub struct FoundryEvm<'db, I: InspectorExt> {
     #[allow(clippy::type_complexity)]
-    inner: RevmEvm<
-        EthEvmContext<&'db mut dyn DatabaseExt>,
+    // inner: RevmEvm<
+    inner: ZKsyncEvm<
+        ZkContext<&'db mut dyn DatabaseExt>,
         I,
-        EthInstructions<EthInterpreter, EthEvmContext<&'db mut dyn DatabaseExt>>,
-        PrecompilesMap,
-        EthFrame<EthInterpreter>,
+        EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
+        // PrecompilesMap,
+        // EthFrame<EthInterpreter>,
     >,
 }
 impl<'db, I: InspectorExt> FoundryEvm<'db, I> {
     /// Consumes the EVM and returns the inner context.
-    pub fn into_context(self) -> EthEvmContext<&'db mut dyn DatabaseExt> {
-        self.inner.ctx
+    pub fn into_context(self) -> ZkContext<&'db mut dyn DatabaseExt> {
+        self.inner.0.ctx
     }
 
     pub fn run_execution(
@@ -140,7 +145,7 @@ impl<'db, I: InspectorExt> FoundryEvm<'db, I> {
 
         // Create first frame
         let memory =
-            SharedMemory::new_with_buffer(self.inner.ctx().local().shared_memory_buffer().clone());
+            SharedMemory::new_with_buffer(self.inner.0.ctx.local().shared_memory_buffer().clone());
         let first_frame_input = FrameInit { depth: 0, memory, frame_input: frame };
 
         // Run execution loop
@@ -159,8 +164,8 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     type DB = &'db mut dyn DatabaseExt;
     type Error = EVMError<DatabaseError>;
     type HaltReason = HaltReason;
-    type Spec = SpecId;
-    type Tx = TxEnv;
+    type Spec = ZkSpecId;
+    type Tx = ZKsyncTx<TxEnv>;
     type BlockEnv = BlockEnv;
 
     fn block(&self) -> &BlockEnv {
@@ -168,39 +173,39 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     }
 
     fn chain_id(&self) -> u64 {
-        self.inner.ctx.cfg.chain_id
+        self.inner.0.ctx.cfg.chain_id
     }
 
     fn components(&self) -> (&Self::DB, &Self::Inspector, &Self::Precompiles) {
-        (&self.inner.ctx.journaled_state.database, &self.inner.inspector, &self.inner.precompiles)
+        (&self.inner.0.ctx.journaled_state.database, &self.inner.0.inspector, &self.inner.0.precompiles)
     }
 
     fn components_mut(&mut self) -> (&mut Self::DB, &mut Self::Inspector, &mut Self::Precompiles) {
         (
-            &mut self.inner.ctx.journaled_state.database,
-            &mut self.inner.inspector,
-            &mut self.inner.precompiles,
+            &mut self.inner.0.ctx.journaled_state.database,
+            &mut self.inner.0.inspector,
+            &mut self.inner.0.precompiles,
         )
     }
 
     fn db_mut(&mut self) -> &mut Self::DB {
-        &mut self.inner.ctx.journaled_state.database
+        &mut self.inner.0.ctx.journaled_state.database
     }
 
     fn precompiles(&self) -> &Self::Precompiles {
-        &self.inner.precompiles
+        &self.inner.0.precompiles
     }
 
     fn precompiles_mut(&mut self) -> &mut Self::Precompiles {
-        &mut self.inner.precompiles
+        &mut self.inner.0.precompiles
     }
 
     fn inspector(&self) -> &Self::Inspector {
-        &self.inner.inspector
+        &self.inner.0.inspector
     }
 
     fn inspector_mut(&mut self) -> &mut Self::Inspector {
-        &mut self.inner.inspector
+        &mut self.inner.0.inspector
     }
 
     fn set_inspector_enabled(&mut self, _enabled: bool) {
@@ -211,12 +216,12 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
         &mut self,
         tx: Self::Tx,
     ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
-        self.inner.ctx.tx = tx;
+        self.inner.0.ctx.tx = tx;
 
         let mut handler = FoundryHandler::<I>::default();
         let result = handler.inspect_run(&mut self.inner)?;
 
-        Ok(ResultAndState::new(result, self.inner.ctx.journaled_state.inner.state.clone()))
+        Ok(ResultAndState::new(result, self.inner.0.ctx.journaled_state.inner.state.clone()))
     }
 
     fn transact_system_call(
@@ -232,23 +237,23 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     where
         Self: Sized,
     {
-        let Context { block: block_env, cfg: cfg_env, journaled_state, .. } = self.inner.ctx;
+        let ZkContext { block: block_env, cfg: cfg_env, journaled_state, .. } = self.inner.0.ctx;
 
         (journaled_state.database, EvmEnv { block_env, cfg_env })
     }
 }
 
 impl<'db, I: InspectorExt> Deref for FoundryEvm<'db, I> {
-    type Target = Context<BlockEnv, TxEnv, CfgEnv, &'db mut dyn DatabaseExt>;
+    type Target = ZkContext<&'db mut dyn DatabaseExt>;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner.ctx
+        &self.inner.0.ctx
     }
 }
 
 impl<I: InspectorExt> DerefMut for FoundryEvm<'_, I> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner.ctx
+        &mut self.inner.0.ctx
     }
 }
 
@@ -266,13 +271,15 @@ impl<I: InspectorExt> Default for FoundryHandler<'_, I> {
 // Blanket Handler implementation for FoundryHandler, needed for implementing the InspectorHandler
 // trait.
 impl<'db, I: InspectorExt> Handler for FoundryHandler<'db, I> {
-    type Evm = RevmEvm<
-        EthEvmContext<&'db mut dyn DatabaseExt>,
+    // type Evm = RevmEvm<
+    type Evm = ZKsyncEvm<
+        ZkContext<&'db mut dyn DatabaseExt>,
         I,
-        EthInstructions<EthInterpreter, EthEvmContext<&'db mut dyn DatabaseExt>>,
+        EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
         PrecompilesMap,
         EthFrame<EthInterpreter>,
     >;
+
     type Error = EVMError<DatabaseError>;
     type HaltReason = HaltReason;
 }
@@ -299,7 +306,7 @@ impl<'db, I: InspectorExt> FoundryHandler<'db, I> {
                 // Generate call inputs for CREATE2 factory and allow zkSync strategy to adjust.
                 let mut call_inputs =
                     get_create2_factory_call_inputs(salt, inputs, create2_deployer);
-                evm.inspector.zksync_set_deployer_call_input(&mut evm.ctx, &mut call_inputs);
+                evm.0.inspector.zksync_set_deployer_call_input(&mut evm.0.ctx, &mut call_inputs);
 
                 // Push data about current override to the stack (after potential adjustments).
                 self.create2_overrides.push((evm.journal().depth(), call_inputs.clone()));

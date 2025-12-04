@@ -34,6 +34,7 @@ revm = { workspace = true, default-features = false, features = [
     "optional_no_base_fee",
     "arbitrary",
 ] }
+zksync-revm.workspace = true
 tracing.workspace = true
 serde.workspace = true
 

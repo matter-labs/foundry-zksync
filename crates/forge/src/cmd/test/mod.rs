@@ -540,7 +540,7 @@ impl TestArgs {
         }
 
         let remote_chain =
-            if runner.fork.is_some() { runner.env.tx.chain_id.map(Into::into) } else { None };
+            if runner.fork.is_some() { runner.env.tx.base.chain_id.map(Into::into) } else { None };
         let known_contracts = runner.known_contracts.clone();
 
         let libraries = runner.libraries.clone();

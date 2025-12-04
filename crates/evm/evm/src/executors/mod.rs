@@ -51,6 +51,7 @@ use std::{
     time::{Duration, Instant},
 };
 use strategy::{DeployLibKind, DeployLibResult, ExecutorStrategy};
+use zksync_revm::ZkSpecId;
 
 mod builder;
 pub use builder::ExecutorBuilder;
@@ -158,8 +159,8 @@ impl Executor {
 
     fn clone_with_backend(&self, backend: Backend) -> Self {
         let env = Env::new_with_spec_id(
-            self.env.evm_env.cfg_env.clone(),
-            self.env.evm_env.block_env.clone(),
+            self.env.evm_env.inner.cfg_env.clone(),
+            self.env.evm_env.inner.block_env.clone(),
             self.env.tx.clone(),
             self.spec_id(),
         );
@@ -204,13 +205,13 @@ impl Executor {
     }
 
     /// Returns the EVM spec ID.
-    pub fn spec_id(&self) -> SpecId {
-        self.env.evm_env.cfg_env.spec
+    pub fn spec_id(&self) -> ZkSpecId {
+        self.env.evm_env.inner.cfg_env.spec
     }
 
     /// Sets the EVM spec ID.
-    pub fn set_spec_id(&mut self, spec_id: SpecId) {
-        self.env.evm_env.cfg_env.spec = spec_id;
+    pub fn set_spec_id(&mut self, spec_id: ZkSpecId) {
+        self.env.evm_env.inner.cfg_env.spec = spec_id;
     }
 
     /// Returns the gas limit for calls and deployments.
@@ -386,11 +387,11 @@ impl Executor {
         rd: Option<&RevertDecoder>,
     ) -> Result<DeployResult, EvmError> {
         assert!(
-            matches!(env.tx.kind, TxKind::Create),
+            matches!(env.tx.base.kind, TxKind::Create),
             "Expected create transaction, got {:?}",
-            env.tx.kind
+            env.tx.base.kind
         );
-        trace!(sender=%env.tx.caller, "deploying contract");
+        trace!(sender=%env.tx.base.caller, "deploying contract");
 
         let mut result = self.transact_with_env(env)?;
         result = result.into_result(rd)?;
@@ -429,9 +430,9 @@ impl Executor {
         res = res.into_result(rd)?;
 
         // record any changes made to the block's environment during setup
-        self.env_mut().evm_env.block_env = res.env.evm_env.block_env.clone();
+        self.env_mut().evm_env.inner.block_env = res.env.evm_env.inner.block_env.clone();
         // and also the chainid, which can be set manually
-        self.env_mut().evm_env.cfg_env.chain_id = res.env.evm_env.cfg_env.chain_id;
+        self.env_mut().evm_env.inner.cfg_env.chain_id = res.env.evm_env.inner.cfg_env.chain_id;
 
         let success =
             self.is_raw_call_success(to, Cow::Borrowed(&res.state_changeset), &res, false);
@@ -510,8 +511,8 @@ impl Executor {
         authorization_list: Vec<SignedAuthorization>,
     ) -> eyre::Result<RawCallResult> {
         let mut env = self.build_test_env(from, to.into(), calldata, value);
-        env.tx.set_signed_authorization(authorization_list);
-        env.tx.tx_type = 4;
+        env.tx.base.set_signed_authorization(authorization_list);
+        env.tx.base.tx_type = 4;
         self.call_with_env(env)
     }
 
@@ -538,8 +539,8 @@ impl Executor {
         authorization_list: Vec<SignedAuthorization>,
     ) -> eyre::Result<RawCallResult> {
         let mut env = self.build_test_env(from, TxKind::Call(to), calldata, value);
-        env.tx.set_signed_authorization(authorization_list);
-        env.tx.tx_type = 4;
+        env.tx.base.set_signed_authorization(authorization_list);
+        env.tx.base.tx_type = 4;
         self.transact_with_env(env)
     }
 
@@ -755,32 +756,37 @@ impl Executor {
     /// the cheatcode state in between calls.
     fn build_test_env(&self, caller: Address, kind: TxKind, data: Bytes, value: U256) -> Env {
         Env {
-            evm_env: EvmEnv {
-                cfg_env: {
-                    let mut cfg = self.env().evm_env.cfg_env.clone();
-                    cfg.spec = self.spec_id();
-                    cfg
-                },
-                // We always set the gas price to 0 so we can execute the transaction regardless of
-                // network conditions - the actual gas price is kept in `self.block` and is applied
-                // by the cheatcode handler if it is enabled
-                block_env: BlockEnv {
-                    basefee: 0,
-                    gas_limit: self.gas_limit,
-                    ..self.env().evm_env.block_env.clone()
+            evm_env: zksync_revm::ZKsyncEnv {
+                inner: EvmEnv {
+                    cfg_env: {
+                        let mut cfg = self.env().evm_env.inner.cfg_env.clone();
+                        cfg.spec = self.spec_id();
+                        cfg
+                    },
+                    // We always set the gas price to 0 so we can execute the transaction regardless of
+                    // network conditions - the actual gas price is kept in `self.block` and is applied
+                    // by the cheatcode handler if it is enabled
+                    block_env: BlockEnv {
+                        basefee: 0,
+                        gas_limit: self.gas_limit,
+                        ..self.env().evm_env.inner.block_env.clone()
+                    },
                 },
             },
-            tx: TxEnv {
-                caller,
-                kind,
-                data,
-                value,
-                // As above, we set the gas price to 0.
-                gas_price: 0,
-                gas_priority_fee: None,
-                gas_limit: self.gas_limit,
-                chain_id: Some(self.env().evm_env.cfg_env.chain_id),
-                ..self.env().tx.clone()
+            tx: zksync_revm::ZKsyncTx {
+                base: TxEnv {
+                    caller,
+                    kind,
+                    data,
+                    value,
+                    // As above, we set the gas price to 0.
+                    gas_price: 0,
+                    gas_priority_fee: None,
+                    gas_limit: self.gas_limit,
+                    chain_id: Some(self.env().evm_env.inner.cfg_env.chain_id),
+                    ..self.env().tx.base.clone()
+                },
+                ..Default::default()
             },
         }
     }
@@ -1108,10 +1114,10 @@ fn convert_executed_result(
         }
     };
     let gas = revm::interpreter::gas::calculate_initial_tx_gas(
-        env.evm_env.cfg_env.spec,
-        &env.tx.data,
-        env.tx.kind.is_create(),
-        env.tx.access_list.len().try_into()?,
+        env.evm_env.inner.cfg_env.spec.into_eth_spec(),
+        &env.tx.base.data,
+        env.tx.base.kind.is_create(),
+        env.tx.base.access_list.len().try_into()?,
         0,
         0,
     );

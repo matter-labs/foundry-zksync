@@ -223,7 +223,7 @@ impl Cheatcode for attachBlobCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { blob } = self;
         ensure!(
-            ccx.ecx.cfg.spec >= SpecId::CANCUN,
+            ccx.ecx.cfg.spec.into_eth_spec() >= SpecId::CANCUN,
             "`attachBlob` is not supported before the Cancun hard fork; \
              see EIP-4844: https://eips.ethereum.org/EIPS/eip-4844"
         );
@@ -375,14 +375,14 @@ fn broadcast(ccx: &mut CheatsCtxt, new_origin: Option<&Address>, single_call: bo
             }
         }
     }
-    let new_origin = new_origin.unwrap_or(ccx.ecx.tx.caller);
+    let new_origin = new_origin.unwrap_or(ccx.ecx.tx.base.caller);
     // Ensure new origin is loaded and touched.
     let _ = journaled_account(ccx.ecx, new_origin)?;
 
     let broadcast = Broadcast {
         new_origin,
         original_caller: ccx.caller,
-        original_origin: ccx.ecx.tx.caller,
+        original_origin: ccx.ecx.tx.base.caller,
         depth,
         single_call,
         deploy_from_code: false,

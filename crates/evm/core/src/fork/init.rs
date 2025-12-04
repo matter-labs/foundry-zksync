@@ -6,6 +6,7 @@ use alloy_rpc_types::BlockNumberOrTag;
 use foundry_common::NON_ARCHIVE_NODE_WARNING;
 use foundry_evm_networks::NetworkConfigs;
 use revm::context::{BlockEnv, CfgEnv, TxEnv};
+use zksync_revm::ZkSpecId;
 
 /// Initializes a REVM block environment based on a forked
 /// ethereum provider.
@@ -65,25 +66,32 @@ pub async fn environment<N: Network, P: Provider<N>>(
     let cfg = configure_env(chain_id, memory_limit, disable_block_gas_limit, enable_tx_gas_limit);
 
     let mut env = Env {
-        evm_env: EvmEnv {
-            cfg_env: cfg,
-            block_env: BlockEnv {
-                number: U256::from(block.header().number()),
-                timestamp: U256::from(block.header().timestamp()),
-                beneficiary: block.header().beneficiary(),
-                difficulty: block.header().difficulty(),
-                prevrandao: block.header().mix_hash(),
-                basefee: block.header().base_fee_per_gas().unwrap_or_default(),
+        evm_env: zksync_revm::ZKsyncEnv {
+            inner: EvmEnv {
+                cfg_env: cfg,
+                block_env: BlockEnv {
+                    number: U256::from(block.header().number()),
+                    timestamp: U256::from(block.header().timestamp()),
+                    beneficiary: block.header().beneficiary(),
+                    difficulty: block.header().difficulty(),
+                    prevrandao: block.header().mix_hash(),
+                    basefee: block.header().base_fee_per_gas().unwrap_or_default(),
+                    gas_limit: block.header().gas_limit(),
+                    ..Default::default()
+                },
+            },
+        },
+        tx: zksync_revm::ZKsyncTx {
+            base: TxEnv {
+                caller: origin,
+                gas_price,
+                chain_id: Some(chain_id),
                 gas_limit: block.header().gas_limit(),
                 ..Default::default()
             },
-        },
-        tx: TxEnv {
-            caller: origin,
-            gas_price,
-            chain_id: Some(chain_id),
-            gas_limit: block.header().gas_limit(),
-            ..Default::default()
+            l1_to_l2_part: Default::default(),
+            gas_used_override: Default::default(),
+            force_fail: Default::default(),
         },
     };
 
@@ -105,7 +113,7 @@ pub fn configure_env(
     memory_limit: u64,
     disable_block_gas_limit: bool,
     enable_tx_gas_limit: bool,
-) -> CfgEnv {
+) -> CfgEnv<ZkSpecId> {
     let mut cfg = CfgEnv::default();
     cfg.chain_id = chain_id;
     cfg.memory_limit = memory_limit;

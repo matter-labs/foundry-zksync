@@ -25,6 +25,7 @@ use revm::{
     primitives::{HashMap, HashSet},
 };
 use serde::{Deserialize, Serialize};
+use zksync_revm::{ZKsyncTx, ZkContext, ZkSpecId};
 
 use crate::backend::{
     context::{ZksyncBackendStrategyContext, ZksyncInspectContext},
@@ -67,10 +68,10 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         ctx.persisted_factory_deps = persisted_factory_deps;
 
         let mut evm_context =
-            EthEvmContext::new(backend as &mut dyn DatabaseExt, env.evm_env.cfg_env.spec);
+            ZkContext::new(backend as &mut dyn DatabaseExt, env.evm_env.inner.cfg_env.spec);
 
         // patch evm context with real caller
-        evm_context.tx.caller = env.tx.caller;
+        evm_context.tx.base.caller = env.tx.base.caller;
 
         result.map(|(result, call_traces)| {
             inspector.trace_zksync(&mut evm_context, Box::new(call_traces), true);
@@ -181,11 +182,12 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
             let ctx = get_context(backend.strategy.context.as_mut());
             ctx.persisted_factory_deps = persisted_factory_deps;
 
-            let mut evm_context =
-                EthEvmContext::new(backend as &mut dyn DatabaseExt, env.evm_env.cfg_env.spec);
+            let mut evm_context: ZkContext<
+                &mut (dyn DatabaseExt<Error = foundry_evm::backend::DatabaseError> + 'static),
+            > = ZkContext::new(backend as &mut dyn DatabaseExt, env.evm_env.inner.cfg_env.spec);
 
             // Patch evm context with real caller and real depth
-            evm_context.tx.caller = env.tx.caller;
+            evm_context.tx.base.caller = env.tx.base.caller;
             evm_context.journaled_state.depth = journaled_state.depth + 1;
 
             result.map(|(result, call_traces)| {

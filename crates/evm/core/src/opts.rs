@@ -185,23 +185,28 @@ impl EvmOpts {
         );
 
         crate::Env {
-            evm_env: EvmEnv {
-                cfg_env: cfg,
-                block_env: BlockEnv {
-                    number: self.env.block_number,
-                    beneficiary: self.env.block_coinbase,
-                    timestamp: self.env.block_timestamp,
-                    difficulty: U256::from(self.env.block_difficulty),
-                    prevrandao: Some(self.env.block_prevrandao),
-                    basefee: self.env.block_base_fee_per_gas,
-                    gas_limit: self.gas_limit(),
-                    ..Default::default()
+            evm_env: zksync_revm::ZKsyncEnv {
+                inner: EvmEnv {
+                    cfg_env: cfg,
+                    block_env: BlockEnv {
+                        number: self.env.block_number,
+                        beneficiary: self.env.block_coinbase,
+                        timestamp: self.env.block_timestamp,
+                        difficulty: U256::from(self.env.block_difficulty),
+                        prevrandao: Some(self.env.block_prevrandao),
+                        basefee: self.env.block_base_fee_per_gas,
+                        gas_limit: self.gas_limit(),
+                        ..Default::default()
+                    },
                 },
             },
-            tx: TxEnv {
-                gas_price: self.env.gas_price.unwrap_or_default().into(),
-                gas_limit: self.gas_limit(),
-                caller: self.sender,
+            tx: zksync_revm::ZKsyncTx {
+                base: TxEnv {
+                    gas_price: self.env.gas_price.unwrap_or_default().into(),
+                    gas_limit: self.gas_limit(),
+                    caller: self.sender,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         }
@@ -222,7 +227,7 @@ impl EvmOpts {
     /// be at `~/.foundry/cache/mainnet/14435000/storage.json`.
     pub fn get_fork(&self, config: &Config, env: crate::Env) -> Option<CreateFork> {
         let url = self.fork_url.clone()?;
-        let enable_caching = config.enable_caching(&url, env.evm_env.cfg_env.chain_id);
+        let enable_caching = config.enable_caching(&url, env.evm_env.inner.cfg_env.chain_id);
         Some(CreateFork { url, enable_caching, env, evm_opts: self.clone() })
     }
 

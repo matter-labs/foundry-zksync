@@ -18,7 +18,6 @@ pub mod vm;
 /// ZKSync Era State implementation.
 pub mod state;
 
-use alloy_evm::eth::EthEvmContext;
 use alloy_network::TransactionBuilder;
 use alloy_primitives::{Address, Bytes, U256 as rU256, address, hex, keccak256};
 use alloy_zksync::{
@@ -29,6 +28,7 @@ use convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU25
 use eyre::eyre;
 use revm::{Database, context::JournalTr};
 use serde::{Deserialize, Serialize};
+use zksync_revm::ZkContext;
 use std::fmt::Debug;
 use zksync_multivm::vm_m6::test_utils::get_create_zksync_address;
 use zksync_types::{Nonce, ProtocolVersionId, bytecode::BytecodeHash};
@@ -284,7 +284,7 @@ pub fn get_immutable_slot_key(address: Address, slot_index: rU256) -> H256 {
 }
 
 /// Sets transaction nonce for a specific address.
-pub fn set_tx_nonce<DB>(address: Address, nonce: rU256, ecx: &mut EthEvmContext<DB>)
+pub fn set_tx_nonce<DB>(address: Address, nonce: rU256, ecx: &mut ZkContext<DB>)
 where
     DB: Database,
     DB::Error: Debug,
@@ -309,7 +309,7 @@ where
 }
 
 /// Increment transaction nonce for a specific address.
-pub fn increment_tx_nonce<DB>(address: Address, ecx: &mut EthEvmContext<DB>)
+pub fn increment_tx_nonce<DB>(address: Address, ecx: &mut ZkContext<DB>)
 where
     DB: Database,
     DB::Error: Debug,
@@ -332,7 +332,7 @@ where
 }
 
 /// Sets deployment nonce for a specific address.
-pub fn set_deployment_nonce<DB>(address: Address, nonce: rU256, ecx: &mut EthEvmContext<DB>)
+pub fn set_deployment_nonce<DB>(address: Address, nonce: rU256, ecx: &mut ZkContext<DB>)
 where
     DB: Database,
     DB::Error: Debug,

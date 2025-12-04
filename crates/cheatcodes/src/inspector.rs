@@ -57,6 +57,7 @@ use revm::{
     primitives::hardfork::SpecId,
 };
 use serde_json::Value;
+use zksync_revm::{ZkContext, ZkSpecId};
 use std::{
     cmp::max,
     collections::{BTreeMap, VecDeque},
@@ -73,7 +74,7 @@ pub use utils::CommonCreateInput;
 pub mod analysis;
 pub use analysis::CheatcodeAnalysis;
 
-pub type Ecx<'a, 'b, 'c> = &'a mut EthEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
+pub type Ecx<'a, 'b, 'c> = &'a mut ZkContext<&'b mut (dyn DatabaseExt + 'c)>;
 
 /// Helper trait for obtaining complete [revm::Inspector] instance from mutable reference to
 /// [Cheatcodes].
@@ -143,7 +144,7 @@ where
     let mut inspector = executor.get_inspector(ccx.state);
     let error = std::mem::replace(&mut ccx.ecx.error, Ok(()));
 
-    let ctx = EthEvmContext {
+    let ctx = ZkContext {
         block: ccx.ecx.block.clone(),
         cfg: ccx.ecx.cfg.clone(),
         tx: ccx.ecx.tx.clone(),
@@ -524,7 +525,7 @@ pub struct Cheatcodes {
     /// Used to determine whether the broadcasted call has dynamic gas limit.
     pub dynamic_gas_limit: bool,
     // Custom execution evm version.
-    pub execution_evm_version: Option<SpecId>,
+    pub execution_evm_version: Option<ZkSpecId>,
 }
 
 // This is not derived because calling this in `fn new` with `..Default::default()` creates a second
@@ -671,10 +672,10 @@ impl Cheatcodes {
     /// access lists themselves.
     fn apply_accesslist(&mut self, ecx: Ecx) {
         if let Some(access_list) = &self.access_list {
-            ecx.tx.access_list = access_list.clone();
+            ecx.tx.base.access_list = access_list.clone();
 
-            if ecx.tx.tx_type == TransactionType::Legacy as u8 {
-                ecx.tx.tx_type = TransactionType::Eip2930 as u8;
+            if ecx.tx.base.tx_type == TransactionType::Legacy as u8 {
+                ecx.tx.base.tx_type = TransactionType::Eip2930 as u8;
             }
         }
     }
@@ -756,7 +757,7 @@ impl Cheatcodes {
 
             // At the target depth, or deeper, we set `tx.origin`
             if let Some(new_origin) = prank.new_origin {
-                ecx.tx.caller = new_origin;
+                ecx.tx.base.caller = new_origin;
                 prank_applied = true;
             }
 
@@ -786,7 +787,7 @@ impl Cheatcodes {
                 });
             }
 
-            ecx.tx.caller = broadcast.new_origin;
+            ecx.tx.base.caller = broadcast.new_origin;
 
             if curr_depth == broadcast.depth || broadcast.deploy_from_code {
                 // Reset deploy from code flag for upcoming calls;
@@ -855,7 +856,7 @@ impl Cheatcodes {
         if let Some(prank) = &self.get_prank(curr_depth)
             && curr_depth == prank.depth
         {
-            ecx.tx.caller = prank.prank_origin;
+            ecx.tx.base.caller = prank.prank_origin;
 
             // Clean single-call prank once we have returned to the original depth
             if prank.single_call {
@@ -867,7 +868,7 @@ impl Cheatcodes {
         if let Some(broadcast) = &self.broadcast
             && curr_depth == broadcast.depth
         {
-            ecx.tx.caller = broadcast.original_origin;
+            ecx.tx.base.caller = broadcast.original_origin;
 
             // Clean single-call broadcast once we have returned to the original depth
             if broadcast.single_call {
@@ -1009,7 +1010,7 @@ impl Cheatcodes {
         // decreasing sender nonce to ensure that it matches on-chain nonce once we start
         // broadcasting.
         if curr_depth == 0 {
-            let sender = ecx.tx.caller;
+            let sender = ecx.tx.base.caller;
             let account = match super::evm::journaled_account(ecx, sender) {
                 Ok(account) => account,
                 Err(err) => {
@@ -1147,7 +1148,7 @@ impl Cheatcodes {
                 let acc = ecx.journaled_state.account(prank.new_caller);
                 call.value = CallValue::Apparent(acc.info.balance);
                 if let Some(new_origin) = prank.new_origin {
-                    ecx.tx.caller = new_origin;
+                    ecx.tx.base.caller = new_origin;
                 }
             }
 
@@ -1164,7 +1165,7 @@ impl Cheatcodes {
 
                 // At the target depth, or deeper, we set `tx.origin`
                 if let Some(new_origin) = prank.new_origin {
-                    ecx.tx.caller = new_origin;
+                    ecx.tx.base.caller = new_origin;
                     prank_applied = true;
                 }
 
@@ -1193,7 +1194,7 @@ impl Cheatcodes {
                 // At the target depth we set `msg.sender` & tx.origin.
                 // We are simulating the caller as being an EOA, so *both* must be set to the
                 // broadcast.origin.
-                ecx.tx.caller = broadcast.new_origin;
+                ecx.tx.base.caller = broadcast.new_origin;
 
                 call.caller = broadcast.new_origin;
                 // Add a `legacy` transaction to the VecDeque. We use a legacy transaction here
@@ -1411,7 +1412,7 @@ impl Cheatcodes {
     }
 }
 
-impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
+impl Inspector<ZkContext<&mut dyn DatabaseExt>> for Cheatcodes {
     fn initialize_interp(&mut self, interpreter: &mut Interpreter, ecx: Ecx) {
         // When the first interpreter is initialized we've circumvented the balance and gas checks,
         // so we apply our actual block data with the correct fees and all.
@@ -1419,7 +1420,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
             ecx.block = block;
         }
         if let Some(gas_price) = self.gas_price.take() {
-            ecx.tx.gas_price = gas_price;
+            ecx.tx.base.gas_price = gas_price;
         }
 
         // Record gas for current frame.
@@ -1536,7 +1537,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
             if let Some(prank) = &self.get_prank(curr_depth)
                 && curr_depth == prank.depth
             {
-                ecx.tx.caller = prank.prank_origin;
+                ecx.tx.base.caller = prank.prank_origin;
 
                 // Clean single-call prank once we have returned to the original depth
                 if prank.single_call {
@@ -1548,7 +1549,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
             if let Some(broadcast) = &self.broadcast
                 && curr_depth == broadcast.depth
             {
-                ecx.tx.caller = broadcast.original_origin;
+                ecx.tx.base.caller = broadcast.original_origin;
 
                 // Clean single-call broadcast once we have returned to the original depth
                 if broadcast.single_call {
@@ -1818,7 +1819,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for Cheatcodes {
 
         // try to diagnose reverts in multi-fork mode where a call is made to an address that does
         // not exist
-        if let TxKind::Call(test_contract) = ecx.tx.kind {
+        if let TxKind::Call(test_contract) = ecx.tx.base.kind {
             // if a call to a different contract than the original test contract returned with
             // `Stop` we check if the contract actually exists on the active fork
             if ecx.journaled_state.db().is_forked_mode()
