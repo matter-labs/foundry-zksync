@@ -69,15 +69,16 @@ mod tests {
     /// Creates a new EVM instance with the custom precompile factory.
     fn create_eth_evm(
         spec: SpecId,
-    ) -> (foundry_evm::Env, EitherEvm<EmptyDBTyped<Infallible>, NoOpInspector, PrecompilesMap>)
+    ) -> (crate::eth::backend::env::EthEnv, EitherEvm<EmptyDBTyped<Infallible>, NoOpInspector, PrecompilesMap>)
     {
-        let eth_env = foundry_evm::Env {
+        let eth_env = crate::eth::backend::env::EthEnv {
             evm_env: EvmEnv { block_env: Default::default(), cfg_env: CfgEnv::new_with_spec(spec) },
             tx: TxEnv {
                 kind: TxKind::Call(PRECOMPILE_ADDR),
                 data: PAYLOAD.into(),
                 ..Default::default()
             },
+            ..Default::default()
         };
 
         let eth_evm_context = EthEvmContext {
