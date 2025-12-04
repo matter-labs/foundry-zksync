@@ -1129,15 +1129,18 @@ impl<'a> FunctionRunner<'a> {
     }
 
     fn build_fuzz_state(&self, invariant: bool) -> EvmFuzzState {
-        let config =
-            if invariant { self.config.invariant.dictionary } else { self.config.fuzz.dictionary };
+        let (config, no_zksync_reserved_addresses) = if invariant {
+            (self.config.invariant.dictionary, self.config.invariant.no_zksync_reserved_addresses)
+        } else {
+            (self.config.fuzz.dictionary, self.config.fuzz.no_zksync_reserved_addresses)
+        };
         if let Some(db) = self.executor.backend().active_fork_db() {
             EvmFuzzState::new(
                 &self.setup.deployed_libs,
                 db,
                 config,
                 Some(&self.cr.mcr.fuzz_literals),
-                false,
+                no_zksync_reserved_addresses,
             )
         } else {
             let db = self.executor.backend().mem_db();
@@ -1146,7 +1149,7 @@ impl<'a> FunctionRunner<'a> {
                 db,
                 config,
                 Some(&self.cr.mcr.fuzz_literals),
-                false,
+                no_zksync_reserved_addresses,
             )
         }
     }
