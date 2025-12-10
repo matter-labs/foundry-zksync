@@ -27,6 +27,8 @@ ignore = [
     "RUSTSEC-2025-0104",
     # https://rustsec.org/advisories/RUSTSEC-2025-0119 number_prefix is unmaintained
     "RUSTSEC-2025-0119",
+    # https://rustsec.org/advisories/RUSTSEC-2025-0134 rustls-pemfile is unmaintained
+    "RUSTSEC-2025-0134",
 ]
 
 # This section is considered when running `cargo deny check bans`.
