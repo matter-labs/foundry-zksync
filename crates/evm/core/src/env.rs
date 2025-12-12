@@ -1,8 +1,7 @@
 pub use alloy_evm::EvmEnv;
 use revm::{
-    Context, Database, Journal, JournalEntry,
+    Database, Journal, JournalEntry,
     context::{BlockEnv, CfgEnv, JournalInner, JournalTr, TxEnv},
-    primitives::hardfork::SpecId,
 };
 use zksync_revm::{ZKsyncEnv, ZKsyncTx, ZkContext, ZkSpecId};
 

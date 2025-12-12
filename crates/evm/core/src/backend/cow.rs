@@ -18,7 +18,7 @@ use revm::{
     bytecode::Bytecode,
     context_interface::result::ResultAndState,
     database::DatabaseRef,
-    primitives::{HashMap as Map, hardfork::SpecId},
+    primitives::HashMap as Map,
     state::{Account, AccountInfo},
 };
 use std::{any::Any, borrow::Cow, collections::BTreeMap};

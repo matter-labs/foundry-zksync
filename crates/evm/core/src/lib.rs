@@ -6,7 +6,6 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use crate::constants::DEFAULT_CREATE2_DEPLOYER;
-use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, map::HashMap};
 use auto_impl::auto_impl;
 use backend::DatabaseExt;

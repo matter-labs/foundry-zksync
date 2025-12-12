@@ -1,6 +1,5 @@
 use std::any::Any;
 
-use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, B256, U256};
 use alloy_rpc_types::TransactionRequest;
 use eyre::{Ok, Result};
@@ -25,7 +24,7 @@ use revm::{
     primitives::{HashMap, HashSet},
 };
 use serde::{Deserialize, Serialize};
-use zksync_revm::{ZKsyncTx, ZkContext, ZkSpecId};
+use zksync_revm::ZkContext;
 
 use crate::backend::{
     context::{ZksyncBackendStrategyContext, ZksyncInspectContext},

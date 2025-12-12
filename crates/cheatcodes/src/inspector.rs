@@ -54,7 +54,6 @@ use revm::{
         Gas, Host, InstructionResult, Interpreter, InterpreterAction, InterpreterResult,
         interpreter_types::{Jumps, LoopControl, MemoryTr},
     },
-    primitives::hardfork::SpecId,
 };
 use serde_json::Value;
 use std::{

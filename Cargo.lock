@@ -291,7 +291,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-evm"
-version = "0.24.1"
+version = "0.24.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01be36ba6f5e6e62563b369e03ca529eac46aea50677f84655084b4750816574"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -403,7 +405,9 @@ dependencies = [
 
 [[package]]
 name = "alloy-op-evm"
-version = "0.24.1"
+version = "0.24.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "231262d7e06000f3fb642d32d38ca75e09e78e04977c10be0a07a5ee2c869cfd"
 dependencies = [
  "alloy-consensus",
  "alloy-eips",
@@ -10054,6 +10058,8 @@ dependencies = [
 [[package]]
 name = "revm"
 version = "33.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c85ed0028f043f87b3c88d4a4cb6f0a76440085523b6a8afe5ff003cf418054"
 dependencies = [
  "revm-bytecode",
  "revm-context",
@@ -10071,6 +10077,8 @@ dependencies = [
 [[package]]
 name = "revm-bytecode"
 version = "7.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2c6b5e6e8dd1e28a4a60e5f46615d4ef0809111c9e63208e55b5c7058200fb0"
 dependencies = [
  "bitvec",
  "phf 0.13.1",
@@ -10081,6 +10089,8 @@ dependencies = [
 [[package]]
 name = "revm-context"
 version = "12.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f038f0c9c723393ac897a5df9140b21cfa98f5753a2cb7d0f28fa430c4118abf"
 dependencies = [
  "bitvec",
  "cfg-if",
@@ -10096,6 +10106,8 @@ dependencies = [
 [[package]]
 name = "revm-context-interface"
 version = "13.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "431c9a14e4ef1be41ae503708fd02d974f80ef1f2b6b23b5e402e8d854d1b225"
 dependencies = [
  "alloy-eip2930",
  "alloy-eip7702",
@@ -10110,6 +10122,8 @@ dependencies = [
 [[package]]
 name = "revm-database"
 version = "9.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "980d8d6bba78c5dd35b83abbb6585b0b902eb25ea4448ed7bfba6283b0337191"
 dependencies = [
  "alloy-eips",
  "revm-bytecode",
@@ -10122,6 +10136,8 @@ dependencies = [
 [[package]]
 name = "revm-database-interface"
 version = "8.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8cce03e3780287b07abe58faf4a7f5d8be7e81321f93ccf3343c8f7755602bae"
 dependencies = [
  "auto_impl",
  "either",
@@ -10133,6 +10149,8 @@ dependencies = [
 [[package]]
 name = "revm-handler"
 version = "14.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d44f8f6dbeec3fecf9fe55f78ef0a758bdd92ea46cd4f1ca6e2a946b32c367f3"
 dependencies = [
  "auto_impl",
  "derive-where",
@@ -10150,6 +10168,8 @@ dependencies = [
 [[package]]
 name = "revm-inspector"
 version = "14.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5617e49216ce1ca6c8826bcead0386bc84f49359ef67cde6d189961735659f93"
 dependencies = [
  "auto_impl",
  "either",
@@ -10186,6 +10206,8 @@ dependencies = [
 [[package]]
 name = "revm-interpreter"
 version = "31.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26ec36405f7477b9dccdc6caa3be19adf5662a7a0dffa6270cdb13a090c077e5"
 dependencies = [
  "revm-bytecode",
  "revm-context-interface",
@@ -10197,6 +10219,8 @@ dependencies = [
 [[package]]
 name = "revm-precompile"
 version = "31.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a62958af953cc4043e93b5be9b8497df84cc3bd612b865c49a7a7dfa26a84e2"
 dependencies = [
  "ark-bls12-381",
  "ark-bn254",
@@ -10220,6 +10244,8 @@ dependencies = [
 [[package]]
 name = "revm-primitives"
 version = "21.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29e161db429d465c09ba9cbff0df49e31049fe6b549e28eb0b7bd642fcbd4412"
 dependencies = [
  "alloy-primitives",
  "num_enum 0.7.5",
@@ -10230,6 +10256,8 @@ dependencies = [
 [[package]]
 name = "revm-state"
 version = "8.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d8be953b7e374dbdea0773cf360debed8df394ea8d82a8b240a6b5da37592fc"
 dependencies = [
  "bitflags 2.10.0",
  "revm-bytecode",
@@ -14593,6 +14621,7 @@ dependencies = [
 [[package]]
 name = "zksync-revm"
 version = "0.1.0"
+source = "git+https://github.com/nbaztec/zksync-revm?branch=revm-33.1.0#0811929929a89704c37f3c6cd2b1216cbb08ff9c"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",

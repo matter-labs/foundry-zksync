@@ -21,7 +21,6 @@ use foundry_common::{
         SlotInfo,
     },
 };
-use foundry_compilers::artifacts::EvmVersion;
 use foundry_evm_core::{
     ContextExt,
     backend::{DatabaseExt, RevertStateSnapshotAction},
@@ -43,10 +42,9 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use zksync_revm::{IntoZkSpecId, ZkSpecId};
+use zksync_revm::ZkSpecId;
 mod record_debug_step;
 use foundry_common::fmt::format_token_raw;
-use foundry_config::evm_spec_id;
 use record_debug_step::{convert_call_trace_ctx_to_debug_step, flatten_call_trace};
 use serde::Serialize;
 
