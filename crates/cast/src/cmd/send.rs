@@ -269,7 +269,7 @@ pub(crate) async fn cast_send<P: Provider<AnyNetwork>>(
     }
 }
 
-async fn handle_transaction_result<P: Provider<AnyNetwork>>(
+async fn handle_transaction_result<P: Provider<AnyNetwork> + Clone + Unpin>(
     cast: &Cast<P>,
     tx_hash: &TxHash,
     cast_async: bool,
