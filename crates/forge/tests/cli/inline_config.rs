@@ -328,6 +328,7 @@ Ran 2 test suites [ELAPSED]: 3 tests passed, 0 failed, 0 skipped (3 total tests)
     assert_eq!(function_config.test_isolated_function, contract_config.test_isolated_contract);
 });
 
+#[ignore = "zksync-revm does not have multiple specs, enable when it does"]
 forgetest_init!(config_inline_evm_version, |prj, cmd| {
     prj.add_test(
         "inline.sol",
@@ -392,6 +393,44 @@ Ran 2 tests for test/inline.sol:FunctionConfig
 Suite result: ok. 2 passed; 0 failed; 0 skipped; [ELAPSED]
 
 Ran 2 test suites [ELAPSED]: 4 tests passed, 0 failed, 0 skipped (4 total tests)
+
+"#]]);
+});
+
+forgetest_init!(config_inline_evm_version_zksync, |prj, cmd| {
+    prj.add_test(
+        "inline.sol",
+        r#"
+        import {Test} from "forge-std/Test.sol";
+
+        contract FunctionConfig is Test {
+            /// forge-config: default.evm_version = "shanghai"
+            function test_new() public {
+                assertEq("atlas", vm.getEvmVersion());
+            }
+        }
+
+        /// forge-config: default.evm_version = "shanghai"
+        contract ContractConfig is Test {
+            /// forge-config: default.evm_version = "cancun"
+            function test_new() public {
+                assertEq("atlas", vm.getEvmVersion());
+            }
+        }
+    "#,
+    );
+
+    cmd.args(["test", "--evm-version=cancun", "-j1"]).assert_success().stdout_eq(str![[r#"
+...
+Ran 1 test for test/inline.sol:ContractConfig
+[PASS] test_new() ([GAS])
+Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]
+
+Ran 1 test for test/inline.sol:FunctionConfig
+[PASS] test_new() ([GAS])
+Suite result: ok. 1 passed; 0 failed; 0 skipped; [ELAPSED]
+
+Ran 2 test suites [ELAPSED]: 2 tests passed, 0 failed, 0 skipped (2 total tests)
 
 "#]]);
 });

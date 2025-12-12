@@ -1547,10 +1547,13 @@ Traces:
 });
 
 // https://github.com/foundry-rs/foundry/issues/4370
-forgetest_init!(pause_gas_metering_with_delete, |prj, cmd| {
-    prj.add_test(
-        "ATest.t.sol",
-        r#"
+forgetest_init!(
+    #[ignore = "zksync-revm supports only cancun spec, eip-7702 gas floor unsupported"]
+    pause_gas_metering_with_delete,
+    |prj, cmd| {
+        prj.add_test(
+            "ATest.t.sol",
+            r#"
 import {Test} from "forge-std/Test.sol";
 contract ATest is Test {
     uint a;
@@ -1562,14 +1565,15 @@ contract ATest is Test {
     }
 }
    "#,
-    );
+        );
 
-    cmd.args(["test"]).with_no_redact().assert_success().stdout_eq(str![[r#"
+        cmd.args(["test"]).with_no_redact().assert_success().stdout_eq(str![[r#"
 ...
 [PASS] test_negativeGas() (gas: 96)
 ...
 "#]]);
-});
+    }
+);
 
 // tests `pauseTracing` and `resumeTracing` functions
 #[cfg(not(feature = "isolate-by-default"))]
@@ -1656,14 +1660,17 @@ Traces:
 "#]]);
 });
 
-forgetest_init!(gas_metering_reset, |prj, cmd| {
-    prj.insert_ds_test();
-    prj.insert_vm();
-    prj.clear();
+forgetest_init!(
+    #[ignore = "zksync-revm supports only cancun spec, eip-7702 gas floor unsupported"]
+    gas_metering_reset,
+    |prj, cmd| {
+        prj.insert_ds_test();
+        prj.insert_vm();
+        prj.clear();
 
-    prj.add_source(
-        "ATest.t.sol",
-        r#"
+        prj.add_source(
+            "ATest.t.sol",
+            r#"
 import {Vm} from "./Vm.sol";
 import {DSTest} from "./test.sol";
 contract B {
@@ -1764,9 +1771,9 @@ contract ATest is DSTest {
     }
 }
      "#,
-    );
+        );
 
-    cmd.args(["test"]).with_no_redact().assert_success().stdout_eq(str![[r#"
+        cmd.args(["test"]).with_no_redact().assert_success().stdout_eq(str![[r#"
 ...
 [PASS] testResetGas() (gas: 96)
 [PASS] testResetGas1() (gas: 96)
@@ -1781,7 +1788,8 @@ contract ATest is DSTest {
 [PASS] testResetNegativeGas() (gas: 96)
 ...
 "#]]);
-});
+    }
+);
 
 // https://github.com/foundry-rs/foundry/issues/8705
 forgetest_init!(test_expect_revert_decode, |prj, cmd| {

@@ -166,24 +166,28 @@ forgetest_async!(can_verify_bytecode_no_metadata, |prj, cmd| {
     );
 });
 
-forgetest_async!(can_verify_bytecode_with_metadata, |prj, cmd| {
-    test_verify_bytecode(
-        prj,
-        cmd,
-        "0xb8901acb165ed027e32754e0ffe830802919727f",
-        "L1_ETH_Bridge",
-        None,
-        Config {
-            evm_version: EvmVersion::Paris,
-            optimizer_runs: Some(50000),
-            optimizer: Some(true),
-            ..Default::default()
-        },
-        "etherscan",
-        "https://api.etherscan.io/v2/api?chainid=1",
-        ("partial", "partial"),
-    );
-});
+forgetest_async!(
+    #[ignore = "zksync-revm supports only cancun spec, paris unsupported"]
+    can_verify_bytecode_with_metadata,
+    |prj, cmd| {
+        test_verify_bytecode(
+            prj,
+            cmd,
+            "0xb8901acb165ed027e32754e0ffe830802919727f",
+            "L1_ETH_Bridge",
+            None,
+            Config {
+                evm_version: EvmVersion::Paris,
+                optimizer_runs: Some(50000),
+                optimizer: Some(true),
+                ..Default::default()
+            },
+            "etherscan",
+            "https://api.etherscan.io/v2/api?chainid=1",
+            ("partial", "partial"),
+        );
+    }
+);
 
 // Test non-CREATE2 deployed contract with blockscout
 forgetest_async!(can_verify_bytecode_with_blockscout, |prj, cmd| {

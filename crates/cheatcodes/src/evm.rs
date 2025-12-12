@@ -43,7 +43,7 @@ use std::{
     path::Path,
     str::FromStr,
 };
-use zksync_revm::IntoZkSpecId;
+use zksync_revm::{IntoZkSpecId, ZkSpecId};
 mod record_debug_step;
 use foundry_common::fmt::format_token_raw;
 use foundry_config::evm_spec_id;
@@ -1106,11 +1106,10 @@ impl Cheatcode for stopAndReturnDebugTraceRecordingCall {
 impl Cheatcode for setEvmVersionCall {
     fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
         let Self { evm } = self;
-        let spec_id = evm_spec_id(
-            EvmVersion::from_str(evm)
-                .map_err(|_| Error::from(format!("invalid evm version {evm}")))?,
-        );
-        ccx.state.execution_evm_version = Some(spec_id.into_zk_spec_id());
+        let evm_capitalized = format!("{}{}", evm[..1].to_uppercase(), &evm[1..]);
+        let spec_id = ZkSpecId::from_str(&evm_capitalized)
+            .map_err(|_| Error::from(format!("invalid evm version {evm}")))?;
+        ccx.state.execution_evm_version = Some(spec_id);
         Ok(Default::default())
     }
 }

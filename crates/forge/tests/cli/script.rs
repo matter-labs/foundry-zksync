@@ -2701,10 +2701,13 @@ Warning: No transactions to broadcast.
 });
 
 // Tests EIP-7702 broadcast <https://github.com/foundry-rs/foundry/issues/10461>
-forgetest_async!(can_broadcast_txes_with_signed_auth, |prj, cmd| {
-    foundry_test_utils::util::initialize(prj.root());
-    prj.initialize_default_contracts();
-    prj.add_script(
+forgetest_async!(
+    #[ignore = "zksync-revm supports only cancun spec, eip-7702 unsupported"]
+    can_broadcast_txes_with_signed_auth,
+    |prj, cmd| {
+        foundry_test_utils::util::initialize(prj.root());
+        prj.initialize_default_contracts();
+        prj.add_script(
             "EIP7702Script.s.sol",
             r#"
 import "forge-std/Script.sol";
@@ -2732,10 +2735,10 @@ contract EIP7702Script is Script {
    "#,
         );
 
-    let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Prague.into()));
-    let (_api, handle) = spawn(node_config).await;
+        let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Prague.into()));
+        let (_api, handle) = spawn(node_config).await;
 
-    cmd.args([
+        cmd.args([
         "script",
         "script/EIP7702Script.s.sol",
         "--rpc-url",
@@ -2835,15 +2838,19 @@ ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
 
 
 "#]]);
-});
+    }
+);
 
 // Tests EIP-7702 with multiple auth <https://github.com/foundry-rs/foundry/issues/10551>
 // Alice sends 5 ETH from Bob to Receiver1 and 1 ETH to Receiver2
-forgetest_async!(can_broadcast_txes_with_multiple_auth, |prj, cmd| {
-    foundry_test_utils::util::initialize(prj.root());
-    prj.add_source(
-        "BatchCallDelegation.sol",
-        r#"
+forgetest_async!(
+    #[ignore = "zksync-revm supports only cancun spec, eip-7702 unsupported"]
+    can_broadcast_txes_with_multiple_auth,
+    |prj, cmd| {
+        foundry_test_utils::util::initialize(prj.root());
+        prj.add_source(
+            "BatchCallDelegation.sol",
+            r#"
 contract BatchCallDelegation {
     event CallExecuted(address indexed to, uint256 indexed value, bytes data, bool success);
 
@@ -2863,9 +2870,9 @@ contract BatchCallDelegation {
     }
 }
    "#,
-    );
+        );
 
-    prj.add_script(
+        prj.add_script(
             "BatchCallDelegationScript.s.sol",
             r#"
 import {Script, console} from "forge-std/Script.sol";
@@ -2911,22 +2918,22 @@ contract BatchCallDelegationScript is Script {
    "#,
         );
 
-    let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Prague.into()));
-    let (api, handle) = spawn(node_config).await;
+        let node_config = NodeConfig::test().with_hardfork(Some(EthereumHardfork::Prague.into()));
+        let (api, handle) = spawn(node_config).await;
 
-    cmd.args([
-        "script",
-        "script/BatchCallDelegationScript.s.sol",
-        "--rpc-url",
-        &handle.http_endpoint(),
-        "--non-interactive",
-        "--slow",
-        "--broadcast",
-        "--evm-version",
-        "prague",
-    ])
-    .assert_success()
-    .stdout_eq(str![[r#"
+        cmd.args([
+            "script",
+            "script/BatchCallDelegationScript.s.sol",
+            "--rpc-url",
+            &handle.http_endpoint(),
+            "--non-interactive",
+            "--slow",
+            "--broadcast",
+            "--evm-version",
+            "prague",
+        ])
+        .assert_success()
+        .stdout_eq(str![[r#"
 [COMPILING_FILES] with [SOLC_VERSION]
 [SOLC_VERSION] [ELAPSED]
 Compiler run successful!
@@ -2958,35 +2965,36 @@ ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
 
 "#]]);
 
-    // Alice nonce should be 2 (tx sender and one auth)
-    let alice_acc = api
-        .get_account(address!("0x70997970C51812dc3A010C7d01b50e0d17dc79C8"), None)
-        .await
-        .unwrap();
-    assert_eq!(alice_acc.nonce, 2);
+        // Alice nonce should be 2 (tx sender and one auth)
+        let alice_acc = api
+            .get_account(address!("0x70997970C51812dc3A010C7d01b50e0d17dc79C8"), None)
+            .await
+            .unwrap();
+        assert_eq!(alice_acc.nonce, 2);
 
-    // Bob nonce should be 2 (two auths) and balance reduced by 6 ETH.
-    let bob_acc = api
-        .get_account(address!("0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"), None)
-        .await
-        .unwrap();
-    assert_eq!(bob_acc.nonce, 2);
-    assert_eq!(bob_acc.balance.to_string(), "94000000000000000000");
+        // Bob nonce should be 2 (two auths) and balance reduced by 6 ETH.
+        let bob_acc = api
+            .get_account(address!("0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"), None)
+            .await
+            .unwrap();
+        assert_eq!(bob_acc.nonce, 2);
+        assert_eq!(bob_acc.balance.to_string(), "94000000000000000000");
 
-    // Receiver balances should be updated with 5 ETH and 1 ETH.
-    let receiver1 = api
-        .get_account(address!("0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"), None)
-        .await
-        .unwrap();
-    assert_eq!(receiver1.nonce, 0);
-    assert_eq!(receiver1.balance.to_string(), "105000000000000000000");
-    let receiver2 = api
-        .get_account(address!("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"), None)
-        .await
-        .unwrap();
-    assert_eq!(receiver2.nonce, 0);
-    assert_eq!(receiver2.balance.to_string(), "101000000000000000000");
-});
+        // Receiver balances should be updated with 5 ETH and 1 ETH.
+        let receiver1 = api
+            .get_account(address!("0x14dC79964da2C08b23698B3D3cc7Ca32193d9955"), None)
+            .await
+            .unwrap();
+        assert_eq!(receiver1.nonce, 0);
+        assert_eq!(receiver1.balance.to_string(), "105000000000000000000");
+        let receiver2 = api
+            .get_account(address!("0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc"), None)
+            .await
+            .unwrap();
+        assert_eq!(receiver2.nonce, 0);
+        assert_eq!(receiver2.balance.to_string(), "101000000000000000000");
+    }
+);
 
 // <https://github.com/foundry-rs/foundry/issues/11159>
 forgetest_async!(check_broadcast_log_with_additional_contracts, |prj, cmd| {
