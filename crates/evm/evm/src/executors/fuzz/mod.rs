@@ -99,20 +99,20 @@ impl FuzzedExecutor {
         &mut self,
         func: &Function,
         fuzz_fixtures: &FuzzFixtures,
-        deployed_libs: &[Address],
+        state: EvmFuzzState,
         address: Address,
         rd: &RevertDecoder,
         progress: Option<&ProgressBar>,
         early_exit: &EarlyExit,
     ) -> Result<FuzzTestResult> {
+        let state = &state;
         // Stores the fuzz test execution data.
         let mut test_data = FuzzTestData::default();
-        let state = self.build_fuzz_state(deployed_libs);
         let no_zksync_reserved_addresses = state.dictionary_read().no_zksync_reserved_addresses();
         let dictionary_weight = self.config.dictionary.dictionary_weight.min(100);
         let strategy = proptest::prop_oneof![
             100 - dictionary_weight => fuzz_calldata(func.clone(), fuzz_fixtures, no_zksync_reserved_addresses),
-            dictionary_weight => fuzz_calldata_from_state(func.clone(), &state),
+            dictionary_weight => fuzz_calldata_from_state(func.clone(), state),
         ]
         .prop_map(move |calldata| BasicTxDetails {
             warp: None,
@@ -174,7 +174,7 @@ impl FuzzedExecutor {
 
                 test_data.runs += 1;
 
-                match corpus_manager.new_input(&mut self.runner, &state, func) {
+                match corpus_manager.new_input(&mut self.runner, state, func) {
                     Ok(input) => input,
                     Err(err) => {
                         test_data.failure = Some(TestCaseError::fail(format!(
@@ -381,31 +381,6 @@ impl FuzzedExecutor {
                 counterexample: (calldata, call),
                 breakpoints,
             }))
-        }
-    }
-
-    /// Stores fuzz state for use with [fuzz_calldata_from_state]
-    pub fn build_fuzz_state(&self, deployed_libs: &[Address]) -> EvmFuzzState {
-        let inspector = self.executor.inspector();
-
-        if let Some(fork_db) = self.executor.backend().active_fork_db() {
-            EvmFuzzState::new(
-                fork_db,
-                self.config.dictionary,
-                deployed_libs,
-                self.config.no_zksync_reserved_addresses,
-                inspector.analysis.as_ref(),
-                inspector.paths_config(),
-            )
-        } else {
-            EvmFuzzState::new(
-                self.executor.backend().mem_db(),
-                self.config.dictionary,
-                deployed_libs,
-                self.config.no_zksync_reserved_addresses,
-                inspector.analysis.as_ref(),
-                inspector.paths_config(),
-            )
         }
     }
 }

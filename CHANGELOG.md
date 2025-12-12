@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.1](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.0...foundry-zksync-v0.1.1) (2025-12-08)
+
+
+### Features
+
+* **cast:** add support for raw transaction data with --data flag in send command, closes ([#12660](https://github.com/matter-labs/foundry-zksync/issues/12660)) ([6a042e8](https://github.com/matter-labs/foundry-zksync/commit/6a042e8eb2f03c32ed3f5f3d9082a65fc1738dfa))
+
+
+### Bug Fixes
+
+* bump svm-rs and builds ([6a042e8](https://github.com/matter-labs/foundry-zksync/commit/6a042e8eb2f03c32ed3f5f3d9082a65fc1738dfa))
+* do not skip first line of error ([#1218](https://github.com/matter-labs/foundry-zksync/issues/1218)) ([3cfad84](https://github.com/matter-labs/foundry-zksync/commit/3cfad8400c3a6496d9020c076e9795e6ebbd02c2))
+
 ## [0.1.0](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.0.32...foundry-zksync-v0.1.0) (2025-11-28)
 
 
