@@ -1,4 +1,3 @@
-use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{FixedBytes, Log, hex};
 use anvil_zksync_config::types::SystemContractsOptions as Options;
 use anvil_zksync_core::{

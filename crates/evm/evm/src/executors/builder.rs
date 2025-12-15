@@ -1,6 +1,5 @@
 use crate::{executors::Executor, inspectors::InspectorStackBuilder};
 use foundry_evm_core::{Env, backend::Backend};
-use revm::primitives::hardfork::SpecId;
 use zksync_revm::ZkSpecId;
 
 use super::strategy::ExecutorStrategy;

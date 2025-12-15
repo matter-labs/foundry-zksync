@@ -30,7 +30,6 @@ foundry-evm.workspace = true
 tempfile.workspace = true
 
 solar.workspace = true
-zksync-revm.workspace = true
 
 alloy-dyn-abi = { workspace = true, features = ["arbitrary"] }
 alloy-primitives = { workspace = true, features = [

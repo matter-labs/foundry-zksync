@@ -29,7 +29,6 @@ use foundry_evm::{
 };
 use foundry_evm_networks::NetworkConfigs;
 use rayon::prelude::*;
-use revm::primitives::hardfork::SpecId;
 use std::{
     collections::BTreeMap,
     path::Path,

@@ -6,7 +6,6 @@
 /// is usually collecting all the diffs - and applies them to database itself.
 use std::{collections::HashMap as sHashMap, fmt::Debug, sync::LazyLock};
 
-use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, U256 as rU256, map::HashMap};
 use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
 use foundry_cheatcodes_common::record::RecordAccess;

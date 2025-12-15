@@ -19,7 +19,6 @@ use foundry_evm::{
 use solang_parser::pt;
 use std::ops::ControlFlow;
 use yansi::Paint;
-use zksync_revm::IntoZkSpecId;
 
 /// Executor implementation for [SessionSource]
 impl SessionSource {

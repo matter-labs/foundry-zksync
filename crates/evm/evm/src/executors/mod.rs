@@ -40,7 +40,6 @@ use revm::{
     },
     database::{DatabaseCommit, DatabaseRef},
     interpreter::{InstructionResult, return_ok},
-    primitives::hardfork::SpecId,
 };
 use std::{
     borrow::Cow,

@@ -10,7 +10,7 @@ use foundry_config::{Chain, Config, utils::evm_spec_id};
 use foundry_evm_core::{backend::Backend, fork::CreateFork, opts::EvmOpts};
 use foundry_evm_networks::NetworkConfigs;
 use foundry_evm_traces::TraceMode;
-use revm::{primitives::hardfork::SpecId, state::Bytecode};
+use revm::state::Bytecode;
 use std::ops::{Deref, DerefMut};
 use zksync_revm::{IntoZkSpecId, ZkSpecId};
 

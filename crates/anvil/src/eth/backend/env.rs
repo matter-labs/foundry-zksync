@@ -5,14 +5,6 @@ use revm::{
     context::{BlockEnv, CfgEnv, TxEnv},
     primitives::hardfork::SpecId,
 };
-use zksync_revm::{IntoZkSpecId, ZKsyncTx, ZkSpecId};
-
-/// Helper container type for [`EvmEnv`] and [`OpTransaction<TxEnd>`].
-#[derive(Clone, Debug, Default)]
-pub struct EthEnv {
-    pub evm_env: EvmEnv,
-    pub tx: TxEnv,
-}
 
 /// Helper container type for [`EvmEnv`] and [`OpTransaction<TxEnd>`].
 #[derive(Clone, Debug, Default)]
@@ -24,13 +16,8 @@ pub struct Env {
 
 /// Helper container type for [`EvmEnv`] and [`OpTransaction<TxEnv>`].
 impl Env {
-    pub fn new(
-        cfg: CfgEnv,
-        block: BlockEnv,
-        tx: OpTransaction<TxEnv>,
-        networks: NetworkConfigs,
-    ) -> Self {
-        Self { evm_env: EvmEnv { cfg_env: cfg, block_env: block }, tx, networks }
+    pub fn new(evm_env: EvmEnv, tx: OpTransaction<TxEnv>, networks: NetworkConfigs) -> Self {
+        Self { evm_env, tx, networks }
     }
 }
 

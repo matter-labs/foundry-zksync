@@ -1,4 +1,3 @@
-use alloy_evm::{EvmEnv, eth::EthEvmContext};
 use alloy_primitives::{hex, map::HashMap};
 use itertools::Itertools;
 use revm::{
@@ -10,7 +9,7 @@ use revm::{
 };
 use tracing::{debug, info};
 use zksync_basic_types::H256;
-use zksync_revm::{ZKsyncEnv, ZKsyncTx, ZkContext, ZkSpecId};
+use zksync_revm::{ZKsyncEnv, ZKsyncTx, ZkContext};
 use zksync_types::{
     CONTRACT_DEPLOYER_ADDRESS, CREATE2_FACTORY_ADDRESS, U256, ethabi, fee::Fee, l2::L2Tx,
     transaction_request::PaymasterParams,

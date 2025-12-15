@@ -7,14 +7,13 @@ use crate::{
     Env, InspectorExt, backend::DatabaseExt, constants::DEFAULT_CREATE2_DEPLOYER_CODEHASH,
 };
 use alloy_consensus::constants::KECCAK_EMPTY;
-use alloy_evm::{Evm, EvmEnv, eth::EthEvmContext, precompiles::PrecompilesMap};
+use alloy_evm::{Evm, EvmEnv, precompiles::PrecompilesMap};
 use alloy_primitives::{Address, Bytes, U256};
 use foundry_fork_db::DatabaseError;
 use revm::{
     Journal,
     context::{
-        BlockEnv, CfgEnv, ContextTr, CreateScheme, Evm as RevmEvm, JournalTr, LocalContext,
-        LocalContextTr, TxEnv,
+        BlockEnv, ContextTr, CreateScheme, JournalTr, LocalContext, LocalContextTr, TxEnv,
         result::{EVMError, ExecResultAndState, ExecutionResult, HaltReason, ResultAndState},
     },
     handler::{
@@ -52,7 +51,7 @@ pub fn new_evm_with_inspector<'db, I: InspectorExt>(
         error: Ok(()),
     };
     ctx.cfg.tx_chain_id_check = true;
-    let spec = ctx.cfg.spec;
+    let _spec = ctx.cfg.spec;
 
     let mut evm = FoundryEvm {
         // inner: RevmEvm::new_with_inspector(
@@ -89,6 +88,7 @@ pub fn new_evm_with_existing_context<'a>(
 }
 
 /// Get the precompiles for the given spec.
+#[allow(dead_code)]
 fn get_precompiles(spec: SpecId) -> PrecompilesMap {
     PrecompilesMap::from_static(
         EthPrecompiles {

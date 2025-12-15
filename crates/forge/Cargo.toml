@@ -65,7 +65,7 @@ alloy-serde.workspace = true
 alloy-signer.workspace = true
 alloy-transport.workspace = true
 
-revm.workspace = true
+# revm.workspace = true
 zksync-revm.workspace = true
 
 alloy-zksync.workspace = true

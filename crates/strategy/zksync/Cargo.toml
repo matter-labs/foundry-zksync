@@ -15,7 +15,7 @@ workspace = true
 [dependencies]
 alloy-sol-types.workspace = true
 alloy-json-abi.workspace = true
-alloy-evm.workspace = true
+# alloy-evm.workspace = true
 alloy-zksync.workspace = true
 foundry-common.workspace = true
 foundry-compilers.workspace = true
