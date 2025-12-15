@@ -8,6 +8,13 @@ use revm::{
 
 /// Helper container type for [`EvmEnv`] and [`OpTransaction<TxEnd>`].
 #[derive(Clone, Debug, Default)]
+pub struct EthEnv {
+    pub evm_env: EvmEnv,
+    pub tx: TxEnv,
+}
+
+/// Helper container type for [`EvmEnv`] and [`OpTransaction<TxEnd>`].
+#[derive(Clone, Debug, Default)]
 pub struct Env {
     pub evm_env: EvmEnv,
     pub tx: OpTransaction<TxEnv>,
