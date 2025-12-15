@@ -3,10 +3,12 @@ use foundry_test_utils::rpc;
 // Test evm version switch during tests / scripts.
 // <https://github.com/foundry-rs/foundry/issues/9840>
 // <https://github.com/foundry-rs/foundry/issues/6228>
-#[ignore = "zksync-revm does not have multiple specs, enable when it does"]
-forgetest_init!(test_set_evm_version, |prj, cmd| {
-    let endpoint = rpc::next_http_archive_rpc_url();
-    prj.add_test(
+forgetest_init!(
+    #[ignore = "zksync-revm does not have multiple specs, enable when it does"]
+    test_set_evm_version,
+    |prj, cmd| {
+        let endpoint = rpc::next_http_archive_rpc_url();
+        prj.add_test(
         "TestEvmVersion.t.sol",
         &r#"
 import {Test} from "forge-std/Test.sol";
@@ -49,7 +51,7 @@ contract TestEvmVersion is Test {
    "#.replace("<rpc>", &endpoint),
     );
 
-    cmd.args(["test", "--mc", "TestEvmVersion", "-vvvv"]).assert_success().stdout_eq(str![[r#"
+        cmd.args(["test", "--mc", "TestEvmVersion", "-vvvv"]).assert_success().stdout_eq(str![[r#"
 [COMPILING_FILES] with [SOLC_VERSION]
 [SOLC_VERSION] [ELAPSED]
 Compiler run successful!
@@ -88,8 +90,8 @@ Ran 1 test suite [ELAPSED]: 1 tests passed, 0 failed, 0 skipped (1 total tests)
 
 "#]]);
 
-    // Test evm version set in `setUp` is accounted in test.
-    prj.add_test(
+        // Test evm version set in `setUp` is accounted in test.
+        prj.add_test(
         "TestSetupEvmVersion.t.sol",
         &r#"
 import {Test} from "forge-std/Test.sol";
@@ -118,10 +120,10 @@ contract TestSetupEvmVersion is Test {
 }
    "#.replace("<rpc>", &endpoint),
     );
-    cmd.forge_fuse()
-        .args(["test", "--mc", "TestSetupEvmVersion", "-vvvv"])
-        .assert_failure()
-        .stdout_eq(str![[r#"
+        cmd.forge_fuse()
+            .args(["test", "--mc", "TestSetupEvmVersion", "-vvvv"])
+            .assert_failure()
+            .stdout_eq(str![[r#"
 ...
 [FAIL: EvmError: NotActivated] test_evm_version_in_setup() ([GAS])
 Traces:
@@ -136,8 +138,8 @@ Traces:
 
 "#]]);
 
-    // Test evm version set in constructor is accounted in test.
-    prj.add_test(
+        // Test evm version set in constructor is accounted in test.
+        prj.add_test(
         "TestConstructorEvmVersion.t.sol",
         &r#"
 import {Test} from "forge-std/Test.sol";
@@ -166,10 +168,10 @@ contract TestConstructorEvmVersion is Test {
 }
    "#.replace("<rpc>", &endpoint),
     );
-    cmd.forge_fuse()
-        .args(["test", "--mc", "TestConstructorEvmVersion", "-vvvv"])
-        .assert_failure()
-        .stdout_eq(str![[r#"
+        cmd.forge_fuse()
+            .args(["test", "--mc", "TestConstructorEvmVersion", "-vvvv"])
+            .assert_failure()
+            .stdout_eq(str![[r#"
 ...
 [FAIL: EvmError: NotActivated] test_evm_version_in_constructor() ([GAS])
 Traces:
@@ -178,7 +180,8 @@ Traces:
 ...
 
 "#]]);
-});
+    }
+);
 
 // Test evm version switch during tests / scripts.
 // <https://github.com/foundry-rs/foundry/issues/9840>

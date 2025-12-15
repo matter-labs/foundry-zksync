@@ -40,7 +40,6 @@ use foundry_compilers::{
     solc::{CliSettings, SolcLanguage, SolcSettings},
 };
 use regex::Regex;
-use revm::primitives::hardfork::SpecId;
 use semver::Version;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{
