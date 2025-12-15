@@ -428,7 +428,7 @@ impl<'a> ContractRunner<'a> {
             let interrupt = early_exit.clone();
             self.tokio_handle.spawn(async move {
                 signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
-                interrupt.record_exit();
+                interrupt.record_ctrl_c();
             });
         }
 
@@ -468,9 +468,9 @@ impl<'a> ContractRunner<'a> {
                 );
                 res.duration = start.elapsed();
 
-                // Set fail fast flag if current test failed.
+                // Record test failure for early exit (only triggers if fail-fast is enabled).
                 if res.status.is_failure() {
-                    early_exit.record_exit();
+                    early_exit.record_failure();
                 }
 
                 Some((sig, res))
