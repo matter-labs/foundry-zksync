@@ -91,8 +91,19 @@ pub enum EstimateSubcommands {
 
 impl EstimateArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, mut tx, block, cost, wallet, rpc, command, zk_tx, zk_force } =
-            self;
+        let Self {
+            to,
+            mut sig,
+            mut args,
+            mut tx,
+            block,
+            cost,
+            wallet,
+            rpc,
+            command,
+            zk_tx,
+            zk_force,
+        } = self;
 
         let config = rpc.load_config()?;
         let provider = utils::get_provider(&config)?;

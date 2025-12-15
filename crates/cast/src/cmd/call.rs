@@ -34,8 +34,8 @@ use foundry_evm::{
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
-use foundry_zksync_core::MAX_L2_GAS_LIMIT;
 use foundry_wallets::WalletOpts;
+use foundry_zksync_core::MAX_L2_GAS_LIMIT;
 use itertools::Either;
 use regex::Regex;
 use revm::context::TransactionType;
