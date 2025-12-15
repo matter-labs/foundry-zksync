@@ -80,7 +80,6 @@ mod tests {
                 data: PAYLOAD.into(),
                 ..Default::default()
             },
-            ..Default::default()
         };
 
         let eth_evm_context = EthEvmContext {
