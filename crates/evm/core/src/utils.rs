@@ -160,7 +160,7 @@ pub fn configure_tx_req_env(
 ) -> eyre::Result<()> {
     // If no transaction type is provided, we need to infer it from the other fields.
     let tx_type = tx.transaction_type.unwrap_or_else(|| tx.minimal_tx_type() as u8);
-    env.tx.tx_type = tx_type;
+    env.tx.base.tx_type = tx_type;
 
     let TransactionRequest {
         nonce,
@@ -182,33 +182,33 @@ pub fn configure_tx_req_env(
     } = *tx;
 
     // If no `to` field then set create kind: https://eips.ethereum.org/EIPS/eip-2470#deployment-transaction
-    env.tx.kind = to.unwrap_or(TxKind::Create);
+    env.tx.base.kind = to.unwrap_or(TxKind::Create);
     // If the transaction is impersonated, we need to set the caller to the from
     // address Ref: https://github.com/foundry-rs/foundry/issues/9541
-    env.tx.caller = if let Some(caller) = impersonated_from {
+    env.tx.base.caller = if let Some(caller) = impersonated_from {
         caller
     } else {
         from.ok_or_else(|| eyre::eyre!("missing `from` field"))?
     };
-    env.tx.gas_limit = gas.ok_or_else(|| eyre::eyre!("missing `gas` field"))?;
-    env.tx.nonce = nonce.unwrap_or_default();
-    env.tx.value = value.unwrap_or_default();
-    env.tx.data = input.input().cloned().unwrap_or_default();
-    env.tx.chain_id = chain_id;
+    env.tx.base.gas_limit = gas.ok_or_else(|| eyre::eyre!("missing `gas` field"))?;
+    env.tx.base.nonce = nonce.unwrap_or_default();
+    env.tx.base.value = value.unwrap_or_default();
+    env.tx.base.data = input.input().cloned().unwrap_or_default();
+    env.tx.base.chain_id = chain_id;
 
     // Type 1, EIP-2930
-    env.tx.access_list = access_list.clone().unwrap_or_default();
+    env.tx.base.access_list = access_list.clone().unwrap_or_default();
 
     // Type 2, EIP-1559
-    env.tx.gas_price = gas_price.or(max_fee_per_gas).unwrap_or_default();
-    env.tx.gas_priority_fee = max_priority_fee_per_gas;
+    env.tx.base.gas_price = gas_price.or(max_fee_per_gas).unwrap_or_default();
+    env.tx.base.gas_priority_fee = max_priority_fee_per_gas;
 
     // Type 3, EIP-4844
-    env.tx.blob_hashes = blob_versioned_hashes.clone().unwrap_or_default();
-    env.tx.max_fee_per_blob_gas = max_fee_per_blob_gas.unwrap_or_default();
+    env.tx.base.blob_hashes = blob_versioned_hashes.clone().unwrap_or_default();
+    env.tx.base.max_fee_per_blob_gas = max_fee_per_blob_gas.unwrap_or_default();
 
     // Type 4, EIP-7702
-    env.tx.set_signed_authorization(authorization_list.clone().unwrap_or_default());
+    env.tx.base.set_signed_authorization(authorization_list.clone().unwrap_or_default());
 
     Ok(())
 }

@@ -151,7 +151,7 @@ fn prank(
 
     let prank = Prank::new(
         ccx.caller,
-        ccx.ecx.tx.caller,
+        ccx.ecx.tx.base.caller,
         *new_caller,
         new_origin.copied(),
         depth,

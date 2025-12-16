@@ -1236,6 +1236,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.22",
  "yansi",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -4962,7 +4963,6 @@ dependencies = [
  "rayon",
  "regex",
  "reqwest 0.12.26",
- "revm",
  "rustls 0.23.35",
  "semver 1.0.27",
  "serde",
@@ -4983,6 +4983,7 @@ dependencies = [
  "watchexec-events",
  "watchexec-signals",
  "yansi",
+ "zksync-revm",
  "zksync_telemetry",
 ]
 
@@ -5155,6 +5156,7 @@ dependencies = [
  "tracing",
  "url",
  "yansi",
+ "zksync-revm",
  "zksync_types",
 ]
 
@@ -5211,7 +5213,6 @@ dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
  "alloy-ens",
- "alloy-evm",
  "alloy-genesis",
  "alloy-json-abi",
  "alloy-network",
@@ -5255,6 +5256,7 @@ dependencies = [
  "toml 0.9.8",
  "tracing",
  "walkdir",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5549,6 +5551,7 @@ dependencies = [
  "tracing",
  "walkdir",
  "yansi",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5604,6 +5607,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "uuid 1.19.0",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5657,6 +5661,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zksync-revm",
 ]
 
 [[package]]
@@ -5834,7 +5839,6 @@ name = "foundry-strategy-zksync"
 version = "0.1.1"
 dependencies = [
  "alloy-eips",
- "alloy-evm",
  "alloy-json-abi",
  "alloy-primitives",
  "alloy-rpc-types",
@@ -5858,6 +5862,7 @@ dependencies = [
  "solar-compiler",
  "tokio",
  "tracing",
+ "zksync-revm",
  "zksync_types",
 ]
 
@@ -5993,6 +5998,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "zksync-revm",
  "zksync_basic_types",
  "zksync_contracts",
  "zksync_multivm",
@@ -14610,6 +14616,18 @@ dependencies = [
  "derive_more 2.1.0",
  "serde",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "zksync-revm"
+version = "0.1.0"
+source = "git+https://github.com/nbaztec/zksync-revm?branch=revm-33.1.0#1b4dd14e76ad868eb24da632618ac13fe2a83db2"
+dependencies = [
+ "alloy-evm",
+ "alloy-primitives",
+ "auto_impl",
+ "revm",
+ "serde",
 ]
 
 [[package]]

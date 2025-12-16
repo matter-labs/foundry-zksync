@@ -201,7 +201,7 @@ impl InspectorExt for TraceCollector {
             // `from` are system addresses) since it is already included in EVM trace.
             let record_trace = !is_first_non_system_call
                 && !foundry_zksync_core::is_system_address(inputs.target_address)
-                && inputs.target_address != context.tx.caller;
+                && inputs.target_address != context.tx.base.caller;
 
             let mut outcome = if let Some(reason) = &call.revert_reason {
                 CallOutcome {

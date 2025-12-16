@@ -6,12 +6,12 @@
 /// is usually collecting all the diffs - and applies them to database itself.
 use std::{collections::HashMap as sHashMap, fmt::Debug, sync::LazyLock};
 
-use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{Address, U256 as rU256, map::HashMap};
 use alloy_zksync::contracts::l2::contract_deployer::CONTRACT_DEPLOYER_ADDRESS;
 use foundry_cheatcodes_common::record::RecordAccess;
 use revm::{Database, context::JournalTr};
 use zksync_basic_types::{H160, H256, L2ChainId, U256};
+use zksync_revm::ZkContext;
 use zksync_types::{
     AccountTreeId, CREATE2_FACTORY_ADDRESS, StorageKey, StorageLog, StorageValue, get_code_key,
     get_nonce_key, get_system_context_init_logs, h256_to_u256,
@@ -69,7 +69,7 @@ static DEPLOYED_SYSTEM_CONTRACTS: LazyLock<Vec<DeployedSystemContract>> = LazyLo
         .collect()
 });
 pub struct ZKVMData<'a, DB: Database> {
-    ecx: &'a mut EthEvmContext<DB>,
+    ecx: &'a mut ZkContext<DB>,
     pub factory_deps: HashMap<H256, Vec<u8>>,
     pub override_keys: sHashMap<StorageKey, StorageValue>,
     pub accesses: Option<&'a mut RecordAccess>,
@@ -96,7 +96,7 @@ where
     <DB as Database>::Error: Debug,
 {
     /// Create a new instance of [ZKEVMData].
-    pub fn new(ecx: &'a mut EthEvmContext<DB>) -> Self {
+    pub fn new(ecx: &'a mut ZkContext<DB>) -> Self {
         // load all deployed contract bytecodes from the JournaledState as factory deps
         let mut factory_deps = ecx
             .journaled_state
@@ -127,7 +127,7 @@ where
 
     /// Create a new instance of [ZKEVMData] with system contracts.
     pub fn new_with_system_contracts(
-        ecx: &'a mut EthEvmContext<DB>,
+        ecx: &'a mut ZkContext<DB>,
         chain_id: L2ChainId,
         evm_interpreter: bool,
     ) -> Self {

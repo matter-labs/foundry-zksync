@@ -40,7 +40,6 @@ use foundry_compilers::{
     solc::{CliSettings, SolcLanguage, SolcSettings},
 };
 use regex::Regex;
-use revm::primitives::hardfork::SpecId;
 use semver::Version;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::{
@@ -50,6 +49,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use zksync_revm::{IntoZkSpecId, ZkSpecId};
 
 mod macros;
 
@@ -1291,8 +1291,8 @@ impl Config {
     }
 
     /// Returns the [SpecId] derived from the configured [EvmVersion]
-    pub fn evm_spec_id(&self) -> SpecId {
-        evm_spec_id(self.evm_version)
+    pub fn evm_spec_id(&self) -> ZkSpecId {
+        evm_spec_id(self.evm_version).into_zk_spec_id()
     }
 
     /// Returns whether the compiler version should be auto-detected
