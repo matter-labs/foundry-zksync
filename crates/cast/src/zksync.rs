@@ -15,7 +15,7 @@ use alloy_zksync::network::{
     tx_envelope::TxEnvelope,
     unsigned_tx::{TypedTransaction, eip712::PaymasterParams},
 };
-use clap::{Parser, command};
+use clap::Parser;
 use eyre::{Context, Result};
 use foundry_cli::utils;
 use foundry_common::{
