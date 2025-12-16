@@ -31,7 +31,7 @@ use revm::{
 };
 
 use zksync_revm::{
-    ZKsyncEvm, ZKsyncTx, ZKsyncTxError, ZkContext, ZkSpecId, handler::ZKsyncHandler,
+    ZKsyncEvm, ZKsyncTx, ZKsyncTxError, ZkContext, ZkHaltReason, ZkSpecId, handler::ZKsyncHandler,
 };
 
 pub fn new_evm_with_inspector<'db, I: InspectorExt>(
@@ -143,7 +143,6 @@ impl<'db, I: InspectorExt> FoundryEvm<'db, I> {
         &mut self,
         frame: FrameInput,
     ) -> Result<FrameResult, EVMError<DatabaseError, ZKsyncTxError>> {
-        // let mut handler = FoundryHandler::<I>::default();
         let mut handler = FoundryZKsyncHandler::<I>::default();
 
         // Create first frame
@@ -226,7 +225,6 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
         self.inner.0.ctx.tx = tx;
 
-        // let mut handler = FoundryHandler::<I>::default();
         let mut handler = FoundryZKsyncHandler::default();
         let result = handler.inspect_run(&mut self.inner)?;
 
@@ -255,12 +253,6 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     }
 }
 
-// impl From<ZKsyncTxError> for EVMError<DatabaseError> {
-//     fn from(value: ZKsyncTxError) -> Self {
-//         todo!()
-//     }
-// }
-
 impl<'db, I: InspectorExt> Deref for FoundryEvm<'db, I> {
     type Target = ZkContext<&'db mut dyn DatabaseExt>;
 
@@ -275,6 +267,367 @@ impl<I: InspectorExt> DerefMut for FoundryEvm<'_, I> {
     }
 }
 
+pub struct FoundryZKsyncHandler<'db, I: InspectorExt> {
+    inner: ZKsyncHandler<
+        ZKsyncEvm<
+            ZkContext<&'db mut dyn DatabaseExt>,
+            I,
+            EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
+            PrecompilesMap,
+            EthFrame<EthInterpreter>,
+        >,
+        EVMError<DatabaseError, ZKsyncTxError>,
+        EthFrame<EthInterpreter>,
+    >,
+    create2_overrides: Vec<(usize, CallInputs)>,
+    _phantom: PhantomData<(&'db mut dyn DatabaseExt, I)>,
+}
+
+impl<I: InspectorExt> Default for FoundryZKsyncHandler<'_, I> {
+    fn default() -> Self {
+        Self {
+            inner: Default::default(),
+            create2_overrides: Default::default(),
+            _phantom: Default::default(),
+        }
+    }
+}
+
+// Blanket Handler implementation for FoundryHandler, needed for implementing the InspectorHandler
+// trait.
+impl<'db, I: InspectorExt> Handler for FoundryZKsyncHandler<'db, I> {
+    // type Evm = RevmEvm<
+    type Evm = ZKsyncEvm<
+        ZkContext<&'db mut dyn DatabaseExt>,
+        I,
+        EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
+        PrecompilesMap,
+        EthFrame<EthInterpreter>,
+    >;
+
+    type Error = EVMError<DatabaseError, ZKsyncTxError>;
+    type HaltReason = ZkHaltReason;
+
+    fn run(
+        &mut self,
+        evm: &mut Self::Evm,
+    ) -> Result<ExecutionResult<Self::HaltReason>, Self::Error> {
+        self.inner.run(evm)
+    }
+
+    fn run_system_call(
+        &mut self,
+        evm: &mut Self::Evm,
+    ) -> Result<ExecutionResult<Self::HaltReason>, Self::Error> {
+        self.inner.run_system_call(evm)
+    }
+
+    fn run_without_catch_error(
+        &mut self,
+        evm: &mut Self::Evm,
+    ) -> Result<ExecutionResult<Self::HaltReason>, Self::Error> {
+        self.inner.run_without_catch_error(evm)
+    }
+
+    fn validate(
+        &self,
+        evm: &mut Self::Evm,
+    ) -> Result<revm::interpreter::InitialAndFloorGas, Self::Error> {
+        self.inner.validate(evm)
+    }
+
+    fn pre_execution(&self, evm: &mut Self::Evm) -> Result<u64, Self::Error> {
+        self.inner.pre_execution(evm)
+    }
+
+    fn execution(
+        &mut self,
+        evm: &mut Self::Evm,
+        init_and_floor_gas: &revm::interpreter::InitialAndFloorGas,
+    ) -> Result<FrameResult, Self::Error> {
+        self.inner.execution(evm, init_and_floor_gas)
+    }
+
+    fn post_execution(
+        &self,
+        evm: &mut Self::Evm,
+        exec_result: &mut FrameResult,
+        init_and_floor_gas: revm::interpreter::InitialAndFloorGas,
+        eip7702_gas_refund: i64,
+    ) -> Result<(), Self::Error> {
+        self.inner.post_execution(evm, exec_result, init_and_floor_gas, eip7702_gas_refund)
+    }
+
+    fn validate_env(&self, evm: &mut Self::Evm) -> Result<(), Self::Error> {
+        self.inner.validate_env(evm)
+    }
+
+    fn validate_initial_tx_gas(
+        &self,
+        evm: &Self::Evm,
+    ) -> Result<revm::interpreter::InitialAndFloorGas, Self::Error> {
+        self.inner.validate_initial_tx_gas(evm)
+    }
+
+    fn load_accounts(&self, evm: &mut Self::Evm) -> Result<(), Self::Error> {
+        self.inner.load_accounts(evm)
+    }
+
+    fn apply_eip7702_auth_list(&self, evm: &mut Self::Evm) -> Result<u64, Self::Error> {
+        self.inner.apply_eip7702_auth_list(evm)
+    }
+
+    fn validate_against_state_and_deduct_caller(
+        &self,
+        evm: &mut Self::Evm,
+    ) -> Result<(), Self::Error> {
+        self.inner.validate_against_state_and_deduct_caller(evm)
+    }
+
+    fn first_frame_input(
+        &mut self,
+        evm: &mut Self::Evm,
+        gas_limit: u64,
+    ) -> Result<FrameInit, Self::Error> {
+        self.inner.first_frame_input(evm, gas_limit)
+    }
+
+    fn last_frame_result(
+        &mut self,
+        evm: &mut Self::Evm,
+        frame_result: &mut <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameResult,
+    ) -> Result<(), Self::Error> {
+        self.inner.last_frame_result(evm, frame_result)
+    }
+
+    fn run_exec_loop(
+        &mut self,
+        evm: &mut Self::Evm,
+        first_frame_input: <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameInit,
+    ) -> Result<FrameResult, Self::Error> {
+        self.inner.run_exec_loop(evm, first_frame_input)
+    }
+
+    fn eip7623_check_gas_floor(
+        &self,
+        evm: &mut Self::Evm,
+        exec_result: &mut <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameResult,
+        init_and_floor_gas: revm::interpreter::InitialAndFloorGas,
+    ) {
+        self.inner.eip7623_check_gas_floor(evm, exec_result, init_and_floor_gas);
+    }
+
+    fn refund(
+        &self,
+        evm: &mut Self::Evm,
+        exec_result: &mut <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameResult,
+        eip7702_refund: i64,
+    ) {
+        self.inner.refund(evm, exec_result, eip7702_refund);
+    }
+
+    fn reimburse_caller(
+        &self,
+        evm: &mut Self::Evm,
+        exec_result: &mut <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameResult,
+    ) -> Result<(), Self::Error> {
+        self.inner.reimburse_caller(evm, exec_result)
+    }
+
+    fn reward_beneficiary(
+        &self,
+        evm: &mut Self::Evm,
+        exec_result: &mut <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameResult,
+    ) -> Result<(), Self::Error> {
+        self.inner.reward_beneficiary(evm, exec_result)
+    }
+
+    fn execution_result(
+        &mut self,
+        evm: &mut Self::Evm,
+        result: <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameResult,
+    ) -> Result<ExecutionResult<Self::HaltReason>, Self::Error> {
+        self.inner.execution_result(evm, result)
+    }
+
+    fn catch_error(
+        &self,
+        evm: &mut Self::Evm,
+        error: Self::Error,
+    ) -> Result<ExecutionResult<Self::HaltReason>, Self::Error> {
+        self.inner.catch_error(evm, error)
+    }
+}
+
+impl<'db, I: InspectorExt> FoundryZKsyncHandler<'db, I> {
+    /// Handles CREATE2 frame initialization, potentially transforming it to use the CREATE2
+    /// factory.
+    fn handle_create_frame(
+        &mut self,
+        evm: &mut <Self as Handler>::Evm,
+        init: &mut FrameInit,
+    ) -> Result<Option<FrameResult>, <Self as Handler>::Error> {
+        if let FrameInput::Create(inputs) = &init.frame_input
+            && let CreateScheme::Create2 { salt } = inputs.scheme
+        {
+            let (ctx, inspector) = evm.ctx_inspector();
+
+            if inspector.should_use_create2_factory(ctx, inputs) {
+                let gas_limit = inputs.gas_limit;
+
+                // Get CREATE2 deployer.
+                let create2_deployer = evm.inspector().create2_deployer();
+
+                // Generate call inputs for CREATE2 factory and allow zkSync strategy to adjust.
+                let mut call_inputs =
+                    get_create2_factory_call_inputs(salt, inputs, create2_deployer);
+                evm.0.inspector.zksync_set_deployer_call_input(&mut evm.0.ctx, &mut call_inputs);
+
+                // Push data about current override to the stack (after potential adjustments).
+                self.create2_overrides.push((evm.journal().depth(), call_inputs.clone()));
+
+                // Sanity check that CREATE2 deployer exists.
+                // NOTE(zk): made mut to apply later check
+                let mut code_hash =
+                    evm.journal_mut().load_account(create2_deployer)?.info.code_hash;
+                // NOTE(zk): We check which deployer we are using to separate the logic for zkSync
+                // and original foundry.
+                // TODO(zk): adding this check to skip comparing to evm create2 deployer
+                // hash, should we compare vs zkevm one?
+                let mut zk_is_create2_deployer = false;
+
+                if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                    code_hash =
+                        evm.journal_mut().load_account(call_inputs.target_address)?.info.code_hash;
+                    zk_is_create2_deployer = true;
+                }
+
+                if code_hash == KECCAK_EMPTY {
+                    return Ok(Some(FrameResult::Call(CallOutcome {
+                        result: InterpreterResult {
+                            result: InstructionResult::Revert,
+                            output: Bytes::from(
+                                format!("missing CREATE2 deployer: {create2_deployer}")
+                                    .into_bytes(),
+                            ),
+                            gas: Gas::new(gas_limit),
+                        },
+                        memory_offset: 0..0,
+                        was_precompile_called: false,
+                        precompile_call_logs: vec![],
+                    })));
+                } else if code_hash != DEFAULT_CREATE2_DEPLOYER_CODEHASH && !zk_is_create2_deployer
+                {
+                    return Ok(Some(FrameResult::Call(CallOutcome {
+                        result: InterpreterResult {
+                            result: InstructionResult::Revert,
+                            output: "invalid CREATE2 deployer bytecode".into(),
+                            gas: Gas::new(gas_limit),
+                        },
+                        memory_offset: 0..0,
+                        was_precompile_called: false,
+                        precompile_call_logs: vec![],
+                    })));
+                }
+
+                // Rewrite the frame init
+                init.frame_input = FrameInput::Call(Box::new(call_inputs));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Transforms CREATE2 factory call results back into CREATE outcomes.
+    fn handle_create2_override(
+        &mut self,
+        evm: &mut <Self as Handler>::Evm,
+        result: FrameResult,
+    ) -> FrameResult {
+        if self.create2_overrides.last().is_some_and(|(depth, _)| *depth == evm.journal().depth()) {
+            let (_, call_inputs) = self.create2_overrides.pop().unwrap();
+            let FrameResult::Call(mut call) = result else {
+                unreachable!("create2 override should be a call frame");
+            };
+
+            let address = match call.instruction_result() {
+                return_ok!() => {
+                    let bytes = call.output().as_ref();
+                    let addr = if call_inputs.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
+                        // ZkSync: Address in the last 20 bytes of a 32-byte word
+                        // We want to error out if the address is not valid as
+                        // Address::from_slice() does
+                        if bytes.len() >= 32 {
+                            Some(Address::from_slice(&bytes[12..32]))
+                        } else {
+                            None
+                        }
+                    } else if bytes.len() == 20 {
+                        Some(Address::from_slice(bytes))
+                    } else {
+                        None
+                    };
+
+                    if addr.is_none() {
+                        call.result = InterpreterResult {
+                            result: InstructionResult::Revert,
+                            output: "invalid CREATE2 factory output".into(),
+                            gas: Gas::new(call_inputs.gas_limit),
+                        };
+                    }
+                    addr
+                }
+                _ => None,
+            };
+
+            FrameResult::Create(CreateOutcome { result: call.result, address })
+        } else {
+            result
+        }
+    }
+}
+
+impl<I: InspectorExt> InspectorHandler for FoundryZKsyncHandler<'_, I> {
+    type IT = EthInterpreter;
+
+    fn inspect_run_exec_loop(
+        &mut self,
+        evm: &mut Self::Evm,
+        first_frame_input: <<Self::Evm as EvmTr>::Frame as FrameTr>::FrameInit,
+    ) -> Result<FrameResult, Self::Error> {
+        let res = evm.inspect_frame_init(first_frame_input)?;
+
+        if let ItemOrResult::Result(frame_result) = res {
+            return Ok(frame_result);
+        }
+
+        loop {
+            let call_or_result = evm.inspect_frame_run()?;
+
+            let result = match call_or_result {
+                ItemOrResult::Item(mut init) => {
+                    // Handle CREATE/CREATE2 frame initialization
+                    if let Some(frame_result) = self.handle_create_frame(evm, &mut init)? {
+                        return Ok(frame_result);
+                    }
+
+                    match evm.inspect_frame_init(init)? {
+                        ItemOrResult::Item(_) => continue,
+                        ItemOrResult::Result(result) => result,
+                    }
+                }
+                ItemOrResult::Result(result) => result,
+            };
+
+            // Handle CREATE2 override transformation if needed
+            let result = self.handle_create2_override(evm, result);
+
+            if let Some(result) = evm.frame_return_result(result)? {
+                return Ok(result);
+            }
+        }
+    }
+}
+
 pub struct FoundryHandler<'db, I: InspectorExt> {
     create2_overrides: Vec<(usize, CallInputs)>,
     _phantom: PhantomData<(&'db mut dyn DatabaseExt, I)>,
@@ -285,18 +638,6 @@ impl<I: InspectorExt> Default for FoundryHandler<'_, I> {
         Self { create2_overrides: Vec::new(), _phantom: PhantomData }
     }
 }
-
-type FoundryZKsyncHandler<'db, I> = ZKsyncHandler<
-    ZKsyncEvm<
-        ZkContext<&'db mut dyn DatabaseExt>,
-        I,
-        EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
-        PrecompilesMap,
-        EthFrame<EthInterpreter>,
-    >,
-    EVMError<DatabaseError, ZKsyncTxError>,
-    EthFrame<EthInterpreter>,
->;
 
 // Blanket Handler implementation for FoundryHandler, needed for implementing the InspectorHandler
 // trait.
