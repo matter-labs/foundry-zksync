@@ -10,6 +10,7 @@ use foundry_wallets::error::WalletSignerError;
 use k256::ecdsa::signature::Error as SignatureError;
 use revm::context_interface::result::EVMError;
 use std::{borrow::Cow, fmt};
+use zksync_revm::ZKsyncTxError;
 
 /// Cheatcode result type.
 ///
@@ -281,6 +282,12 @@ impl_from!(
 
 impl<T: Into<BackendError>> From<EVMError<T>> for Error {
     fn from(err: EVMError<T>) -> Self {
+        Self::display(BackendError::from(err))
+    }
+}
+
+impl<T: Into<BackendError>> From<EVMError<T, ZKsyncTxError>> for Error {
+    fn from(err: EVMError<T, ZKsyncTxError>) -> Self {
         Self::display(BackendError::from(err))
     }
 }

@@ -30,7 +30,9 @@ use revm::{
     primitives::hardfork::SpecId,
 };
 
-use zksync_revm::{ZKsyncEvm, ZKsyncTx, ZkContext, ZkSpecId};
+use zksync_revm::{
+    ZKsyncEvm, ZKsyncTx, ZKsyncTxError, ZkContext, ZkSpecId, handler::ZKsyncHandler,
+};
 
 pub fn new_evm_with_inspector<'db, I: InspectorExt>(
     db: &'db mut dyn DatabaseExt,
@@ -140,8 +142,9 @@ impl<'db, I: InspectorExt> FoundryEvm<'db, I> {
     pub fn run_execution(
         &mut self,
         frame: FrameInput,
-    ) -> Result<FrameResult, EVMError<DatabaseError>> {
-        let mut handler = FoundryHandler::<I>::default();
+    ) -> Result<FrameResult, EVMError<DatabaseError, ZKsyncTxError>> {
+        // let mut handler = FoundryHandler::<I>::default();
+        let mut handler = FoundryZKsyncHandler::<I>::default();
 
         // Create first frame
         let memory =
@@ -158,11 +161,14 @@ impl<'db, I: InspectorExt> FoundryEvm<'db, I> {
     }
 }
 
+type ZKsyncEVMError = EVMError<DatabaseError, ZKsyncTxError>;
+
 impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     type Precompiles = PrecompilesMap;
     type Inspector = I;
     type DB = &'db mut dyn DatabaseExt;
-    type Error = EVMError<DatabaseError>;
+    type Error = EVMError<DatabaseError, ZKsyncTxError>;
+    // type Error = EVMError<ZKsyncTxError>;
     type HaltReason = HaltReason;
     type Spec = ZkSpecId;
     type Tx = ZKsyncTx<TxEnv>;
@@ -222,8 +228,12 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
         self.inner.0.ctx.tx = tx;
 
-        let mut handler = FoundryHandler::<I>::default();
+        // let mut handler = FoundryHandler::<I>::default();
+        let mut handler = FoundryZKsyncHandler::default();
         let result = handler.inspect_run(&mut self.inner)?;
+
+        let result: ExecutionResult<HaltReason> =
+            result.map_haltreason(|reason| reason.try_into().unwrap());
 
         Ok(ResultAndState::new(result, self.inner.0.ctx.journaled_state.inner.state.clone()))
     }
@@ -246,6 +256,12 @@ impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
         (journaled_state.database, EvmEnv { block_env, cfg_env })
     }
 }
+
+// impl From<ZKsyncTxError> for EVMError<DatabaseError> {
+//     fn from(value: ZKsyncTxError) -> Self {
+//         todo!()
+//     }
+// }
 
 impl<'db, I: InspectorExt> Deref for FoundryEvm<'db, I> {
     type Target = ZkContext<&'db mut dyn DatabaseExt>;
@@ -271,6 +287,18 @@ impl<I: InspectorExt> Default for FoundryHandler<'_, I> {
         Self { create2_overrides: Vec::new(), _phantom: PhantomData }
     }
 }
+
+type FoundryZKsyncHandler<'db, I> = ZKsyncHandler<
+    ZKsyncEvm<
+        ZkContext<&'db mut dyn DatabaseExt>,
+        I,
+        EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
+        PrecompilesMap,
+        EthFrame<EthInterpreter>,
+    >,
+    EVMError<DatabaseError, ZKsyncTxError>,
+    EthFrame<EthInterpreter>,
+>;
 
 // Blanket Handler implementation for FoundryHandler, needed for implementing the InspectorHandler
 // trait.
