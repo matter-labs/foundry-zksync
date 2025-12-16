@@ -161,8 +161,6 @@ impl<'db, I: InspectorExt> FoundryEvm<'db, I> {
     }
 }
 
-type ZKsyncEVMError = EVMError<DatabaseError, ZKsyncTxError>;
-
 impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
     type Precompiles = PrecompilesMap;
     type Inspector = I;
