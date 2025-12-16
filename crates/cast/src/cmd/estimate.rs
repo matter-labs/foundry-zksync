@@ -9,9 +9,10 @@ use alloy_rpc_types::BlockId;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
-    opts::{EthereumOpts, TransactionOpts},
+    opts::{RpcOpts, TransactionOpts},
     utils::{self, LoadConfig, parse_ether_value},
 };
+use foundry_wallets::WalletOpts;
 use std::str::FromStr;
 
 use crate::zksync;
@@ -42,14 +43,14 @@ pub struct EstimateArgs {
     #[arg(long)]
     cost: bool,
 
+    #[command(flatten)]
+    wallet: WalletOpts,
+
     #[command(subcommand)]
     command: Option<EstimateSubcommands>,
 
     #[command(flatten)]
     tx: TransactionOpts,
-
-    #[command(flatten)]
-    eth: EthereumOpts,
 
     /// Zksync Transaction
     #[command(flatten)]
@@ -58,6 +59,9 @@ pub struct EstimateArgs {
     /// Force a zksync eip-712 transaction and apply CREATE overrides
     #[arg(long = "zksync")]
     zk_force: bool,
+
+    #[command(flatten)]
+    rpc: RpcOpts,
 }
 
 #[derive(Debug, Parser)]
@@ -87,12 +91,23 @@ pub enum EstimateSubcommands {
 
 impl EstimateArgs {
     pub async fn run(self) -> Result<()> {
-        let Self { to, mut sig, mut args, mut tx, block, cost, eth, command, zk_tx, zk_force } =
-            self;
+        let Self {
+            to,
+            mut sig,
+            mut args,
+            mut tx,
+            block,
+            cost,
+            wallet,
+            rpc,
+            command,
+            zk_tx,
+            zk_force,
+        } = self;
 
-        let config = eth.load_config()?;
+        let config = rpc.load_config()?;
         let provider = utils::get_provider(&config)?;
-        let sender = SenderKind::from_wallet_opts(eth.wallet).await?;
+        let sender = SenderKind::from_wallet_opts(wallet).await?;
 
         let code = if let Some(EstimateSubcommands::Create {
             code,

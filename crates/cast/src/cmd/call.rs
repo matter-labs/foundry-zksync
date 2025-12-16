@@ -17,13 +17,13 @@ use alloy_serde::OtherFields;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
-    opts::{EthereumOpts, TransactionOpts},
+    opts::{ChainValueParser, RpcOpts, TransactionOpts},
     utils::{self, TraceResult, parse_ether_value},
 };
 use foundry_common::shell;
 use foundry_compilers::artifacts::EvmVersion;
 use foundry_config::{
-    Config,
+    Chain, Config,
     figment::{
         self, Metadata, Profile,
         value::{Dict, Map},
@@ -34,6 +34,7 @@ use foundry_evm::{
     opts::EvmOpts,
     traces::{InternalTraceMode, TraceMode},
 };
+use foundry_wallets::WalletOpts;
 use foundry_zksync_core::MAX_L2_GAS_LIMIT;
 use itertools::Either;
 use regex::Regex;
@@ -132,7 +133,19 @@ pub struct CallArgs {
     tx: TransactionOpts,
 
     #[command(flatten)]
-    eth: EthereumOpts,
+    rpc: RpcOpts,
+
+    #[command(flatten)]
+    wallet: WalletOpts,
+
+    #[arg(
+        short,
+        long,
+        alias = "chain-id",
+        env = "CHAIN",
+        value_parser = ChainValueParser::default(),
+    )]
+    pub chain: Option<Chain>,
 
     /// Zksync Transaction
     #[command(flatten)]
@@ -207,7 +220,7 @@ pub enum CallSubcommands {
 
 impl CallArgs {
     pub async fn run(self) -> Result<()> {
-        let figment = self.eth.rpc.clone().into_figment(self.with_local_artifacts).merge(&self);
+        let figment = self.rpc.clone().into_figment(self.with_local_artifacts).merge(&self);
         let evm_opts = figment.extract::<EvmOpts>()?;
 
         let is_zk = self.zk_tx.has_zksync_args() || self.zk_force;
@@ -224,7 +237,6 @@ impl CallArgs {
             mut sig,
             mut args,
             mut tx,
-            eth,
             command,
             block,
             trace,
@@ -236,6 +248,7 @@ impl CallArgs {
             with_local_artifacts,
             disable_labels,
             zk_tx,
+            wallet,
             ..
         } = self;
 
@@ -244,8 +257,7 @@ impl CallArgs {
         }
 
         let provider = utils::get_provider(&config)?;
-
-        let sender = SenderKind::from_wallet_opts(eth.wallet).await?;
+        let sender = SenderKind::from_wallet_opts(wallet).await?;
         let from = sender.address();
 
         let mut zkcode = Default::default();
