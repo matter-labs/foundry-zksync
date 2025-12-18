@@ -36,8 +36,10 @@ use zksync_types::H256;
 
 /// Max l2 gas limit to use in transactions. Determined empirically to be good enough
 /// for all use cases.
-pub const MAX_L2_GAS_LIMIT: u64 = ((u32::MAX >> 1) as u64) * 2;
-
+/// Официальный лимит газа для L2 транзакций в ZKsync Era
+pub const MAX_L2_GAS_LIMIT: u64 = 4_294_967_294;
+/// The default minimum L2 gas price (0.26 Gwei).
+pub const DEFAULT_L2_GAS_PRICE: u64 = 260_000_000;
 /// Gets the RPC URL for Ethereum.
 ///
 /// If the `eth.rpc_url` is `None`, an error is returned.
@@ -114,7 +116,7 @@ pub fn get_private_key(private_key: &Option<String>) -> Result<H256> {
 ///   * The scripts can fail if the balance is not enough for gas * MAGIC_VALUE
 ///   * The tests/deploy can fail if MAGIC_VALUE is too low
 pub fn fix_l2_gas_price(gas_price: U256) -> U256 {
-    U256::max(gas_price, U256::from(260_000_000))
+U256::max(gas_price, U256::from(DEFAULT_L2_GAS_PRICE))
 }
 
 /// Limits the gas_limit proportional to a user's available balance given the gas_price.
