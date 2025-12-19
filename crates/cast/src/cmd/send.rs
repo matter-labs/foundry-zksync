@@ -1,8 +1,7 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
 use crate::{
-    Cast,
-    tx::{self, CastTxBuilder, SendTxOpts},
+    tx::{self, CastTxBuilder, CastTxSender, SendTxOpts},
     zksync::ZkTransactionOpts,
 };
 use alloy_ens::NameOrAddress;
@@ -211,9 +210,10 @@ impl SendTxArgs {
 
                 let provider =
                     ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(&provider);
+                let cast = CastTxSender::new(provider);
 
                 handle_transaction_result(
-                    &Cast::new(provider),
+                    &cast,
                     &tx_hash,
                     send_tx.cast_async,
                     send_tx.confirmations,
@@ -257,7 +257,7 @@ pub(crate) async fn cast_send<P: Provider<AnyNetwork>>(
     confs: u64,
     timeout: u64,
 ) -> Result<()> {
-    let cast = Cast::new(&provider);
+    let cast = CastTxSender::new(&provider);
     if sync {
         let receipt = cast.send_sync(tx).await?;
         sh_println!("{receipt}")?;
@@ -269,8 +269,8 @@ pub(crate) async fn cast_send<P: Provider<AnyNetwork>>(
     }
 }
 
-async fn handle_transaction_result<P: Provider<AnyNetwork> + Clone + Unpin>(
-    cast: &Cast<P>,
+async fn handle_transaction_result<P: Provider<AnyNetwork>>(
+    cast: &CastTxSender<P>,
     tx_hash: &TxHash,
     cast_async: bool,
     confs: u64,

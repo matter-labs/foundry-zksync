@@ -3,6 +3,7 @@ use crate::{
     cmd::erc20::IERC20,
     opts::{Cast as CastArgs, CastSubcommand, ToBaseArgs},
     traces::identifier::SignaturesIdentifier,
+    tx::CastTxSender,
 };
 use alloy_dyn_abi::{DynSolValue, ErrorExt, EventExt};
 use alloy_eips::eip7702::SignedAuthorization;
@@ -525,7 +526,7 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
             let provider = utils::get_provider(&config)?;
             sh_println!(
                 "{}",
-                Cast::new(provider)
+                CastTxSender::new(provider)
                     .receipt(tx_hash, field, confirmations, None, cast_async)
                     .await?
             )?

@@ -250,6 +250,12 @@ jobs:
           fi
           printf "foundry_attestation=%s\n" "foundry_${VERSION_NAME}_${PLATFORM_NAME}_${ARCH}.attestation.txt" >> "$GITHUB_OUTPUT"
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          retention-days: 1
+          name: ${{ steps.artifacts.outputs.file_name }}
+          path: ${{ steps.artifacts.outputs.file_name }}
 
       - name: Build man page
         id: man

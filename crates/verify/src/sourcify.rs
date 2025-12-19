@@ -197,6 +197,7 @@ impl SourcifyVerificationProvider {
             .unwrap_or_else(|_| Url::parse(SOURCIFY_URL).unwrap())
     }
 
+    // Note(zk): this is a workaround to get the project root from the context
     fn get_project_root<'a>(&self, context: &'a CompilerVerificationContext) -> &'a Path {
         match context {
             CompilerVerificationContext::Solc(c) => c.project.root(),
