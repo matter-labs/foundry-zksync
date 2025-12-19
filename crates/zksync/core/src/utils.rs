@@ -34,12 +34,13 @@ use url::Url;
 use zksync_basic_types::U256;
 use zksync_types::H256;
 
-/// Max l2 gas limit to use in transactions. Determined empirically to be good enough
-/// for all use cases.
-/// Официальный лимит газа для L2 транзакций в ZKsync Era
+/// The maximum gas limit for L2 transactions in ZKsync Era.
+/// Defined as (u32::MAX >> 1) * 2 to fit within protocol constraints.
 pub const MAX_L2_GAS_LIMIT: u64 = 4_294_967_294;
+
 /// The default minimum L2 gas price (0.26 Gwei).
 pub const DEFAULT_L2_GAS_PRICE: u64 = 260_000_000;
+
 /// Gets the RPC URL for Ethereum.
 ///
 /// If the `eth.rpc_url` is `None`, an error is returned.
