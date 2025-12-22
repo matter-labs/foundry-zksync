@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -xeo pipefail
+set -eo pipefail
 
 # NOTE: if you make modifications to this script, please increment the version number.
 # WARNING: the SemVer pattern: major.minor.patch must be followed as we use it to determine if the script is up to date.
@@ -669,7 +669,8 @@ tolower() {
 
 compute_sha256() {
   if check_cmd sha256sum; then
-    sha256sum "$1" | cut -d' ' -f1
+    # Use sed to strip leading backslash (sha256sum on Windows/Git Bash outputs \ prefix for binary files)
+    sha256sum "$1" | cut -d' ' -f1 | sed 's/^\\//'
   else
     shasum -a 256 "$1" | awk '{print $1}'
   fi

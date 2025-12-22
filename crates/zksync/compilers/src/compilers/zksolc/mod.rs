@@ -618,8 +618,7 @@ fn version_from_output(output: Output) -> Result<Version> {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let version = stdout
             .lines()
-            .filter(|l| !l.trim().is_empty())
-            .next_back()
+            .rfind(|l| !l.trim().is_empty())
             .ok_or_else(|| SolcError::msg("Version not found in zksolc output"))?;
 
         version
