@@ -4,8 +4,9 @@ use crate::{
     tx::{self, CastTxBuilder, CastTxSender, SendTxOpts},
     zksync::ZkTransactionOpts,
 };
+use alloy_eips::Encodable2718;
 use alloy_ens::NameOrAddress;
-use alloy_network::{AnyNetwork, EthereumWallet};
+use alloy_network::{AnyNetwork, EthereumWallet, NetworkWallet};
 use alloy_primitives::TxHash;
 use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_types::TransactionRequest;
@@ -14,6 +15,7 @@ use alloy_signer::Signer;
 use clap::Parser;
 use eyre::{Result, eyre};
 use foundry_cli::{opts::TransactionOpts, utils, utils::LoadConfig};
+use foundry_wallets::WalletSigner;
 
 mod zksync;
 use zksync::send_zk_transaction;
@@ -161,6 +163,14 @@ impl SendTxArgs {
 
         let timeout = send_tx.timeout.unwrap_or(config.transaction_timeout);
 
+        // Check if this is a Tempo transaction - requires special handling for local signing
+        let is_tempo = builder.is_tempo();
+
+        // Tempo transactions with browser wallets are not supported
+        if is_tempo && send_tx.eth.wallet.browser {
+            return Err(eyre!("Tempo transactions are not supported with browser wallets."));
+        }
+
         // Case 1:
         // Default to sending via eth_sendTransaction if the --unlocked flag is passed.
         // This should be the only way this RPC method is used as it requires a local node
@@ -189,7 +199,7 @@ impl SendTxArgs {
 
             cast_send(
                 provider,
-                tx,
+                tx.into_inner(),
                 send_tx.cast_async,
                 send_tx.sync,
                 send_tx.confirmations,
@@ -225,9 +235,82 @@ impl SendTxArgs {
                 let signer = send_tx.eth.wallet.signer().await?;
                 let from = signer.address();
 
+                // Browser wallets work differently as they sign and send the transaction in one
+                // step.
+                if send_tx.eth.wallet.browser
+                    && let WalletSigner::Browser(ref browser_signer) = signer
+                {
+                    let (tx_request, _) = builder.build(from).await?;
+                    let tx_hash = browser_signer
+                        .send_transaction_via_browser(tx_request.into_inner().inner)
+                        .await?;
+
+                    let provider =
+                        ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(&provider);
+                    let cast = CastTxSender::new(provider);
+
+                    return handle_transaction_result(
+                        &cast,
+                        &tx_hash,
+                        send_tx.cast_async,
+                        send_tx.confirmations,
+                        timeout,
+                    )
+                    .await;
+                }
+
                 tx::validate_from_address(send_tx.eth.wallet.from, from)?;
 
-                // Standard transaction
+                // Tempo transactions need to be signed locally and sent as raw transactions
+                // because EthereumWallet doesn't understand type 0x76
+                // TODO(onbjerg): All of this is a side effect of a few things, most notably that we
+                // do not use `FoundryNetwork` and `FoundryTransactionRequest`
+                // everywhere, which is downstream of the fact that we use
+                // `EthereumWallet` everywhere.
+                if is_tempo {
+                    let (ftx, _) = builder.build(&signer).await?;
+
+                    // Sign using NetworkWallet<FoundryNetwork>
+                    let signed_tx = signer.sign_request(ftx).await?;
+
+                    // Encode and send raw
+                    let mut raw_tx = Vec::with_capacity(signed_tx.encode_2718_len());
+                    signed_tx.encode_2718(&mut raw_tx);
+
+                    let cast = CastTxSender::new(&provider);
+                    let pending_tx = cast.send_raw(&raw_tx).await?;
+                    let tx_hash = pending_tx.inner().tx_hash();
+
+                    if send_tx.cast_async {
+                        sh_println!("{tx_hash:#x}")?;
+                    } else if send_tx.sync {
+                        // For sync mode, we already have the hash, just wait for receipt
+                        let receipt = cast
+                            .receipt(
+                                format!("{tx_hash:#x}"),
+                                None,
+                                send_tx.confirmations,
+                                Some(timeout),
+                                false,
+                            )
+                            .await?;
+                        sh_println!("{receipt}")?;
+                    } else {
+                        let receipt = cast
+                            .receipt(
+                                format!("{tx_hash:#x}"),
+                                None,
+                                send_tx.confirmations,
+                                Some(timeout),
+                                false,
+                            )
+                            .await?;
+                        sh_println!("{receipt}")?;
+                    }
+
+                    return Ok(());
+                }
+
                 let (tx, _) = builder.build(&signer).await?;
 
                 let wallet = EthereumWallet::from(signer);
@@ -237,7 +320,7 @@ impl SendTxArgs {
 
                 cast_send(
                     provider,
-                    tx,
+                    tx.into_inner(),
                     send_tx.cast_async,
                     send_tx.sync,
                     send_tx.confirmations,
