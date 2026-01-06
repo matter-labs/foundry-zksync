@@ -354,9 +354,14 @@ EOF
     case "$uname_str" in
         "Linux")
             os="unknown-linux-gnu"
-            # Note: If `lscpu` isn't guaranteed to be available, 
-            # you may want to fallback to `uname -m`
-            arch=$(lscpu | awk '/Architecture:/{print $2}')
+            # Try lscpu first (forcing C locale), fallback to uname -m if lscpu fails or is missing
+            if command -v lscpu >/dev/null 2>&1; then
+                arch=$(LC_ALL=C lscpu | awk '/Architecture:/{print $2}')
+            fi
+            # If arch is still empty (lscpu failed or didn't find the string), use uname -m
+            if [ -z "$arch" ]; then
+                arch=$(uname -m)
+            fi
             ;;
         "Darwin")
             os="apple-darwin"
