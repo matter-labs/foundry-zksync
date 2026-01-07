@@ -236,7 +236,6 @@ fn next_url(is_ws: bool, chain: NamedChain) -> String {
 }
 
 fn next_url_inner(is_ws: bool, chain: NamedChain) -> String {
-    println!("NEXT");
     if matches!(chain, Base) {
         return "https://mainnet.base.org".to_string();
     }
