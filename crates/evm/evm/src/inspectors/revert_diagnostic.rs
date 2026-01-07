@@ -16,8 +16,9 @@ use revm::{
     },
 };
 use std::fmt;
+use zksync_revm::precompiles::l2_base_token::L2_BASE_TOKEN_ADDRESS;
 
-const IGNORE: [Address; 2] = [HARDHAT_CONSOLE_ADDRESS, CHEATCODE_ADDRESS];
+const IGNORE: [Address; 3] = [HARDHAT_CONSOLE_ADDRESS, CHEATCODE_ADDRESS, L2_BASE_TOKEN_ADDRESS];
 
 /// Checks if the call scheme corresponds to any sort of delegate call
 pub fn is_delegatecall(scheme: CallScheme) -> bool {

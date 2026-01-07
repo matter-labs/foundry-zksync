@@ -67,6 +67,48 @@ forgetest!(testdata, |_prj, cmd| {
     orig_assert.success();
 });
 
+// Run `forge test` on `/testdata` for zksync-revm.
+forgetest!(testdata_zksync_revm, |_prj, cmd| {
+    let testdata =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata").canonicalize().unwrap();
+    cmd.current_dir(&testdata);
+
+    let mut dotenv = std::fs::File::create(testdata.join(".env")).unwrap();
+    for (name, endpoint) in rpc_endpoints().iter() {
+        if let Some(url) = endpoint.endpoint.as_url() {
+            let key = format!("RPC_{}", name.to_uppercase());
+            writeln!(dotenv, "{key}={url}").unwrap();
+        }
+    }
+    drop(dotenv);
+
+    let args = vec!["test", "--mc=ZKsyncOSTest", "-vvv"];
+    
+    let orig_assert = cmd.args(args).assert();
+
+    if orig_assert.get_output().status.success() {
+        return;
+    }
+    let stdout = orig_assert.get_output().stdout_lossy();
+
+    if let Some(i) = stdout.rfind("Suite result:") {
+        test_debug!("--- short stdout ---\n\n{}\n\n---", &stdout[i..]);
+    }
+
+    // Retry failed tests.
+    cmd.args(["--rerun"]);
+    let n = 3;
+    for i in 1..=n {
+        test_debug!("retrying failed tests... ({i}/{n})");
+        let assert = cmd.assert();
+        if assert.get_output().status.success() {
+            return;
+        }
+    }
+
+    orig_assert.success();
+});
+
 // tests that test filters are handled correctly
 forgetest!(can_set_filter_values, |prj, cmd| {
     let patt = regex::Regex::new("test*").unwrap();

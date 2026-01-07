@@ -14621,13 +14621,15 @@ dependencies = [
 [[package]]
 name = "zksync-revm"
 version = "0.1.0"
-source = "git+https://github.com/nbaztec/zksync-revm?branch=revm-33.1.0#1b4dd14e76ad868eb24da632618ac13fe2a83db2"
+source = "git+https://github.com/nbaztec/zksync-revm?branch=revm-33.1.0#59e8c3ea31221e39ef29ef77c661e4e49e5f7f71"
 dependencies = [
  "alloy-evm",
  "alloy-primitives",
+ "alloy-sol-types",
  "auto_impl",
  "revm",
  "serde",
+ "tracing",
 ]
 
 [[package]]

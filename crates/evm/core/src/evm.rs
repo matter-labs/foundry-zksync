@@ -31,7 +31,7 @@ use revm::{
 };
 
 use zksync_revm::{
-    ZKsyncEvm, ZKsyncTx, ZKsyncTxError, ZkContext, ZkHaltReason, ZkSpecId, handler::ZKsyncHandler,
+    ZKsyncEvm, ZKsyncTx, ZKsyncTxError, ZkContext, ZkHaltReason, ZkSpecId, handler::ZKsyncHandler, precompiles::ZKsyncPrecompiles,
 };
 
 pub fn new_evm_with_inspector<'db, I: InspectorExt>(
@@ -55,7 +55,7 @@ pub fn new_evm_with_inspector<'db, I: InspectorExt>(
     ctx.cfg.tx_chain_id_check = true;
     let _spec = ctx.cfg.spec;
 
-    let mut evm = FoundryEvm {
+    let evm = FoundryEvm {
         // inner: RevmEvm::new_with_inspector(
         inner: ZKsyncEvm::new(
             ctx,
@@ -65,7 +65,8 @@ pub fn new_evm_with_inspector<'db, I: InspectorExt>(
         ),
     };
 
-    evm.inspector().get_networks().inject_precompiles(evm.precompiles_mut());
+    // TODO: we do not need to support injecting dynamic precompiles just yet
+    // evm.inspector().get_networks().inject_precompiles(evm.precompiles_mut());
     evm
 }
 
@@ -75,7 +76,7 @@ pub fn new_evm_with_existing_context<'a>(
 ) -> FoundryEvm<'a, &'a mut dyn InspectorExt> {
     let _spec = ctx.cfg.spec;
 
-    let mut evm = FoundryEvm {
+    let evm = FoundryEvm {
         // inner: RevmEvm::new_with_inspector(
         inner: ZKsyncEvm::new(
             ctx,
@@ -85,7 +86,8 @@ pub fn new_evm_with_existing_context<'a>(
         ),
     };
 
-    evm.inspector().get_networks().inject_precompiles(evm.precompiles_mut());
+    // TODO: we do not need to support injecting dynamic precompiles just yet
+    // evm.inspector().get_networks().inject_precompiles(evm.precompiles_mut());
     evm
 }
 
@@ -161,7 +163,7 @@ impl<'db, I: InspectorExt> FoundryEvm<'db, I> {
 }
 
 impl<'db, I: InspectorExt> Evm for FoundryEvm<'db, I> {
-    type Precompiles = PrecompilesMap;
+    type Precompiles = ZKsyncPrecompiles;
     type Inspector = I;
     type DB = &'db mut dyn DatabaseExt;
     type Error = EVMError<DatabaseError, ZKsyncTxError>;
@@ -273,7 +275,7 @@ pub struct FoundryZKsyncHandler<'db, I: InspectorExt> {
             ZkContext<&'db mut dyn DatabaseExt>,
             I,
             EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
-            PrecompilesMap,
+            ZKsyncPrecompiles,
             EthFrame<EthInterpreter>,
         >,
         EVMError<DatabaseError, ZKsyncTxError>,
@@ -301,7 +303,7 @@ impl<'db, I: InspectorExt> Handler for FoundryZKsyncHandler<'db, I> {
         ZkContext<&'db mut dyn DatabaseExt>,
         I,
         EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
-        PrecompilesMap,
+        ZKsyncPrecompiles,
         EthFrame<EthInterpreter>,
     >;
 
@@ -647,7 +649,7 @@ impl<'db, I: InspectorExt> Handler for FoundryHandler<'db, I> {
         ZkContext<&'db mut dyn DatabaseExt>,
         I,
         EthInstructions<EthInterpreter, ZkContext<&'db mut dyn DatabaseExt>>,
-        PrecompilesMap,
+        ZKsyncPrecompiles,
         EthFrame<EthInterpreter>,
     >;
 

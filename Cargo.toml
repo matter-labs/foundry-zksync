@@ -482,6 +482,10 @@ rexpect = { git = "https://github.com/rust-cli/rexpect", rev = "2ed0b1898d7edaf6
 # alloy-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "237d0a0" }
 # alloy-op-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "237d0a0" }
 
+# alloy-evm = { path = "../alloy-evm/crates/evm"}
+# alloy-op-evm = {path = "../alloy-evm/crates/op-evm"}
+
+
 ## revm
 # revm = { path = "../revm/crates/revm"}
 # revm = { git = "https://github.com/bluealloy/revm.git", rev = "7e59936" }
