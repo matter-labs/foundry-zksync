@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.3](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.2...foundry-zksync-v0.1.3) (2026-01-07)
+
+
+### Features
+
+* add support for constructing tempo tx ([#12972](https://github.com/matter-labs/foundry-zksync/issues/12972)) ([5bd4607](https://github.com/matter-labs/foundry-zksync/commit/5bd4607b1a6a9dd2ae5e12687564f87f635a5bfa))
+* alias `cast erc20 transfer` to `cast erc20 send` ([#12990](https://github.com/matter-labs/foundry-zksync/issues/12990)) ([793afef](https://github.com/matter-labs/foundry-zksync/commit/793afef6f5365d24dd3ffa65106b70621d2a4dc9))
+* **anvil:** basic tempo tx signing support ([#12974](https://github.com/matter-labs/foundry-zksync/issues/12974)) ([7be9072](https://github.com/matter-labs/foundry-zksync/commit/7be9072c10ba02efc06de7a0738cab64ce8de014))
+* **cast:** add tempo tx construction support ([#12973](https://github.com/matter-labs/foundry-zksync/issues/12973)) ([3a0f1e8](https://github.com/matter-labs/foundry-zksync/commit/3a0f1e8aa4be100aa913e8ea479b5f416325e4fa))
+* **cast:** tempo nonce keys ([#12977](https://github.com/matter-labs/foundry-zksync/issues/12977)) ([d6b648c](https://github.com/matter-labs/foundry-zksync/commit/d6b648ce945ecac87d1813111843c581126d9e1a))
+* implement Uifmt for foundry primitive types ([#12917](https://github.com/matter-labs/foundry-zksync/issues/12917)) ([fdf5732](https://github.com/matter-labs/foundry-zksync/commit/fdf5732d08ce1c67aa0aaf047c3fb86614caf5ae))
+
+
+### Bug Fixes
+
+* **anvil:** use B256 instead of TxHash for block hash parameters ([#12961](https://github.com/matter-labs/foundry-zksync/issues/12961)) ([d9af753](https://github.com/matter-labs/foundry-zksync/commit/d9af753aed6f5cec9394a62131a1ce005502417a))
+* **chisel:** uninitalized variables ([#12937](https://github.com/matter-labs/foundry-zksync/issues/12937)) ([d01c806](https://github.com/matter-labs/foundry-zksync/commit/d01c806111e2dd98b1e9bd9078418d80d0ea8909))
+* **config:** err on unknown profile ([#12946](https://github.com/matter-labs/foundry-zksync/issues/12946)) ([6ff4b52](https://github.com/matter-labs/foundry-zksync/commit/6ff4b52e2e572e93d0cd81591b1bd0e6ad9ed507))
+* **config:** reject bare versions in compilation restrictions ([#12955](https://github.com/matter-labs/foundry-zksync/issues/12955)) ([8618c36](https://github.com/matter-labs/foundry-zksync/commit/8618c36a4d866e67afe22cd09ae0b77f2b6b2dfe))
+* **evm:** use timestamp-based blob base fee calculation ([#12959](https://github.com/matter-labs/foundry-zksync/issues/12959)) ([b9bc92a](https://github.com/matter-labs/foundry-zksync/commit/b9bc92a471d7691e2db704c4c036d3499b62401f))
+* **forge:** lookup artifact if not in available artifacts ([8b1457a](https://github.com/matter-labs/foundry-zksync/commit/8b1457a04bb0fb0fb2246b49dbe065a980d64a84))
+* **forge:** lookup path artifact if not in available artifacts ([#12927](https://github.com/matter-labs/foundry-zksync/issues/12927)) ([8b1457a](https://github.com/matter-labs/foundry-zksync/commit/8b1457a04bb0fb0fb2246b49dbe065a980d64a84))
+* use network-specific BaseFeeParams for Optimism in Anvil ([#12944](https://github.com/matter-labs/foundry-zksync/issues/12944)) ([74b6fea](https://github.com/matter-labs/foundry-zksync/commit/74b6feaabc32911c8f9d36f570b91920e53fc516))
+
 ## [0.1.2](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.1...foundry-zksync-v0.1.2) (2025-12-22)
 
 
