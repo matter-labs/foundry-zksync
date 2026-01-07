@@ -5,6 +5,7 @@ use crate::{
     traces::identifier::SignaturesIdentifier,
     tx::CastTxSender,
 };
+use alloy_consensus::transaction::Recovered;
 use alloy_dyn_abi::{DynSolValue, ErrorExt, EventExt};
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_ens::{ProviderEnsExt, namehash};
@@ -742,8 +743,13 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
         CastSubcommand::DecodeTransaction { tx } => {
             let tx = stdin::unwrap_line(tx)?;
             let tx = SimpleCast::decode_raw_transaction(&tx)?;
-            // not using tx.recover_signer
-            sh_println!("{}", serde_json::to_string_pretty(&tx)?)?
+
+            if let Ok(signer) = tx.recover() {
+                let recovered = Recovered::new_unchecked(tx, signer);
+                sh_println!("{}", serde_json::to_string_pretty(&recovered)?)?;
+            } else {
+                sh_println!("{}", serde_json::to_string_pretty(&tx)?)?;
+            }
         }
         CastSubcommand::RecoverAuthority { auth } => {
             let auth: SignedAuthorization = serde_json::from_str(&auth)?;

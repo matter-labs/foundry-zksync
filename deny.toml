@@ -29,6 +29,8 @@ ignore = [
     "RUSTSEC-2025-0119",
     # https://rustsec.org/advisories/RUSTSEC-2025-0134 rustls-pemfile is unmaintained
     "RUSTSEC-2025-0134",
+    # https://rustsec.org/advisories/RUSTSEC-2025-0137 `reciprocal_mg10` OOB, unused
+    "RUSTSEC-2025-0137",
 ]
 
 # This section is considered when running `cargo deny check bans`.
@@ -145,6 +147,10 @@ allow-git = [
     "https://github.com/bluealloy/revm",
     # Only for tests.
     "https://github.com/rust-cli/rexpect",
+    # Tempo
+    "https://github.com/tempoxyz/tempo",
+    # Transitive dependency of Tempo
+    "https://github.com/paradigmxyz/reth",
 ]
 
 [sources.allow-org]
