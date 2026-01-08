@@ -5,7 +5,7 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
-    utils::{configure_tx_env, get_blob_base_fee_update_fraction_by_spec_id},
+    utils::{configure_tx_env, get_blob_base_fee_update_fraction},
 };
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
@@ -2040,7 +2040,7 @@ fn update_env_block(env: &mut EnvMut<'_>, block: &AnyRpcBlock) {
     if let Some(excess_blob_gas) = block.header.excess_blob_gas {
         env.block.blob_excess_gas_and_price = Some(BlobExcessGasAndPrice::new(
             excess_blob_gas,
-            get_blob_base_fee_update_fraction_by_spec_id(env.cfg.spec),
+            get_blob_base_fee_update_fraction(env.cfg.chain_id, block.header.timestamp),
         ));
     }
 }

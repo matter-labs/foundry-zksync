@@ -155,7 +155,11 @@ prefer_compact = "all"
 single_line_imports = false
 
 [lint]
-severity = []
+severity = [
+    "high",
+    "medium",
+    "low",
+]
 exclude_lints = []
 ignore = []
 lint_on_build = true
@@ -1362,7 +1366,11 @@ forgetest_init!(test_default_config, |prj, cmd| {
     "single_line_imports": false
   },
   "lint": {
-    "severity": [],
+    "severity": [
+      "high",
+      "medium",
+      "low"
+    ],
     "exclude_lints": [],
     "ignore": [],
     "lint_on_build": true,

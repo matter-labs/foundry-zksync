@@ -380,7 +380,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 tx_req.sidecar = None;
             }
             (false, Some(blob_sidecar)) => {
-                tx_req.sidecar = Some(blob_sidecar);
+                tx_req.sidecar = Some(blob_sidecar.into());
                 tx_req.authorization_list = None;
             }
             (false, None) => {
