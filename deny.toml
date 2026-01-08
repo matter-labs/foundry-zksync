@@ -31,6 +31,8 @@ ignore = [
     "RUSTSEC-2025-0134",
     # https://rustsec.org/advisories/RUSTSEC-2025-0137 `reciprocal_mg10` OOB, unused
     "RUSTSEC-2025-0137",
+    # https://rustsec.org/advisories/RUSTSEC-2026-0002 lru IterMut violates Stacked Borrows
+    "RUSTSEC-2026-0002",
 ]
 
 # This section is considered when running `cargo deny check bans`.
