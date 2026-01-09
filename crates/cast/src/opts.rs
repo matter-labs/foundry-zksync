@@ -1270,6 +1270,7 @@ impl CastSubcommand {
             Self::B2EPayload(_) => "b2e-payload",
             Self::AbiEncodeEvent { sig: _, args: _ } => "abi-encode-event",
             Self::Erc20Token { command: _ } => "erc20-token",
+            Self::Trace(_) => "trace",
         };
         TelemetryProps::new().insert("command", Some(command_name)).take()
     }

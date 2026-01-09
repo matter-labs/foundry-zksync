@@ -103,47 +103,6 @@ pub fn remove_zk_contract(
     Ok((contract, id))
 }
 
-/// Helper function for finding a contract by ContractName
-// TODO: Is there a better / more ergonomic way to get the artifacts given a project and a
-// contract name?
-pub fn get_cached_entry_by_name(
-    cache: &CompilerCache<Settings>,
-    name: &str,
-) -> Result<(PathBuf, CacheEntry)> {
-    let mut cached_entry = None;
-    let mut alternatives = Vec::new();
-
-    for (abs_path, entry) in &cache.files {
-        for artifact_name in entry.artifacts.keys() {
-            if artifact_name == name {
-                if cached_entry.is_some() {
-                    eyre::bail!(
-                        "contract with duplicate name `{}`. please pass the path instead",
-                        name
-                    )
-                }
-                cached_entry = Some((abs_path.to_owned(), entry.to_owned()));
-            } else {
-                alternatives.push(artifact_name);
-            }
-        }
-    }
-
-    if let Some(entry) = cached_entry {
-        return Ok(entry);
-    }
-
-    let mut err = format!("could not find artifact: `{name}`");
-    if let Some(suggestion) = super::did_you_mean(name, &alternatives).pop() {
-        err = format!(
-            r#"{err}
-
-        Did you mean `{suggestion}`?"#
-        );
-    }
-    eyre::bail!(err)
-}
-
 /// Returns error if constructor has arguments.
 pub fn ensure_clean_constructor(abi: &JsonAbi) -> Result<()> {
     if let Some(constructor) = &abi.constructor
