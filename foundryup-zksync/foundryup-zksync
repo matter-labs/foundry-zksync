@@ -354,9 +354,8 @@ EOF
     case "$uname_str" in
         "Linux")
             os="unknown-linux-gnu"
-            # Note: If `lscpu` isn't guaranteed to be available, 
-            # you may want to fallback to `uname -m`
-            arch=$(lscpu | awk '/Architecture:/{print $2}')
+            # Use uname -m for locale-independent architecture detection
+            arch=$(uname -m)
             ;;
         "Darwin")
             os="apple-darwin"
