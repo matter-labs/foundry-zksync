@@ -760,6 +760,7 @@ pub async fn run_command(args: CastArgs) -> Result<()> {
         CastSubcommand::DAEstimate(cmd) => {
             cmd.run().await?;
         }
+        CastSubcommand::Trace(cmd) => cmd.run().await?,
     };
 
     let _ = telemetry

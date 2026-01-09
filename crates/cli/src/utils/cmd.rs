@@ -2,10 +2,7 @@ use alloy_json_abi::JsonAbi;
 use eyre::{Result, WrapErr};
 use foundry_common::{TestFunctionExt, fs, fs::json_files, selectors::SelectorKind, shell};
 use foundry_compilers::{
-    Artifact, ArtifactId, ProjectCompileOutput,
-    artifacts::{CompactBytecode, Settings},
-    cache::{CacheEntry, CompilerCache},
-    utils::read_json_file,
+    Artifact, ArtifactId, ProjectCompileOutput, artifacts::CompactBytecode, utils::read_json_file,
 };
 use foundry_config::{Chain, Config, NamedChain, error::ExtractConfigError, figment::Figment};
 use foundry_evm::{
