@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.4](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.3...foundry-zksync-v0.1.4) (2026-01-12)
+
+
+### Features
+
+* add telemetry property for Trace command ([ec389aa](https://github.com/matter-labs/foundry-zksync/commit/ec389aa4a1e11467422023b20d1e94a624e863cb))
+
+
+### Bug Fixes
+
+* add missing newline at end of file in mod.rs ([6b39d1a](https://github.com/matter-labs/foundry-zksync/commit/6b39d1ac0253762f8bb2105c0ede233b4d7b6ea6))
+* deduplicate submodule status check logic ([#13010](https://github.com/matter-labs/foundry-zksync/issues/13010)) ([68844bf](https://github.com/matter-labs/foundry-zksync/commit/68844bf26ea5ef0356f4ac93f8e409d2ca8050fa))
+* **forge:** respect lint ignore config in solar compilation ([#12978](https://github.com/matter-labs/foundry-zksync/issues/12978)) ([af51a53](https://github.com/matter-labs/foundry-zksync/commit/af51a5361d10bfde4f03bffc74fff8e75dcdb5cc))
+* ignore RUSTSEC-2026-0002 lru soundness issue ([#1237](https://github.com/matter-labs/foundry-zksync/issues/1237)) ([d39dcd8](https://github.com/matter-labs/foundry-zksync/commit/d39dcd85c6281bb0dea3e8e5316bb4ffb3e1d79f))
+* use locale-independent architecture detection in foundryup ([#1234](https://github.com/matter-labs/foundry-zksync/issues/1234)) ([31950c8](https://github.com/matter-labs/foundry-zksync/commit/31950c8568bcd3f0c3ead79740a3b67813905eb1))
+
 ## [0.1.3](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.2...foundry-zksync-v0.1.3) (2026-01-07)
 
 
