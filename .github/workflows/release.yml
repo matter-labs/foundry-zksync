@@ -210,14 +210,10 @@ jobs:
           set -eo pipefail
           target="${{ matrix.target }}"
 
-          flags=(--target $target --bins
-            --no-default-features --features aws-kms,gcp-kms,cli,asm-keccak)
-
           # Disable asm-keccak, see https://github.com/alloy-rs/core/issues/711
-          # # Remove jemalloc, only keep `asm-keccak` if applicable
-          # if [[ "$target" != *msvc* && "$target" != "aarch64-unknown-linux-gnu" ]]; then
-          #     flags+=(--features asm-keccak)
-          # fi
+          # This has caused regression as of https://github.com/matter-labs/foundry-zksync/issues/1188
+          flags=(--target $target --bins
+            --no-default-features --features aws-kms,gcp-kms,cli)
 
           cargo build --release --bin forge --bin cast "${flags[@]}"
 
