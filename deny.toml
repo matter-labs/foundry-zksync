@@ -155,6 +155,8 @@ allow-git = [
     "https://github.com/tempoxyz/tempo",
     # Transitive dependency of Tempo
     "https://github.com/paradigmxyz/reth",
+    # Temporary fix for foundry-compilers
+    "https://github.com/nbaztec/compilers",
 ]
 
 [sources.allow-org]
