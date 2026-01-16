@@ -5445,8 +5445,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers"
 version = "0.19.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "366854900404df2e7dce32662bdf76e442ec2001b72eb3f15cb1af7f6c2c3501"
+source = "git+https://github.com/nbaztec/compilers.git?branch=v0.19.10-fix-remapping#013c7e120cf575e404d703093aa033ceb1548bc3"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5479,8 +5478,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts"
 version = "0.19.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91d46ae5cbaccf86b1019194309398b04bb65ab9cfb07c8e4ca2e79a95bbc85f"
+source = "git+https://github.com/nbaztec/compilers.git?branch=v0.19.10-fix-remapping#013c7e120cf575e404d703093aa033ceb1548bc3"
 dependencies = [
  "foundry-compilers-artifacts-solc",
  "foundry-compilers-artifacts-vyper",
@@ -5489,8 +5487,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-solc"
 version = "0.19.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0265397f148271a9e5733c9598685181ce3f3d0b878187220fb9ec98c208ef7d"
+source = "git+https://github.com/nbaztec/compilers.git?branch=v0.19.10-fix-remapping#013c7e120cf575e404d703093aa033ceb1548bc3"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5512,8 +5509,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-artifacts-vyper"
 version = "0.19.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4c5e38bda9f97e2a3b36a08f24ea1bf343c90f5c8398bd07ebf48a6ed65d8cf"
+source = "git+https://github.com/nbaztec/compilers.git?branch=v0.19.10-fix-remapping#013c7e120cf575e404d703093aa033ceb1548bc3"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -5527,8 +5523,7 @@ dependencies = [
 [[package]]
 name = "foundry-compilers-core"
 version = "0.19.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c4f2dda845ce5933e70dcd6dd5b3edfb953d3dcf764bd64f96a31d0de56d6d8"
+source = "git+https://github.com/nbaztec/compilers.git?branch=v0.19.10-fix-remapping#013c7e120cf575e404d703093aa033ceb1548bc3"
 dependencies = [
  "alloy-primitives",
  "cfg-if",
