@@ -4,12 +4,11 @@ use alloy_primitives::{U256, map::AddressHashMap};
 use foundry_common::{ContractsByArtifact, fs::normalize_path};
 use foundry_compilers::{ArtifactId, ProjectPathsConfig, utils::canonicalize};
 use foundry_config::{
-    Config, ForkConfigs, FsPermissions, ResolvedRpcEndpoint, ResolvedRpcEndpoints, RpcEndpoint,
+    Config, FsPermissions, ResolvedRpcEndpoint, ResolvedRpcEndpoints, RpcEndpoint,
     RpcEndpointUrl, cache::StorageCachingConfig, fs_permissions::FsAccessKind,
 };
 use foundry_evm_core::opts::EvmOpts;
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -41,8 +40,6 @@ pub struct CheatsConfig {
     pub root: PathBuf,
     /// Absolute Path to broadcast dir i.e project_root/broadcast
     pub broadcast: PathBuf,
-    /// Paths (directories) where file reading/writing is allowed
-    pub allowed_paths: Vec<PathBuf>,
     /// How the evm was configured by the user
     pub evm_opts: EvmOpts,
     /// Address labels from config
@@ -61,20 +58,6 @@ pub struct CheatsConfig {
     pub seed: Option<U256>,
     /// Whether to allow `expectRevert` to work for internal calls.
     pub internal_expect_revert: bool,
-    /// Mapping of chain aliases to chain data
-    pub chains: HashMap<String, ChainData>,
-    /// Mapping of chain IDs to their aliases
-    pub chain_id_to_alias: HashMap<u64, String>,
-    /// Fork configuration
-    pub forks: ForkConfigs,
-}
-
-/// Chain data for getChain cheatcodes
-#[derive(Clone, Debug)]
-pub struct ChainData {
-    pub name: String,
-    pub chain_id: u64,
-    pub default_rpc_url: String, // Store default RPC URL
 }
 
 impl CheatsConfig {
@@ -87,10 +70,6 @@ impl CheatsConfig {
         running_artifact: Option<ArtifactId>,
         strategy: CheatcodeInspectorStrategy,
     ) -> Self {
-        let mut allowed_paths = vec![config.root.clone()];
-        allowed_paths.extend(config.libs.iter().cloned());
-        allowed_paths.extend(config.allow_paths.iter().cloned());
-
         let rpc_endpoints = config.rpc_endpoints.clone().resolved();
         trace!(?rpc_endpoints, "using resolved rpc endpoints");
 
@@ -110,7 +89,6 @@ impl CheatsConfig {
             fs_permissions: config.fs_permissions.clone().joined(config.root.as_ref()),
             root: config.root.clone(),
             broadcast: config.root.clone().join(&config.broadcast),
-            allowed_paths,
             evm_opts,
             labels: config.labels.clone(),
             available_artifacts,
@@ -119,9 +97,6 @@ impl CheatsConfig {
             assertions_revert: config.assertions_revert,
             seed: config.fuzz.seed,
             internal_expect_revert: config.allow_internal_expect_revert,
-            chains: HashMap::new(),
-            chain_id_to_alias: HashMap::new(),
-            forks: config.forks.clone(),
         }
     }
 
@@ -251,7 +226,6 @@ impl Default for CheatsConfig {
             root: Default::default(),
             bind_json_path: PathBuf::default().join("utils").join("jsonBindings.sol"),
             broadcast: Default::default(),
-            allowed_paths: vec![],
             evm_opts: Default::default(),
             labels: Default::default(),
             available_artifacts: Default::default(),
@@ -260,9 +234,6 @@ impl Default for CheatsConfig {
             assertions_revert: true,
             seed: None,
             internal_expect_revert: false,
-            chains: HashMap::new(),
-            chain_id_to_alias: HashMap::new(),
-            forks: Default::default(),
         }
     }
 }

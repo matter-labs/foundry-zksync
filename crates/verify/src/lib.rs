@@ -22,6 +22,8 @@ pub use bytecode::VerifyBytecodeArgs;
 
 pub use retry::RetryArgs;
 
+pub mod sourcify;
+
 pub mod verify;
 pub use verify::{VerifierArgs, VerifyArgs, VerifyCheckArgs};
 
