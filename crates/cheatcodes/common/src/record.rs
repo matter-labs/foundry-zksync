@@ -1,6 +1,19 @@
 use std::collections::HashMap;
 
 use alloy_primitives::{Address, U256};
+use serde::Serialize;
+
+/// JSON-serializable log entry for `getRecordedLogsJson`.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogJson {
+    /// The topics of the log, including the signature, if any.
+    pub topics: Vec<String>,
+    /// The raw data of the log, hex-encoded with 0x prefix.
+    pub data: String,
+    /// The address of the log's emitter.
+    pub emitter: String,
+}
 
 /// Records storage slots reads and writes.
 #[derive(Clone, Debug, Default)]

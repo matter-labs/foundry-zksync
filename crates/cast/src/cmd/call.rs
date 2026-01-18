@@ -18,7 +18,7 @@ use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{ChainValueParser, RpcOpts, TransactionOpts},
-    utils::{LoadConfig, TraceResult, get_provider_with_curl, parse_ether_value},
+    utils::{self, LoadConfig, TraceResult, get_provider_with_curl, parse_ether_value},
 };
 use foundry_common::{
     abi::{encode_function_args, get_func},

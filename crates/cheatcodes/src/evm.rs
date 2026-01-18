@@ -14,6 +14,7 @@ use alloy_primitives::{
 };
 use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
+use foundry_cheatcodes_common::record::LogJson;
 use foundry_common::{
     fs::{read_json_file, write_json_file},
     slot_identifier::{

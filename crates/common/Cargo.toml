@@ -83,6 +83,7 @@ flate2.workspace = true
 chrono.workspace = true
 vergen = { workspace = true, features = ["build", "emit_and_set"] }
 vergen-git2 = { workspace = true }
+cargo_metadata = "0.23.1"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

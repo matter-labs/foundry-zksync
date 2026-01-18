@@ -133,7 +133,7 @@ pub fn get_executor_strategy(config: &Config) -> ExecutorStrategy {
 /// Returns a [RetryProvider] instantiated using [Config]'s
 /// RPC for ZKsync
 pub fn get_provider_zksync(config: &Config) -> Result<RetryProvider<Zksync>> {
-    get_provider_builder(config)?.build_zksync()
+    get_provider_builder(config, false)?.build_zksync()
 }
 
 /// Returns a [ProviderBuilder] instantiated using [Config] values.

@@ -342,6 +342,7 @@ impl ProviderBuilder {
             headers,
             is_local,
             accept_invalid_certs,
+            curl_mode: _,
         } = self;
         let url = url?;
 

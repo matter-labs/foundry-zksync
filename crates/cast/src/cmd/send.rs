@@ -16,7 +16,7 @@ use clap::Parser;
 use eyre::{Result, eyre};
 use foundry_cli::{
     opts::TransactionOpts,
-    utils::{LoadConfig, get_provider_with_curl},
+    utils::{self, LoadConfig, get_provider_with_curl},
 };
 use foundry_wallets::WalletSigner;
 
