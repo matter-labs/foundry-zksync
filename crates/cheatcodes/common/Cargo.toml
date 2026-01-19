@@ -13,4 +13,6 @@ exclude.workspace = true
 
 [dependencies]
 alloy-primitives.workspace = true
+cargo_metadata = "0.23.1"
 revm.workspace = true
+serde.workspace = true

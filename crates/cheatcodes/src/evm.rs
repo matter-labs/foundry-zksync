@@ -14,6 +14,7 @@ use alloy_primitives::{
 };
 use alloy_rlp::Decodable;
 use alloy_sol_types::SolValue;
+use foundry_cheatcodes_common::record::LogJson;
 use foundry_common::{
     fs::{read_json_file, write_json_file},
     slot_identifier::{
@@ -383,6 +384,22 @@ impl Cheatcode for getRecordedLogsCall {
     fn apply(&self, state: &mut Cheatcodes) -> Result {
         let Self {} = self;
         Ok(state.recorded_logs.replace(Default::default()).unwrap_or_default().abi_encode())
+    }
+}
+
+impl Cheatcode for getRecordedLogsJsonCall {
+    fn apply(&self, state: &mut Cheatcodes) -> Result {
+        let Self {} = self;
+        let logs = state.recorded_logs.replace(Default::default()).unwrap_or_default();
+        let json_logs: Vec<_> = logs
+            .into_iter()
+            .map(|log| LogJson {
+                topics: log.topics.iter().map(|t| format!("{t}")).collect(),
+                data: hex::encode_prefixed(&log.data),
+                emitter: format!("{}", log.emitter),
+            })
+            .collect();
+        Ok(serde_json::to_string(&json_logs)?.abi_encode())
     }
 }
 

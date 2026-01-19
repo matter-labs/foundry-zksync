@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use alloy_eips::eip7594::BlobTransactionSidecarVariant;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, map::HashMap};
 use alloy_rpc_types::{
-    BlobTransactionSidecar,
     request::{TransactionInput, TransactionRequest},
     serde_helpers::WithOtherFields,
 };
@@ -301,7 +301,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
         active_delegations: Vec<SignedAuthorization>,
-        active_blob_sidecar: Option<BlobTransactionSidecar>,
+        active_blob_sidecar: Option<BlobTransactionSidecarVariant>,
     ) {
         let ctx_zk = get_context(ctx);
 
@@ -380,7 +380,7 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 tx_req.sidecar = None;
             }
             (false, Some(blob_sidecar)) => {
-                tx_req.sidecar = Some(blob_sidecar.into());
+                tx_req.sidecar = Some(blob_sidecar);
                 tx_req.authorization_list = None;
             }
             (false, None) => {

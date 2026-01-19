@@ -13,7 +13,7 @@ use crate::{
     },
     utils::IgnoredTraces,
 };
-use alloy_consensus::BlobTransactionSidecar;
+use alloy_consensus::BlobTransactionSidecarVariant;
 use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::{
     Address, B256, Bytes, Log, TxKind, U256, hex,
@@ -397,7 +397,7 @@ pub struct Cheatcodes {
     pub active_delegations: Vec<SignedAuthorization>,
 
     /// The active EIP-4844 blob that will be attached to the next call.
-    pub active_blob_sidecar: Option<BlobTransactionSidecar>,
+    pub active_blob_sidecar: Option<BlobTransactionSidecarVariant>,
 
     /// The gas price.
     ///
@@ -1238,8 +1238,9 @@ impl Cheatcodes {
                     let account =
                         ecx.journaled_state.inner.state().get_mut(&broadcast.new_origin).unwrap();
 
-                    // Note(zk): The active delegation and blob sidecar check is in the strategy in
-                    // our codebase.
+                    // Note(zk): The transaction building is delegated to the strategy.
+                    // But we need to check for delegation+blob conflict here since strategy can't
+                    // return CallOutcome.
                     if has_delegation && has_blob_sidecar {
                         let msg = "both delegation and blob are active; `attachBlob` and `attachDelegation` are not compatible";
                         return Some(CallOutcome {

@@ -16,7 +16,7 @@ pub mod zk_provider;
 
 pub mod bytecode;
 pub mod retry;
-mod sourcify;
+pub mod sourcify;
 mod zksync;
 pub use bytecode::VerifyBytecodeArgs;
 

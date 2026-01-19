@@ -1,7 +1,7 @@
 use std::{any::Any, fmt::Debug, sync::Arc};
 
-use alloy_consensus::BlobTransactionSidecar;
-use alloy_network::TransactionBuilder4844;
+use alloy_consensus::BlobTransactionSidecarVariant;
+use alloy_network::{TransactionBuilder4844, TransactionBuilder7594};
 use alloy_primitives::{Address, B256, TxKind, map::HashMap};
 use alloy_rpc_types::{TransactionInput, TransactionRequest};
 use revm::{
@@ -99,7 +99,7 @@ pub trait CheatcodeInspectorStrategyRunner:
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
         active_delegations: Vec<SignedAuthorization>,
-        active_blob_sidecar: Option<BlobTransactionSidecar>,
+        active_blob_sidecar: Option<BlobTransactionSidecarVariant>,
     );
 
     fn post_initialize_interp(
@@ -223,7 +223,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         broadcast: &Broadcast,
         broadcastable_transactions: &mut BroadcastableTransactions,
         mut active_delegations: Vec<SignedAuthorization>,
-        mut active_blob_sidecar: Option<BlobTransactionSidecar>,
+        mut active_blob_sidecar: Option<BlobTransactionSidecarVariant>,
     ) {
         let input = TransactionInput::new(call.input.bytes(ecx));
 
@@ -248,7 +248,12 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
                 // NOTE(zk): We can't return a call outcome from here
                 return;
             }
-            tx_req.set_blob_sidecar(blob_sidecar);
+            // Handle both EIP-4844 and EIP-7594 blob sidecar formats
+            if blob_sidecar.is_eip4844() {
+                tx_req.set_blob_sidecar(blob_sidecar.into_eip4844().unwrap());
+            } else if blob_sidecar.is_eip7594() {
+                tx_req.set_blob_sidecar_7594(blob_sidecar.into_eip7594().unwrap());
+            }
         }
 
         // Apply active EIP-7702 delegations, if any.
