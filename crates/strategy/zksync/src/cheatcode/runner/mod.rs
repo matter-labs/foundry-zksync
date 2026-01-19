@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use alloy_eips::eip7594::BlobTransactionSidecarVariant;
-use alloy_primitives::{Address, B256, Bytes, TxKind, U256, map::DefaultHashBuilder};
+use alloy_primitives::{Address, B256, Bytes, TxKind, U256, map::HashMap};
 use alloy_rpc_types::{
     request::{TransactionInput, TransactionRequest},
     serde_helpers::WithOtherFields,
@@ -1006,7 +1006,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     fn zksync_persist_factory_deps(
         &self,
         ctx: &mut dyn CheatcodeInspectorStrategyContext,
-        factory_deps: HashMap<B256, Vec<u8>, DefaultHashBuilder>,
+        factory_deps: HashMap<B256, Vec<u8>>,
     ) {
         let ctx = get_context(ctx);
         ctx.persisted_factory_deps
