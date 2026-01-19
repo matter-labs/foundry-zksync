@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.1.5](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.4...foundry-zksync-v0.1.5) (2026-01-19)
+
+
+### Features
+
+* add precompile decoding for Prague BLS12-381 and Osaka P256VERIFY ([#13094](https://github.com/matter-labs/foundry-zksync/issues/13094)) ([a03c806](https://github.com/matter-labs/foundry-zksync/commit/a03c806b4d6f439552776233503783a20698400b))
+* add Sourcify support to forge clone ([#12900](https://github.com/matter-labs/foundry-zksync/issues/12900)) ([72cfc0e](https://github.com/matter-labs/foundry-zksync/commit/72cfc0e56cade691d14913af8fff9a49b1d44a50))
+* **cast:** add --curl flag to output equivalent curl commands ([#13114](https://github.com/matter-labs/foundry-zksync/issues/13114)) ([ad890da](https://github.com/matter-labs/foundry-zksync/commit/ad890da457dc8465c3a7155bff86349f7e92a46c))
+* **cast:** add eip7594 support ([#13058](https://github.com/matter-labs/foundry-zksync/issues/13058)) ([e4be928](https://github.com/matter-labs/foundry-zksync/commit/e4be9280054883222b4e667b44eb8405c68a3110))
+* **cast:** add tx flags to `erc20` command ([#13002](https://github.com/matter-labs/foundry-zksync/issues/13002)) ([8ac3ffc](https://github.com/matter-labs/foundry-zksync/commit/8ac3ffcb27d9494e8671071fc3f307d713d7c7e3))
+* **cheatcodes:** add getRecordedLogsJson cheatcode ([#13093](https://github.com/matter-labs/foundry-zksync/issues/13093)) ([6bfca30](https://github.com/matter-labs/foundry-zksync/commit/6bfca304c953e97f7771b1db27f2742f336772e7)), closes [#12854](https://github.com/matter-labs/foundry-zksync/issues/12854)
+* **cheatcodes:** support both 4844/7594 formats in `attachBlob` ([#13054](https://github.com/matter-labs/foundry-zksync/issues/13054)) ([46f2d89](https://github.com/matter-labs/foundry-zksync/commit/46f2d8938ea3a07532a370ccbe856c8150d1ae0b))
+
+
+### Bug Fixes
+
+* add Tempo transaction receipt type support in TryFrom conversion ([#13047](https://github.com/matter-labs/foundry-zksync/issues/13047)) ([9474ba4](https://github.com/matter-labs/foundry-zksync/commit/9474ba4c4e8d6313ee35891038fb212e2bc300df))
+* **anvil:** use suggested priority fee by default ([#13092](https://github.com/matter-labs/foundry-zksync/issues/13092)) ([31c7493](https://github.com/matter-labs/foundry-zksync/commit/31c7493374d626555d1e98650bd5b4d81c64934e))
+* correct error message in disk cache write operation ([cac0f28](https://github.com/matter-labs/foundry-zksync/commit/cac0f288230289d5e2c42ba1feb0c699cc81381a))
+* **evm:** pin fork block number to prevent state inconsistency ([#13085](https://github.com/matter-labs/foundry-zksync/issues/13085)) ([c9d4110](https://github.com/matter-labs/foundry-zksync/commit/c9d4110e116a7a5fd97310faa039d3b5a0605e1a))
+* **invariant:** preserve state across calls during replay ([#13084](https://github.com/matter-labs/foundry-zksync/issues/13084)) ([3ad32bb](https://github.com/matter-labs/foundry-zksync/commit/3ad32bb6e500587471e42686fc39f7a2bdd6a38e))
+* **preprocessor:** mark getCode as view in VmContractHelper ([#13089](https://github.com/matter-labs/foundry-zksync/issues/13089)) ([a0fb0e8](https://github.com/matter-labs/foundry-zksync/commit/a0fb0e88676a7d7b94a29ab132093a6ab32402df)), closes [#13086](https://github.com/matter-labs/foundry-zksync/issues/13086)
+* remappings to be deterministic ([#1241](https://github.com/matter-labs/foundry-zksync/issues/1241)) ([c534c75](https://github.com/matter-labs/foundry-zksync/commit/c534c75c713e3f636010d6f8166dd6a51edc8bb2))
+* use official foundry-compilers 0.19.12, remove fork patch ([#1244](https://github.com/matter-labs/foundry-zksync/issues/1244)) ([9c23095](https://github.com/matter-labs/foundry-zksync/commit/9c23095104350bfdb8a48e5f7597349a190ec8e1))
+* wrong error message in cache write ([#13066](https://github.com/matter-labs/foundry-zksync/issues/13066)) ([cac0f28](https://github.com/matter-labs/foundry-zksync/commit/cac0f288230289d5e2c42ba1feb0c699cc81381a))
+
+
+### Performance Improvements
+
+* add dist profile for smaller release binaries ([#13097](https://github.com/matter-labs/foundry-zksync/issues/13097)) ([e9dd47f](https://github.com/matter-labs/foundry-zksync/commit/e9dd47fe7269580e1a686b2a0eed055d460417af))
+
 ## [0.1.4](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.3...foundry-zksync-v0.1.4) (2026-01-12)
 
 
