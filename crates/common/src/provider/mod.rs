@@ -107,6 +107,8 @@ pub struct ProviderBuilder {
     is_local: bool,
     /// Whether to accept invalid certificates.
     accept_invalid_certs: bool,
+    /// Whether to disable automatic proxy detection.
+    no_proxy: bool,
     /// Whether to output curl commands instead of making requests.
     curl_mode: bool,
 }
@@ -159,6 +161,7 @@ impl ProviderBuilder {
             headers: vec![],
             is_local,
             accept_invalid_certs: false,
+            no_proxy: false,
             curl_mode: false,
         }
     }
@@ -263,6 +266,15 @@ impl ProviderBuilder {
         self
     }
 
+    /// Sets whether to disable automatic proxy detection.
+    ///
+    /// This can help in sandboxed environments (e.g., Cursor IDE sandbox, macOS App Sandbox)
+    /// where system proxy detection via SCDynamicStore causes crashes.
+    pub fn no_proxy(mut self, no_proxy: bool) -> Self {
+        self.no_proxy = no_proxy;
+        self
+    }
+
     /// Sets whether to output curl commands instead of making requests.
     ///
     /// When enabled, the provider will print equivalent curl commands to stdout
@@ -285,6 +297,7 @@ impl ProviderBuilder {
             headers,
             is_local,
             accept_invalid_certs,
+            no_proxy,
             curl_mode,
         } = self;
         let url = url?;
@@ -308,6 +321,7 @@ impl ProviderBuilder {
             .with_headers(headers)
             .with_jwt(jwt)
             .accept_invalid_certs(accept_invalid_certs)
+            .no_proxy(no_proxy)
             .build();
         let client = ClientBuilder::default().layer(retry_layer).transport(transport, is_local);
 
@@ -343,6 +357,7 @@ impl ProviderBuilder {
             is_local,
             accept_invalid_certs,
             curl_mode: _,
+            no_proxy: _,
         } = self;
         let url = url?;
 
@@ -385,6 +400,7 @@ impl ProviderBuilder {
             headers,
             is_local,
             accept_invalid_certs,
+            no_proxy,
             curl_mode,
         } = self;
         let url = url?;
@@ -410,6 +426,7 @@ impl ProviderBuilder {
             .with_headers(headers)
             .with_jwt(jwt)
             .accept_invalid_certs(accept_invalid_certs)
+            .no_proxy(no_proxy)
             .build();
 
         let client = ClientBuilder::default().layer(retry_layer).transport(transport, is_local);
