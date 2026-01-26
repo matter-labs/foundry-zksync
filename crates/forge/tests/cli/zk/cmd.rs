@@ -116,10 +116,9 @@ contract CallEmptyCode is Test {
     );
     cmd.args(["test", "--zksync", "--evm-version", "shanghai", "--mc", "CallEmptyCode"]);
 
-    cmd.assert_success()
-        .get_output()
-        .stdout_lossy()
-        .contains("call may fail or behave unexpectedly due to empty code");
+    // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
+    let output = cmd.assert_success().get_output().stderr_lossy();
+    assert!(output.contains("call may fail or behave unexpectedly due to empty code"));
 });
 
 forgetest_async!(test_zk_can_send_eth_to_eoa_without_warnings, |prj, cmd| {
@@ -142,7 +141,8 @@ contract SendEthToEOA is Test {
     );
 
     cmd.args(["test", "--zksync", "--match-test", "testSendEthToEOA"]);
-    let output = cmd.assert_success().get_output().stdout_lossy();
+    // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
+    let output = cmd.assert_success().get_output().stderr_lossy();
 
     assert!(!output.contains("call may fail or behave unexpectedly due to empty code"));
 });
@@ -167,7 +167,8 @@ contract CallEmptyCodeWithZeroValue is Test {
     );
 
     cmd.args(["test", "--zksync", "--match-test", "testCallEmptyCodeWithZeroValue"]);
-    let output = cmd.assert_success().get_output().stdout_lossy();
+    // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
+    let output = cmd.assert_success().get_output().stderr_lossy();
 
     assert!(output.contains("call may fail or behave unexpectedly due to empty code"));
 });
