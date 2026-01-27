@@ -723,7 +723,16 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
 
     let output = cmd
         .cast_fuse()
-        .args(["run", "--rpc-url", &url, "--zksync", "--use", ZK_MAX_SOLC, tx_hash, "--no-storage-caching"])
+        .args([
+            "run",
+            "--rpc-url",
+            &url,
+            "--zksync",
+            "--use",
+            ZK_MAX_SOLC,
+            tx_hash,
+            "--no-storage-caching",
+        ])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -751,15 +760,16 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
     prj.add_script(
         "Counter",
         r#"
-        pragma solidity ^0.8.0;
-        contract Counter {
-            uint256 public number;
+pragma solidity ^0.8.0;
 
-            function increment() public {
-                number++;
-            }
-        }
-       "#,
+contract Counter {
+    uint256 public number;
+
+    function increment() public {
+        number++;
+    }
+}
+"#,
     );
 
     let output = cmd
@@ -809,7 +819,16 @@ casttest!(test_zk_cast_run_with_call, async |prj, cmd| {
 
     let output = cmd
         .cast_fuse()
-        .args(["run", "--rpc-url", &url, "--zksync", "--use", ZK_MAX_SOLC, tx_hash, "--no-storage-caching"])
+        .args([
+            "run",
+            "--rpc-url",
+            &url,
+            "--zksync",
+            "--use",
+            ZK_MAX_SOLC,
+            tx_hash,
+            "--no-storage-caching",
+        ])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -837,15 +856,16 @@ casttest!(test_zk_cast_run_with_evm_interpreter, async |prj, cmd| {
     prj.add_script(
         "Counter",
         r#"
-        pragma solidity ^0.8.0;
-        contract Counter {
-            uint256 public number;
+pragma solidity ^0.8.0;
 
-            function increment() public {
-                number++;
-            }
-        }
-       "#,
+contract Counter {
+    uint256 public number;
+
+    function increment() public {
+        number++;
+    }
+}
+"#,
     );
 
     // Deploy the contract
@@ -897,7 +917,16 @@ casttest!(test_zk_cast_run_with_evm_interpreter, async |prj, cmd| {
 
     let output = cmd
         .cast_fuse()
-        .args(["run", "--rpc-url", &url, "--zksync", "--use", ZK_MAX_SOLC, tx_hash, "--no-storage-caching"])
+        .args([
+            "run",
+            "--rpc-url",
+            &url,
+            "--zksync",
+            "--use",
+            ZK_MAX_SOLC,
+            tx_hash,
+            "--no-storage-caching",
+        ])
         .assert_success()
         .get_output()
         .stdout_lossy();

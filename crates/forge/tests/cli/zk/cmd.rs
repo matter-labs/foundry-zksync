@@ -10,6 +10,7 @@ forgetest!(test_zk_gas_report, |prj, cmd| {
         "Contracts.sol",
         r#"
 //SPDX-license-identifier: MIT
+pragma solidity ^0.8.0;
 
 import "./test.sol";
 
@@ -96,6 +97,9 @@ forgetest_async!(test_zk_can_detect_call_to_empty_contract, |prj, cmd| {
     prj.add_test(
         "CallEmptyCode.t.sol",
         r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Test.sol";
 
 // https://github.com/matter-labs/foundry-zksync/issues/478
@@ -136,6 +140,9 @@ forgetest_async!(test_zk_can_send_eth_to_eoa_without_warnings, |prj, cmd| {
     prj.add_test(
         "SendEthToEOA.t.sol",
         r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Test.sol";
 
 contract SendEthToEOA is Test {
@@ -162,6 +169,9 @@ forgetest_async!(test_zk_calling_empty_code_with_zero_value_issues_warning, |prj
     prj.add_test(
         "CallEmptyCodeWithZeroValue.t.sol",
         r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Test.sol";
 
 contract CallEmptyCodeWithZeroValue is Test {

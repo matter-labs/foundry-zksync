@@ -425,6 +425,9 @@ contract Counter {
         prj.add_script(
     "SimpleScript.s.sol",
     r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Script.sol";
 import {Counter} from "../src/Counter.sol";
 contract SimpleScript is Script {
@@ -879,6 +882,9 @@ mod factory_deps {
         prj.add_script(
             "LargeContracts.s.sol",
             r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Script.sol";
 import "../src/LargeContracts.sol";
 
@@ -1048,6 +1054,9 @@ mod fork {
         prj.add_script(
         "ZkForkNonceTest.s.sol",
         format!(r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
