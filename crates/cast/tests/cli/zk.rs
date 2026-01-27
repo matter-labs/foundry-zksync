@@ -728,8 +728,6 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
             "--rpc-url",
             &url,
             "--zksync",
-            "--use",
-            ZK_MAX_SOLC,
             tx_hash,
             "--no-storage-caching",
         ])
@@ -824,8 +822,6 @@ contract Counter {
             "--rpc-url",
             &url,
             "--zksync",
-            "--use",
-            ZK_MAX_SOLC,
             tx_hash,
             "--no-storage-caching",
         ])
@@ -922,8 +918,6 @@ contract Counter {
             "--rpc-url",
             &url,
             "--zksync",
-            "--use",
-            ZK_MAX_SOLC,
             tx_hash,
             "--no-storage-caching",
         ])
