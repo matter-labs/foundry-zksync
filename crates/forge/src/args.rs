@@ -100,10 +100,20 @@ pub fn run_command(args: Forge) -> Result<()> {
         ForgeSubcommand::Clean { root } => {
             let config = utils::load_config_with_root(root.as_deref())?;
             let project = config.project()?;
-            let zk_project =
-                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
             config.cleanup(&project)?;
-            config.cleanup(&zk_project)?;
+            // Only create zkSync project if zkSync compilation is enabled (to avoid
+            // downloading zkSync solc for non-zkSync projects)
+            if config.zksync.should_compile() {
+                let zk_project =
+                    foundry_config::zksync::config_create_project(&config, config.cache, false)?;
+                config.cleanup(&zk_project)?;
+            } else {
+                // Still clean zkout directory if it exists (from previous zkSync builds)
+                let zkout_path = config.root.join(foundry_config::zksync::ZKSYNC_ARTIFACTS_DIR);
+                if zkout_path.exists() {
+                    let _ = std::fs::remove_dir_all(&zkout_path);
+                }
+            }
             Ok(())
         }
         ForgeSubcommand::Snapshot(cmd) => {
