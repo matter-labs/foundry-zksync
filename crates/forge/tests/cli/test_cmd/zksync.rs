@@ -11,6 +11,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+/// Maximum solc version supported by zksolc (era-solidity only supports up to 0.8.30).
+const ZK_MAX_SOLC: &str = "0.8.30";
+
 forgetest!(test_zk_core, |_prj, cmd| {
     let testdata =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata_zk").canonicalize().unwrap();
@@ -279,6 +282,8 @@ pub async fn run_zk_script_test(
 
     let mut script_args = vec![
         "--zk-startup",
+        "--use",
+        ZK_MAX_SOLC,
         &script_path_contract,
         "--private-key",
         &private_key,
@@ -329,6 +334,8 @@ pub fn deploy_zk_contract(
     cmd.forge_fuse().args([
         "create",
         "--zk-startup",
+        "--use",
+        ZK_MAX_SOLC,
         contract_path,
         "--rpc-url",
         url,
@@ -374,7 +381,7 @@ mod cheats {
             include_str!("../../fixtures/zk/DeployCounterWithBytecodeHash.s.sol"),
         );
         prj.add_source("Factory.sol", include_str!("../../fixtures/zk/Factory.sol"));
-        prj.add_source("Counter", "contract Counter {}");
+        prj.add_source("Counter", "pragma solidity ^0.8.0; contract Counter {}");
     }
 
     forgetest_async!(test_zk_use_factory_dep, |prj, cmd| {
@@ -453,6 +460,8 @@ contract SimpleScript is Script {
             "script",
             "-vvvvv",
             "--zksync",
+            "--use",
+            ZK_MAX_SOLC,
             "--private-key",
             private_key,
             "--rpc-url",
@@ -574,6 +583,8 @@ mod contracts {
         cmd.args([
             "test",
             "--zk-startup",
+            "--use",
+            ZK_MAX_SOLC,
             "--evm-version",
             "shanghai",
             "--mc",
@@ -701,6 +712,8 @@ mod create {
             cmd.forge_fuse().args([
                 "create",
                 "--zk-startup",
+                "--use",
+                ZK_MAX_SOLC,
                 "./src/ERC20.sol:MyToken",
                 "--rpc-url",
                 url.as_str(),
@@ -733,6 +746,8 @@ mod create {
         cmd.forge_fuse().args([
             "create",
             "--zk-startup",
+            "--use",
+            ZK_MAX_SOLC,
             "./src/ERC20.sol:MyToken",
             "--rpc-url",
             url.as_str(),
@@ -884,6 +899,8 @@ contract ZkLargeFactoryDependenciesScript is Script {
 
         cmd.arg("script").args([
             "--zk-startup",
+            "--use",
+            ZK_MAX_SOLC,
             "./script/LargeContracts.s.sol",
             "--broadcast",
             "--private-key",
@@ -1061,6 +1078,8 @@ contract ZkForkNonceTest is Script {{
         cmd.arg("script")
             .args([
                 "--zk-startup=true",
+                "--use",
+                ZK_MAX_SOLC,
                 "--no-storage-caching", // prevents rpc caching
                 "--rpc-url",
                 node.url().as_str(),
@@ -1170,6 +1189,8 @@ mod gas {
             .args([
                 "script",
                 "--zksync",
+                "--use",
+                ZK_MAX_SOLC,
                 "script/Gas.s.sol:GasScript",
                 "--private-key",
                 &private_key,
@@ -1219,6 +1240,8 @@ mod gas {
     ) -> Vec<&'a str> {
         vec![
             "--zk-startup",
+            "--use",
+            ZK_MAX_SOLC,
             "./script/Gas.s.sol",
             "--private-key",
             private_key,
@@ -1440,6 +1463,8 @@ mod paymaster {
         cmd.args([
             "test",
             "--zk-startup",
+            "--use",
+            ZK_MAX_SOLC,
             "--via-ir",
             "--match-contract",
             "TestPaymasterFlow",
@@ -1484,6 +1509,8 @@ mod paymaster {
                 "--value",
                 "1000000000000000000",
                 "--zksync",
+                "--use",
+                ZK_MAX_SOLC,
                 "--broadcast",
             ])
             .assert_success()
@@ -1513,6 +1540,8 @@ mod paymaster {
             "0x8c5a344500000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
             "--via-ir",
             "--zksync",
+            "--use",
+            ZK_MAX_SOLC,
             "--broadcast",
         ])
         .assert_success()
@@ -1537,6 +1566,8 @@ mod paymaster {
             "0x0000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000",
             "--via-ir",
             "--zksync",
+            "--use",
+            ZK_MAX_SOLC,
             "--broadcast",
         ])
         .assert_failure();
@@ -1608,6 +1639,8 @@ mod script {
 
         let script_args = vec![
             "--zk-startup",
+            "--use",
+            ZK_MAX_SOLC,
             &script_path_contract,
             "--broadcast",
             "--keystores",
