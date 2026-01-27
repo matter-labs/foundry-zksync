@@ -404,28 +404,30 @@ contract InvariantSequenceLenTest is Test {
    "#,
     );
 
-    cmd.args(["test", "--mt", "invariant_increment"]).assert_failure().stdout_eq(str![[r#"
+    cmd.args(["test", "-j", "1", "--mt", "invariant_increment"]).assert_failure().stdout_eq(str![
+        [r#"
 ...
 [FAIL: invariant increment failure]
 	[Sequence] (original: 3, shrunk: 1)
 ...
-"#]]);
+"#]
+    ]);
 
     // Check regular sequence output. Shrink disabled to show several lines.
     cmd.forge_fuse().arg("clean").assert_success();
     prj.update_config(|config| {
         config.invariant.shrink_run_limit = 0;
     });
-    cmd.forge_fuse().args(["test", "--mt", "invariant_increment"]).assert_failure().stdout_eq(
+    cmd.forge_fuse().args(["test", "-j", "1", "--mt", "invariant_increment"]).assert_failure().stdout_eq(
         str![[r#"
 ...
 Failing tests:
 Encountered 1 failing test in test/InvariantSequenceLenTest.t.sol:InvariantSequenceLenTest
 [FAIL: invariant increment failure]
 	[Sequence] (original: 3, shrunk: 3)
-		sender=0x0000000000000000000000000000000000001490 addr=[src/Counter.sol:Counter]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=increment() args=[]
+		sender=0x00000000000000000000000000000000000014aD addr=[src/Counter.sol:Counter]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=increment() args=[]
 		sender=0x8ef7F804bAd9183981A366EA618d9D47D3124649 addr=[src/Counter.sol:Counter]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=increment() args=[]
-		sender=0x00000000000000000000000000000000000016C5 addr=[src/Counter.sol:Counter]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setNumber(uint256) args=[284406551521730736391345481857560031052359183671404042152984097777 [2.844e65]]
+		sender=0x00000000000000000000000000000000000016Ac addr=[src/Counter.sol:Counter]0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f calldata=setNumber(uint256) args=[284406551521730736391345481857560031052359183671404042152984097777 [2.844e65]]
  invariant_increment() (runs: 0, calls: 0, reverts: 0)
 
 Encountered a total of 1 failing tests, 0 tests succeeded
@@ -440,18 +442,18 @@ Tip: Run `forge test --rerun` to retry only the 1 failed test
     prj.update_config(|config| {
         config.invariant.show_solidity = true;
     });
-    cmd.forge_fuse().args(["test", "--mt", "invariant_increment"]).assert_failure().stdout_eq(
+    cmd.forge_fuse().args(["test", "-j", "1", "--mt", "invariant_increment"]).assert_failure().stdout_eq(
         str![[r#"
 ...
 Failing tests:
 Encountered 1 failing test in test/InvariantSequenceLenTest.t.sol:InvariantSequenceLenTest
 [FAIL: invariant increment failure]
 	[Sequence] (original: 3, shrunk: 3)
-		vm.prank(0x0000000000000000000000000000000000001490);
+		vm.prank(0x00000000000000000000000000000000000014aD);
 		Counter(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f).increment();
 		vm.prank(0x8ef7F804bAd9183981A366EA618d9D47D3124649);
 		Counter(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f).increment();
-		vm.prank(0x00000000000000000000000000000000000016C5);
+		vm.prank(0x00000000000000000000000000000000000016Ac);
 		Counter(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f).setNumber(284406551521730736391345481857560031052359183671404042152984097777);
  invariant_increment() (runs: 0, calls: 0, reverts: 0)
 
@@ -466,7 +468,7 @@ Tip: Run `forge test --rerun` to retry only the 1 failed test
     prj.update_config(|config| {
         config.invariant.show_solidity = false;
     });
-    cmd.forge_fuse().args(["test", "--mt", "invariant_increment"]).assert_failure().stdout_eq(
+    cmd.forge_fuse().args(["test", "-j", "1", "--mt", "invariant_increment"]).assert_failure().stdout_eq(
         str![[r#"
 ...
 Failing tests:

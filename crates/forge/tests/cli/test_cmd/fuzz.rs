@@ -49,10 +49,12 @@ contract FuzzerDictTest is Test {
     );
 
     // Test that immutable address is used as fuzzed input, causing test to fail.
-    cmd.args(["test", "--fuzz-seed", "119", "--mt", "testImmutableOwner"]).assert_failure();
+    // Note(zk): Use --threads 1 to ensure deterministic seed derivation across platforms.
+    cmd.args(["test", "--fuzz-seed", "119", "-j", "1", "--mt", "testImmutableOwner"])
+        .assert_failure();
     // Test that storage address is used as fuzzed input, causing test to fail.
     cmd.forge_fuse()
-        .args(["test", "--fuzz-seed", "119", "--mt", "testStorageOwner"])
+        .args(["test", "--fuzz-seed", "119", "-j", "1", "--mt", "testStorageOwner"])
         .assert_failure();
 });
 

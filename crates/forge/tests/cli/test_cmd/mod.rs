@@ -2701,7 +2701,7 @@ contract ReverterTest is Test {
 
 }"#,
     );
-    cmd.args(["test", "--mc", "ReverterTest"]).assert_failure().stdout_eq(str![[r#"
+    cmd.args(["test", "-j", "1", "--mc", "ReverterTest"]).assert_failure().stdout_eq(str![[r#"
 [COMPILING_FILES] with [SOLC_VERSION]
 [SOLC_VERSION] [ELAPSED]
 Compiler run successful!
