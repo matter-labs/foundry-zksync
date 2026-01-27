@@ -30,11 +30,7 @@ static TEMPLATE_LOCK: LazyLock<PathBuf> =
     LazyLock::new(|| env::temp_dir().join("foundry-forge-test-template.lock"));
 
 /// The default Solc version used when compiling tests.
-///
-/// Note(zk): Pinned to 0.8.30 because zksolc only supports up to solc 0.8.30.
-/// Upstream foundry uses 0.8.33 for Osaka hardfork support, but zkVM-compatible
-/// solc binaries from matter-labs/era-solidity only go up to 0.8.30.
-pub const SOLC_VERSION: &str = "0.8.30";
+pub const SOLC_VERSION: &str = "0.8.33";
 
 /// Another Solc version used when compiling tests.
 ///

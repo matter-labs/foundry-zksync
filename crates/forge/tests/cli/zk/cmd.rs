@@ -52,6 +52,7 @@ contract ContractOneTest is DSTest {
         .arg("test")
         .arg("--gas-report")
         .arg("--zksync")
+        .args(["--use", super::ZK_MAX_SOLC])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -114,7 +115,16 @@ contract CallEmptyCode is Test {
 }
 "#,
     );
-    cmd.args(["test", "--zksync", "--evm-version", "shanghai", "--mc", "CallEmptyCode"]);
+    cmd.args([
+        "test",
+        "--zksync",
+        "--use",
+        super::ZK_MAX_SOLC,
+        "--evm-version",
+        "shanghai",
+        "--mc",
+        "CallEmptyCode",
+    ]);
 
     // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
     let output = cmd.assert_success().get_output().stderr_lossy();
@@ -140,7 +150,7 @@ contract SendEthToEOA is Test {
 "#,
     );
 
-    cmd.args(["test", "--zksync", "--match-test", "testSendEthToEOA"]);
+    cmd.args(["test", "--zksync", "--use", super::ZK_MAX_SOLC, "--match-test", "testSendEthToEOA"]);
     // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
     let output = cmd.assert_success().get_output().stderr_lossy();
 
@@ -158,7 +168,7 @@ contract CallEmptyCodeWithZeroValue is Test {
     function testCallEmptyCodeWithZeroValue() external {
         address eoa = makeAddr("Juan's Account");
         vm.deal(address(this), 1 ether);
-        
+
         (bool success,) = eoa.call("");
         assertTrue(success, "call failed");
     }
@@ -166,7 +176,14 @@ contract CallEmptyCodeWithZeroValue is Test {
 "#,
     );
 
-    cmd.args(["test", "--zksync", "--match-test", "testCallEmptyCodeWithZeroValue"]);
+    cmd.args([
+        "test",
+        "--zksync",
+        "--use",
+        super::ZK_MAX_SOLC,
+        "--match-test",
+        "testCallEmptyCodeWithZeroValue",
+    ]);
     // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
     let output = cmd.assert_success().get_output().stderr_lossy();
 

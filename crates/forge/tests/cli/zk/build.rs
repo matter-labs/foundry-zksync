@@ -4,7 +4,15 @@ use regex::Regex;
 // tests build output is as expected in zksync mode
 forgetest_init!(test_zk_build_sizes, |prj, cmd| {
     prj.initialize_default_contracts();
-    cmd.args(["build", "--sizes", "--zksync", "--evm-version", "shanghai"]);
+    cmd.args([
+        "build",
+        "--sizes",
+        "--zksync",
+        "--use",
+        super::ZK_MAX_SOLC,
+        "--evm-version",
+        "shanghai",
+    ]);
     let stdout = cmd.assert_success().get_output().stdout_lossy();
     let pattern =
         Regex::new(r"\|\s*Counter\s*\|\s*864\s*\|\s*864\s*\|\s*450,135\s*\|\s*450,135\s*\|")
