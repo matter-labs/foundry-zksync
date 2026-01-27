@@ -723,14 +723,8 @@ casttest!(test_zk_cast_run_with_create, async |prj, cmd| {
 
     let output = cmd
         .cast_fuse()
-        .args([
-            "run",
-            "--rpc-url",
-            &url,
-            "--zksync",
-            tx_hash,
-            "--no-storage-caching",
-        ])
+        .current_dir(prj.root())
+        .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -797,6 +791,7 @@ contract Counter {
 
     let output = cmd
         .cast_fuse()
+        .current_dir(prj.root())
         .args([
             "send",
             deployed_addr,
@@ -817,14 +812,8 @@ contract Counter {
 
     let output = cmd
         .cast_fuse()
-        .args([
-            "run",
-            "--rpc-url",
-            &url,
-            "--zksync",
-            tx_hash,
-            "--no-storage-caching",
-        ])
+        .current_dir(prj.root())
+        .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -893,6 +882,7 @@ contract Counter {
     // Call a function to generate a transaction
     let output = cmd
         .cast_fuse()
+        .current_dir(prj.root())
         .args([
             "send",
             deployed_addr,
@@ -913,14 +903,8 @@ contract Counter {
 
     let output = cmd
         .cast_fuse()
-        .args([
-            "run",
-            "--rpc-url",
-            &url,
-            "--zksync",
-            tx_hash,
-            "--no-storage-caching",
-        ])
+        .current_dir(prj.root())
+        .args(["run", "--rpc-url", &url, "--zksync", tx_hash, "--no-storage-caching"])
         .assert_success()
         .get_output()
         .stdout_lossy();
