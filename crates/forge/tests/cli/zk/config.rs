@@ -23,6 +23,7 @@ forgetest!(test_zk_foundry_toml_config_error_does_not_skip_correct_settings, |pr
 
     fs::write(prj.root().join("foundry.toml"), faulty_toml).unwrap();
 
+    // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
     let output = cmd
         .forge_fuse()
         .arg("build")
@@ -30,7 +31,7 @@ forgetest!(test_zk_foundry_toml_config_error_does_not_skip_correct_settings, |pr
         .arg("--build-info")
         .assert_success()
         .get_output()
-        .stdout_lossy();
+        .stderr_lossy();
 
     assert!(output.contains("Invalid suppressed error type: invalid-error"));
     assert!(output.contains("Invalid suppressed warning type: invalid-warning"));

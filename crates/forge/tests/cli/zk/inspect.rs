@@ -48,6 +48,7 @@ contract ContractOne {
         .arg("ContractOne")
         .arg("bytecode")
         .arg("--zksync")
+        .args(["--use", super::ZK_MAX_SOLC])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -60,6 +61,7 @@ contract ContractOne {
         .arg("ContractOne")
         .arg("deployedbytecode")
         .arg("--zksync")
+        .args(["--use", super::ZK_MAX_SOLC])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -78,6 +80,7 @@ contract ContractOne {
         .arg("ContractOne")
         .arg("assembly")
         .arg("--zksync")
+        .args(["--use", super::ZK_MAX_SOLC])
         .assert_failure()
         .stderr_eq("Error: ZKsync version of inspect does not support this field\n");
 });

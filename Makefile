@@ -47,7 +47,7 @@ build-docker: ## Build the docker image.
 ## is unstable (https://github.com/taiki-e/cargo-llvm-cov/issues/2).
 .PHONY: test-coverage
 test-coverage:
-	cargo +nightly llvm-cov --no-report nextest -E 'kind(test) & !test(/\b(issue|ext_integration)/)' && \
+	cargo +nightly llvm-cov --no-report nextest -E 'kind(test) & !test(/\b(issue|ext_integration|flaky_)/)' && \
 	cargo +nightly llvm-cov --no-report --doc && \
 	cargo +nightly llvm-cov report --doctests --open
 

@@ -229,13 +229,13 @@ impl InspectorExt for TraceCollector {
 
             let is_create = matches!(call.r#type, foundry_zksync_core::CallType::Create);
             let mut create_inputs = if is_create {
-                Some(CreateInputs {
-                    caller: inputs.caller,
-                    scheme: CreateScheme::Create,
-                    value: inputs.value.get(),
-                    init_code: inputs.input.bytes(context),
-                    gas_limit: inputs.gas_limit,
-                })
+                Some(CreateInputs::new(
+                    inputs.caller,
+                    CreateScheme::Create,
+                    inputs.value.get(),
+                    inputs.input.bytes(context),
+                    inputs.gas_limit,
+                ))
             } else {
                 None
             };
