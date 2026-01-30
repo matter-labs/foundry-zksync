@@ -10,6 +10,7 @@ forgetest!(test_zk_gas_report, |prj, cmd| {
         "Contracts.sol",
         r#"
 //SPDX-license-identifier: MIT
+pragma solidity ^0.8.0;
 
 import "./test.sol";
 
@@ -52,6 +53,7 @@ contract ContractOneTest is DSTest {
         .arg("test")
         .arg("--gas-report")
         .arg("--zksync")
+        .args(["--use", super::ZK_MAX_SOLC])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -95,6 +97,9 @@ forgetest_async!(test_zk_can_detect_call_to_empty_contract, |prj, cmd| {
     prj.add_test(
         "CallEmptyCode.t.sol",
         r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Test.sol";
 
 // https://github.com/matter-labs/foundry-zksync/issues/478
@@ -114,12 +119,20 @@ contract CallEmptyCode is Test {
 }
 "#,
     );
-    cmd.args(["test", "--zksync", "--evm-version", "shanghai", "--mc", "CallEmptyCode"]);
+    cmd.args([
+        "test",
+        "--zksync",
+        "--use",
+        super::ZK_MAX_SOLC,
+        "--evm-version",
+        "shanghai",
+        "--mc",
+        "CallEmptyCode",
+    ]);
 
-    cmd.assert_success()
-        .get_output()
-        .stdout_lossy()
-        .contains("call may fail or behave unexpectedly due to empty code");
+    // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
+    let output = cmd.assert_success().get_output().stderr_lossy();
+    assert!(output.contains("call may fail or behave unexpectedly due to empty code"));
 });
 
 forgetest_async!(test_zk_can_send_eth_to_eoa_without_warnings, |prj, cmd| {
@@ -127,6 +140,9 @@ forgetest_async!(test_zk_can_send_eth_to_eoa_without_warnings, |prj, cmd| {
     prj.add_test(
         "SendEthToEOA.t.sol",
         r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Test.sol";
 
 contract SendEthToEOA is Test {
@@ -141,8 +157,9 @@ contract SendEthToEOA is Test {
 "#,
     );
 
-    cmd.args(["test", "--zksync", "--match-test", "testSendEthToEOA"]);
-    let output = cmd.assert_success().get_output().stdout_lossy();
+    cmd.args(["test", "--zksync", "--use", super::ZK_MAX_SOLC, "--match-test", "testSendEthToEOA"]);
+    // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
+    let output = cmd.assert_success().get_output().stderr_lossy();
 
     assert!(!output.contains("call may fail or behave unexpectedly due to empty code"));
 });
@@ -152,13 +169,16 @@ forgetest_async!(test_zk_calling_empty_code_with_zero_value_issues_warning, |prj
     prj.add_test(
         "CallEmptyCodeWithZeroValue.t.sol",
         r#"
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "forge-std/Test.sol";
 
 contract CallEmptyCodeWithZeroValue is Test {
     function testCallEmptyCodeWithZeroValue() external {
         address eoa = makeAddr("Juan's Account");
         vm.deal(address(this), 1 ether);
-        
+
         (bool success,) = eoa.call("");
         assertTrue(success, "call failed");
     }
@@ -166,8 +186,16 @@ contract CallEmptyCodeWithZeroValue is Test {
 "#,
     );
 
-    cmd.args(["test", "--zksync", "--match-test", "testCallEmptyCodeWithZeroValue"]);
-    let output = cmd.assert_success().get_output().stdout_lossy();
+    cmd.args([
+        "test",
+        "--zksync",
+        "--use",
+        super::ZK_MAX_SOLC,
+        "--match-test",
+        "testCallEmptyCodeWithZeroValue",
+    ]);
+    // Note:(zk): tracing logs are redirected to stderr (see upstream commit 887dbdff4a)
+    let output = cmd.assert_success().get_output().stderr_lossy();
 
     assert!(output.contains("call may fail or behave unexpectedly due to empty code"));
 });

@@ -142,6 +142,7 @@ jobs:
         env:
           RUST_BACKTRACE: full
           TEST_MAINNET_URL: http://localhost:8011
+          RUST_MIN_STACK: 8388608
         run: |
           ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --no-fail-fast --package '*' --lib --test '*' -E '(test(~zk) or package(~zksync)) and not test(~test_zk_aave_di)'
 

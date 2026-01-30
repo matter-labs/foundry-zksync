@@ -175,6 +175,12 @@ impl ZkSettings {
         if let Some(ref mut evm_version) = self.evm_version {
             self.evm_version = evm_version.normalize_version_solc(solc_version);
         }
+        // Cap the EVM version to Prague since zksolc doesn't support newer versions (like Osaka)
+        if let Some(ref evm_version) = self.evm_version
+            && *evm_version > EvmVersion::Prague
+        {
+            self.evm_version = Some(EvmVersion::Prague);
+        }
     }
 
     /// Removes prefix from all paths

@@ -964,7 +964,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
 
         if let Some(cheatcodes) = self.cheatcodes.as_deref_mut() {
             // Handle mocked functions, replace bytecode address with mock if matched.
-            if let Some(mocks) = cheatcodes.mocked_functions.get(&call.target_address) {
+            if let Some(mocks) = cheatcodes.mocked_functions.get(&call.bytecode_address) {
                 let input_bytes = call.input.bytes(ecx);
                 // Check if any mock function set for call data or if catch-all mock function set
                 // for selector.
@@ -1084,7 +1084,7 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
         }
         ecx.journaled_state.depth -= self.in_inner_context as usize;
 
-        if !matches!(create.scheme, CreateScheme::Create2 { .. })
+        if !matches!(create.scheme(), CreateScheme::Create2 { .. })
             && self.enable_isolation
             && !self.in_inner_context
             && ecx.journaled_state.depth == 1
@@ -1092,10 +1092,10 @@ impl Inspector<EthEvmContext<&mut dyn DatabaseExt>> for InspectorStackRefMut<'_>
             let (result, address) = self.transact_inner(
                 ecx,
                 TxKind::Create,
-                create.caller,
-                create.init_code.clone(),
-                create.gas_limit,
-                create.value,
+                create.caller(),
+                create.init_code().clone(),
+                create.gas_limit(),
+                create.value(),
             );
             return Some(CreateOutcome { result, address });
         }

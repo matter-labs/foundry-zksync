@@ -77,6 +77,8 @@ contract DeployScript is Script {
 
     cmd.arg("script").args([
         "--zksync",
+        "--use",
+        super::ZK_MAX_SOLC,
         "DeployScript",
         "--broadcast",
         "--private-key",

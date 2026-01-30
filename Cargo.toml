@@ -285,11 +285,11 @@ foundry-primitives = { path = "crates/primitives" }
 
 # solc & compilation utilities
 foundry-block-explorers = { version = "0.22.0", default-features = false }
-foundry-compilers = { version = "0.19.12", default-features = false, features = [
+foundry-compilers = { version = "0.19.14", default-features = false, features = [
     "rustls",
     "svm-solc",
 ] }
-foundry-fork-db = "0.21"
+foundry-fork-db = "0.22"
 solang-parser = { version = "=0.3.9", package = "foundry-solang-parser" }
 solar = { package = "solar-compiler", version = "=0.1.8", default-features = false }
 svm = { package = "svm-rs", version = "0.5", default-features = false, features = [
@@ -351,13 +351,13 @@ op-alloy-rpc-types = "0.23.1"
 op-alloy-flz = "0.13.1"
 
 ## alloy-evm
-alloy-evm = "0.25.2"
-alloy-op-evm = "0.25.2"
+alloy-evm = "0.26.3"
+alloy-op-evm = "0.26.3"
 
 # revm
-revm = { version = "33.1.0", default-features = false }
-revm-inspectors = { version = "0.33.2", features = ["serde"] }
-op-revm = { version = "14.1.0", default-features = false }
+revm = { version = "34.0.0", default-features = false }
+revm-inspectors = { version = "0.34.0", features = ["serde"] }
+op-revm = { version = "15.0.0", default-features = false }
 
 ## cli
 anstream = "0.6"
@@ -454,8 +454,10 @@ tower-http = "0.6"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 url = "2"
-vergen = { version = "9", default-features = false, features = ["build", "cargo"] }
-vergen-git2 = "9"
+vergen = { package = "vergen-gitcl", version = "10.0.0-beta.5", default-features = false, features = [
+    "build",
+    "cargo",
+] }
 yansi = { version = "1.0", features = ["detect-tty", "detect-env"] }
 httptest = "0.16.3"
 path-slash = "0.2"
@@ -469,7 +471,7 @@ flate2 = "1.1"
 ethereum_ssz = "0.10"
 
 # Tempo
-tempo-primitives = { git = "https://github.com/tempoxyz/tempo", tag = "v0.7.5", default-features = false, features = ["serde"] }
+tempo-primitives = { git = "https://github.com/tempoxyz/tempo", tag = "v1.0.0", default-features = false, features = ["serde"] }
 
 ## Pinned dependencies. Enabled for the workspace in crates/test-utils.
 
@@ -525,13 +527,13 @@ rexpect = { git = "https://github.com/rust-cli/rexpect", rev = "2ed0b1898d7edaf6
 # alloy-transport-ws = { git = "https://github.com/alloy-rs/alloy", rev = "7fab7ee" }
 
 ## alloy-evm
-# alloy-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "237d0a0" }
-# alloy-op-evm = { git = "https://github.com/alloy-rs/evm.git", rev = "237d0a0" }
+# alloy-evm = { git = "https://github.com/alloy-rs/evm.git", branch = "staging-revm" }
+# alloy-op-evm = { git = "https://github.com/alloy-rs/evm.git", branch = "staging-revm" }
 
 ## revm
 # revm = { git = "https://github.com/bluealloy/revm.git", rev = "7e59936" }
 # op-revm = { git = "https://github.com/bluealloy/revm.git", rev = "7e59936" }
-# revm-inspectors = { git = "https://github.com/zerosnacks/revm-inspectors.git", rev = "0aaab71" }
+# revm-inspectors = { git = "https://github.com/paradigmxyz/revm-inspectors.git", branch = "staging-revm" }
 
 ## foundry
 # foundry-block-explorers = { git = "https://github.com/foundry-rs/block-explorers.git", rev = "f5b46b2" }
@@ -540,10 +542,10 @@ rexpect = { git = "https://github.com/rust-cli/rexpect", rev = "2ed0b1898d7edaf6
 # foundry-fork-db = { git = "https://github.com/foundry-rs/foundry-fork-db", rev = "b4299fc" }
 
 # solar
-solar = { package = "solar-compiler", git = "https://github.com/paradigmxyz/solar.git", rev = "1f28069" }
-solar-interface = { package = "solar-interface", git = "https://github.com/paradigmxyz/solar.git", rev = "1f28069" }
-solar-ast = { package = "solar-ast", git = "https://github.com/paradigmxyz/solar.git", rev = "1f28069" }
-solar-sema = { package = "solar-sema", git = "https://github.com/paradigmxyz/solar.git", rev = "1f28069" }
+solar = { package = "solar-compiler", git = "https://github.com/paradigmxyz/solar", rev = "530f129" }
+solar-interface = { package = "solar-interface", git = "https://github.com/paradigmxyz/solar", rev = "530f129" }
+solar-ast = { package = "solar-ast", git = "https://github.com/paradigmxyz/solar", rev = "530f129" }
+solar-sema = { package = "solar-sema", git = "https://github.com/paradigmxyz/solar", rev = "530f129" }
 
 # NOTE(zk): The following patches are to handle sha2@0.10.9 update. Add addtitional patches here as needed in future.
 # The patches need to be only applied once per zk_evm version, and can be cherry-picked on the latest in-use release.

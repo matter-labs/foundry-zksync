@@ -1224,6 +1224,7 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                                 code: Some(Bytecode::new_raw(Bytes::from(
                                     contract.zk_deployed_bytecode.clone(),
                                 ))),
+                                account_id: None,
                             },
                         );
                     } else {

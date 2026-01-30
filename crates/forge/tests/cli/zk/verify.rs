@@ -156,6 +156,7 @@ fn deploy_contract(
         .arg(contract_path)
         .arg("--broadcast")
         .arg("--zksync")
+        .args(["--use", super::ZK_MAX_SOLC])
         .assert_success()
         .get_output()
         .stdout_lossy();
@@ -178,6 +179,8 @@ fn verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut cmd: Te
             address,
             contract_path.to_string(),
             "--zksync".to_string(),
+            "--use".to_string(),
+            super::ZK_MAX_SOLC.to_string(),
             "--verifier-url".to_string(),
             ZKSYNC_VERIFIER_URL.to_string(),
             "--verifier".to_string(),
@@ -210,6 +213,8 @@ fn create_verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut 
                 "--verifier".to_string(),
                 "zksync".to_string(),
                 "--zksync".to_string(),
+                "--use".to_string(),
+                super::ZK_MAX_SOLC.to_string(),
             ])
             .execute();
 
@@ -234,6 +239,8 @@ fn create_verify_on_chain(info: Option<EnvExternalities>, prj: TestProject, mut 
                 address,
                 contract_path.to_string(),
                 "--zksync".to_string(),
+                "--use".to_string(),
+                super::ZK_MAX_SOLC.to_string(),
                 "--verifier-url".to_string(),
                 ZKSYNC_VERIFIER_URL.to_string(),
                 "--verifier".to_string(),
@@ -319,6 +326,8 @@ fn create_verify_with_optimization_runs(
                 "--verifier".to_string(),
                 "zksync".to_string(),
                 "--zksync".to_string(),
+                "--use".to_string(),
+                super::ZK_MAX_SOLC.to_string(),
                 "--optimizer-runs".to_string(),
                 "200".to_string(),
             ])
@@ -350,6 +359,7 @@ fn deploy_with_constructor_args(
             .args(create_args(&info))
             .arg(contract_path)
             .arg("--zksync")
+            .args(["--use", super::ZK_MAX_SOLC])
             .arg("--broadcast")
             .arg("--constructor-args")
             .arg("(42,TestString)")
@@ -379,6 +389,7 @@ fn create_then_verify_with_constructor_args(
             .args(create_args(&info))
             .arg(contract_path)
             .arg("--zksync")
+            .args(["--use", super::ZK_MAX_SOLC])
             .arg("--broadcast")
             .arg("--constructor-args")
             .arg("(42,TestString)")
@@ -411,6 +422,7 @@ fn create_then_verify_with_constructor_args(
                 "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
             ))
             .arg("--zksync")
+            .args(["--use", super::ZK_MAX_SOLC])
             .arg("--verifier-url")
             .arg(ZKSYNC_VERIFIER_URL)
             .arg("--verifier")
