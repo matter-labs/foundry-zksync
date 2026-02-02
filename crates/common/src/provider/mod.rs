@@ -79,7 +79,7 @@ pub fn try_get_http_provider(builder: impl AsRef<str>) -> Result<RetryProvider> 
 /// likely an anvil or other dev node) and with the default, or 7 second otherwise.
 #[inline]
 pub fn try_get_zksync_http_provider(builder: impl AsRef<str>) -> Result<RetryProvider<Zksync>> {
-    ProviderBuilder::new(builder.as_ref()).build_zksync()
+    ProviderBuilder::<AnyNetwork>::new(builder.as_ref()).build_zksync()
 }
 /// Helper type to construct a `RetryProvider`
 ///
@@ -367,7 +367,6 @@ impl<N: Network> ProviderBuilder<N> {
 
         Ok(provider)
     }
-}
 
     /// Constructs the `RetryProvider` taking all configs into account for ZKsync network.
     pub fn build_zksync(self) -> Result<RetryProvider<Zksync>> {
@@ -384,6 +383,7 @@ impl<N: Network> ProviderBuilder<N> {
             accept_invalid_certs,
             curl_mode: _,
             no_proxy: _,
+            ..
         } = self;
         let url = url?;
 
@@ -412,7 +412,9 @@ impl<N: Network> ProviderBuilder<N> {
 
         Ok(provider)
     }
+}
 
+impl<N: Network> ProviderBuilder<N> {
     /// Constructs the `RetryProvider` with a wallet.
     pub fn build_with_wallet<W: NetworkWallet<N> + Clone>(
         self,
