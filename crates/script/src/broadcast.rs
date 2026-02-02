@@ -207,9 +207,10 @@ impl<'a> SendTransactionKind<'a> {
                 *provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?.tx_hash()
             }
             Self::Browser(tx, signer) => {
-                debug!("sending transaction via browser wallet: {:?}", tx);
-                // Browser signer handles the entire send flow through the browser wallet
-                signer.send_transaction_via_browser(tx.inner.clone()).await?
+                debug!("sending transaction: {:?}", tx);
+
+                // Sign and send the transaction via the browser wallet
+                signer.send_transaction_via_browser(tx.into_inner()).await?
             }
         };
 
