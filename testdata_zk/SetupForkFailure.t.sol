@@ -7,7 +7,7 @@ contract ZkSetupForkFailureTest is Test {
     uint256 constant ETH_FORK_BLOCK = 18993187;
 
     function setUp() public {
-        vm.createSelectFork("https://eth-mainnet.alchemyapi.io/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H", ETH_FORK_BLOCK); // trufflehog:ignore
+        vm.createSelectFork("https://eth-mainnet.g.alchemy.com/v2/cZPtUjuF-Kp330we94LOvfXUXoMU794H", ETH_FORK_BLOCK); // trufflehog:ignore
     }
 
     // We test that the following function is called after EVM fork from zk context

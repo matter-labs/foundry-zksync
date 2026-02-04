@@ -54,9 +54,9 @@ and merge, at the per-key level:
 
 The selected profile is the value of the `FOUNDRY_PROFILE` environment variable, or if it is not set, "default".
 
-### All Options
+## Configuration Reference
 
-The following is a foundry.toml file with all configuration options set. See also [/config/src/lib.rs](./src/lib.rs) and [/cli/tests/it/config.rs](../forge/tests/it/config.rs).
+For a full list of all configuration options, see the [Foundry Book](https://getfoundry.sh/config/reference/overview):
 
 ```toml
 ## defaults for _all_ profiles
@@ -422,4 +422,3 @@ supported, this means that `FOUNDRY_SRC` and `DAPP_SRC` are equivalent.
 Some exceptions to the above are [explicitly ignored](https://github.com/foundry-rs/foundry/blob/10440422e63aae660104e079dfccd5b0ae5fd720/config/src/lib.rs#L1539-L15522) due to security concerns.
 
 Environment variables take precedence over values in `foundry.toml`. Values are parsed as a loose form of TOML syntax.
-Consider the following examples:

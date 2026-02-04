@@ -36,7 +36,7 @@ contract ZkForkStorageMigrationTest is Test {
     function setUp() public {
         forkEra = vm.createFork(Globals.ZKSYNC_MAINNET_URL, ERA_FORK_BLOCK);
         string memory ethUrl = string.concat(
-            "https://eth-mainnet.alchemyapi.io/v2/",
+            "https://eth-mainnet.g.alchemy.com/v2/",
             vm.envOr("ALCHEMY_API_KEY", string("cZPtUjuF-Kp330we94LOvfXUXoMU794H"))
         );
         forkEth = vm.createFork(ethUrl, ETH_FORK_BLOCK);
