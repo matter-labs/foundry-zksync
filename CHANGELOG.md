@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.7](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.6...foundry-zksync-v0.1.7) (2026-02-06)
+
+
+### Features
+
+* **debugger:** display actual gas usage alongside refund counter ([#13271](https://github.com/matter-labs/foundry-zksync/issues/13271)) ([a325677](https://github.com/matter-labs/foundry-zksync/commit/a325677add640770acb9a3b3c02325fab9ca12e9))
+
+
+### Bug Fixes
+
+* adjust numerical cells in gas report to be right aligned ([#12883](https://github.com/matter-labs/foundry-zksync/issues/12883)) ([a656bb0](https://github.com/matter-labs/foundry-zksync/commit/a656bb01e80bf156766d75a2223602849ce59637))
+* **cast:** remove redundant chain() call in explorer_client ([#13272](https://github.com/matter-labs/foundry-zksync/issues/13272)) ([274ab98](https://github.com/matter-labs/foundry-zksync/commit/274ab986d897cb264e26ea5203417febf7c36145))
+* **config:** handle decimal string in U256 deserialization ([#13284](https://github.com/matter-labs/foundry-zksync/issues/13284)) ([3a7ed77](https://github.com/matter-labs/foundry-zksync/commit/3a7ed77c9a97d55fa061741ec72361412758e5cd))
+* **config:** Respect user-configured etherscan URL over chain defaults ([#13238](https://github.com/matter-labs/foundry-zksync/issues/13238)) ([6f1ea72](https://github.com/matter-labs/foundry-zksync/commit/6f1ea721c95e523081bb432d1ef1a42ee4bc3a0d))
+* **invariant:** remove unused cloned calldata ([#12893](https://github.com/matter-labs/foundry-zksync/issues/12893)) ([50dbffb](https://github.com/matter-labs/foundry-zksync/commit/50dbffbb077a42027cc52c3418398ff5e89b85f9))
+* **verify:** respect user-configured etherscan URL over chain defaults ([#13275](https://github.com/matter-labs/foundry-zksync/issues/13275)) ([2ddcec6](https://github.com/matter-labs/foundry-zksync/commit/2ddcec69989e05b18312bc9a422dd724c3898e32))
+
+
+### Performance Improvements
+
+* **docker:** use shared cache mounts for parallel builds ([6f1ea72](https://github.com/matter-labs/foundry-zksync/commit/6f1ea721c95e523081bb432d1ef1a42ee4bc3a0d))
+
 ## [0.1.6](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.5...foundry-zksync-v0.1.6) (2026-01-30)
 
 
