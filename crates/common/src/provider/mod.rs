@@ -367,7 +367,9 @@ impl<N: Network> ProviderBuilder<N> {
 
         Ok(provider)
     }
+}
 
+impl<N: Network> ProviderBuilder<N> {
     /// Constructs the `RetryProvider` taking all configs into account for ZKsync network.
     pub fn build_zksync(self) -> Result<RetryProvider<Zksync>> {
         let Self {

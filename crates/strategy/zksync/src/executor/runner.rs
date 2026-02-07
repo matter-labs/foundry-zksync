@@ -46,11 +46,11 @@ impl ZksyncExecutorStrategyRunner {
     ) -> BackendResult<()> {
         let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
         // fetch the full nonce to preserve account's tx nonce
-        let full_nonce = executor.backend.storage(address, slot)?;
+        let full_nonce = executor.backend_mut().storage(address, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
         let new_full_nonce =
             foundry_zksync_core::state::new_full_nonce(full_nonce.tx_nonce, nonce as u128);
-        executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
+        executor.backend_mut().insert_account_storage(address, slot, new_full_nonce)?;
 
         Ok(())
     }
@@ -74,14 +74,14 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
         EvmExecutorStrategyRunner.set_balance(executor, address, amount)?;
 
         let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
-        executor.backend.insert_account_storage(address, slot, amount)?;
+        executor.backend_mut().insert_account_storage(address, slot, amount)?;
 
         Ok(())
     }
 
     fn get_balance(&self, executor: &mut Executor, address: Address) -> BackendResult<U256> {
         let (address, slot) = foundry_zksync_core::state::get_balance_storage(address);
-        let balance = executor.backend.storage(address, slot)?;
+        let balance = executor.backend_mut().storage(address, slot)?;
 
         Ok(balance)
     }
@@ -96,18 +96,18 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
 
         let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
         // fetch the full nonce to preserve account's deployment nonce
-        let full_nonce = executor.backend.storage(address, slot)?;
+        let full_nonce = executor.backend_mut().storage(address, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
         let new_full_nonce =
             foundry_zksync_core::state::new_full_nonce(nonce as u128, full_nonce.deploy_nonce);
-        executor.backend.insert_account_storage(address, slot, new_full_nonce)?;
+        executor.backend_mut().insert_account_storage(address, slot, new_full_nonce)?;
 
         Ok(())
     }
 
     fn get_nonce(&self, executor: &mut Executor, address: Address) -> BackendResult<u64> {
         let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
-        let full_nonce = executor.backend.storage(address, slot)?;
+        let full_nonce = executor.backend_mut().storage(address, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
 
         Ok(full_nonce.tx_nonce as u64)

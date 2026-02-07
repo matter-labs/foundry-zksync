@@ -44,6 +44,7 @@ use foundry_evm::{
     traces::{backtrace::BacktraceBuilder, identifier::TraceIdentifiers, prune_trace_depth},
 };
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContracts;
+use rand::Rng;
 use regex::Regex;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -307,6 +308,12 @@ impl TestArgs {
             config.invariant.gas_report_samples = 0;
         }
 
+        // Generate a random fuzz seed if none provided, for reproducibility.
+        config.fuzz.seed = config
+            .fuzz
+            .seed
+            .or_else(|| Some(U256::from_be_bytes(rand::rng().random::<[u8; 32]>())));
+
         // Create test options from general project settings and compiler output.
         let should_debug = self.debug;
         let should_draw = self.flamegraph || self.flamechart;
@@ -455,6 +462,7 @@ impl TestArgs {
         filter: &ProjectPathsAwareFilter,
         output: &ProjectCompileOutput,
     ) -> eyre::Result<TestOutcome> {
+        let fuzz_seed = config.fuzz.seed;
         if self.list {
             return list(runner, filter);
         }
@@ -530,13 +538,13 @@ impl TestArgs {
                 }
             });
             sh_println!("{}", serde_json::to_string(&results)?)?;
-            return Ok(TestOutcome::new(Some(runner), results, self.allow_failure));
+            return Ok(TestOutcome::new(Some(runner), results, self.allow_failure, fuzz_seed));
         }
 
         if self.junit {
             let results = runner.test_collect(filter)?;
             sh_println!("{}", junit_xml_report(&results, verbosity).to_string()?)?;
-            return Ok(TestOutcome::new(Some(runner), results, self.allow_failure));
+            return Ok(TestOutcome::new(Some(runner), results, self.allow_failure, fuzz_seed));
         }
 
         let remote_chain =
@@ -593,6 +601,7 @@ impl TestArgs {
         let mut gas_snapshots = BTreeMap::<String, BTreeMap<String, String>>::new();
 
         let mut outcome = TestOutcome::empty(None, self.allow_failure);
+        outcome.fuzz_seed = fuzz_seed;
 
         let mut any_test_failed = false;
         let mut backtrace_builder = None;

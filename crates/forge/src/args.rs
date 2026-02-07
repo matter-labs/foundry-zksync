@@ -14,6 +14,8 @@ use zksync_telemetry::{TelemetryProps, get_telemetry};
 pub fn run() -> Result<()> {
     setup()?;
 
+    foundry_cli::opts::GlobalArgs::check_markdown_help::<Forge>();
+
     let args = Forge::parse();
     args.global.init()?;
 

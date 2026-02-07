@@ -27,6 +27,7 @@ members = [
     "crates/primitives/",
     "crates/script-sequence/",
     "crates/test-utils/",
+    "crates/cli-markdown/",
 ]
 resolver = "2"
 
@@ -152,7 +153,6 @@ ruint.opt-level = 3
 
 sha2.opt-level = 3
 sha3.opt-level = 3
-tiny-keccak.opt-level = 3
 keccak.opt-level = 3
 
 # Fuzzing.
@@ -262,6 +262,7 @@ foundry-cheatcodes = { path = "crates/cheatcodes" }
 foundry-cheatcodes-spec = { path = "crates/cheatcodes/spec" }
 foundry-cheatcodes-common = { path = "crates/cheatcodes/common" }
 foundry-cli = { path = "crates/cli" }
+foundry-cli-markdown = { path = "crates/cli-markdown" }
 foundry-common = { path = "crates/common" }
 foundry-common-fmt = { path = "crates/common/fmt" }
 foundry-config = { path = "crates/config" }
