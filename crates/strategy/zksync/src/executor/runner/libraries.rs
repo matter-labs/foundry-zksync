@@ -282,12 +282,14 @@ impl ZksyncExecutorStrategyRunner {
 
         // Persist factory deps deployed during this stage directly in the cheatcode inspector so
         // they are available during normal execution.
-        if let Some(cheatcodes) = executor.inspector.cheatcodes.as_mut() {
-            let factory_deps = executor
-                .backend
+        let factory_deps = {
+            let backend = executor.backend_mut();
+            backend
                 .strategy
                 .runner
-                .zksync_get_persisted_factory_deps(executor.backend.strategy.context.as_mut());
+                .zksync_get_persisted_factory_deps(backend.strategy.context.as_mut())
+        };
+        if let Some(cheatcodes) = executor.inspector.cheatcodes.as_mut() {
             cheatcodes
                 .strategy
                 .runner

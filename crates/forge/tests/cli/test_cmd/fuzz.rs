@@ -386,6 +386,8 @@ Encountered a total of 1 failing tests, 2 tests succeeded
 
 Tip: Run `forge test --rerun` to retry only the 1 failed test
 
+[SEED] (use `--fuzz-seed` to reproduce)
+
 "#]]);
 });
 

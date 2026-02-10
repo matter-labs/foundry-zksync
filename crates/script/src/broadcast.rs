@@ -151,12 +151,13 @@ impl<'a> SendTransactionKind<'a> {
         estimate_multiplier: u64,
         gas_per_pubdata: Option<u64>,
     ) -> Result<TxHash> {
-        let pending_tx_hash = match self {
+        match self {
             Self::Unlocked(tx) => {
                 debug!("sending transaction from unlocked account {:?}", tx);
 
                 // Submit the transaction
-                *provider.send_transaction(tx).await?.tx_hash()
+                let pending = provider.send_transaction(tx).await?;
+                Ok(*pending.tx_hash())
             }
             Self::Raw(tx, signer) => {
                 debug!("sending transaction: {:?}", tx);
@@ -194,27 +195,29 @@ impl<'a> SendTransactionKind<'a> {
                         alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
                     let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
 
-                    *zk_provider.send_raw_transaction(signed.as_ref()).await?.tx_hash()
+                    let pending = zk_provider.send_raw_transaction(signed.as_ref()).await?;
+                    Ok(*pending.tx_hash())
                 } else {
                     let signed = tx.build(signer).await?;
 
                     // Submit the raw transaction
-                    *provider.send_raw_transaction(signed.encoded_2718().as_ref()).await?.tx_hash()
+                    let pending =
+                        provider.send_raw_transaction(signed.encoded_2718().as_ref()).await?;
+                    Ok(*pending.tx_hash())
                 }
             }
             Self::Signed(tx) => {
                 debug!("sending transaction: {:?}", tx);
-                *provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?.tx_hash()
+                let pending = provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?;
+                Ok(*pending.tx_hash())
             }
             Self::Browser(tx, signer) => {
                 debug!("sending transaction: {:?}", tx);
 
                 // Sign and send the transaction via the browser wallet
-                signer.send_transaction_via_browser(tx.into_inner()).await?
+                Ok(signer.send_transaction_via_browser(tx.into_inner()).await?)
             }
-        };
-
-        Ok(pending_tx_hash)
+        }
     }
 
     /// Prepares and sends the transaction in one operation.
