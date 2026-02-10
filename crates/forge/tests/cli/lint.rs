@@ -735,8 +735,7 @@ Warning: Key `deny_warnings` is being deprecated in favor of `deny = warnings`. 
 
 #[tokio::test]
 async fn ensure_lint_rule_docs() {
-    const FOUNDRY_BOOK_LINT_PAGE_URL: &str =
-        "https://book.getfoundry.sh/reference/forge/lint";
+    const FOUNDRY_BOOK_LINT_PAGE_URL: &str = "https://book.getfoundry.sh/reference/forge/lint";
 
     // Fetch the content of the lint reference
     let content = match reqwest::get(FOUNDRY_BOOK_LINT_PAGE_URL).await {
