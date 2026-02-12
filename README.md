@@ -33,15 +33,11 @@ If the answer is not there:
 - Open a [discussion](https://github.com/foundry-rs/foundry/discussions/new) with your question, or
 - Open an issue with [the bug](https://github.com/foundry-rs/foundry/issues/new)
 
-If you want to contribute, or follow along with contributor discussion, you can use our [main telegram](https://t.me/foundry_rs) to chat with us about the development of Foundry!
+Join our [Telegram][tg-url] to chat about the development of Foundry.
 
 ## Support
 
-Having trouble? See if the answer to your question can be found in the [Foundry Docs][foundry-docs].
-
-If the answer is not there:
-- Join the [support Telegram][tg-support-url] to get help, or
-- Open an issue with [the bug](https://github.com/foundry-rs/foundry/issues/new)
+Having trouble? Check the [Foundry Docs][foundry-docs], join the [support Telegram][tg-support-url], or [open an issue](https://github.com/foundry-rs/foundry/issues/new).
 
 #### License
 

@@ -472,25 +472,21 @@ impl CreateArgs {
         constructor: &Constructor,
         constructor_args: &[String],
     ) -> Result<Vec<DynSolValue>> {
-        let expected_params = constructor.inputs.len();
+        if constructor.inputs.len() != constructor_args.len() {
+            eyre::bail!(
+                "Constructor argument count mismatch: expected {} but got {}",
+                constructor.inputs.len(),
+                constructor_args.len()
+            );
+        }
 
-        let mut params = Vec::with_capacity(expected_params);
+        let mut params = Vec::with_capacity(constructor.inputs.len());
         for (input, arg) in constructor.inputs.iter().zip(constructor_args) {
             // resolve the input type directly
             let ty = input
                 .resolve()
                 .wrap_err_with(|| format!("Could not resolve constructor arg: input={input}"))?;
             params.push((ty, arg));
-        }
-
-        let actual_params = params.len();
-
-        if actual_params != expected_params {
-            tracing::warn!(
-                given = actual_params,
-                expected = expected_params,
-                "Constructor argument mismatch: expected {expected_params} arguments, but received {actual_params}. Ensure that the number of arguments provided matches the constructor definition."
-            );
         }
 
         let params = params.iter().map(|(ty, arg)| (ty, arg.as_str()));

@@ -127,12 +127,6 @@ impl Clone for Executor {
 }
 
 impl Executor {
-    /// Creates a new `ExecutorBuilder`.
-    #[inline]
-    pub fn builder() -> ExecutorBuilder {
-        ExecutorBuilder::new()
-    }
-
     /// Creates a new `Executor` with the given arguments.
     #[inline]
     pub fn new(
