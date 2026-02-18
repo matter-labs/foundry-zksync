@@ -36,9 +36,12 @@ jobs:
           toolchain: ${{ env.TARGET_RUST_VERSION }}
       - uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-      - name: cargo test
-        run: cargo test --doc -p forge
+          toolchain: stable
+          target: ${{ matrix.target }}
+      - uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+      - uses: taiki-e/install-action@1e67dedb5e3c590e1c9d9272ace46ef689da250d # v2
+        with:
+          tool: nextest
 
   clippy:
     name: clippy

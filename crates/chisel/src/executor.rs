@@ -220,16 +220,22 @@ impl SessionSource {
 
         let executor = ExecutorBuilder::new()
             .inspectors(|stack| {
-                stack.chisel_state(final_pc).trace_mode(TraceMode::Call).cheatcodes(
-                    CheatsConfig::new(
-                        &self.config.foundry_config,
-                        self.config.evm_opts.clone(),
-                        None,
-                        None,
-                        strategy.runner.new_cheatcode_inspector_strategy(strategy.context.as_mut()),
+                stack
+                    .logs(self.config.foundry_config.live_logs)
+                    .chisel_state(final_pc)
+                    .trace_mode(TraceMode::Call)
+                    .cheatcodes(
+                        CheatsConfig::new(
+                            &self.config.foundry_config,
+                            self.config.evm_opts.clone(),
+                            None,
+                            None,
+                            strategy
+                                .runner
+                                .new_cheatcode_inspector_strategy(strategy.context.as_mut()),
+                        )
+                        .into(),
                     )
-                    .into(),
-                )
             })
             .gas_limit(self.config.evm_opts.gas_limit())
             .spec_id(self.config.foundry_config.evm_spec_id())

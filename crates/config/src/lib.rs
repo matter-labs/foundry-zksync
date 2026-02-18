@@ -360,6 +360,8 @@ pub struct Config {
     pub invariant: InvariantConfig,
     /// Whether to allow ffi cheatcodes in test
     pub ffi: bool,
+    /// Whether to show `console.log` outputs in realtime during script/test execution
+    pub live_logs: bool,
     /// Whether to allow `expectRevert` for internal functions.
     pub allow_internal_expect_revert: bool,
     /// Use the create 2 factory in all cases including tests and non-broadcasting scripts.
@@ -1878,11 +1880,6 @@ impl Config {
             src: paths.sources.file_name().unwrap().into(),
             out: artifacts.clone(),
             libs: paths.libraries.into_iter().map(|lib| lib.file_name().unwrap().into()).collect(),
-            remappings: paths
-                .remappings
-                .into_iter()
-                .map(|r| RelativeRemapping::new(r, root))
-                .collect(),
             fs_permissions: FsPermissions::new([PathPermission::read(artifacts)]),
             ..Self::default()
         }
@@ -2602,6 +2599,7 @@ impl Default for Config {
             invariant: InvariantConfig::new("cache/invariant".into()),
             always_use_create_2_factory: false,
             ffi: false,
+            live_logs: false,
             allow_internal_expect_revert: false,
             prompt_timeout: 120,
             sender: Self::DEFAULT_SENDER,

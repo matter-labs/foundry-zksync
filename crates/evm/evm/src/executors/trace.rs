@@ -37,8 +37,8 @@ impl TracingExecutor {
             strategy.runner.new_backend_strategy(strategy.context.as_ref()),
         )?;
 
-        // configures a bare version of the evm executor: no cheatcode inspector is enabled,
-        // tracing will be enabled only for the targeted transaction
+        // configures a bare version of the evm executor: no cheatcode and log_collector inspector
+        // is enabled, tracing will be enabled only for the targeted transaction
         let mut executor = ExecutorBuilder::new()
             .inspectors(|stack| {
                 stack.trace_mode(trace_mode).networks(networks).create2_deployer(create2_deployer)
