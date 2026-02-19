@@ -16,7 +16,7 @@ use clap::Parser;
 use eyre::{Result, eyre};
 use foundry_cli::{
     opts::TransactionOpts,
-    utils::{self, LoadConfig, get_provider_with_curl},
+    utils::{self, LoadConfig, get_provider},
 };
 use foundry_wallets::WalletSigner;
 
@@ -150,7 +150,7 @@ impl SendTxArgs {
         };
 
         let config = send_tx.eth.load_config()?;
-        let provider = get_provider_with_curl(&config, send_tx.eth.rpc.curl)?;
+        let provider = get_provider(&config)?;
 
         if let Some(interval) = send_tx.poll_interval {
             provider.client().set_poll_interval(Duration::from_secs(interval))
