@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.1.8](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.7...foundry-zksync-v0.1.8) (2026-02-23)
+
+
+### Features
+
+* add `executeTransaction` cheatcode ([#13437](https://github.com/matter-labs/foundry-zksync/issues/13437)) ([1e03468](https://github.com/matter-labs/foundry-zksync/commit/1e034688ab84d1dc2f6a6bb173d1d5e02ed4d79f))
+* add executeTransaction cheatcode ([1e03468](https://github.com/matter-labs/foundry-zksync/commit/1e034688ab84d1dc2f6a6bb173d1d5e02ed4d79f))
+* **cheatcodes:** add Ed25519 crypto cheatcodes ([#13450](https://github.com/matter-labs/foundry-zksync/issues/13450)) ([288b27d](https://github.com/matter-labs/foundry-zksync/commit/288b27d75d9d9171d631a576d845d6f3442ebc3f))
+* **evm:** `ForkDatabase`/`MultiFork` generic over `Network` ([#13459](https://github.com/matter-labs/foundry-zksync/issues/13459)) ([f8e3dfa](https://github.com/matter-labs/foundry-zksync/commit/f8e3dfaf9a6eb88481c095bf7bf5286b3c5d0b4a))
+* **forge,chisel:** realtime `console.log` ([#13321](https://github.com/matter-labs/foundry-zksync/issues/13321)) ([5c25342](https://github.com/matter-labs/foundry-zksync/commit/5c2534222e3a4666f2c867a0bf88149624e738bb))
+* **lint:** add missing visit methods to EarlyLintVisitor ([#13454](https://github.com/matter-labs/foundry-zksync/issues/13454)) ([6823f47](https://github.com/matter-labs/foundry-zksync/commit/6823f47af460e5478fdb4f22155a15dc3f6fe172))
+
+
+### Bug Fixes
+
+* **anvil:** handle disk cache write failures in state eviction ([#13332](https://github.com/matter-labs/foundry-zksync/issues/13332)) ([c0689eb](https://github.com/matter-labs/foundry-zksync/commit/c0689eb74b9147e0777dfd5ce1163849ec48a9c0))
+* **anvil:** variable shadowing bug in ReadyTransactions::remove_with_markers ([#13436](https://github.com/matter-labs/foundry-zksync/issues/13436)) ([28769aa](https://github.com/matter-labs/foundry-zksync/commit/28769aa04d1b3675daef7edc52407eea083b0290))
+* bind TempDir guard in clone test to prevent premature cleanup ([#13471](https://github.com/matter-labs/foundry-zksync/issues/13471)) ([7326b79](https://github.com/matter-labs/foundry-zksync/commit/7326b79920fd831758caed60a56edad4af3c8aaf))
+* **cast:** --json support for erc20 cmds ([#12727](https://github.com/matter-labs/foundry-zksync/issues/12727)) ([2804e38](https://github.com/matter-labs/foundry-zksync/commit/2804e383aa6e85404e60c89a8bd016f35da9e065))
+* **cast:** clean up temp dir in `cast storage` when etherscan cache is unavailable ([#13418](https://github.com/matter-labs/foundry-zksync/issues/13418)) ([d1c4f38](https://github.com/matter-labs/foundry-zksync/commit/d1c4f3835ae498d8ca7075182152a526ded0fce9))
+* **cast:** remove duplicate receipt handling in Tempo transactions ([#13378](https://github.com/matter-labs/foundry-zksync/issues/13378)) ([6527a54](https://github.com/matter-labs/foundry-zksync/commit/6527a5487e05b9e10e5c2053a37c019ae4eaf8ff))
+* **cheatcodes:** fix vm.expectRevert for direct precompile calls ([#13460](https://github.com/matter-labs/foundry-zksync/issues/13460)) ([0d2a1d3](https://github.com/matter-labs/foundry-zksync/commit/0d2a1d318a92c5ee931493c99b4a9f52bdda6742))
+* **common:** remove trailing space in `state_root` match pattern ([#13426](https://github.com/matter-labs/foundry-zksync/issues/13426)) ([9ef198e](https://github.com/matter-labs/foundry-zksync/commit/9ef198e36cdc3974624b65aa409d7ba6845319ca))
+* **config:** normalize deny_warnings from env vars ([#13434](https://github.com/matter-labs/foundry-zksync/issues/13434)) ([6612bd6](https://github.com/matter-labs/foundry-zksync/commit/6612bd6551b11ebac66b566722cefff3d7f63eac))
+* constructor params and args check ([#13375](https://github.com/matter-labs/foundry-zksync/issues/13375)) ([074d732](https://github.com/matter-labs/foundry-zksync/commit/074d7326d3b31da46c62868a5e35c35a99188d2a))
+* correct dead condition in command error formatting ([#13427](https://github.com/matter-labs/foundry-zksync/issues/13427)) ([61290cf](https://github.com/matter-labs/foundry-zksync/commit/61290cf847de12421d897ada62938442217e6a02))
+* correct path format in get_paths doc comment ([#13388](https://github.com/matter-labs/foundry-zksync/issues/13388)) ([7838a07](https://github.com/matter-labs/foundry-zksync/commit/7838a07615c4dc308257e4b6a02932ae2828e73d))
+* correct trace message in dynamic linking preprocessor ([#13394](https://github.com/matter-labs/foundry-zksync/issues/13394)) ([1d693f2](https://github.com/matter-labs/foundry-zksync/commit/1d693f2b6ad2f1985e20ac2c0f30e23f9182e6ac))
+* **forge:** don't reset snapshot diff result on missing file ([#13442](https://github.com/matter-labs/foundry-zksync/issues/13442)) ([98c6d9b](https://github.com/matter-labs/foundry-zksync/commit/98c6d9bcde0e15634c3fa1b27dcd39b93c5abe04))
+* **lint:** remove unreachable macro arm in declare_forge_lint ([#13452](https://github.com/matter-labs/foundry-zksync/issues/13452)) ([4f79da7](https://github.com/matter-labs/foundry-zksync/commit/4f79da792c474f6348270d97aa13cef5ce0abb63))
+* may div by zero ([#13369](https://github.com/matter-labs/foundry-zksync/issues/13369)) ([1ac22cb](https://github.com/matter-labs/foundry-zksync/commit/1ac22cb9dd888d7454bf9f01127b59f9ee1805cb))
+* prevent panic on etherscan client creation failure in test command ([#13395](https://github.com/matter-labs/foundry-zksync/issues/13395)) ([9abaa53](https://github.com/matter-labs/foundry-zksync/commit/9abaa538b6831ed4e2e8d25392647661aecf735a))
+* **primitives:** `FoundryTransactionRequest` conversion w/ tempo variant ([#13401](https://github.com/matter-labs/foundry-zksync/issues/13401)) ([45d2d6c](https://github.com/matter-labs/foundry-zksync/commit/45d2d6cd33fd8a024d8df882a26a39a17f6e87e3))
+* **traces:** check HTTP status before JSON parsing in Sourcify fetcher ([#13446](https://github.com/matter-labs/foundry-zksync/issues/13446)) ([278ba19](https://github.com/matter-labs/foundry-zksync/commit/278ba19b49d2bf1369d98a30cb2fdbc2ec9bc697))
+* unittest failed ([#13371](https://github.com/matter-labs/foundry-zksync/issues/13371)) ([e286608](https://github.com/matter-labs/foundry-zksync/commit/e28660897f5d5614175cd962feb98c3ebf39f39c))
+
+
+### Performance Improvements
+
+* **anvil:** reuse storage root from prove_storage instead of recompu… ([#13363](https://github.com/matter-labs/foundry-zksync/issues/13363)) ([b523fd2](https://github.com/matter-labs/foundry-zksync/commit/b523fd29ad7e1fe872005a2dacd806a3a1b73fc8))
+* **anvil:** reuse storage root from prove_storage instead of recomputing ([b523fd2](https://github.com/matter-labs/foundry-zksync/commit/b523fd29ad7e1fe872005a2dacd806a3a1b73fc8))
+* avoid checksum ([#13374](https://github.com/matter-labs/foundry-zksync/issues/13374)) ([8a2f572](https://github.com/matter-labs/foundry-zksync/commit/8a2f5728c6c31e10344c7acbc520bf3822dd27ae))
+* **config:** skip redundant remapping detection in _with_root ([#13389](https://github.com/matter-labs/foundry-zksync/issues/13389)) ([017120d](https://github.com/matter-labs/foundry-zksync/commit/017120d7d12a8f1cb618000713d0dffcc8c029f8))
+* **invariant:** avoid cloning state changeset in fuzz runs ([#13398](https://github.com/matter-labs/foundry-zksync/issues/13398)) ([dbc7d1f](https://github.com/matter-labs/foundry-zksync/commit/dbc7d1f972ce65f914de6d83f6d6043fbd679df4))
+* **primitives:** avoid cloning receipts ([#13396](https://github.com/matter-labs/foundry-zksync/issues/13396)) ([c39c8b5](https://github.com/matter-labs/foundry-zksync/commit/c39c8b5f697e26a364a5e0429f47cf6174d8bf0f))
+* **traces:** deduplicate addresses before external fetching ([#13320](https://github.com/matter-labs/foundry-zksync/issues/13320)) ([057f6b5](https://github.com/matter-labs/foundry-zksync/commit/057f6b5dfc77bfdf025152a3e9fc31c2f9e90cb1))
+* **verify:** reuse transaction from earlier RPC call instead of fetching twice ([#13391](https://github.com/matter-labs/foundry-zksync/issues/13391)) ([9a31dec](https://github.com/matter-labs/foundry-zksync/commit/9a31dec741a98cef12bc8ebeccd3020e4474d1d0))
+
 ## [0.1.7](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.6...foundry-zksync-v0.1.7) (2026-02-06)
 
 
