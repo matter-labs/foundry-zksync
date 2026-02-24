@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.8...foundry-zksync-v0.1.9) (2026-02-24)
+
+
+### Bug Fixes
+
+* patch alloy-chains to fix zkSync etherscan 504 timeouts ([#1258](https://github.com/matter-labs/foundry-zksync/issues/1258)) ([8686e8b](https://github.com/matter-labs/foundry-zksync/commit/8686e8b38134e7573745ff772df0696dddf58a5c)), closes [#1246](https://github.com/matter-labs/foundry-zksync/issues/1246)
+
 ## [0.1.8](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.7...foundry-zksync-v0.1.8) (2026-02-23)
 
 
