@@ -115,17 +115,6 @@ pub trait CheatcodesExecutor {
     fn tracing_inspector(&mut self) -> Option<&mut Option<Box<TraceCollector>>> {
         None
     }
-
-    fn trace_zksync(
-        &mut self,
-        ccx_state: &mut Cheatcodes,
-        ecx: Ecx,
-        call_traces: Box<dyn std::any::Any>, /* TODO(merge): Should me moved elsewhere,
-                                              * represents `Vec<Call>` */
-    ) {
-        let mut inspector = self.get_inspector(ccx_state);
-        inspector.trace_zksync(ecx, call_traces, false);
-    }
 }
 
 /// Constructs [FoundryEvm] and runs a given closure with it.
