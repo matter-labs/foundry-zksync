@@ -225,6 +225,9 @@ pub struct ScriptArgs {
     #[command(flatten)]
     pub retry: RetryArgs,
 
+    /// Only `gas_per_pubdata`, `paymaster_address`, and `paymaster_input` are used
+    /// during broadcast. `custom_signature` and `factory_deps` are unused in the
+    /// script path (factory deps come from cheatcode transaction metadata).
     #[command(flatten)]
     pub zk_tx: ZkTransactionOpts,
 }
