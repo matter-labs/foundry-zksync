@@ -1,7 +1,8 @@
 use crate::{
     tx::{self, CastTxBuilder, SenderKind},
-    zksync::{NoopWallet, ZkTransactionOpts},
+    zksync::NoopWallet,
 };
+use foundry_cli::opts::ZkTransactionOpts;
 use alloy_eips::Encodable2718;
 use alloy_ens::NameOrAddress;
 use alloy_network::{EthereumWallet, TransactionBuilder};

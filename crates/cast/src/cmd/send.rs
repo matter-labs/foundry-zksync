@@ -1,9 +1,7 @@
 use std::{path::PathBuf, str::FromStr, time::Duration};
 
-use crate::{
-    tx::{self, CastTxBuilder, CastTxSender, SendTxOpts},
-    zksync::ZkTransactionOpts,
-};
+use crate::tx::{self, CastTxBuilder, CastTxSender, SendTxOpts};
+use foundry_cli::opts::ZkTransactionOpts;
 use alloy_eips::Encodable2718;
 use alloy_ens::NameOrAddress;
 use alloy_network::{AnyNetwork, EthereumWallet, TransactionBuilder};

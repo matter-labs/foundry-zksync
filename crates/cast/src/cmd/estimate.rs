@@ -1,7 +1,5 @@
-use crate::{
-    ZkTransactionOpts,
-    tx::{CastTxBuilder, SenderKind},
-};
+use crate::tx::{CastTxBuilder, SenderKind};
+use foundry_cli::opts::ZkTransactionOpts;
 use alloy_ens::NameOrAddress;
 use alloy_primitives::U256;
 use alloy_provider::Provider;

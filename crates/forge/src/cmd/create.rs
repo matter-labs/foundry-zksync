@@ -13,7 +13,7 @@ use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
 use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::{
-    opts::{BuildOpts, EthereumOpts, EtherscanOpts, TransactionOpts},
+    opts::{BuildOpts, EthereumOpts, EtherscanOpts, TransactionOpts, ZkTransactionOpts},
     utils::{self, LoadConfig, find_contract_artifacts, read_constructor_args_file},
 };
 use foundry_common::{
@@ -103,7 +103,7 @@ pub struct CreateArgs {
     retry: RetryArgs,
 
     #[command(flatten)]
-    pub zksync: zksync::ZkCreateArgs,
+    pub zk_tx: ZkTransactionOpts,
 }
 
 impl CreateArgs {

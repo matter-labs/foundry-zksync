@@ -12,8 +12,9 @@ use foundry_cli::opts::EthereumOpts;
 
 use crate::{
     tx::{self, CastTxBuilder, InputState, SenderKind},
-    zksync::{NoopWallet, ZkTransactionOpts},
+    zksync::NoopWallet,
 };
+use foundry_cli::opts::ZkTransactionOpts;
 
 pub async fn send_zk_transaction(
     zk_provider: RootProvider<Zksync>,
@@ -57,7 +58,7 @@ async fn send_transaction_internal<Z>(
 where
     Z: ZksyncProvider,
 {
-    let mut tx = zk_tx_opts.build_base_tx(tx, zk_code)?;
+    let mut tx = crate::zksync::build_zk_tx(&zk_tx_opts, tx, zk_code)?;
 
     // Estimate fees
     foundry_zksync_core::estimate_fee(&mut tx, &zk_provider, 130, None).await?;

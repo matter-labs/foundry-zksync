@@ -1,11 +1,12 @@
 use super::run::fetch_contracts_bytecode_from_trace;
 use crate::{
-    Cast, ZkCast, ZkTransactionOpts,
+    Cast, ZkCast,
     debug::handle_traces,
     traces::TraceKind,
     tx::{CastTxBuilder, SenderKind},
     zksync,
 };
+use foundry_cli::opts::ZkTransactionOpts;
 use alloy_ens::NameOrAddress;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, hex, map::HashMap};
 use alloy_provider::Provider;

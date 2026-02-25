@@ -4,7 +4,7 @@ use alloy_consensus::SignableTransaction;
 use alloy_dyn_abi::FunctionExt;
 use alloy_json_abi::Function;
 use alloy_network::{AnyNetwork, NetworkWallet, TransactionBuilder};
-use alloy_primitives::{Address, Bytes, Signature, TxKind, U256, hex};
+use alloy_primitives::{Address, Signature, TxKind, U256, hex};
 use alloy_provider::Provider;
 use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
@@ -15,9 +15,8 @@ use alloy_zksync::network::{
     tx_envelope::TxEnvelope,
     unsigned_tx::{TypedTransaction, eip712::PaymasterParams},
 };
-use clap::Parser;
 use eyre::{Context, Result};
-use foundry_cli::utils;
+use foundry_cli::{opts::ZkTransactionOpts, utils};
 use foundry_common::{
     fmt::{format_token, format_token_raw},
     shell,
@@ -26,84 +25,47 @@ use foundry_config::Config;
 
 use crate::Cast;
 
-#[derive(Clone, Debug, Parser)]
-#[command(next_help_heading = "Transaction options")]
-pub struct ZkTransactionOpts {
-    /// Paymaster address for the ZKSync transaction
-    #[arg(long = "zk-paymaster-address", requires = "paymaster_input")]
-    pub paymaster_address: Option<Address>,
+/// Builds a base ZkSync transaction request from the common parameters
+pub fn build_zk_tx(
+    opts: &ZkTransactionOpts,
+    evm_tx: WithOtherFields<TransactionRequest>,
+    zk_code: Option<String>,
+) -> Result<ZkTransactionRequest> {
+    let is_create = evm_tx.to == Some(TxKind::Create);
+    let mut tx: ZkTransactionRequest = evm_tx.inner.into();
 
-    /// Paymaster input for the ZKSync transaction
-    #[arg(long = "zk-paymaster-input", requires = "paymaster_address", value_parser = parse_hex_bytes)]
-    pub paymaster_input: Option<Bytes>,
-
-    /// Custom signature for the ZKSync transaction
-    #[arg(long = "zk-custom-signature",  value_parser = parse_hex_bytes)]
-    pub custom_signature: Option<Bytes>,
-
-    /// Factory dependencies for the ZKSync transaction
-    #[arg(long = "zk-factory-deps", value_parser = parse_hex_bytes, value_delimiter = ',')]
-    pub factory_deps: Vec<Bytes>,
-
-    /// Gas per pubdata for the ZKSync transaction
-    #[arg(long = "zk-gas-per-pubdata")]
-    pub gas_per_pubdata: Option<U256>,
-}
-
-fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
-    hex::decode(s).map(Bytes::from).map_err(|e| format!("Invalid hex string: {e}"))
-}
-
-impl ZkTransactionOpts {
-    pub fn has_zksync_args(&self) -> bool {
-        self.paymaster_address.is_some()
-            || self.custom_signature.is_some()
-            || !self.factory_deps.is_empty()
-            || self.gas_per_pubdata.is_some()
+    if let Some(gas_per_pubdata) = opts.gas_per_pubdata {
+        tx.set_gas_per_pubdata(U256::from(gas_per_pubdata));
     }
 
-    /// Builds a base ZkSync transaction request from the common parameters
-    pub fn build_base_tx(
-        &self,
-        evm_tx: WithOtherFields<TransactionRequest>,
-        zk_code: Option<String>,
-    ) -> Result<ZkTransactionRequest> {
-        let is_create = evm_tx.to == Some(TxKind::Create);
-        let mut tx: ZkTransactionRequest = evm_tx.inner.into();
-
-        if let Some(gas_per_pubdata) = self.gas_per_pubdata {
-            tx.set_gas_per_pubdata(gas_per_pubdata);
-        }
-
-        if let (Some(paymaster), Some(paymaster_input)) =
-            (self.paymaster_address, self.paymaster_input.clone())
-        {
-            tx.set_paymaster_params(PaymasterParams { paymaster, paymaster_input });
-        }
-
-        if let Some(custom_signature) = self.custom_signature.clone() {
-            tx.set_custom_signature(custom_signature);
-        }
-
-        if is_create {
-            let input_data = tx.input().cloned().unwrap_or_default().to_vec();
-            let zk_code = zk_code
-                .ok_or_else(|| eyre::eyre!("ZkSync code is required for contract creation"))?;
-            let zk_code_bytes = hex::decode(zk_code)?;
-            let constructor_args = &input_data[zk_code_bytes.len()..];
-
-            tx = tx.with_create_params(
-                zk_code_bytes,
-                constructor_args.to_vec(),
-                self.factory_deps.iter().map(|b| b.to_vec()).collect(),
-            )?;
-        } else {
-            tx.set_factory_deps(self.factory_deps.clone());
-        }
-
-        tx.prep_for_submission();
-        Ok(tx)
+    if let (Some(paymaster), Some(paymaster_input)) =
+        (opts.paymaster_address, opts.paymaster_input.clone())
+    {
+        tx.set_paymaster_params(PaymasterParams { paymaster, paymaster_input });
     }
+
+    if let Some(custom_signature) = opts.custom_signature.clone() {
+        tx.set_custom_signature(custom_signature);
+    }
+
+    if is_create {
+        let input_data = tx.input().cloned().unwrap_or_default().to_vec();
+        let zk_code = zk_code
+            .ok_or_else(|| eyre::eyre!("ZkSync code is required for contract creation"))?;
+        let zk_code_bytes = hex::decode(zk_code)?;
+        let constructor_args = &input_data[zk_code_bytes.len()..];
+
+        tx = tx.with_create_params(
+            zk_code_bytes,
+            constructor_args.to_vec(),
+            opts.factory_deps.iter().map(|b| b.to_vec()).collect(),
+        )?;
+    } else {
+        tx.set_factory_deps(opts.factory_deps.clone());
+    }
+
+    tx.prep_for_submission();
+    Ok(tx)
 }
 
 pub struct ZkCast<P, Z> {
@@ -253,7 +215,7 @@ pub async fn convert_tx(
     zk_tx: ZkTransactionOpts,
     zk_code: Option<String>,
 ) -> Result<ZkTransactionRequest> {
-    let mut tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
+    let mut tx = build_zk_tx(&zk_tx, evm_tx, zk_code)?;
 
     // NOTE(zk): here we are doing a `call` so the fee doesn't matter
     // but we need a valid value for `gas_per_pubdata`
@@ -282,6 +244,6 @@ pub async fn estimate_gas(
     config: &Config,
 ) -> Result<u64> {
     let zk_provider = utils::get_provider_zksync(config)?;
-    let tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
+    let tx = build_zk_tx(&zk_tx, evm_tx, zk_code)?;
     Ok(zk_provider.estimate_gas(tx).await?)
 }

@@ -1,6 +1,5 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use alloy_primitives::{Address, Bytes, hex};
 use clap::Parser;
 use foundry_config::zksync::ZkSyncConfig;
 use foundry_zksync_compilers::compilers::zksolc::{ErrorType, WarningType};
@@ -110,23 +109,6 @@ pub struct ZkSyncArgs {
     #[clap(long = "zk-optimizer")]
     pub optimizer: bool,
 
-    /// Paymaster address
-    #[clap(
-        long = "zk-paymaster-address",
-        value_name = "PAYMASTER_ADDRESS",
-        visible_alias = "paymaster-address"
-    )]
-    pub paymaster_address: Option<Address>,
-
-    /// Paymaster input
-    #[clap(
-        long = "zk-paymaster-input",
-        value_name = "PAYMASTER_INPUT",
-        visible_alias = "paymaster-input",
-        value_parser = parse_hex_bytes
-    )]
-    pub paymaster_input: Option<Bytes>,
-
     /// Set the warnings to suppress for zksolc.
     #[clap(
         long = "zk-suppressed-warnings",
@@ -193,6 +175,3 @@ impl ZkSyncArgs {
     }
 }
 
-fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
-    hex::decode(s).map(Bytes::from).map_err(|e| format!("Invalid hex string: {e}"))
-}
