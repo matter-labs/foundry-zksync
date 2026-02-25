@@ -1,10 +1,9 @@
 use super::run::fetch_contracts_bytecode_from_trace;
 use crate::{
-    Cast, ZkCast, ZkTransactionOpts,
+    Cast, ZkTransactionOpts,
     debug::handle_traces,
     traces::TraceKind,
     tx::{CastTxBuilder, SenderKind},
-    zksync,
 };
 use alloy_ens::NameOrAddress;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, hex, map::HashMap};
@@ -18,7 +17,7 @@ use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
     opts::{ChainValueParser, RpcOpts, TransactionOpts},
-    utils::{self, LoadConfig, TraceResult, get_provider, parse_ether_value},
+    utils::{LoadConfig, TraceResult, get_executor_strategy, get_provider, parse_ether_value},
 };
 use foundry_common::{
     abi::{encode_function_args, get_func},
@@ -44,6 +43,8 @@ use itertools::Either;
 use regex::Regex;
 use revm::context::TransactionType;
 use std::{str::FromStr, sync::LazyLock};
+
+mod zksync;
 
 // matches override pattern <address>:<slot>:<value>
 // e.g. 0x123:0x1:0x1234
@@ -239,7 +240,7 @@ impl CallArgs {
         let block_overrides = self.get_block_overrides()?;
         config.zksync.compile = is_zk;
 
-        let mut strategy = utils::get_executor_strategy(&config);
+        let mut strategy = get_executor_strategy(&config);
 
         let Self {
             to,
@@ -447,16 +448,7 @@ impl CallArgs {
         }
 
         let response = if is_zk {
-            // ensure we are calling either the target func
-            // or `create` in case of deployment
-            // as the original evm func would be the constructor
-            let func = func.map(|func| zksync::convert_func(&tx, func)).transpose()?;
-            let zk_tx = zksync::convert_tx(tx.clone(), zk_tx, zkcode).await?;
-
-            let cast = Cast::new(&provider);
-            let zk_cast = ZkCast::new(utils::get_provider_zksync(&config)?, cast);
-
-            zk_cast.call_zk(&zk_tx, func.as_ref(), block).await?
+            zksync::run_zk_call(&provider, &config, &tx, func, zk_tx, zkcode, block).await?
         } else {
             Cast::new(&provider)
                 .call(&tx, func.as_ref(), block, state_overrides, block_overrides)
