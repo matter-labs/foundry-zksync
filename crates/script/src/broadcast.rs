@@ -179,15 +179,12 @@ impl<'a> SendTransactionKind<'a> {
                     }
 
                     // Cheatcode paymaster takes priority; CLI args are fallback
-                    let paymaster_params = if let Some(paymaster_data) =
-                        &zk_tx_meta.paymaster_data
+                    let paymaster_params = if let Some(paymaster_data) = &zk_tx_meta.paymaster_data
                     {
-                        Some(
-                            alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
-                                paymaster: paymaster_data.paymaster.to_address(),
-                                paymaster_input: paymaster_data.paymaster_input.clone().into(),
-                            },
-                        )
+                        Some(alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
+                            paymaster: paymaster_data.paymaster.to_address(),
+                            paymaster_input: paymaster_data.paymaster_input.clone().into(),
+                        })
                     } else if let (Some(addr), Some(input)) =
                         (zk_tx_opts.paymaster_address, zk_tx_opts.paymaster_input.clone())
                     {

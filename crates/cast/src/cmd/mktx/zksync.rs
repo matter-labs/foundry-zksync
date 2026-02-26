@@ -1,4 +1,3 @@
-use foundry_cli::opts::ZkTransactionOpts;
 use alloy_network::TransactionBuilder;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -7,7 +6,7 @@ use alloy_zksync::{
     provider::ZksyncProvider,
 };
 use eyre::Result;
-use foundry_cli::utils;
+use foundry_cli::{opts::ZkTransactionOpts, utils};
 use foundry_config::Config;
 
 /// Builds a complete ZkSync transaction request with fee estimation

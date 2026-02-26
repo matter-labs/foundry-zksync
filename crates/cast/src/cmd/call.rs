@@ -6,7 +6,6 @@ use crate::{
     tx::{CastTxBuilder, SenderKind},
     zksync,
 };
-use foundry_cli::opts::ZkTransactionOpts;
 use alloy_ens::NameOrAddress;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, hex, map::HashMap};
 use alloy_provider::Provider;
@@ -18,7 +17,7 @@ use alloy_serde::OtherFields;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
-    opts::{ChainValueParser, RpcOpts, TransactionOpts},
+    opts::{ChainValueParser, RpcOpts, TransactionOpts, ZkTransactionOpts},
     utils::{self, LoadConfig, TraceResult, get_provider, parse_ether_value},
 };
 use foundry_common::{

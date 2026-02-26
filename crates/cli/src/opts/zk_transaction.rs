@@ -9,7 +9,11 @@ fn parse_hex_bytes(s: &str) -> Result<Bytes, String> {
 #[command(next_help_heading = "ZKSync transaction options")]
 pub struct ZkTransactionOpts {
     /// Paymaster address for the ZKSync transaction
-    #[arg(long = "zk-paymaster-address", visible_alias = "paymaster-address", requires = "paymaster_input")]
+    #[arg(
+        long = "zk-paymaster-address",
+        visible_alias = "paymaster-address",
+        requires = "paymaster_input"
+    )]
     pub paymaster_address: Option<Address>,
 
     /// Paymaster input for the ZKSync transaction

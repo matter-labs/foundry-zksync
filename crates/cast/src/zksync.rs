@@ -50,8 +50,8 @@ pub fn build_zk_tx(
 
     if is_create {
         let input_data = tx.input().cloned().unwrap_or_default().to_vec();
-        let zk_code = zk_code
-            .ok_or_else(|| eyre::eyre!("ZkSync code is required for contract creation"))?;
+        let zk_code =
+            zk_code.ok_or_else(|| eyre::eyre!("ZkSync code is required for contract creation"))?;
         let zk_code_bytes = hex::decode(zk_code)?;
         let constructor_args = &input_data[zk_code_bytes.len()..];
 
