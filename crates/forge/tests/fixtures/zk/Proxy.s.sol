@@ -8,10 +8,12 @@ contract ProxyScript is Script {
     function run() public {
         vm.startBroadcast(0x7becc4a46e0c3b512d380ca73a4c868f790d1055a7698f38fb3ca2b2ac97efbb);
         //deploy Foo
-        ERC1967Proxy proxy = new ERC1967Proxy(address(new Foo()), "");
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(new Foo()),
+            abi.encodeCall(Foo.initialize, (msg.sender))
+        );
 
         Foo foo = Foo(payable(proxy));
-        foo.initialize(msg.sender);
 
         console.log("Foo deployed at: ", address(foo));
         console.log("Bar: ", foo.getAddress());
