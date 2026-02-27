@@ -26,7 +26,7 @@ use eyre::{ContextCompat, Result};
 use forge_script_sequence::{AdditionalContract, NestedValue};
 use forge_verify::{RetryArgs, VerifierArgs};
 use foundry_cli::{
-    opts::{BuildOpts, EvmArgs, GlobalArgs},
+    opts::{BuildOpts, EvmArgs, GlobalArgs, ZkTransactionOpts},
     utils::{self, LoadConfig},
 };
 use foundry_common::{
@@ -225,9 +225,11 @@ pub struct ScriptArgs {
     #[command(flatten)]
     pub retry: RetryArgs,
 
-    /// Gas per pubdata
-    #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
-    pub zk_gas_per_pubdata: Option<u64>,
+    /// Only `gas_per_pubdata`, `paymaster_address`, and `paymaster_input` are used
+    /// during broadcast. `custom_signature` and `factory_deps` are unused in the
+    /// script path (factory deps come from cheatcode transaction metadata).
+    #[command(flatten)]
+    pub zk_tx: ZkTransactionOpts,
 }
 
 impl ScriptArgs {

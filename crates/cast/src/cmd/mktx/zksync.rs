@@ -1,4 +1,3 @@
-use crate::zksync::ZkTransactionOpts;
 use alloy_network::TransactionBuilder;
 use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
@@ -7,7 +6,7 @@ use alloy_zksync::{
     provider::ZksyncProvider,
 };
 use eyre::Result;
-use foundry_cli::utils;
+use foundry_cli::{opts::ZkTransactionOpts, utils};
 use foundry_config::Config;
 
 /// Builds a complete ZkSync transaction request with fee estimation
@@ -18,7 +17,7 @@ pub async fn build_tx(
     config: &Config,
 ) -> Result<ZkTransactionRequest> {
     let zk_provider = utils::get_provider_zksync(config)?;
-    let mut tx = zk_tx.build_base_tx(evm_tx, Some(zk_code))?;
+    let mut tx = crate::zksync::build_zk_tx(&zk_tx, evm_tx, Some(zk_code))?;
 
     let fee = ZksyncProvider::estimate_fee(&zk_provider, tx.clone()).await?;
     tx.set_max_fee_per_gas(fee.max_fee_per_gas);

@@ -18,7 +18,10 @@ use alloy_zksync::network::{
 use eyre::{Context, Result, bail};
 use forge_verify::provider::VerificationProviderType;
 use foundry_cheatcodes::Wallets;
-use foundry_cli::utils::{has_batch_support, has_different_gas_calc};
+use foundry_cli::{
+    opts::ZkTransactionOpts,
+    utils::{has_batch_support, has_different_gas_calc},
+};
 use foundry_common::{
     TransactionMaybeSigned,
     provider::{
@@ -149,7 +152,7 @@ impl<'a> SendTransactionKind<'a> {
         provider: Arc<RetryProvider>,
         zk_provider: Arc<RetryProvider<Zksync>>,
         estimate_multiplier: u64,
-        gas_per_pubdata: Option<u64>,
+        zk_tx_opts: ZkTransactionOpts,
     ) -> Result<TxHash> {
         match self {
             Self::Unlocked(tx) => {
@@ -174,20 +177,34 @@ impl<'a> SendTransactionKind<'a> {
                             zk_tx_meta.factory_deps.iter().map(Bytes::from_iter).collect(),
                         );
                     }
-                    if let Some(paymaster_data) = &zk_tx_meta.paymaster_data {
-                        zk_tx.set_paymaster_params(
-                            alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
-                                paymaster: paymaster_data.paymaster.to_address(),
-                                paymaster_input: paymaster_data.paymaster_input.clone().into(),
-                            },
-                        );
+
+                    // Cheatcode paymaster takes priority; CLI args are fallback
+                    let paymaster_params = if let Some(paymaster_data) = &zk_tx_meta.paymaster_data
+                    {
+                        Some(alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
+                            paymaster: paymaster_data.paymaster.to_address(),
+                            paymaster_input: paymaster_data.paymaster_input.clone().into(),
+                        })
+                    } else if let (Some(addr), Some(input)) =
+                        (zk_tx_opts.paymaster_address, zk_tx_opts.paymaster_input.clone())
+                    {
+                        Some(alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
+                            paymaster: addr,
+                            paymaster_input: input,
+                        })
+                    } else {
+                        None
+                    };
+
+                    if let Some(params) = paymaster_params {
+                        zk_tx.set_paymaster_params(params);
                     }
 
                     foundry_zksync_core::estimate_fee(
                         &mut zk_tx,
                         &zk_provider,
                         estimate_multiplier,
-                        gas_per_pubdata,
+                        zk_tx_opts.gas_per_pubdata,
                     )
                     .await?;
 
@@ -233,7 +250,7 @@ impl<'a> SendTransactionKind<'a> {
         is_fixed_gas_limit: bool,
         estimate_via_rpc: bool,
         estimate_multiplier: u64,
-        gas_per_pubdata: Option<u64>,
+        zk_tx_opts: ZkTransactionOpts,
     ) -> Result<TxHash> {
         self.prepare(
             &provider,
@@ -244,7 +261,7 @@ impl<'a> SendTransactionKind<'a> {
         )
         .await?;
 
-        self.send(provider, zk_provider, estimate_multiplier, gas_per_pubdata).await
+        self.send(provider, zk_provider, estimate_multiplier, zk_tx_opts).await
     }
 }
 
@@ -553,7 +570,7 @@ impl BundledState {
                                 let provider = provider.clone();
                                 let zk_provider = zk_provider.clone();
                                 let gas_estimate_multiplier = self.args.gas_estimate_multiplier;
-                                let zk_gas_per_pubdata = self.args.zk_gas_per_pubdata;
+                                let zk_tx_opts = self.args.zk_tx.clone();
                                 async move {
                                     let res = kind
                                         .clone()
@@ -564,7 +581,7 @@ impl BundledState {
                                             *is_fixed_gas_limit,
                                             estimate_via_rpc,
                                             gas_estimate_multiplier,
-                                            zk_gas_per_pubdata,
+                                            zk_tx_opts,
                                         )
                                         .await;
                                     (res, kind, 0, None)
@@ -582,7 +599,7 @@ impl BundledState {
                                 let provider = provider.clone();
                                 let zk_provider = zk_provider.clone();
                                 let gas_estimate_multiplier = self.args.gas_estimate_multiplier;
-                                let zk_gas_per_pubdata = self.args.zk_gas_per_pubdata;
+                                let zk_tx_opts = self.args.zk_tx.clone();
                                 let progress = seq_progress.inner.clone();
                                 buffer.push(Box::pin(async move {
                                     debug!(err=?res, ?attempt, "retrying transaction ");
@@ -597,7 +614,7 @@ impl BundledState {
                                             provider,
                                             zk_provider,
                                             gas_estimate_multiplier,
-                                            zk_gas_per_pubdata,
+                                            zk_tx_opts,
                                         )
                                         .await;
                                     (r, kind, attempt, original_res.or(Some(res)))

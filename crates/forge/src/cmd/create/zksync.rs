@@ -19,7 +19,6 @@ use alloy_zksync::{
     },
     wallet::ZksyncWallet,
 };
-use clap::Parser;
 use eyre::{Context, Result};
 use forge_verify::VerifyArgs;
 use foundry_cli::{
@@ -33,13 +32,6 @@ use foundry_zksync_compilers::compilers::artifact_output::zk::ZkContractArtifact
 use foundry_zksync_core::convert::ConvertH160;
 use serde_json::json;
 
-#[derive(Clone, Debug, Parser)]
-pub struct ZkCreateArgs {
-    /// Gas per pubdata
-    #[clap(long = "zk-gas-per-pubdata", value_name = "GAS_PER_PUBDATA")]
-    pub gas_per_pubdata: Option<u64>,
-}
-
 #[derive(Debug, Default)]
 /// Data used to deploy a contract on zksync
 pub struct ZkSyncData {
@@ -51,12 +43,10 @@ pub struct ZkSyncData {
 
 impl CreateArgs {
     pub(super) async fn run_zksync(mut self, project: Project) -> Result<()> {
-        let paymaster_params = if let Some(paymaster_address) =
-            self.build.compiler.zk.paymaster_address
-        {
+        let paymaster_params = if let Some(paymaster_address) = self.zk_tx.paymaster_address {
             Some(PaymasterParams {
                 paymaster: paymaster_address,
-                paymaster_input: self.build.compiler.zk.paymaster_input.clone().unwrap_or_default(),
+                paymaster_input: self.zk_tx.paymaster_input.clone().unwrap_or_default(),
             })
         } else {
             None
@@ -282,7 +272,7 @@ impl CreateArgs {
             &mut deployer.tx,
             &provider,
             130,
-            self.zksync.gas_per_pubdata,
+            self.zk_tx.gas_per_pubdata,
         )
         .await?;
 
