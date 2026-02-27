@@ -1,6 +1,6 @@
 use crate::{
-    tx::{self, CastTxBuilder, SenderKind},
-    zksync::{NoopWallet, ZkTransactionOpts},
+    tx::{self, CastTxBuilder},
+    zksync::ZkTransactionOpts,
 };
 use alloy_eips::Encodable2718;
 use alloy_ens::NameOrAddress;
@@ -8,7 +8,6 @@ use alloy_network::{EthereumWallet, TransactionBuilder};
 use alloy_primitives::{Address, hex};
 use alloy_provider::Provider;
 use alloy_signer::Signer;
-use alloy_zksync::wallet::ZksyncWallet;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
@@ -18,7 +17,6 @@ use foundry_cli::{
 use std::{path::PathBuf, str::FromStr};
 
 mod zksync;
-use zksync::build_tx;
 
 /// CLI arguments for `cast mktx`.
 #[derive(Debug, Parser)]
@@ -167,47 +165,16 @@ impl MakeTxArgs {
             return Ok(());
         }
 
-        // NOTE(zk): if custom signature is sent, signer is not used so
-        // we do not bail in that case, the Result is kept instead
-        let (from, maybe_signer) = if zk_tx.custom_signature.is_some() {
-            if let Some(from) = eth.wallet.from {
-                (from, None)
-            } else {
-                eyre::bail!("expected address via --from option to be used for custom signature");
-            }
-        } else {
+        if zk_tx.has_zksync_args() || zk_force {
+            return zksync::run_zk_mktx(tx_builder, &eth, zk_tx, zkcode, &config).await;
+        }
+
+        {
             // Default to using the local signer.
             // Get the signer from the wallet, and fail if it can't be constructed.
             let signer = eth.wallet.signer().await?;
             let from = signer.address();
-
             tx::validate_from_address(eth.wallet.from, from)?;
-
-            (from, Some(signer))
-        };
-
-        if zk_tx.has_zksync_args() || zk_force {
-            let (tx, _) = if zk_tx.custom_signature.is_some() {
-                tx_builder.build_raw(SenderKind::Address(from)).await?
-            } else {
-                tx_builder.build_raw(maybe_signer.as_ref().expect("No signer found")).await?
-            };
-
-            let zktx = build_tx(zk_tx, tx, zkcode, &config).await?;
-
-            let signed_tx = if zktx.custom_signature().is_some() {
-                let zk_wallet = NoopWallet { address: from };
-                zktx.build(&zk_wallet).await?.encoded_2718()
-            } else {
-                let zk_wallet = ZksyncWallet::new(maybe_signer.expect("No signer found"));
-                zktx.build(&zk_wallet).await?.encoded_2718()
-            };
-
-            sh_println!("0x{}", hex::encode(signed_tx))?;
-
-            Ok(())
-        } else {
-            let signer = maybe_signer.expect("No signer found");
 
             // Handle Tempo transactions separately
             // TODO(onbjerg): All of this is a side effect of a few things, most notably that we do

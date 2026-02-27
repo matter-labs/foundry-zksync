@@ -8,14 +8,47 @@ use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_zksync::{network::Zksync, provider::ZksyncProvider, wallet::ZksyncWallet};
 use eyre::Result;
-use foundry_cli::opts::EthereumOpts;
+use foundry_cli::{
+    opts::EthereumOpts,
+    utils,
+};
+use foundry_config::Config;
 
 use crate::{
-    tx::{self, CastTxBuilder, InputState, SenderKind},
+    tx::{self, CastTxBuilder, CastTxSender, InputState, SenderKind, SendTxOpts},
     zksync::{NoopWallet, ZkTransactionOpts},
 };
 
-pub async fn send_zk_transaction(
+/// Handle the full zksync send flow: provider setup, transaction sending, and result handling.
+pub async fn run_zk_send(
+    config: &Config,
+    provider: &RootProvider<AnyNetwork>,
+    builder: CastTxBuilder<&RootProvider<AnyNetwork>, InputState>,
+    send_tx: &SendTxOpts,
+    eth_opts: &EthereumOpts,
+    zk_tx_opts: ZkTransactionOpts,
+    zk_code: Option<String>,
+    timeout: u64,
+) -> Result<()> {
+    let zk_provider = utils::get_provider_zksync(config)?;
+    let tx_hash =
+        send_zk_transaction(zk_provider, builder, eth_opts, zk_tx_opts, zk_code).await?;
+
+    let provider =
+        ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(provider);
+    let cast = CastTxSender::new(provider);
+
+    super::handle_transaction_result(
+        &cast,
+        &tx_hash,
+        send_tx.cast_async,
+        send_tx.confirmations,
+        timeout,
+    )
+    .await
+}
+
+async fn send_zk_transaction(
     zk_provider: RootProvider<Zksync>,
     builder: CastTxBuilder<&RootProvider<AnyNetwork>, InputState>,
     eth_opts: &EthereumOpts,

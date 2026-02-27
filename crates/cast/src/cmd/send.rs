@@ -16,12 +16,11 @@ use clap::Parser;
 use eyre::{Result, eyre};
 use foundry_cli::{
     opts::TransactionOpts,
-    utils::{self, LoadConfig, get_provider},
+    utils::{LoadConfig, get_provider},
 };
 use foundry_wallets::WalletSigner;
 
 mod zksync;
-use zksync::send_zk_transaction;
 
 /// CLI arguments for `cast send`.
 #[derive(Debug, Parser)]
@@ -217,22 +216,10 @@ impl SendTxArgs {
             // NOTE(zk): Avoid initializing `signer` twice as it will error out with Ledger, so we
             // move the signers to their respective blocks.
             if zk_tx.has_zksync_args() || zk_force {
-                let zk_provider = utils::get_provider_zksync(&config)?;
-                let tx_hash =
-                    send_zk_transaction(zk_provider, builder, &send_tx.eth, zk_tx, zk_code).await?;
-
-                let provider =
-                    ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(&provider);
-                let cast = CastTxSender::new(provider);
-
-                handle_transaction_result(
-                    &cast,
-                    &tx_hash,
-                    send_tx.cast_async,
-                    send_tx.confirmations,
-                    timeout,
+                return zksync::run_zk_send(
+                    &config, &provider, builder, &send_tx, &send_tx.eth, zk_tx, zk_code, timeout,
                 )
-                .await
+                .await;
             } else {
                 // Retrieve the signer, and bail if it can't be constructed.
                 let signer = send_tx.eth.wallet.signer().await?;
