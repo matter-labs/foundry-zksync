@@ -1617,7 +1617,7 @@ mod proxy {
             "./script/Proxy.s.sol",
             "ProxyScript",
             Some("OpenZeppelin/openzeppelin-contracts"),
-            4,
+            3,
             Some(&["--broadcast"]),
         )
         .await;
