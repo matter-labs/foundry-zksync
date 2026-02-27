@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.10](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.9...foundry-zksync-v0.1.10) (2026-02-27)
+
+
+### Bug Fixes
+
+* adapt proxy test to OpenZeppelin breaking change ([#1267](https://github.com/matter-labs/foundry-zksync/issues/1267)) ([ab5cb78](https://github.com/matter-labs/foundry-zksync/commit/ab5cb78ae086bd55bd7854bf645f2cb586cbf2f7))
+* allow alloy-chains git source in cargo-deny config ([#1262](https://github.com/matter-labs/foundry-zksync/issues/1262)) ([336a6df](https://github.com/matter-labs/foundry-zksync/commit/336a6df3265fc12742150640900c2887cc6c0ac6))
+
 ## [0.1.9](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.8...foundry-zksync-v0.1.9) (2026-02-24)
 
 
