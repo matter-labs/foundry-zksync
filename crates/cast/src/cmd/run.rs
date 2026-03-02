@@ -322,7 +322,7 @@ impl RunArgs {
                             other_fields,
                         );
                     } else {
-                        configure_tx_env(&mut env.as_env_mut(), &tx.inner);
+                        configure_tx_env(&mut env.as_env_mut(), tx);
                     }
 
                     env.evm_env.cfg_env.disable_balance_check = true;
@@ -400,7 +400,7 @@ impl RunArgs {
                     other_fields,
                 );
             } else {
-                configure_tx_env(&mut env.as_env_mut(), &tx.inner);
+                configure_tx_env(&mut env.as_env_mut(), tx);
                 if is_impersonated_tx(tx.inner.inner.inner()) {
                     env.evm_env.cfg_env.disable_balance_check = true;
                 }
