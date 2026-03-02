@@ -217,7 +217,14 @@ impl SendTxArgs {
             // move the signers to their respective blocks.
             if zk_tx.has_zksync_args() || zk_force {
                 return zksync::run_zk_send(
-                    &config, &provider, builder, &send_tx, &send_tx.eth, zk_tx, zk_code, timeout,
+                    &config,
+                    &provider,
+                    builder,
+                    &send_tx,
+                    &send_tx.eth,
+                    zk_tx,
+                    zk_code,
+                    timeout,
                 )
                 .await;
             } else {

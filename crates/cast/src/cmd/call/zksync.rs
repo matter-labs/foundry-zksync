@@ -1,3 +1,4 @@
+use crate::{Cast, ZkCast, ZkTransactionOpts};
 use alloy_json_abi::Function;
 use alloy_primitives::{TxKind, U256};
 use alloy_provider::Provider;
@@ -5,7 +6,6 @@ use alloy_rpc_types::{BlockId, TransactionRequest};
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolCall;
 use alloy_zksync::network::transaction_request::TransactionRequest as ZkTransactionRequest;
-use crate::{Cast, ZkCast, ZkTransactionOpts};
 use eyre::Result;
 use foundry_cli::utils;
 use foundry_config::Config;

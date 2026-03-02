@@ -7,8 +7,7 @@ use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_zksync::{
     network::transaction_request::TransactionRequest as ZkTransactionRequest,
-    provider::ZksyncProvider,
-    wallet::ZksyncWallet,
+    provider::ZksyncProvider, wallet::ZksyncWallet,
 };
 use eyre::Result;
 use foundry_cli::{opts::EthereumOpts, utils};
