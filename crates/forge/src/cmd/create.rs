@@ -102,9 +102,7 @@ pub struct CreateArgs {
     #[command(flatten)]
     retry: RetryArgs,
 
-    /// Only `gas_per_pubdata`, `paymaster_address`, and `paymaster_input` are used
-    /// during deployment. `custom_signature` and `factory_deps` are unused in the
-    /// create path (factory deps are derived from compilation output).
+    /// Only `gas_per_pubdata`, `paymaster_address`, and `paymaster_input` are used during deployment.
     #[command(flatten)]
     pub zk_tx: ZkTransactionOpts,
 }
