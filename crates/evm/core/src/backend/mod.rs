@@ -10,7 +10,9 @@ use crate::{
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
-use alloy_network::{AnyNetwork, AnyRpcBlock, AnyTxEnvelope, TransactionResponse, AnyRpcTransaction};
+use alloy_network::{
+    AnyNetwork, AnyRpcBlock, AnyRpcTransaction, AnyTxEnvelope, TransactionResponse,
+};
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256, uint};
 use alloy_provider::Provider as _;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};

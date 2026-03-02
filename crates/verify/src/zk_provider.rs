@@ -185,7 +185,11 @@ impl CompilerVerificationContext {
             Self::Solc(c) => {
                 let mut sources = c.project.paths.read_input_files()?;
                 sources.insert(c.target_path.clone(), Source::read(&c.target_path)?);
-                let solc_paths = c.project.paths.clone().with_language::<foundry_compilers::solc::SolcLanguage>();
+                let solc_paths = c
+                    .project
+                    .paths
+                    .clone()
+                    .with_language::<foundry_compilers::solc::SolcLanguage>();
                 let graph = Graph::<SolParser>::resolve_sources(&solc_paths, sources)?;
                 Ok(graph.imports(&c.target_path).into_iter().map(|p| p.to_path_buf()).collect())
             }
