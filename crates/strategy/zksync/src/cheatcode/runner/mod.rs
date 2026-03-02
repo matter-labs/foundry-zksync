@@ -670,7 +670,11 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 );
 
                 // append traces
-                executor.trace_zksync(state, ecx, Box::new(result.call_traces));
+                executor.get_inspector(state).trace_zksync(
+                    ecx,
+                    Box::new(result.call_traces),
+                    false,
+                );
 
                 // for each log in cloned logs call handle_expect_emit
                 if !state.expected_emits.is_empty() {
@@ -862,7 +866,11 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     }
 
                     // append traces
-                    executor.trace_zksync(state, ecx, Box::new(result.call_traces));
+                    executor.get_inspector(state).trace_zksync(
+                        ecx,
+                        Box::new(result.call_traces),
+                        false,
+                    );
 
                     // for each log in cloned logs call handle_expect_emit
                     if !state.expected_emits.is_empty() {
