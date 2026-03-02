@@ -102,7 +102,8 @@ pub struct CreateArgs {
     #[command(flatten)]
     retry: RetryArgs,
 
-    /// Only `gas_per_pubdata`, `paymaster_address`, and `paymaster_input` are used during deployment.
+    /// Only `gas_per_pubdata`, `paymaster_address`, and `paymaster_input` are used during
+    /// deployment.
     #[command(flatten)]
     pub zk_tx: ZkTransactionOpts,
 }
