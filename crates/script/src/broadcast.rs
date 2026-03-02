@@ -178,26 +178,13 @@ impl<'a> SendTransactionKind<'a> {
                         );
                     }
 
-                    // Cheatcode paymaster takes priority; CLI args are fallback
-                    let paymaster_params = if let Some(paymaster_data) = &zk_tx_meta.paymaster_data
-                    {
-                        Some(alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
-                            paymaster: paymaster_data.paymaster.to_address(),
-                            paymaster_input: paymaster_data.paymaster_input.clone().into(),
-                        })
-                    } else if let (Some(addr), Some(input)) =
-                        (zk_tx_opts.paymaster_address, zk_tx_opts.paymaster_input.clone())
-                    {
-                        Some(alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
-                            paymaster: addr,
-                            paymaster_input: input,
-                        })
-                    } else {
-                        None
-                    };
-
-                    if let Some(params) = paymaster_params {
-                        zk_tx.set_paymaster_params(params);
+                    if let Some(paymaster_data) = &zk_tx_meta.paymaster_data {
+                        zk_tx.set_paymaster_params(
+                            alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
+                                paymaster: paymaster_data.paymaster.to_address(),
+                                paymaster_input: paymaster_data.paymaster_input.clone().into(),
+                            },
+                        );
                     }
 
                     foundry_zksync_core::estimate_fee(
