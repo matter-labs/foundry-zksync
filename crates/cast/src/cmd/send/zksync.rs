@@ -61,13 +61,8 @@ where
     let mut tx = crate::zksync::build_zk_tx(&zk_tx_opts, tx, zk_code)?;
 
     // Estimate fees
-    foundry_zksync_core::estimate_fee(
-        &mut tx,
-        &zk_provider,
-        130,
-        zk_tx_opts.gas_per_pubdata.map(|v| v.to::<u64>()),
-    )
-    .await?;
+    foundry_zksync_core::estimate_fee(&mut tx, &zk_provider, 130, zk_tx_opts.gas_per_pubdata)
+        .await?;
 
     let pending_tx: PendingTransactionBuilder<Zksync> = zk_provider.send_transaction(tx).await?;
     let tx_hash = pending_tx.inner().tx_hash();
