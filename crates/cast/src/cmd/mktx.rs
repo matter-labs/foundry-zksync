@@ -1,6 +1,6 @@
 use crate::{
     tx::{self, CastTxBuilder, SenderKind},
-    zksync::{NoopWallet, ZkTransactionOpts},
+    zksync::NoopWallet,
 };
 use alloy_eips::Encodable2718;
 use alloy_ens::NameOrAddress;
@@ -12,7 +12,7 @@ use alloy_zksync::wallet::ZksyncWallet;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
-    opts::{EthereumOpts, TransactionOpts},
+    opts::{EthereumOpts, TransactionOpts, ZkTransactionOpts},
     utils::{LoadConfig, get_provider},
 };
 use std::{path::PathBuf, str::FromStr};

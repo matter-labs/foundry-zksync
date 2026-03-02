@@ -4,7 +4,7 @@ use alloy_rpc_types::TransactionRequest;
 use alloy_serde::WithOtherFields;
 use alloy_sol_types::SolCall;
 use alloy_zksync::network::transaction_request::TransactionRequest as ZkTransactionRequest;
-use cast::ZkTransactionOpts;
+use foundry_cli::opts::ZkTransactionOpts;
 use eyre::Result;
 
 /// Converts the given tx request to be a full ZkSync transaction request with fee estimation
@@ -13,7 +13,7 @@ pub async fn convert_tx(
     zk_tx: ZkTransactionOpts,
     zk_code: Option<String>,
 ) -> Result<ZkTransactionRequest> {
-    let mut tx = zk_tx.build_base_tx(evm_tx, zk_code)?;
+    let mut tx = cast::zksync::build_zk_tx(&zk_tx, evm_tx, zk_code)?;
 
     // NOTE(zk): here we are doing a `call` so the fee doesn't matter
     // but we need a valid value for `gas_per_pubdata`
