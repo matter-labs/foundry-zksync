@@ -1,6 +1,6 @@
 use super::run::fetch_contracts_bytecode_from_trace;
 use crate::{
-    Cast, ZkCast, ZkTransactionOpts,
+    Cast, ZkCast,
     debug::handle_traces,
     traces::TraceKind,
     tx::{CastTxBuilder, SenderKind},
@@ -17,7 +17,7 @@ use alloy_serde::OtherFields;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
-    opts::{ChainValueParser, RpcOpts, TransactionOpts},
+    opts::{ChainValueParser, RpcOpts, TransactionOpts, ZkTransactionOpts},
     utils::{self, LoadConfig, TraceResult, get_provider, parse_ether_value},
 };
 use foundry_common::{
