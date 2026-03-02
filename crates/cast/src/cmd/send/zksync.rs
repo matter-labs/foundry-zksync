@@ -17,6 +17,7 @@ use crate::{
 };
 
 /// Handle the full zksync send flow: provider setup, transaction sending, and result handling.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_zk_send(
     config: &Config,
     provider: &RootProvider<AnyNetwork>,
