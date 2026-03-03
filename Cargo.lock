@@ -1173,7 +1173,7 @@ dependencies = [
 
 [[package]]
 name = "anvil"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "anvil-core"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -1266,7 +1266,7 @@ dependencies = [
 
 [[package]]
 name = "anvil-rpc"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "serde",
  "serde_json",
@@ -1274,7 +1274,7 @@ dependencies = [
 
 [[package]]
 name = "anvil-server"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "anvil-rpc",
  "async-trait",
@@ -2935,7 +2935,7 @@ dependencies = [
 
 [[package]]
 name = "cast"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -3040,7 +3040,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chisel"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -4935,7 +4935,7 @@ checksum = "932dcfbd51320af5f27f1ba02d2e567dec332cac7d2c221ba45d8e767264c4dc"
 
 [[package]]
 name = "forge"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-dyn-abi",
@@ -5021,7 +5021,7 @@ dependencies = [
 
 [[package]]
 name = "forge-doc"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-primitives",
  "derive_more 2.1.1",
@@ -5045,7 +5045,7 @@ dependencies = [
 
 [[package]]
 name = "forge-fmt"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "foundry-common",
  "foundry-config",
@@ -5059,7 +5059,7 @@ dependencies = [
 
 [[package]]
 name = "forge-lint"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "eyre",
  "foundry-common",
@@ -5073,7 +5073,7 @@ dependencies = [
 
 [[package]]
 name = "forge-script"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -5122,7 +5122,7 @@ dependencies = [
 
 [[package]]
 name = "forge-script-sequence"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-network",
  "alloy-primitives",
@@ -5138,7 +5138,7 @@ dependencies = [
 
 [[package]]
 name = "forge-sol-macro-gen"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-sol-macro-expander",
  "alloy-sol-macro-input",
@@ -5153,7 +5153,7 @@ dependencies = [
 
 [[package]]
 name = "forge-verify"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -5200,7 +5200,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-bench"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "chrono",
  "clap",
@@ -5235,7 +5235,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-cheatcodes"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -5291,7 +5291,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-cheatcodes-common"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-primitives",
  "cargo_metadata 0.23.1",
@@ -5301,7 +5301,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-cheatcodes-spec"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-sol-types",
  "foundry-macros",
@@ -5312,7 +5312,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-cli"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-dyn-abi",
@@ -5362,7 +5362,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-cli-markdown"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "clap",
  "pretty_assertions",
@@ -5370,7 +5370,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-common"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -5430,7 +5430,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-common-fmt"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -5556,7 +5556,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-config"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -5598,7 +5598,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-debugger"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-primitives",
  "crossterm",
@@ -5616,7 +5616,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-evm",
@@ -5655,7 +5655,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-abi"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -5667,7 +5667,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-core"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-consensus",
@@ -5708,7 +5708,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-coverage"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-primitives",
  "eyre",
@@ -5724,7 +5724,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-fuzz"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -5750,7 +5750,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-networks"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-eips",
@@ -5764,7 +5764,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-evm-traces"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-dyn-abi",
  "alloy-json-abi",
@@ -5821,7 +5821,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-linking"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-primitives",
  "foundry-compilers",
@@ -5835,7 +5835,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-macros"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "proc-macro-error2",
  "proc-macro2",
@@ -5845,7 +5845,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-primitives"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-consensus",
  "alloy-evm",
@@ -5884,7 +5884,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-strategy-zksync"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-eips",
  "alloy-evm",
@@ -5916,7 +5916,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-test-utils"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-chains",
  "alloy-primitives",
@@ -5956,7 +5956,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-wallets"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-consensus",
  "alloy-dyn-abi",
@@ -5995,7 +5995,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-zksync-compilers"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-json-abi",
  "alloy-primitives",
@@ -6021,7 +6021,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-zksync-core"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-evm",
  "alloy-json-abi",
@@ -6056,7 +6056,7 @@ dependencies = [
 
 [[package]]
 name = "foundry-zksync-inspectors"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "alloy-primitives",
  "foundry-evm-core",
