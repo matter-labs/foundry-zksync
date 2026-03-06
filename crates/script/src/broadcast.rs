@@ -18,10 +18,7 @@ use alloy_zksync::network::{
 use eyre::{Context, Result, bail};
 use forge_verify::provider::VerificationProviderType;
 use foundry_cheatcodes::Wallets;
-use foundry_cli::{
-    opts::ZkTransactionOpts,
-    utils::{has_batch_support, has_different_gas_calc},
-};
+use foundry_cli::utils::{has_batch_support, has_different_gas_calc};
 use foundry_common::{
     TransactionMaybeSigned,
     provider::{
@@ -152,7 +149,7 @@ impl<'a> SendTransactionKind<'a> {
         provider: Arc<RetryProvider>,
         zk_provider: Arc<RetryProvider<Zksync>>,
         estimate_multiplier: u64,
-        zk_tx_opts: ZkTransactionOpts,
+        gas_per_pubdata: Option<u64>,
     ) -> Result<TxHash> {
         match self {
             Self::Unlocked(tx) => {
@@ -177,7 +174,6 @@ impl<'a> SendTransactionKind<'a> {
                             zk_tx_meta.factory_deps.iter().map(Bytes::from_iter).collect(),
                         );
                     }
-
                     if let Some(paymaster_data) = &zk_tx_meta.paymaster_data {
                         zk_tx.set_paymaster_params(
                             alloy_zksync::network::unsigned_tx::eip712::PaymasterParams {
@@ -191,7 +187,7 @@ impl<'a> SendTransactionKind<'a> {
                         &mut zk_tx,
                         &zk_provider,
                         estimate_multiplier,
-                        zk_tx_opts.gas_per_pubdata,
+                        gas_per_pubdata,
                     )
                     .await?;
 
@@ -237,7 +233,7 @@ impl<'a> SendTransactionKind<'a> {
         is_fixed_gas_limit: bool,
         estimate_via_rpc: bool,
         estimate_multiplier: u64,
-        zk_tx_opts: ZkTransactionOpts,
+        gas_per_pubdata: Option<u64>,
     ) -> Result<TxHash> {
         self.prepare(
             &provider,
@@ -248,7 +244,7 @@ impl<'a> SendTransactionKind<'a> {
         )
         .await?;
 
-        self.send(provider, zk_provider, estimate_multiplier, zk_tx_opts).await
+        self.send(provider, zk_provider, estimate_multiplier, gas_per_pubdata).await
     }
 }
 
@@ -557,7 +553,7 @@ impl BundledState {
                                 let provider = provider.clone();
                                 let zk_provider = zk_provider.clone();
                                 let gas_estimate_multiplier = self.args.gas_estimate_multiplier;
-                                let zk_tx_opts = self.args.zk_tx.clone();
+                                let zk_gas_per_pubdata = self.args.zk_gas_per_pubdata;
                                 async move {
                                     let res = kind
                                         .clone()
@@ -568,7 +564,7 @@ impl BundledState {
                                             *is_fixed_gas_limit,
                                             estimate_via_rpc,
                                             gas_estimate_multiplier,
-                                            zk_tx_opts,
+                                            zk_gas_per_pubdata,
                                         )
                                         .await;
                                     (res, kind, 0, None)
@@ -586,7 +582,7 @@ impl BundledState {
                                 let provider = provider.clone();
                                 let zk_provider = zk_provider.clone();
                                 let gas_estimate_multiplier = self.args.gas_estimate_multiplier;
-                                let zk_tx_opts = self.args.zk_tx.clone();
+                                let zk_gas_per_pubdata = self.args.zk_gas_per_pubdata;
                                 let progress = seq_progress.inner.clone();
                                 buffer.push(Box::pin(async move {
                                     debug!(err=?res, ?attempt, "retrying transaction ");
@@ -601,7 +597,7 @@ impl BundledState {
                                             provider,
                                             zk_provider,
                                             gas_estimate_multiplier,
-                                            zk_tx_opts,
+                                            zk_gas_per_pubdata,
                                         )
                                         .await;
                                     (r, kind, attempt, original_res.or(Some(res)))

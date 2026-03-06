@@ -1,4 +1,7 @@
-use crate::tx::{CastTxBuilder, SenderKind};
+use crate::{
+    ZkTransactionOpts,
+    tx::{CastTxBuilder, SenderKind},
+};
 use alloy_ens::NameOrAddress;
 use alloy_primitives::U256;
 use alloy_provider::Provider;
@@ -6,7 +9,7 @@ use alloy_rpc_types::BlockId;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
-    opts::{RpcOpts, TransactionOpts, ZkTransactionOpts},
+    opts::{RpcOpts, TransactionOpts},
     utils::{self, LoadConfig, parse_ether_value},
 };
 use foundry_wallets::WalletOpts;

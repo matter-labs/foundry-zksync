@@ -13,7 +13,7 @@ use clap::{Parser, ValueHint};
 use eyre::{Context, Result};
 use forge_verify::{RetryArgs, VerifierArgs, VerifyArgs};
 use foundry_cli::{
-    opts::{BuildOpts, EthereumOpts, EtherscanOpts, TransactionOpts, ZkTransactionOpts},
+    opts::{BuildOpts, EthereumOpts, EtherscanOpts, TransactionOpts},
     utils::{self, LoadConfig, find_contract_artifacts, read_constructor_args_file},
 };
 use foundry_common::{
@@ -102,10 +102,8 @@ pub struct CreateArgs {
     #[command(flatten)]
     retry: RetryArgs,
 
-    /// Only `gas_per_pubdata`, `paymaster_address`, and `paymaster_input` are used during
-    /// deployment.
     #[command(flatten)]
-    pub zk_tx: ZkTransactionOpts,
+    pub zksync: zksync::ZkCreateArgs,
 }
 
 impl CreateArgs {
