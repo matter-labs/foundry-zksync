@@ -1,3 +1,4 @@
+//! Merge fix: preserve zksync send helpers and upstream opts location.
 use std::sync::Arc;
 
 use alloy_network::AnyNetwork;
@@ -8,12 +9,15 @@ use alloy_serde::WithOtherFields;
 use alloy_signer::Signer;
 use alloy_zksync::{network::Zksync, provider::ZksyncProvider, wallet::ZksyncWallet};
 use eyre::Result;
-use foundry_cli::{opts::EthereumOpts, utils};
+use foundry_cli::{
+    opts::{EthereumOpts, ZkTransactionOpts},
+    utils,
+};
 use foundry_config::Config;
 
 use crate::{
     tx::{self, CastTxBuilder, CastTxSender, InputState, SendTxOpts, SenderKind},
-    zksync::{NoopWallet, ZkTransactionOpts},
+    zksync::NoopWallet,
 };
 
 /// Handle the full zksync send flow: provider setup, transaction sending, and result handling.
@@ -86,10 +90,11 @@ async fn send_transaction_internal<Z>(
 where
     Z: ZksyncProvider,
 {
-    let mut tx = zk_tx_opts.build_base_tx(tx, zk_code)?;
+    let mut tx = crate::zksync::build_zk_tx(&zk_tx_opts, tx, zk_code)?;
 
     // Estimate fees
-    foundry_zksync_core::estimate_fee(&mut tx, &zk_provider, 130, None).await?;
+    foundry_zksync_core::estimate_fee(&mut tx, &zk_provider, 130, zk_tx_opts.gas_per_pubdata)
+        .await?;
 
     let pending_tx: PendingTransactionBuilder<Zksync> = zk_provider.send_transaction(tx).await?;
     let tx_hash = pending_tx.inner().tx_hash();

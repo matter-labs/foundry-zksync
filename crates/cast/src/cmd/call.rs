@@ -1,6 +1,7 @@
+//! Merge fix: keep upstream opts/utils wiring with zksync call path.
 use super::run::fetch_contracts_bytecode_from_trace;
 use crate::{
-    Cast, ZkTransactionOpts,
+    Cast,
     debug::handle_traces,
     traces::TraceKind,
     tx::{CastTxBuilder, SenderKind},
@@ -16,7 +17,7 @@ use alloy_serde::OtherFields;
 use clap::Parser;
 use eyre::Result;
 use foundry_cli::{
-    opts::{ChainValueParser, RpcOpts, TransactionOpts},
+    opts::{ChainValueParser, RpcOpts, TransactionOpts, ZkTransactionOpts},
     utils::{LoadConfig, TraceResult, get_executor_strategy, get_provider, parse_ether_value},
 };
 use foundry_common::{

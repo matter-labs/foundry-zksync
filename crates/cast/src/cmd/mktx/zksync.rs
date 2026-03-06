@@ -1,3 +1,4 @@
+//! Merge fix: retain zksync raw-signing flow and upstream opts location.
 use alloy_eips::Encodable2718;
 use alloy_network::{AnyNetwork, TransactionBuilder};
 use alloy_primitives::hex;
@@ -10,13 +11,16 @@ use alloy_zksync::{
     provider::ZksyncProvider, wallet::ZksyncWallet,
 };
 use eyre::Result;
-use foundry_cli::{opts::EthereumOpts, utils};
+use foundry_cli::{
+    opts::{EthereumOpts, ZkTransactionOpts},
+    utils,
+};
 use foundry_common::sh_println;
 use foundry_config::Config;
 
 use crate::{
     tx::{self, CastTxBuilder, InputState, SenderKind},
-    zksync::{NoopWallet, ZkTransactionOpts},
+    zksync::NoopWallet,
 };
 
 /// Handle the full zksync mktx flow: signer resolution, tx building, signing, and output.
@@ -69,7 +73,7 @@ async fn build_tx(
     config: &Config,
 ) -> Result<ZkTransactionRequest> {
     let zk_provider = utils::get_provider_zksync(config)?;
-    let mut tx = zk_tx.build_base_tx(evm_tx, Some(zk_code))?;
+    let mut tx = crate::zksync::build_zk_tx(&zk_tx, evm_tx, Some(zk_code))?;
 
     let fee = ZksyncProvider::estimate_fee(&zk_provider, tx.clone()).await?;
     tx.set_max_fee_per_gas(fee.max_fee_per_gas);
