@@ -90,26 +90,30 @@ impl EvmExecutorStrategyRunner {
         let foundry_linking::LinkOutput { libraries, libs_to_deploy } = linker
             .link_with_nonce_or_address(Default::default(), deployer, 0, linker.contracts.keys())?;
 
-        let linked_contracts = linker.get_linked_artifacts(&libraries)?;
+        let linked_contracts_cow = linker.get_linked_artifacts_cow(&libraries)?;
 
         // Create a mapping of name => (abi, deployment code, Vec<library deployment code>)
         let mut deployable_contracts = BTreeMap::default();
-        for (id, contract) in linked_contracts.iter() {
-            let Some(abi) = &contract.abi else { continue };
+        for (id, contract) in linked_contracts_cow.iter() {
+            let Some(abi) = contract.abi.as_ref() else { continue };
 
             // if it's a test, link it and add to deployable contracts
             if abi.constructor.as_ref().map(|c| c.inputs.is_empty()).unwrap_or(true)
                 && abi.functions().any(|func| func.name.is_any_test())
             {
+                linker.ensure_linked(contract, id)?;
+
                 let Some(bytecode) =
                     contract.get_bytecode_bytes().map(|b| b.into_owned()).filter(|b| !b.is_empty())
                 else {
                     continue;
                 };
 
-                deployable_contracts.insert(id.clone(), (abi.clone(), bytecode));
+                deployable_contracts.insert(id.clone(), (abi.clone().into_owned(), bytecode));
             }
         }
+
+        let linked_contracts = ArtifactContracts::from_iter(linked_contracts_cow);
 
         let known_contracts = ContractsByArtifact::zksync_new_with_storage_layouts(
             linked_contracts.clone(),

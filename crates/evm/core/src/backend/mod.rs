@@ -10,7 +10,9 @@ use crate::{
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
-use alloy_network::{AnyNetwork, AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
+use alloy_network::{
+    AnyNetwork, AnyRpcBlock, AnyRpcTransaction, AnyTxEnvelope, TransactionResponse,
+};
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256, uint};
 use alloy_provider::Provider as _;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
@@ -953,7 +955,7 @@ impl Backend {
 
             commit_transaction(
                 &mut self.strategy,
-                &tx.inner,
+                tx,
                 &mut env.as_env_mut(),
                 journaled_state,
                 fork,
@@ -1402,7 +1404,7 @@ impl DatabaseExt for Backend {
         let fork = self.inner.get_fork_by_id_mut(id)?;
         commit_transaction(
             &mut self.strategy,
-            &tx.inner,
+            &tx,
             &mut env.as_env_mut(),
             journaled_state,
             fork,
@@ -2053,7 +2055,7 @@ fn update_env_block(env: &mut EnvMut<'_>, block: &AnyRpcBlock) {
 #[allow(clippy::too_many_arguments)]
 fn commit_transaction(
     strategy: &mut BackendStrategy,
-    tx: &Transaction<AnyTxEnvelope>,
+    tx: &AnyRpcTransaction,
     env: &mut EnvMut<'_>,
     journaled_state: &mut JournaledState,
     fork: &mut Fork,
