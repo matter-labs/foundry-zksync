@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.1.10](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.9...foundry-zksync-v0.1.10) (2026-03-09)
+
+
+### Features
+
+* **doc:** Adding new 'Constants' section for constants and immutables ([#13116](https://github.com/matter-labs/foundry-zksync/issues/13116)) ([34cec70](https://github.com/matter-labs/foundry-zksync/commit/34cec707d81b3a0f8175c3f007b3a1c31d2c0753))
+* **fmt:** pretty printing for generic block/transaction reponses ([896c97e](https://github.com/matter-labs/foundry-zksync/commit/896c97ebba69443b7ba990b2ad3d8b3bd7cf02a0))
+* **primitives:** add `FoundryTransactionBuilder` trait ([#13512](https://github.com/matter-labs/foundry-zksync/issues/13512)) ([970f6f6](https://github.com/matter-labs/foundry-zksync/commit/970f6f67dcc76caf52989bb1994b77a216084e91))
+
+
+### Bug Fixes
+
+* adapt proxy test to OpenZeppelin breaking change ([#1267](https://github.com/matter-labs/foundry-zksync/issues/1267)) ([ab5cb78](https://github.com/matter-labs/foundry-zksync/commit/ab5cb78ae086bd55bd7854bf645f2cb586cbf2f7))
+* allow alloy-chains git source in cargo-deny config ([#1262](https://github.com/matter-labs/foundry-zksync/issues/1262)) ([336a6df](https://github.com/matter-labs/foundry-zksync/commit/336a6df3265fc12742150640900c2887cc6c0ac6))
+* **anvil:** clear tx pool on anvil_reset ([#13544](https://github.com/matter-labs/foundry-zksync/issues/13544)) ([bb0db65](https://github.com/matter-labs/foundry-zksync/commit/bb0db65486bd6a27d04c1827cf1d612187664af7))
+* **anvil:** preserve original error in update_url ([#13531](https://github.com/matter-labs/foundry-zksync/issues/13531)) ([4887d4e](https://github.com/matter-labs/foundry-zksync/commit/4887d4e3c829d53f86d58129e647dcd5152948fb))
+* **anvil:** use EIP-2718 encoding for OP enveloped_tx ([#13537](https://github.com/matter-labs/foundry-zksync/issues/13537)) ([652b8d4](https://github.com/matter-labs/foundry-zksync/commit/652b8d41577f8f65c1b10deb792514653b951a3d))
+* **anvil:** use individual tx gas instead of cumulative in fee history ([#13552](https://github.com/matter-labs/foundry-zksync/issues/13552)) ([640f26b](https://github.com/matter-labs/foundry-zksync/commit/640f26bf0edd98fca850ee4ee5a979799d8f7b98))
+* cast send ignores --zk-gas-per-pubdata flag ([#1276](https://github.com/matter-labs/foundry-zksync/issues/1276)) ([6a77b81](https://github.com/matter-labs/foundry-zksync/commit/6a77b81dbe4e55ee3686699f35aa1e9e8ed9278a))
+* **cast:** correct max_int boundary check for uint255 ([#13568](https://github.com/matter-labs/foundry-zksync/issues/13568)) ([d41efa2](https://github.com/matter-labs/foundry-zksync/commit/d41efa28fb84305dcbef318a9caa791d86e2011f))
+* **ci:** remove dependabot config to prevent unwanted PRs in fork ([#1275](https://github.com/matter-labs/foundry-zksync/issues/1275)) ([01d1353](https://github.com/matter-labs/foundry-zksync/commit/01d13532cca86c0af91c75cd5ff41fa59d4ea19c))
+* clarify Anvil storage caching builder naming ([#13546](https://github.com/matter-labs/foundry-zksync/issues/13546)) ([382672b](https://github.com/matter-labs/foundry-zksync/commit/382672b427e15383d33323f93ae36c560705333d))
+* **cli:** Git::is_repo_root always returns false ([#13505](https://github.com/matter-labs/foundry-zksync/issues/13505)) ([1666a9f](https://github.com/matter-labs/foundry-zksync/commit/1666a9f59764dac7637f4b3f777e3f4ac8a3ef49))
+* correct flag name in error message from --compiler-version to --… ([#13539](https://github.com/matter-labs/foundry-zksync/issues/13539)) ([b1c38a0](https://github.com/matter-labs/foundry-zksync/commit/b1c38a0db3bba8b7672d1623d2326f33caad038b))
+* **evm:** avoid wrong CowBackend initialization in load_allocs and clone_account ([#13554](https://github.com/matter-labs/foundry-zksync/issues/13554)) ([6628501](https://github.com/matter-labs/foundry-zksync/commit/6628501ef5b68182bc87617c329f7ab2a286cf76))
+* **fmt:** correct total_difficulty attribute name ([#13578](https://github.com/matter-labs/foundry-zksync/issues/13578)) ([73f9986](https://github.com/matter-labs/foundry-zksync/commit/73f998629615399cbd51a04bdf2874c32e40406a))
+* **forge:** apply --access-list in forge create ([#13557](https://github.com/matter-labs/foundry-zksync/issues/13557)) ([8d00351](https://github.com/matter-labs/foundry-zksync/commit/8d003511ed5b1ae3791e7f1a96701b751ecfc8c1))
+* remove code duplication in `get_runtime_codes` ([#13502](https://github.com/matter-labs/foundry-zksync/issues/13502)) ([1d653f6](https://github.com/matter-labs/foundry-zksync/commit/1d653f6a650cffc301d015a5e83dfbd0edd347be))
+* remove unused `no_storage_caching()` method from `NodeConfig` ([#13487](https://github.com/matter-labs/foundry-zksync/issues/13487)) ([88084f5](https://github.com/matter-labs/foundry-zksync/commit/88084f50366d3a0909146324a5dd05cc57826289))
+* **script:** actually skip Vyper contract verification ([#13484](https://github.com/matter-labs/foundry-zksync/issues/13484)) ([9736461](https://github.com/matter-labs/foundry-zksync/commit/973646178c13964c589bc2a47ec188927b436f0b))
+* swap incorrect doc comments for archive RPC URL functions in rpc. ([#13480](https://github.com/matter-labs/foundry-zksync/issues/13480)) ([76fae88](https://github.com/matter-labs/foundry-zksync/commit/76fae8881e1aae800d4505cffb52a279248616b9))
+* **verify:** remove unused functions from `VerificationContext` ([#13481](https://github.com/matter-labs/foundry-zksync/issues/13481)) ([bf89f4f](https://github.com/matter-labs/foundry-zksync/commit/bf89f4fc71219fec7259a06733d47410cfcbd195))
+* **wallets:** use turnkey_unsupported() instead of hardcoded error ([#13535](https://github.com/matter-labs/foundry-zksync/issues/13535)) ([a00f915](https://github.com/matter-labs/foundry-zksync/commit/a00f915ffb499c584fc3124254a144d8d0739238))
+
 ## [0.1.9](https://github.com/matter-labs/foundry-zksync/compare/foundry-zksync-v0.1.8...foundry-zksync-v0.1.9) (2026-02-24)
 
 
