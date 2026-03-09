@@ -370,6 +370,17 @@ impl CheatcodesExecutor for InspectorStackInner {
     fn tracing_inspector(&mut self) -> Option<&mut Option<Box<TraceCollector>>> {
         Some(&mut self.tracer)
     }
+
+    fn set_in_inner_context(&mut self, enabled: bool, original_origin: Option<Address>) {
+        self.in_inner_context = enabled;
+        self.inner_context_data = if enabled {
+            Some(InnerContextData {
+                original_origin: original_origin.expect("origin required when enabling inner ctx"),
+            })
+        } else {
+            None
+        };
+    }
 }
 
 impl InspectorStack {

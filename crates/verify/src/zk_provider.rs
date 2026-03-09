@@ -182,7 +182,17 @@ impl CompilerVerificationContext {
 
     pub fn get_target_imports(&self) -> Result<Vec<PathBuf>> {
         match self {
-            Self::Solc(c) => c.get_target_imports(),
+            Self::Solc(c) => {
+                let mut sources = c.project.paths.read_input_files()?;
+                sources.insert(c.target_path.clone(), Source::read(&c.target_path)?);
+                let solc_paths = c
+                    .project
+                    .paths
+                    .clone()
+                    .with_language::<foundry_compilers::solc::SolcLanguage>();
+                let graph = Graph::<SolParser>::resolve_sources(&solc_paths, sources)?;
+                Ok(graph.imports(&c.target_path).into_iter().map(|p| p.to_path_buf()).collect())
+            }
             Self::ZkSolc(c) => c.get_target_imports(),
         }
     }
@@ -190,7 +200,24 @@ impl CompilerVerificationContext {
     pub fn get_target_metadata(&self) -> Result<serde_json::Value> {
         match self {
             Self::Solc(c) => {
-                let m = c.get_target_metadata()?;
+                let mut project = c.project.clone();
+                project.update_output_selection(|selection| {
+                    *selection = OutputSelection::common_output_selection(["metadata".to_string()]);
+                });
+
+                let output = ProjectCompiler::new()
+                    .quiet(true)
+                    .files([c.target_path.clone()])
+                    .compile(&project)?;
+
+                let artifact = output
+                    .find(&c.target_path, &c.target_name)
+                    .ok_or_eyre("failed to find target artifact when compiling for metadata")?;
+
+                let m = artifact
+                    .metadata
+                    .clone()
+                    .ok_or_eyre("target artifact does not have metadata")?;
                 Ok(serde_json::to_value(m)?)
             }
             Self::ZkSolc(c) => c.get_target_metadata(),
