@@ -206,6 +206,10 @@ impl<'a> ContractRunner<'a> {
 
         self.executor.deploy_create2_deployer()?;
 
+        // NOTE(zk): re-set the test contract address as `deploy_create2_deployer` triggers
+        // `Backend::initialize` which overwrites it with the CREATE2 deployer address.
+        self.executor.backend_mut().set_test_contract(address);
+
         // Test contract has already been deployed so we can migrate the database to zkEVM storage
         // in the next runner execution. Additionally we can allow persisting the next nonce update
         // to simulate EVM behavior where only the tx that deploys the test contract increments the

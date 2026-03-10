@@ -4,6 +4,7 @@ use std::{borrow::Borrow, collections::BTreeMap};
 
 use alloy_json_abi::JsonAbi;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256};
+use alloy_rpc_types::TransactionRequest;
 use eyre::{Context, Result};
 use foundry_common::{ContractsByArtifact, TestFunctionExt, TransactionMaybeSigned};
 use foundry_compilers::{
@@ -176,7 +177,7 @@ impl EvmExecutorStrategyRunner {
             DeployLibKind::Create(code) => {
                 executor.deploy(from, code.clone(), value, rd).map(|dr| {
                     let mut request = TransactionMaybeSigned::new(Default::default());
-                    let unsigned = request.as_unsigned_mut().unwrap();
+                    let unsigned: &mut TransactionRequest = request.as_unsigned_mut().unwrap();
                     unsigned.from = Some(from);
                     unsigned.input = code.into();
                     unsigned.nonce = Some(nonce);
@@ -200,7 +201,7 @@ impl EvmExecutorStrategyRunner {
                 debug!(%address, "deployed contract with create2");
 
                 let mut request = TransactionMaybeSigned::new(Default::default());
-                let unsigned = request.as_unsigned_mut().unwrap();
+                let unsigned: &mut TransactionRequest = request.as_unsigned_mut().unwrap();
                 unsigned.from = Some(from);
                 unsigned.input = calldata.into();
                 unsigned.nonce = Some(nonce);

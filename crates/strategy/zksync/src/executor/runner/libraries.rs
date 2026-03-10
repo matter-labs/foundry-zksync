@@ -27,8 +27,7 @@ use foundry_linking::{
 };
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
-    encode_create_params, hash_bytecode,
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, ZkTransactionMetadata, encode_create_params, hash_bytecode,
 };
 use revm::context::{CreateScheme, result::Output};
 
@@ -263,7 +262,7 @@ impl ZksyncExecutorStrategyRunner {
             ctx.transaction_context.take().and_then(|metadata| metadata.paymaster_data);
         let metadata =
             ZkTransactionMetadata { factory_deps, paymaster_data, force_evm_interpreter: None };
-        ctx.transaction_context = Some(metadata.clone());
+        ctx.transaction_context = Some(metadata);
 
         let result = executor.transact_raw(from, to, create_params.clone(), value)?;
         let result = result.into_result(rd)?;
@@ -296,17 +295,13 @@ impl ZksyncExecutorStrategyRunner {
                 .zksync_persist_factory_deps(cheatcodes.strategy.context.as_mut(), factory_deps);
         }
 
-        let mut request = TransactionMaybeSigned::new(Default::default());
+        let mut request: TransactionMaybeSigned = TransactionMaybeSigned::new(Default::default());
         let unsigned = request.as_unsigned_mut().unwrap();
         unsigned.from = Some(from);
         unsigned.input = create_params.into();
         unsigned.nonce = Some(nonce);
         // we use the deployer here for consistency with linking
         unsigned.to = Some(TxKind::Call(to));
-        unsigned.other.insert(
-            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-            serde_json::to_value(metadata).expect("failed encoding json"),
-        );
 
         // ignore all EVM broadcastables
         evm_deployment.iter_mut().for_each(|result| {

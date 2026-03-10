@@ -2,7 +2,7 @@ use super::{ScriptConfig, ScriptResult};
 use crate::build::ScriptPredeployLibraries;
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, U256};
-use alloy_serde::OtherFields;
+use alloy_rpc_types::serde_helpers::OtherFields;
 use eyre::Result;
 use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
@@ -88,6 +88,7 @@ impl ScriptRunner {
                         library_transactions.push_back(BroadcastableTransaction {
                             rpc: self.evm_opts.fork_url.clone(),
                             transaction,
+                            zk_metadata: None,
                         });
                     }
                 }
@@ -120,6 +121,7 @@ impl ScriptRunner {
                             library_transactions.push_back(BroadcastableTransaction {
                                 rpc: self.evm_opts.fork_url.clone(),
                                 transaction,
+                                zk_metadata: None,
                             });
                         }
                     }

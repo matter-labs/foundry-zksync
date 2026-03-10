@@ -18,13 +18,19 @@ extern crate tracing;
 use alloy_evm::eth::EthEvmContext;
 use alloy_primitives::Address;
 use foundry_evm_core::backend::DatabaseExt;
+use revm::context::{ContextTr, JournalTr};
 use spec::Status;
+
+/// The inner EVM context type (without the outer `&mut`), suitable as a generic
+/// parameter for `CheatsCtxt<'_, CTX>` where `CTX: CheatsCtxExt`.
+pub type ConcreteEcx<'b, 'c> = EthEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 
 pub use Vm::ForgeContext;
 pub use config::CheatsConfig;
 pub use error::{Error, ErrorKind, Result};
 pub use inspector::{
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
+    CheatsCtxExt, NestedEvmClosure,
 };
 pub use spec::{CheatcodeDef, Vm};
 
@@ -70,7 +76,7 @@ mod utils;
 pub mod strategy;
 
 /// Cheatcode implementation.
-pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
+pub(crate) trait Cheatcode: CheatcodeDef {
     /// Applies this cheatcode to the given state.
     ///
     /// Implement this function if you don't need access to the EVM data.
@@ -83,7 +89,7 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     ///
     /// Implement this function if you need access to the EVM data.
     #[inline(always)]
-    fn apply_stateful(&self, ccx: &mut CheatsCtxt) -> Result {
+    fn apply_stateful<CTX: CheatsCtxExt>(&self, ccx: &mut CheatsCtxt<'_, CTX>) -> Result {
         self.apply(ccx.state)
     }
 
@@ -91,7 +97,11 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
     ///
     /// Implement this function if you need access to the executor.
     #[inline(always)]
-    fn apply_full(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
+    fn apply_full<CTX: CheatsCtxExt>(
+        &self,
+        ccx: &mut CheatsCtxt<'_, CTX>,
+        executor: &mut dyn CheatcodesExecutor<CTX>,
+    ) -> Result {
         let _ = executor;
         self.apply_stateful(ccx)
     }
@@ -100,17 +110,25 @@ pub(crate) trait Cheatcode: CheatcodeDef + DynCheatcode {
 pub trait DynCheatcode: 'static + std::fmt::Debug {
     fn cheatcode(&self) -> &'static spec::Cheatcode<'static>;
 
-    fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result;
+    fn dyn_apply<'b, 'c>(
+        &self,
+        ccx: &mut CheatsCtxt<'_, ConcreteEcx<'b, 'c>>,
+        executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
+    ) -> Result;
 
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
-impl<T: Cheatcode> DynCheatcode for T {
+impl<T: Cheatcode + 'static> DynCheatcode for T {
     fn cheatcode(&self) -> &'static spec::Cheatcode<'static> {
         Self::CHEATCODE
     }
 
-    fn dyn_apply(&self, ccx: &mut CheatsCtxt, executor: &mut dyn CheatcodesExecutor) -> Result {
+    fn dyn_apply<'b, 'c>(
+        &self,
+        ccx: &mut CheatsCtxt<'_, ConcreteEcx<'b, 'c>>,
+        executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
+    ) -> Result {
         self.apply_full(ccx, executor)
     }
 
@@ -138,20 +156,20 @@ impl dyn DynCheatcode {
     }
 }
 
-/// The cheatcode context, used in `Cheatcode`.
-pub struct CheatsCtxt<'cheats, 'evm, 'db, 'db2> {
+/// The cheatcode context.
+pub struct CheatsCtxt<'a, CTX> {
     /// The cheatcodes inspector state.
-    pub state: &'cheats mut Cheatcodes,
-    /// The EVM data.
-    pub ecx: &'evm mut EthEvmContext<&'db mut (dyn DatabaseExt + 'db2)>,
+    pub state: &'a mut Cheatcodes,
+    /// The EVM context.
+    pub ecx: &'a mut CTX,
     /// The original `msg.sender`.
     pub caller: Address,
     /// Gas limit of the current cheatcode call.
     pub gas_limit: u64,
 }
 
-impl<'db, 'db2> std::ops::Deref for CheatsCtxt<'_, '_, 'db, 'db2> {
-    type Target = EthEvmContext<&'db mut (dyn DatabaseExt + 'db2)>;
+impl<CTX> std::ops::Deref for CheatsCtxt<'_, CTX> {
+    type Target = CTX;
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
@@ -159,20 +177,20 @@ impl<'db, 'db2> std::ops::Deref for CheatsCtxt<'_, '_, 'db, 'db2> {
     }
 }
 
-impl std::ops::DerefMut for CheatsCtxt<'_, '_, '_, '_> {
+impl<CTX> std::ops::DerefMut for CheatsCtxt<'_, CTX> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.ecx
+        self.ecx
     }
 }
 
-impl CheatsCtxt<'_, '_, '_, '_> {
+impl<CTX: ContextTr> CheatsCtxt<'_, CTX> {
     pub(crate) fn ensure_not_precompile(&self, address: &Address) -> Result<()> {
         if self.is_precompile(address) { Err(precompile_error(address)) } else { Ok(()) }
     }
 
     pub(crate) fn is_precompile(&self, address: &Address) -> bool {
-        self.ecx.journaled_state.warm_addresses.precompiles().contains(address)
+        self.ecx.journal().precompile_addresses().contains(address)
     }
 }
 
