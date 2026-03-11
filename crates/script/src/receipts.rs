@@ -94,7 +94,7 @@ pub fn format_receipt(
     let gas_used = receipt.gas_used;
     let gas_price = receipt.effective_gas_price;
     let block_number = receipt.block_number.unwrap_or_default();
-    let success = receipt.inner.inner.inner.receipt.status.coerce_status();
+    let success = receipt.status();
 
     let (contract_name, function) = sequence
         .and_then(|seq| {

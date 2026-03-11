@@ -27,7 +27,8 @@ use foundry_linking::{
 };
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
 use foundry_zksync_core::{
-    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, ZkTransactionMetadata, encode_create_params, hash_bytecode,
+    DEFAULT_CREATE2_DEPLOYER_ZKSYNC, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
+    encode_create_params, hash_bytecode,
 };
 use revm::context::{CreateScheme, result::Output};
 
@@ -262,7 +263,7 @@ impl ZksyncExecutorStrategyRunner {
             ctx.transaction_context.take().and_then(|metadata| metadata.paymaster_data);
         let metadata =
             ZkTransactionMetadata { factory_deps, paymaster_data, force_evm_interpreter: None };
-        ctx.transaction_context = Some(metadata);
+        ctx.transaction_context = Some(metadata.clone());
 
         let result = executor.transact_raw(from, to, create_params.clone(), value)?;
         let result = result.into_result(rd)?;
@@ -307,9 +308,16 @@ impl ZksyncExecutorStrategyRunner {
         evm_deployment.iter_mut().for_each(|result| {
             result.tx.take();
         });
+        let mut fields = alloy_rpc_types::serde_helpers::OtherFields::default();
+        fields.insert(
+            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+            serde_json::to_value(&metadata).expect("failed encoding json"),
+        );
+
         evm_deployment.push(DeployLibResult {
             result: DeployResult { raw: result, address },
             tx: Some(request),
+            other_fields: Some(fields),
         });
         Ok(evm_deployment)
     }

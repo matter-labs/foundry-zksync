@@ -45,6 +45,8 @@ pub struct DeployLibResult {
     pub result: DeployResult,
     /// Equivalent transaction to deploy the given library
     pub tx: Option<TransactionMaybeSigned>,
+    /// NOTE(zk): extra transaction fields (e.g. ZKsync factory deps)
+    pub other_fields: Option<alloy_rpc_types::serde_helpers::OtherFields>,
 }
 
 impl std::ops::Deref for DeployLibResult {
@@ -182,7 +184,7 @@ impl EvmExecutorStrategyRunner {
                     unsigned.input = code.into();
                     unsigned.nonce = Some(nonce);
 
-                    vec![DeployLibResult { result: dr, tx: Some(request) }]
+                    vec![DeployLibResult { result: dr, tx: Some(request), other_fields: None }]
                 })
             }
             DeployLibKind::Create2(salt, code) => {
@@ -215,6 +217,7 @@ impl EvmExecutorStrategyRunner {
                 Ok(vec![DeployLibResult {
                     result: DeployResult { raw: result, address },
                     tx: Some(request),
+                    other_fields: None,
                 }])
             }
         }

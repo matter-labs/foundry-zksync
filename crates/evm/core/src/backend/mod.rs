@@ -1708,23 +1708,26 @@ impl Database for Backend {
             let retry =
                 foundry_common::retry::Retry::new(CODE_BY_HASH_RETRIES, CODE_BY_HASH_RETRY_DELAY);
 
-            return retry
+            let result = retry
                 .run(move || {
                     let provider = provider.clone();
                     db.db
                         .do_any_request(async move {
                             provider
-                                .raw_request::<_, Bytes>(
+                                .raw_request::<_, Option<Bytes>>(
                                     "zks_getBytecodeByHash".into(),
                                     vec![code_hash],
                                 )
                                 .await
-                                .map(Bytecode::new_raw)
                                 .map_err(Into::into)
                         })
                         .map_err(Into::into)
                 })
-                .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)));
+                .map_err(|err| DatabaseError::AnyRequest(Arc::new(err)))?;
+
+            if let Some(bytes) = result {
+                return Ok(Bytecode::new_raw(bytes));
+            }
         }
 
         if let Some(db) = self.active_fork_db_mut() {
