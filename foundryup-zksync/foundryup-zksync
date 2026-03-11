@@ -473,6 +473,7 @@ EOF
 
     # Force checkout, discarding any local changes
     cd "$REPO_PATH"
+    ensure git restore Cargo.lock
     ensure git fetch origin "${FOUNDRYUP_BRANCH}:remotes/origin/${FOUNDRYUP_BRANCH}"
     ensure git checkout "origin/${FOUNDRYUP_BRANCH}"
 
