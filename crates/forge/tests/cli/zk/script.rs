@@ -13,13 +13,8 @@ forgetest_async!(test_zk_can_execute_script_with_arguments, |prj, cmd| {
     #[derive(serde::Deserialize, Debug)]
     #[allow(dead_code)]
     struct ZkTransaction {
-        transaction: ZkTransactionInner,
-    }
-
-    #[derive(serde::Deserialize, Debug)]
-    #[allow(dead_code)]
-    struct ZkTransactionInner {
-        zksync: ZkTransactionMetadata,
+        #[serde(default, rename = "zkMetadata")]
+        zk_metadata: Option<ZkTransactionMetadata>,
     }
 
     let node = foundry_test_utils::ZkSyncNode::start().await;

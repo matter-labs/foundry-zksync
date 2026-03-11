@@ -296,25 +296,28 @@ impl ZksyncExecutorStrategyRunner {
                 .zksync_persist_factory_deps(cheatcodes.strategy.context.as_mut(), factory_deps);
         }
 
-        let mut request = TransactionMaybeSigned::new(Default::default());
+        let mut request: TransactionMaybeSigned = TransactionMaybeSigned::new(Default::default());
         let unsigned = request.as_unsigned_mut().unwrap();
         unsigned.from = Some(from);
         unsigned.input = create_params.into();
         unsigned.nonce = Some(nonce);
         // we use the deployer here for consistency with linking
         unsigned.to = Some(TxKind::Call(to));
-        unsigned.other.insert(
-            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-            serde_json::to_value(metadata).expect("failed encoding json"),
-        );
 
         // ignore all EVM broadcastables
         evm_deployment.iter_mut().for_each(|result| {
             result.tx.take();
         });
+        let mut fields = alloy_rpc_types::serde_helpers::OtherFields::default();
+        fields.insert(
+            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+            serde_json::to_value(&metadata).expect("failed encoding json"),
+        );
+
         evm_deployment.push(DeployLibResult {
             result: DeployResult { raw: result, address },
             tx: Some(request),
+            other_fields: Some(fields),
         });
         Ok(evm_deployment)
     }

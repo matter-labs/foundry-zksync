@@ -160,7 +160,7 @@ impl BackendStrategyRunner for ZksyncBackendStrategyRunner {
         backend.commit(journaled_state.state.clone());
 
         let res = {
-            configure_tx_req_env(&mut env.as_env_mut(), tx, None)?;
+            configure_tx_req_env(&mut env.as_env_mut(), tx)?;
             let env = env.clone();
 
             let inspect_ctx = get_inspect_context(inspect_ctx);
