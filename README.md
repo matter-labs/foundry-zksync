@@ -1,43 +1,41 @@
-# **Foundry with ZKsync Era - Alpha**
+# **Foundry with ZKsync Era**
 
 **[Install](https://foundry-book.zksync.io/getting-started/installation)**
 | [Limitations](https://foundry-book.zksync.io/zksync-specifics/limitations/)
 | [User Book](https://foundry-book.zksync.io/)
 | [ZKsync Docs](https://docs.zksync.io/build/tooling/foundry/overview)
 
-**Foundry ZKsync** is a specialized fork of [Foundry](https://github.com/foundry-rs/foundry), tailored for ZKsync. 
+**Foundry ZKsync** is a specialized fork of [Foundry](https://github.com/foundry-rs/foundry), tailored for ZKsync.
 
 It extends Foundry's capabilities for Ethereum app development to support ZKsync, **allowing for the compilation, deployment, testing, and interaction with smart contracts on ZKsync.**
- 
-> ⚠️ **Alpha Stage:** The project its alpha stage, indicating ongoing development and potential for future improvements.
->
+
+- **Latest upstream merge commit:** [`c0fe76c`](https://github.com/foundry-rs/foundry/commit/c0fe76c)
+- **Pinned zksolc version:** `v1.5.15`
+
 > 🐞 **Found an Issue?:** Please report it to help us improve by opening an issue or submitting a pull request.
 
-## 📖 User Book 
+## 📖 User Book
 
 For **detailed information, including installation instructions, usage examples, and advanced guides**, please refer to the **[Foundry ZKsync Book](https://foundry-book.zksync.io/).**
 
-*If you are interested in contributing to the book, please refer to the **[Foundry ZKsync Book repository](https://github.com/matter-labs/foundry-zksync-book).***
+\*If you are interested in contributing to the book, please refer to the **[Foundry ZKsync Book repository](https://github.com/matter-labs/foundry-zksync-book).\***
 
 ## 🤝 Contributing
 
 See our [contributing guidelines](./CONTRIBUTING.md).
 
-## 🗣️ Acknowledgements
+## 🗣️ Getting Help
 
 First, see if the answer to your question can be found in the [Foundry Docs][foundry-docs], or in the relevant crate.
 
 If the answer is not there:
 
-- Join the [support Telegram][tg-support-url] to get help, or
-- Open a [discussion](https://github.com/foundry-rs/foundry/discussions/new) with your question, or
-- Open an issue with [the bug](https://github.com/foundry-rs/foundry/issues/new)
-
-Join our [Telegram][tg-url] to chat about the development of Foundry.
+- Open a [discussion](https://github.com/ZKsync-Community-Hub/zksync-developers/discussions) with your question, or
+- Open an issue with [the bug](https://github.com/matter-labs/foundry-zksync/issues/new)
 
 ## Support
 
-Having trouble? Check the [Foundry Docs][foundry-docs], join the [support Telegram][tg-support-url], or [open an issue](https://github.com/foundry-rs/foundry/issues/new).
+Having trouble? Check the [Foundry Docs][foundry-docs], or [open an issue](https://github.com/matter-labs/foundry-zksync/issues/new).
 
 #### License
 
@@ -64,4 +62,11 @@ shall be dual licensed as above, without any additional terms or conditions.
 - All the other [contributors](https://github.com/foundry-rs/foundry/graphs/contributors) to the [ethers-rs](https://github.com/gakonst/ethers-rs), [alloy][alloy] & [foundry](https://github.com/foundry-rs/foundry) repositories and chatrooms.
 
 ### Foundry ZKsync
-- [Moonsong Labs](https://moonsonglabs.com/): Implemented [ZKsync crates](./crates/zksync/), and resolved a number of different challenges to enable ZKsync support. 
+
+- [Moonsong Labs](https://moonsonglabs.com/): Implemented [ZKsync crates](./crates/zksync/), and resolved a number of different challenges to enable ZKsync support.
+
+[foundry-docs]: https://getfoundry.sh
+[dapptools]: https://github.com/dapphub/dapptools
+[ethers-solc]: https://github.com/gakonst/ethers-rs/tree/master/ethers-solc
+[foundry-compilers]: https://github.com/foundry-rs/compilers
+[alloy]: https://github.com/alloy-rs/alloy
