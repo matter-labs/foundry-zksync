@@ -27,6 +27,7 @@ foundry-evm-traces.workspace = true
 foundry-wallets.workspace = true
 forge-script-sequence.workspace = true
 foundry-zksync-inspectors.workspace = true
+foundry-zksync-core.workspace = true
 
 solar.workspace = true
 

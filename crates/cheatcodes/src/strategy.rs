@@ -11,10 +11,10 @@ use revm::{
 
 use crate::{
     BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, DynCheatcode, Result,
-    inspector::{CommonCreateInput, Ecx},
+    CheatsConfig, CheatsCtxt, ConcreteEcx, DynCheatcode, Result, inspector::CommonCreateInput,
     script::Broadcast,
 };
+use foundry_evm_core::Ecx;
 
 /// Represents the context for [CheatcodeInspectorStrategy].
 pub trait CheatcodeInspectorStrategyContext: Debug + Send + Sync + Any {
@@ -64,11 +64,11 @@ impl Clone for CheatcodeInspectorStrategy {
 pub trait CheatcodeInspectorStrategyRunner:
     Debug + Send + Sync + CheatcodeInspectorStrategyExt
 {
-    fn apply_full(
+    fn apply_full<'b, 'c>(
         &self,
         cheatcode: &dyn DynCheatcode,
-        ccx: &mut CheatsCtxt,
-        executor: &mut dyn CheatcodesExecutor,
+        ccx: &mut CheatsCtxt<'_, ConcreteEcx<'b, 'c>>,
+        executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
     ) -> Result {
         cheatcode.dyn_apply(ccx, executor)
     }
@@ -147,22 +147,22 @@ pub trait CheatcodeInspectorStrategyExt {
     ) {
     }
 
-    fn zksync_try_create(
+    fn zksync_try_create<'b, 'c>(
         &self,
         _state: &mut Cheatcodes,
-        _ecx: Ecx,
+        _ecx: Ecx<'_, 'b, 'c>,
         _input: &dyn CommonCreateInput,
-        _executor: &mut dyn CheatcodesExecutor,
+        _executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
     ) -> Option<CreateOutcome> {
         None
     }
 
-    fn zksync_try_call(
+    fn zksync_try_call<'b, 'c>(
         &self,
         _state: &mut Cheatcodes,
-        _ecx: Ecx,
+        _ecx: Ecx<'_, 'b, 'c>,
         _input: &CallInputs,
-        _executor: &mut dyn CheatcodesExecutor,
+        _executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
     ) -> Option<CallOutcome> {
         None
     }
@@ -210,6 +210,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
                 ..Default::default()
             }
             .into(),
+            zk_metadata: None,
         });
     }
 
@@ -274,6 +275,7 @@ impl CheatcodeInspectorStrategyRunner for EvmCheatcodeInspectorStrategyRunner {
         broadcastable_transactions.push_back(BroadcastableTransaction {
             rpc: ecx.journaled_state.database.active_fork_url(),
             transaction: tx_req.into(),
+            zk_metadata: None,
         });
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
     }

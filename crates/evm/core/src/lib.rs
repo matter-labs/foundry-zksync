@@ -49,19 +49,18 @@ pub mod utils;
 
 pub type Ecx<'a, 'b, 'c> = &'a mut EthEvmContext<&'b mut (dyn DatabaseExt + 'c)>;
 
-/// An extension trait that allows us to add additional hooks to Inspector for later use in
-/// handlers.
+/// Foundry-specific inspector methods, decoupled from any particular EVM context type.
+///
+/// This trait holds Foundry-specific extensions (create2 factory, console logging,
+/// network config, deployer address). It has no `Inspector<CTX>` supertrait so it can
+/// be used in generic code with `I: FoundryInspectorExt + Inspector<CTX>`.
 #[auto_impl(&mut, Box)]
-pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>> {
+pub trait FoundryInspectorExt {
     /// Determines whether the `DEFAULT_CREATE2_DEPLOYER` should be used for a CREATE2 frame.
     ///
     /// If this function returns true, we'll replace CREATE2 frame with a CALL frame to CREATE2
     /// factory.
-    fn should_use_create2_factory(
-        &mut self,
-        _context: &mut EthEvmContext<&mut dyn DatabaseExt>,
-        _inputs: &CreateInputs,
-    ) -> bool {
+    fn should_use_create2_factory(&mut self, _depth: usize, _inputs: &CreateInputs) -> bool {
         false
     }
 
@@ -85,11 +84,8 @@ pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>
         _context: Ecx<'_, '_, '_>,
         _call_inputs: &mut CallInputs,
     ) {
-        // No-op by default, can be overridden in the inspector.
     }
 
-    /// Appends provided zksync traces.
-    // TODO(merge): Should be moved outside of the upstream codebase
     fn trace_zksync(
         &mut self,
         _context: Ecx<'_, '_, '_>,
@@ -99,6 +95,20 @@ pub trait InspectorExt: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>
     }
 }
 
-impl InspectorExt for NoOpInspector {}
+/// Combined trait: `Inspector<EthEvmContext<...>>` + [`FoundryInspectorExt`].
+///
+/// Used as a trait object (`dyn InspectorExt`) in backend code that is Eth-specific.
+/// For generic multi-network code, use `I: FoundryInspectorExt + Inspector<CTX>` instead.
+pub trait InspectorExt:
+    for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>> + FoundryInspectorExt
+{
+}
 
-impl InspectorExt for AccessListInspector {}
+impl<T> InspectorExt for T where
+    T: for<'a> Inspector<EthEvmContext<&'a mut dyn DatabaseExt>> + FoundryInspectorExt
+{
+}
+
+impl FoundryInspectorExt for NoOpInspector {}
+
+impl FoundryInspectorExt for AccessListInspector {}

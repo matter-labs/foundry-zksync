@@ -401,7 +401,7 @@ impl RunArgs {
                 );
             } else {
                 configure_tx_env(&mut env.as_env_mut(), &tx);
-                if is_impersonated_tx(tx.inner.inner.inner()) {
+                if is_impersonated_tx(tx.as_ref()) {
                     env.evm_env.cfg_env.disable_balance_check = true;
                 }
             }

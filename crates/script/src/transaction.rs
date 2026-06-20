@@ -16,9 +16,14 @@ pub struct ScriptTransactionBuilder {
 }
 
 impl ScriptTransactionBuilder {
-    pub fn new(transaction: TransactionMaybeSigned, rpc: String) -> Self {
+    pub fn new(
+        transaction: TransactionMaybeSigned,
+        rpc: String,
+        zk_metadata: Option<foundry_zksync_core::ZkTransactionMetadata>,
+    ) -> Self {
         let mut transaction = TransactionWithMetadata::from_tx_request(transaction);
         transaction.rpc = rpc;
+        transaction.zk_metadata = zk_metadata;
         // If tx.gas is already set that means it was specified in script
         transaction.is_fixed_gas_limit = transaction.tx().gas().is_some();
 

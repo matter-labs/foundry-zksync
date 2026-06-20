@@ -18,7 +18,7 @@ use alloy_consensus::{
     proofs::calculate_receipt_root, transaction::Either,
 };
 use alloy_eips::{
-    Encodable2718,
+    Encodable2718, eip2935, eip4788,
     eip7685::EMPTY_REQUESTS_HASH,
     eip7702::{RecoveredAuthority, RecoveredAuthorization},
     eip7840::BlobParams,
@@ -28,10 +28,11 @@ use alloy_evm::{
     eth::EthEvmContext,
     precompiles::{DynPrecompile, Precompile, PrecompilesMap},
 };
+use alloy_network::Network;
 use alloy_op_evm::OpEvmFactory;
-use alloy_primitives::{B256, Bloom, BloomInput, Log};
+use alloy_primitives::{B256, Bloom, BloomInput, Bytes, Log};
 use anvil_core::eth::{
-    block::{BlockInfo, create_block},
+    block::{TypedBlockInfo, create_block},
     transaction::{PendingTransaction, TransactionInfo},
 };
 use foundry_evm::{
@@ -40,7 +41,7 @@ use foundry_evm::{
     traces::{CallTraceDecoder, CallTraceNode},
 };
 use foundry_evm_networks::NetworkConfigs;
-use foundry_primitives::{FoundryReceiptEnvelope, FoundryTxEnvelope};
+use foundry_primitives::{FoundryNetwork, FoundryReceiptEnvelope, FoundryTxEnvelope};
 use op_revm::{OpContext, OpTransaction};
 use revm::{
     Database, Inspector,
@@ -103,10 +104,10 @@ impl ExecutedTransaction {
 }
 
 /// Represents the outcome of mining a new block
-#[derive(Clone, Debug)]
-pub struct ExecutedTransactions {
+#[derive(Debug)]
+pub struct ExecutedTransactions<N: Network> {
     /// The block created after executing the `included` transactions
-    pub block: BlockInfo,
+    pub block: TypedBlockInfo<N>,
     /// All transactions included in the block
     pub included: Vec<Arc<PoolTransaction>>,
     /// All transactions that were invalid at the point of their execution and were not included in
@@ -142,7 +143,7 @@ pub struct TransactionExecutor<'a, Db: ?Sized, V: TransactionValidator> {
 
 impl<DB: Db + ?Sized, V: TransactionValidator> TransactionExecutor<'_, DB, V> {
     /// Executes all transactions and puts them in a new block with the provided `timestamp`
-    pub fn execute(mut self) -> ExecutedTransactions {
+    pub fn execute(mut self) -> ExecutedTransactions<FoundryNetwork> {
         let mut transactions = Vec::new();
         let mut transaction_infos = Vec::new();
         let mut receipts = Vec::new();
@@ -169,6 +170,26 @@ impl<DB: Db + ?Sized, V: TransactionValidator> TransactionExecutor<'_, DB, V> {
         let excess_blob_gas =
             if is_cancun { self.evm_env.block_env().blob_excess_gas() } else { None };
         let mut cumulative_blob_gas_used = if is_cancun { Some(0u64) } else { None };
+
+        // EIP-2935: store parent block hash in history storage contract.
+        if is_prague && !block_number.is_zero() {
+            let env = Env::new(self.evm_env.clone(), Default::default(), self.networks);
+            let mut inspector = AnvilInspector::default();
+            let mut evm = new_evm_with_inspector(&mut *self.db, &env, &mut inspector);
+            // SYSTEM_ADDRESS is defined in EIP-4788 and reused by EIP-2935.
+            match evm.transact_system_call(
+                eip4788::SYSTEM_ADDRESS,
+                eip2935::HISTORY_STORAGE_ADDRESS,
+                Bytes::copy_from_slice(parent_hash.as_slice()),
+            ) {
+                Ok(result) => {
+                    self.db.commit(result.state);
+                }
+                Err(err) => {
+                    warn!(target: "backend", "EIP-2935 system call failed: {:?}", err);
+                }
+            }
+        }
 
         for tx in self.into_iter() {
             let tx = match tx {
@@ -268,7 +289,7 @@ impl<DB: Db + ?Sized, V: TransactionValidator> TransactionExecutor<'_, DB, V> {
         };
 
         let block = create_block(header, transactions);
-        let block = BlockInfo { block, transactions: transaction_infos, receipts };
+        let block = TypedBlockInfo { block, transactions: transaction_infos, receipts };
         ExecutedTransactions { block, included, invalid }
     }
 

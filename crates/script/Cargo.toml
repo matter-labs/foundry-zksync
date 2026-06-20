@@ -24,7 +24,6 @@ foundry-cheatcodes.workspace = true
 foundry-wallets.workspace = true
 foundry-linking.workspace = true
 forge-script-sequence.workspace = true
-foundry-strategy-zksync.workspace = true
 foundry-zksync-core.workspace = true
 foundry-zksync-compilers.workspace = true
 
@@ -49,7 +48,6 @@ dialoguer.workspace = true
 indicatif.workspace = true
 
 alloy-signer.workspace = true
-alloy-serde.workspace = true
 alloy-network.workspace = true
 alloy-provider.workspace = true
 alloy-chains.workspace = true

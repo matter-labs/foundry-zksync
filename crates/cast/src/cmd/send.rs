@@ -15,7 +15,7 @@ use foundry_cli::{
     opts::{TransactionOpts, ZkTransactionOpts},
     utils::{self, LoadConfig, get_provider},
 };
-use foundry_wallets::WalletSigner;
+use foundry_primitives::FoundryNetwork;
 
 mod zksync;
 use zksync::send_zk_transaction;
@@ -166,8 +166,11 @@ impl SendTxArgs {
         // Check if this is a Tempo transaction - requires special handling for local signing
         let is_tempo = builder.is_tempo();
 
-        // Tempo transactions with browser wallets are not supported
-        if is_tempo && send_tx.eth.wallet.browser {
+        // Launch browser signer if `--browser` flag is set
+        let browser = send_tx.browser.run::<FoundryNetwork>().await?;
+
+        // Tempo transactions with browser signer are not supported
+        if is_tempo && browser.is_some() {
             return Err(eyre!("Tempo transactions are not supported with browser wallets."));
         }
 
@@ -175,7 +178,7 @@ impl SendTxArgs {
         // Default to sending via eth_sendTransaction if the --unlocked flag is passed.
         // This should be the only way this RPC method is used as it requires a local node
         // or remote RPC with unlocked accounts.
-        if unlocked && !send_tx.eth.wallet.browser {
+        if unlocked && browser.is_none() {
             // only check current chain id if it was specified in the config
             if let Some(config_chain) = config.chain {
                 let current_chain_id = provider.get_chain_id().await?;
@@ -230,43 +233,37 @@ impl SendTxArgs {
                     timeout,
                 )
                 .await
+            } else if let Some(browser) = browser {
+                let (tx_request, _) = builder.build(browser.address()).await?;
+                let tx_hash = browser.send_transaction_via_browser(tx_request).await?;
+
+                if send_tx.cast_async {
+                    sh_println!("{tx_hash:#x}")?;
+                } else {
+                    let receipt = CastTxSender::new(&provider)
+                        .receipt(
+                            format!("{tx_hash:#x}"),
+                            None,
+                            send_tx.confirmations,
+                            Some(timeout),
+                            false,
+                        )
+                        .await?;
+                    sh_println!("{receipt}")?;
+                }
+
+                Ok(())
             } else {
                 // Retrieve the signer, and bail if it can't be constructed.
                 let signer = send_tx.eth.wallet.signer().await?;
                 let from = signer.address();
 
-                // Browser wallets work differently as they sign and send the transaction in one
-                // step.
-                if send_tx.eth.wallet.browser
-                    && let WalletSigner::Browser(ref browser_signer) = signer
-                {
-                    let (tx_request, _) = builder.build(from).await?;
-                    let tx_hash = browser_signer
-                        .send_transaction_via_browser(tx_request.into_inner())
-                        .await?;
-
-                    let provider =
-                        ProviderBuilder::<_, _, AnyNetwork>::default().connect_provider(&provider);
-                    let cast = CastTxSender::new(provider);
-
-                    return handle_transaction_result(
-                        &cast,
-                        &tx_hash,
-                        send_tx.cast_async,
-                        send_tx.confirmations,
-                        timeout,
-                    )
-                    .await;
-                }
-
                 tx::validate_from_address(send_tx.eth.wallet.from, from)?;
-
                 // Tempo transactions need to be signed locally and sent as raw transactions
                 // because EthereumWallet doesn't understand type 0x76
                 // TODO(onbjerg): All of this is a side effect of a few things, most notably that we
-                // do not use `FoundryNetwork` and `FoundryTransactionRequest`
-                // everywhere, which is downstream of the fact that we use
-                // `EthereumWallet` everywhere.
+                // do not use `FoundryNetwork` and `FoundryTransactionRequest` everywhere, which is
+                // downstream of the fact that we use `EthereumWallet` everywhere.
                 if is_tempo {
                     let (ftx, _) = builder.build(&signer).await?;
 
@@ -298,7 +295,7 @@ impl SendTxArgs {
                     return Ok(());
                 }
 
-                let (tx, _) = builder.build(&signer).await?;
+                let (tx_request, _) = builder.build(&signer).await?;
 
                 let wallet = EthereumWallet::from(signer);
                 let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
@@ -307,7 +304,7 @@ impl SendTxArgs {
 
                 cast_send(
                     provider,
-                    tx.into_inner().into(),
+                    tx_request.into_inner().into(),
                     send_tx.cast_async,
                     send_tx.sync,
                     send_tx.confirmations,

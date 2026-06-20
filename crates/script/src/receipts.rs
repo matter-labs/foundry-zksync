@@ -1,5 +1,5 @@
 use alloy_chains::{Chain, NamedChain};
-use alloy_network::AnyTransactionReceipt;
+use alloy_network::{AnyTransactionReceipt, ReceiptResponse};
 use alloy_primitives::{TxHash, U256, utils::format_units};
 use alloy_provider::{PendingTransactionBuilder, PendingTransactionError, Provider, WatchTxError};
 use eyre::{Result, eyre};
@@ -25,11 +25,7 @@ pub enum TxStatus {
 
 impl From<AnyTransactionReceipt> for TxStatus {
     fn from(receipt: AnyTransactionReceipt) -> Self {
-        if !receipt.inner.inner.inner.receipt.status.coerce_status() {
-            Self::Revert(receipt)
-        } else {
-            Self::Success(receipt)
-        }
+        if !receipt.status() { Self::Revert(receipt) } else { Self::Success(receipt) }
     }
 }
 
@@ -98,7 +94,7 @@ pub fn format_receipt(
     let gas_used = receipt.gas_used;
     let gas_price = receipt.effective_gas_price;
     let block_number = receipt.block_number.unwrap_or_default();
-    let success = receipt.inner.inner.inner.receipt.status.coerce_status();
+    let success = receipt.status();
 
     let (contract_name, function) = sequence
         .and_then(|seq| {

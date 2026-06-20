@@ -11,7 +11,6 @@ use alloy_primitives::{
 };
 use alloy_provider::{Provider, utils::Eip1559Estimation};
 use alloy_rpc_types::TransactionRequest;
-use alloy_serde::WithOtherFields;
 use alloy_zksync::network::{
     Zksync, transaction_request::TransactionRequest as ZkTransactionRequest, tx_type::TxType,
 };
@@ -30,7 +29,7 @@ use foundry_common::{
     shell,
 };
 use foundry_config::Config;
-use foundry_wallets::{WalletSigner, wallet_browser::signer::BrowserSigner};
+use foundry_wallets::wallet_browser::signer::BrowserSigner;
 use foundry_zksync_core::convert::ConvertH160;
 use futures::{FutureExt, StreamExt, future::join_all, stream::FuturesUnordered};
 use itertools::Itertools;
@@ -41,7 +40,7 @@ use crate::{
 };
 
 pub async fn estimate_gas<P: Provider<AnyNetwork>>(
-    tx: &mut WithOtherFields<TransactionRequest>,
+    tx: &mut TransactionRequest,
     provider: &P,
     estimate_multiplier: u64,
 ) -> Result<()> {
@@ -50,7 +49,7 @@ pub async fn estimate_gas<P: Provider<AnyNetwork>>(
     tx.gas = None;
 
     tx.set_gas_limit(
-        provider.estimate_gas(tx.clone()).await.wrap_err("Failed to estimate gas for tx")?
+        provider.estimate_gas(tx.clone().into()).await.wrap_err("Failed to estimate gas for tx")?
             * estimate_multiplier
             / 100,
     );
@@ -72,9 +71,13 @@ pub async fn next_nonce(
 /// Represents how to send a single transaction.
 #[derive(Clone)]
 pub enum SendTransactionKind<'a> {
-    Unlocked(WithOtherFields<TransactionRequest>),
-    Raw(WithOtherFields<TransactionRequest>, &'a EthereumWallet),
-    Browser(WithOtherFields<TransactionRequest>, &'a BrowserSigner),
+    Unlocked(TransactionRequest, Option<foundry_zksync_core::ZkTransactionMetadata>),
+    Raw(TransactionRequest, Option<foundry_zksync_core::ZkTransactionMetadata>, &'a EthereumWallet),
+    Browser(
+        TransactionRequest,
+        Option<foundry_zksync_core::ZkTransactionMetadata>,
+        &'a BrowserSigner,
+    ),
     Signed(TxEnvelope),
 }
 
@@ -93,13 +96,10 @@ impl<'a> SendTransactionKind<'a> {
         estimate_via_rpc: bool,
         estimate_multiplier: u64,
     ) -> Result<()> {
-        let zk_tx_meta = if let Self::Raw(tx, _) | Self::Unlocked(tx) = self {
-            foundry_strategy_zksync::try_get_zksync_transaction_metadata(&tx.other)
-        } else {
-            None
-        };
-
-        if let Self::Raw(tx, _) | Self::Unlocked(tx) | Self::Browser(tx, _) = self {
+        if let Self::Raw(tx, zk_tx_meta, _)
+        | Self::Unlocked(tx, zk_tx_meta)
+        | Self::Browser(tx, zk_tx_meta, _) = self
+        {
             if sequential_broadcast {
                 let from = tx.from.expect("no sender");
 
@@ -155,21 +155,18 @@ impl<'a> SendTransactionKind<'a> {
         zk_tx_opts: ZkTransactionOpts,
     ) -> Result<TxHash> {
         match self {
-            Self::Unlocked(tx) => {
+            Self::Unlocked(tx, _) => {
                 debug!("sending transaction from unlocked account {:?}", tx);
 
                 // Submit the transaction
-                let pending = provider.send_transaction(tx).await?;
+                let pending = provider.send_transaction(tx.into()).await?;
                 Ok(*pending.tx_hash())
             }
-            Self::Raw(tx, signer) => {
+            Self::Raw(tx, zk_tx_meta, signer) => {
                 debug!("sending transaction: {:?}", tx);
 
-                let zk_tx_meta =
-                    foundry_strategy_zksync::try_get_zksync_transaction_metadata(&tx.other);
-
                 if let Some(zk_tx_meta) = zk_tx_meta {
-                    let mut inner = tx.inner.clone();
+                    let mut inner = tx.clone();
                     inner.transaction_type = Some(TxType::Eip712 as u8);
                     let mut zk_tx: ZkTransactionRequest = inner.into();
                     if !zk_tx_meta.factory_deps.is_empty() {
@@ -186,7 +183,6 @@ impl<'a> SendTransactionKind<'a> {
                             },
                         );
                     }
-
                     foundry_zksync_core::estimate_fee(
                         &mut zk_tx,
                         &zk_provider,
@@ -197,7 +193,10 @@ impl<'a> SendTransactionKind<'a> {
 
                     let zk_signer =
                         alloy_zksync::wallet::ZksyncWallet::new(signer.default_signer());
-                    let signed = zk_tx.build(&zk_signer).await?.encoded_2718();
+                    let signed = zk_tx
+                        .build::<alloy_zksync::wallet::ZksyncWallet>(&zk_signer)
+                        .await?
+                        .encoded_2718();
 
                     let pending = zk_provider.send_raw_transaction(signed.as_ref()).await?;
                     Ok(*pending.tx_hash())
@@ -215,11 +214,11 @@ impl<'a> SendTransactionKind<'a> {
                 let pending = provider.send_raw_transaction(tx.encoded_2718().as_ref()).await?;
                 Ok(*pending.tx_hash())
             }
-            Self::Browser(tx, signer) => {
+            Self::Browser(tx, _, signer) => {
                 debug!("sending transaction: {:?}", tx);
 
                 // Sign and send the transaction via the browser wallet
-                Ok(signer.send_transaction_via_browser(tx.into_inner()).await?)
+                Ok(signer.send_transaction_via_browser(tx).await?)
             }
         }
     }
@@ -252,40 +251,12 @@ impl<'a> SendTransactionKind<'a> {
     }
 }
 
-/// Convenience enum to represent either an Ethereum wallet or a browser signer
-pub enum EitherSigner {
-    Ethereum(EthereumWallet),
-    Browser(BrowserSigner),
-}
-
-impl From<EthereumWallet> for EitherSigner {
-    fn from(wallet: EthereumWallet) -> Self {
-        Self::Ethereum(wallet)
-    }
-}
-
-impl From<WalletSigner> for EitherSigner {
-    fn from(wallet: WalletSigner) -> Self {
-        match wallet {
-            WalletSigner::Browser(wallet) => Self::Browser(wallet),
-            // Convert any other signer to an Ethereum wallet
-            signer => EthereumWallet::new(signer).into(),
-        }
-    }
-}
-
-impl From<BrowserSigner> for EitherSigner {
-    fn from(wallet: BrowserSigner) -> Self {
-        Self::Browser(wallet)
-    }
-}
-
 /// Represents how to send _all_ transactions
 pub enum SendTransactionsKind {
     /// Send via `eth_sendTransaction` and rely on the  `from` address being unlocked.
     Unlocked(AddressHashSet),
-    /// Send a signed transaction via `eth_sendRawTransaction`
-    Raw(AddressHashMap<EitherSigner>),
+    /// Send a signed transaction via `eth_sendRawTransaction`, or via browser
+    Raw { eth_wallets: AddressHashMap<EthereumWallet>, browser: Option<BrowserSigner> },
 }
 
 impl SendTransactionsKind {
@@ -295,23 +266,23 @@ impl SendTransactionsKind {
     pub fn for_sender(
         &self,
         addr: &Address,
-        tx: WithOtherFields<TransactionRequest>,
+        tx: TransactionRequest,
+        zk_metadata: Option<foundry_zksync_core::ZkTransactionMetadata>,
     ) -> Result<SendTransactionKind<'_>> {
         match self {
             Self::Unlocked(unlocked) => {
                 if !unlocked.contains(addr) {
                     bail!("Sender address {:?} is not unlocked", addr)
                 }
-                Ok(SendTransactionKind::Unlocked(tx))
+                Ok(SendTransactionKind::Unlocked(tx, zk_metadata))
             }
-            Self::Raw(wallets) => {
-                if let Some(wallet) = wallets.get(addr) {
-                    match wallet {
-                        EitherSigner::Ethereum(wallet) => Ok(SendTransactionKind::Raw(tx, wallet)),
-                        EitherSigner::Browser(signer) => {
-                            Ok(SendTransactionKind::Browser(tx, signer))
-                        }
-                    }
+            Self::Raw { eth_wallets, browser } => {
+                if let Some(wallet) = eth_wallets.get(addr) {
+                    Ok(SendTransactionKind::Raw(tx, zk_metadata, wallet))
+                } else if let Some(b) = browser
+                    && b.address() == *addr
+                {
+                    Ok(SendTransactionKind::Browser(tx, zk_metadata, b))
                 } else {
                     bail!("No matching signer for {:?} found", addr)
                 }
@@ -388,11 +359,12 @@ impl BundledState {
         let send_kind = if self.args.unlocked {
             SendTransactionsKind::Unlocked(required_addresses.clone())
         } else {
-            let signers = self.script_wallets.into_multi_wallet().into_signers()?;
+            let signers: Vec<Address> =
+                self.script_wallets.signers().map_err(|e| eyre::eyre!("{e}"))?;
             let mut missing_addresses = Vec::new();
 
             for addr in &required_addresses {
-                if !signers.contains_key(addr) {
+                if !signers.contains(addr) {
                     missing_addresses.push(addr);
                 }
             }
@@ -401,13 +373,15 @@ impl BundledState {
                 eyre::bail!(
                     "No associated wallet for addresses: {:?}. Unlocked wallets: {:?}",
                     missing_addresses,
-                    signers.keys().collect::<Vec<_>>()
+                    signers
                 );
             }
 
-            let signers = signers.into_iter().map(|(addr, signer)| (addr, signer.into())).collect();
+            let (signers, browser) = self.script_wallets.into_multi_wallet().into_signers()?;
+            let eth_wallets =
+                signers.into_iter().map(|(addr, signer)| (addr, signer.into())).collect();
 
-            SendTransactionsKind::Raw(signers)
+            SendTransactionsKind::Raw { eth_wallets, browser }
         };
 
         let progress = ScriptProgress::default();
@@ -484,6 +458,7 @@ impl BundledState {
                     .skip(already_broadcasted)
                     .map(|tx_with_metadata| {
                         let is_fixed_gas_limit = tx_with_metadata.is_fixed_gas_limit;
+                        let zk_metadata = tx_with_metadata.zk_metadata.clone();
 
                         let kind = match tx_with_metadata.tx().clone() {
                             TransactionMaybeSigned::Signed { tx, .. } => {
@@ -519,7 +494,7 @@ impl BundledState {
                                     tx.set_max_fee_per_gas(eip1559_fees.max_fee_per_gas);
                                 }
 
-                                send_kind.for_sender(&from, tx)?
+                                send_kind.for_sender(&from, tx, zk_metadata)?
                             }
                         };
 

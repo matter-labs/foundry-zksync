@@ -494,9 +494,10 @@ contract SimpleScript is Script {
             .expect("from key was not a string")
             .contains("0xbc989fde9e54cad2ab4392af6df60f04873a033a");
 
-        let zksync =
-            deployment["transaction"]["zksync"].as_object().expect("zksync key was not an object");
-        let factory_deps = zksync["factoryDeps"].as_array().expect("factoryDeps was not an array");
+        let zk_metadata =
+            deployment["zkMetadata"].as_object().expect("zkMetadata key was not an object");
+        let factory_deps =
+            zk_metadata["factoryDeps"].as_array().expect("factoryDeps was not an array");
         assert!(!factory_deps.is_empty());
 
         let broadcasted = &txns[1];
