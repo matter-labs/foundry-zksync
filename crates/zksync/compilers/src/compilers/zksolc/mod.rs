@@ -535,7 +535,7 @@ impl ZkSolc {
             let version_str = version_str.split('-').next().unwrap();
             // Matter Labs uses a different repositiry for pre-releases
             format!(
-                "https://github.com/matter-labs/era-compiler-solidity/releases/download/{pre}/zksolc-{compiler_prefix}v{version_str}",
+                "https://github.com/matter-labs/era-compiler-solidity/releases/download/{pre}/{compiler_prefix}v{version_str}",
             )
         };
         let compilers_dir = Self::compilers_dir()?;
