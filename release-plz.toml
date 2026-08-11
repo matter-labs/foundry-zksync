@@ -1,0 +1,15 @@
+[workspace]
+publish = false                                 # Do not publish to crates.io for now
+dependencies_update = true                      # Whether to run `cargo update` in the release PR
+pr_name = "release: foundry-zksync {{version}}" # template for the PR name
+pr_labels = ["release", "automated"]            # Set PR labels
+changelog_update = false                        # Disable individual changelog updates for all packages.
+git_tag_enable = false                          # Disable individual tags for all packages.
+git_release_enable = false                      # Disable individual releases for all packages.
+semver_check = false                            # Enable API breaking changes checks with cargo-semver-checks.
+
+# Use one main package for a common tag for all workspace crates
+[[package]]
+name = "forge"
+git_tag_enable = true                     # Enable one common tag for all crates
+git_tag_name = "0.2.0-zksync.{{version}}" # Tag name

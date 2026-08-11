@@ -1,0 +1,111 @@
+[package]
+name = "cast"
+description = "Command-line tool for performing Ethereum RPC calls"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "cast"
+
+[[bin]]
+name = "cast"
+path = "bin/main.rs"
+
+[dependencies]
+# lib
+foundry-block-explorers.workspace = true
+foundry-common.workspace = true
+foundry-compilers.workspace = true
+foundry-config.workspace = true
+foundry-debugger.workspace = true
+foundry-evm.workspace = true
+foundry-wallets.workspace = true
+foundry-zksync-core.workspace = true
+forge-fmt.workspace = true
+foundry-primitives.workspace = true
+
+alloy-chains.workspace = true
+alloy-consensus = { workspace = true, features = ["serde", "kzg"] }
+alloy-contract.workspace = true
+alloy-dyn-abi.workspace = true
+alloy-json-abi.workspace = true
+alloy-json-rpc.workspace = true
+alloy-network.workspace = true
+alloy-primitives.workspace = true
+alloy-provider = { workspace = true, features = [
+    "reqwest",
+    "ws",
+    "ipc",
+    "trace-api",
+    "txpool-api",
+] }
+alloy-rlp.workspace = true
+alloy-rpc-types = { workspace = true, features = ["eth", "trace"] }
+alloy-rpc-types-beacon.workspace = true
+alloy-serde.workspace = true
+alloy-signer-local = { workspace = true, features = ["mnemonic", "keystore"] }
+alloy-signer.workspace = true
+alloy-sol-types.workspace = true
+alloy-transport.workspace = true
+alloy-ens = { workspace = true, features = ["provider"] }
+alloy-eips.workspace = true
+
+op-alloy-flz.workspace = true
+
+alloy-zksync.workspace = true
+
+zksync_types.workspace = true
+zksync_telemetry.workspace = true
+
+chrono.workspace = true
+eyre.workspace = true
+futures.workspace = true
+revm = { workspace = true, features = ["optional_balance_check"] }
+rand.workspace = true
+rand_08.workspace = true
+rayon.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+
+# bin
+foundry-cli.workspace = true
+
+clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap_complete.workspace = true
+comfy-table.workspace = true
+dunce.workspace = true
+itertools.workspace = true
+regex = { workspace = true, default-features = false }
+rpassword = "7"
+semver.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "signal"] }
+tracing.workspace = true
+yansi.workspace = true
+evmole.workspace = true
+
+[dev-dependencies]
+alloy-hardforks.workspace = true
+dirs.workspace = true
+anvil.workspace = true
+foundry-test-utils.workspace = true
+
+[features]
+default = ["jemalloc"]
+asm-keccak = ["alloy-primitives/asm-keccak"]
+jemalloc = ["foundry-cli/jemalloc"]
+mimalloc = ["foundry-cli/mimalloc"]
+tracy-allocator = ["foundry-cli/tracy-allocator"]
+aws-kms = ["foundry-wallets/aws-kms"]
+gcp-kms = ["foundry-wallets/gcp-kms"]
+turnkey = ["foundry-wallets/turnkey"]
+isolate-by-default = ["foundry-config/isolate-by-default"]

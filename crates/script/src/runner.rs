@@ -1,0 +1,435 @@
+use super::{ScriptConfig, ScriptResult};
+use crate::build::ScriptPredeployLibraries;
+use alloy_eips::eip7702::SignedAuthorization;
+use alloy_primitives::{Address, Bytes, U256};
+use alloy_serde::OtherFields;
+use eyre::Result;
+use foundry_cheatcodes::BroadcastableTransaction;
+use foundry_config::Config;
+use foundry_evm::{
+    constants::CALLER,
+    executors::{
+        DeployResult, EvmError, ExecutionErr, Executor, RawCallResult,
+        strategy::{DeployLibKind, DeployLibResult},
+    },
+    opts::EvmOpts,
+    revm::interpreter::{InstructionResult, return_ok},
+    traces::{TraceKind, Traces},
+};
+use std::collections::VecDeque;
+
+/// Drives script execution
+#[derive(Debug)]
+pub struct ScriptRunner {
+    pub executor: Executor,
+    pub evm_opts: EvmOpts,
+}
+
+impl ScriptRunner {
+    pub fn new(executor: Executor, evm_opts: EvmOpts) -> Self {
+        Self { executor, evm_opts }
+    }
+
+    /// Deploys the libraries and broadcast contract. Calls setUp method if requested.
+    pub fn setup(
+        &mut self,
+        libraries: &ScriptPredeployLibraries,
+        code: Bytes,
+        setup: bool,
+        script_config: &ScriptConfig,
+        is_broadcast: bool,
+    ) -> Result<(Address, ScriptResult)> {
+        info!(target: "script", "executing setUP()");
+
+        if !is_broadcast {
+            if self.evm_opts.sender == Config::DEFAULT_SENDER {
+                // We max out their balance so that they can deploy and make calls.
+                self.executor.set_balance(self.evm_opts.sender, U256::MAX)?;
+            }
+
+            if script_config.evm_opts.fork_url.is_none() {
+                self.executor.deploy_create2_deployer()?;
+            }
+        }
+
+        let sender_nonce = script_config.sender_nonce;
+        self.executor.set_nonce(self.evm_opts.sender, sender_nonce)?;
+
+        // We max out their balance so that they can deploy and make calls.
+        self.executor.set_balance(CALLER, U256::MAX)?;
+
+        let mut library_transactions = VecDeque::new();
+        let mut traces = Traces::default();
+
+        // NOTE(zk): below we moved the logic into the strategy
+        // so we can override it in the zksync strategy
+        // Additionally, we have a list of results to register
+        // both the EVM and EraVM deployment
+
+        // Deploy libraries
+        match libraries {
+            ScriptPredeployLibraries::Default(libraries) => libraries.iter().for_each(|code| {
+                let results = self
+                    .executor
+                    .deploy_library(
+                        self.evm_opts.sender,
+                        DeployLibKind::Create(code.clone()),
+                        U256::ZERO,
+                        None,
+                    )
+                    .expect("couldn't deploy library");
+
+                for DeployLibResult { result, tx } in results {
+                    if let Some(deploy_traces) = result.raw.traces {
+                        traces.push((TraceKind::Deployment, deploy_traces));
+                    }
+
+                    if let Some(transaction) = tx {
+                        library_transactions.push_back(BroadcastableTransaction {
+                            rpc: self.evm_opts.fork_url.clone(),
+                            transaction,
+                        });
+                    }
+                }
+            }),
+            ScriptPredeployLibraries::Create2(libraries, salt) => {
+                let create2_deployer = self.executor.create2_deployer();
+                for library in libraries {
+                    let address = create2_deployer.create2_from_code(salt, library.as_ref());
+                    // Skip if already deployed
+                    if !self.executor.is_empty_code(address)? {
+                        continue;
+                    }
+
+                    let results = self
+                        .executor
+                        .deploy_library(
+                            self.evm_opts.sender,
+                            DeployLibKind::Create2(*salt, library.clone()),
+                            U256::from(0),
+                            None,
+                        )
+                        .expect("couldn't deploy library");
+
+                    for DeployLibResult { result, tx } in results {
+                        if let Some(deploy_traces) = result.raw.traces {
+                            traces.push((TraceKind::Deployment, deploy_traces));
+                        }
+
+                        if let Some(transaction) = tx {
+                            library_transactions.push_back(BroadcastableTransaction {
+                                rpc: self.evm_opts.fork_url.clone(),
+                                transaction,
+                            });
+                        }
+                    }
+                }
+            }
+        };
+
+        let address = CALLER.create(self.executor.get_nonce(CALLER)?);
+
+        // Set the contracts initial balance before deployment, so it is available during the
+        // construction
+        self.executor.set_balance(address, self.evm_opts.initial_balance)?;
+
+        // HACK: if the current sender is the default script sender (which is a default value), we
+        // set its nonce to a very large value before deploying the script contract. This
+        // ensures that the nonce increase during this CREATE does not affect deployment
+        // addresses of contracts that are deployed in the script, Otherwise, we'd have a
+        // nonce mismatch during script execution and onchain simulation, potentially
+        // resulting in weird errors like <https://github.com/foundry-rs/foundry/issues/8960>.
+        let prev_sender_nonce = self.executor.get_nonce(self.evm_opts.sender)?;
+        if self.evm_opts.sender == CALLER {
+            self.executor.set_nonce(self.evm_opts.sender, u64::MAX / 2)?;
+        }
+
+        // NOTE(zk): Address recomputed again after the nonce modification as it will
+        // differ in case of evm_opts.sender == CALLER
+        let zk_actual_script_address = CALLER.create(self.executor.get_nonce(CALLER)?);
+        // NOTE(zk): the test contract is set here instead of where upstream does it as
+        // the test contract address needs to be retrieved in order to skip
+        // zkEVM mode for the creation of the test address (and for calls to it later).
+        self.executor.backend_mut().set_test_contract(zk_actual_script_address);
+
+        // Deploy an instance of the contract
+        let DeployResult {
+            address,
+            raw: RawCallResult { mut logs, traces: constructor_traces, .. },
+        } = self
+            .executor
+            .deploy(CALLER, code, U256::ZERO, None)
+            .map_err(|err| eyre::eyre!("Failed to deploy script:\n{}", err))?;
+
+        if self.evm_opts.sender == CALLER {
+            self.executor.set_nonce(self.evm_opts.sender, prev_sender_nonce)?;
+        }
+
+        // set script address to be used by execution inspector
+        if script_config.config.script_execution_protection {
+            self.executor.set_script_execution(address);
+        }
+
+        traces.extend(constructor_traces.map(|traces| (TraceKind::Deployment, traces)));
+
+        // Script has already been deployed so we can migrate the database to zkEVM storage
+        // in the next runner execution. Additionally we can allow persisting the next nonce update
+        // to simulate EVM behavior where only the tx that deploys the test contract increments the
+        // nonce.
+        if let Some(cheatcodes) = &mut self.executor.inspector.cheatcodes {
+            debug!("script deployed");
+            cheatcodes.strategy.runner.base_contract_deployed(cheatcodes.strategy.context.as_mut());
+        }
+
+        // Optionally call the `setUp` function
+        let (success, gas_used, labeled_addresses, transactions) = if !setup {
+            // NOTE(zk): keeping upstream code for context. Test contract is only set on this branch
+            // self.executor.backend_mut().set_test_contract(address);
+            (true, 0, Default::default(), Some(library_transactions))
+        } else {
+            match self.executor.setup(Some(self.evm_opts.sender), address, None) {
+                Ok(RawCallResult {
+                    reverted,
+                    traces: setup_traces,
+                    labels,
+                    logs: setup_logs,
+                    gas_used,
+                    transactions: setup_transactions,
+                    ..
+                }) => {
+                    traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
+                    logs.extend_from_slice(&setup_logs);
+
+                    if let Some(txs) = setup_transactions {
+                        library_transactions.extend(txs);
+                    }
+
+                    (!reverted, gas_used, labels, Some(library_transactions))
+                }
+                Err(EvmError::Execution(err)) => {
+                    let RawCallResult {
+                        reverted,
+                        traces: setup_traces,
+                        labels,
+                        logs: setup_logs,
+                        gas_used,
+                        transactions,
+                        ..
+                    } = err.raw;
+                    traces.extend(setup_traces.map(|traces| (TraceKind::Setup, traces)));
+                    logs.extend_from_slice(&setup_logs);
+
+                    if let Some(txs) = transactions {
+                        library_transactions.extend(txs);
+                    }
+
+                    (!reverted, gas_used, labels, Some(library_transactions))
+                }
+                Err(e) => return Err(e.into()),
+            }
+        };
+
+        Ok((
+            address,
+            ScriptResult {
+                returned: Bytes::new(),
+                success,
+                gas_used,
+                labeled_addresses,
+                transactions,
+                logs,
+                traces,
+                address: None,
+                ..Default::default()
+            },
+        ))
+    }
+
+    /// Executes the method that will collect all broadcastable transactions.
+    pub fn script(&mut self, address: Address, calldata: Bytes) -> Result<ScriptResult> {
+        self.call(self.evm_opts.sender, address, calldata, U256::ZERO, None, false)
+    }
+
+    /// Runs a broadcastable transaction locally and persists its state.
+    pub fn simulate(
+        &mut self,
+        from: Address,
+        to: Option<Address>,
+        calldata: Option<Bytes>,
+        value: Option<U256>,
+        authorization_list: Option<Vec<SignedAuthorization>>,
+        other_fields: Option<OtherFields>,
+    ) -> Result<ScriptResult> {
+        if let Some(other_fields) = other_fields {
+            self.executor.strategy.runner.zksync_set_transaction_context(
+                self.executor.strategy.context.as_mut(),
+                other_fields,
+            );
+        }
+
+        if let Some(to) = to {
+            self.call(
+                from,
+                to,
+                calldata.unwrap_or_default(),
+                value.unwrap_or(U256::ZERO),
+                authorization_list,
+                true,
+            )
+        } else {
+            let res = self.executor.deploy(
+                from,
+                calldata.expect("No data for create transaction"),
+                value.unwrap_or(U256::ZERO),
+                None,
+            );
+            let (address, RawCallResult { gas_used, logs, traces, .. }) = match res {
+                Ok(DeployResult { address, raw }) => (address, raw),
+                Err(EvmError::Execution(err)) => {
+                    let ExecutionErr { raw, reason } = *err;
+                    sh_err!("Failed with `{reason}`:\n")?;
+                    (Address::ZERO, raw)
+                }
+                Err(e) => eyre::bail!("Failed deploying contract: {e:?}"),
+            };
+
+            Ok(ScriptResult {
+                returned: Bytes::new(),
+                success: address != Address::ZERO,
+                gas_used,
+                logs,
+                // Manually adjust gas for the trace to add back the stipend/real used gas
+                traces: traces
+                    .map(|traces| vec![(TraceKind::Execution, traces)])
+                    .unwrap_or_default(),
+                address: Some(address),
+                ..Default::default()
+            })
+        }
+    }
+
+    /// Executes the call
+    ///
+    /// This will commit the changes if `commit` is true.
+    ///
+    /// This will return _estimated_ gas instead of the precise gas the call would consume, so it
+    /// can be used as `gas_limit`.
+    fn call(
+        &mut self,
+        from: Address,
+        to: Address,
+        calldata: Bytes,
+        value: U256,
+        authorization_list: Option<Vec<SignedAuthorization>>,
+        commit: bool,
+    ) -> Result<ScriptResult> {
+        let mut res = if let Some(authorization_list) = &authorization_list {
+            self.executor.call_raw_with_authorization(
+                from,
+                to,
+                calldata.clone(),
+                value,
+                authorization_list.clone(),
+            )?
+        } else {
+            self.executor.call_raw(from, to, calldata.clone(), value)?
+        };
+        let mut gas_used = res.gas_used;
+
+        // We should only need to calculate realistic gas costs when preparing to broadcast
+        // something. This happens during the onchain simulation stage, where we commit each
+        // collected transactions.
+        //
+        // Otherwise don't re-execute, or some usecases might be broken: https://github.com/foundry-rs/foundry/issues/3921
+        if commit {
+            gas_used = self.search_optimal_gas_usage(&res, from, to, &calldata, value)?;
+            res = if let Some(authorization_list) = authorization_list {
+                self.executor.transact_raw_with_authorization(
+                    from,
+                    to,
+                    calldata,
+                    value,
+                    authorization_list,
+                )?
+            } else {
+                self.executor.transact_raw(from, to, calldata, value)?
+            }
+        }
+
+        let RawCallResult { result, reverted, logs, traces, labels, transactions, .. } = res;
+        let breakpoints = res.cheatcodes.map(|cheats| cheats.breakpoints).unwrap_or_default();
+
+        Ok(ScriptResult {
+            returned: result,
+            success: !reverted,
+            gas_used,
+            logs,
+            traces: traces
+                .map(|traces| {
+                    // Manually adjust gas for the trace to add back the stipend/real used gas
+
+                    vec![(TraceKind::Execution, traces)]
+                })
+                .unwrap_or_default(),
+            labeled_addresses: labels,
+            transactions,
+            address: None,
+            breakpoints,
+        })
+    }
+
+    /// The executor will return the _exact_ gas value this transaction consumed, setting this value
+    /// as gas limit will result in `OutOfGas` so to come up with a better estimate we search over a
+    /// possible range we pick a higher gas limit 3x of a succeeded call should be safe.
+    ///
+    /// This might result in executing the same script multiple times. Depending on the user's goal,
+    /// it might be problematic when using `ffi`.
+    fn search_optimal_gas_usage(
+        &mut self,
+        res: &RawCallResult,
+        from: Address,
+        to: Address,
+        calldata: &Bytes,
+        value: U256,
+    ) -> Result<u64> {
+        let mut gas_used = res.gas_used;
+        if matches!(res.exit_reason, Some(return_ok!())) {
+            // Store the current gas limit and reset it later.
+            let init_gas_limit = self.executor.env().tx.gas_limit;
+
+            let mut highest_gas_limit = gas_used * 3;
+            let mut lowest_gas_limit = gas_used;
+            let mut last_highest_gas_limit = highest_gas_limit;
+            while (highest_gas_limit - lowest_gas_limit) > 1 {
+                let mid_gas_limit = (highest_gas_limit + lowest_gas_limit) / 2;
+                self.executor.env_mut().tx.gas_limit = mid_gas_limit;
+                let res = self.executor.call_raw(from, to, calldata.0.clone().into(), value)?;
+                match res.exit_reason {
+                    Some(InstructionResult::Revert)
+                    | Some(InstructionResult::OutOfGas)
+                    | Some(InstructionResult::OutOfFunds) => {
+                        lowest_gas_limit = mid_gas_limit;
+                    }
+                    _ => {
+                        highest_gas_limit = mid_gas_limit;
+                        // if last two successful estimations only vary by 10%, we consider this to
+                        // sufficiently accurate
+                        const ACCURACY: u64 = 10;
+                        if (last_highest_gas_limit - highest_gas_limit) * ACCURACY
+                            / last_highest_gas_limit
+                            < 1
+                        {
+                            // update the gas
+                            gas_used = highest_gas_limit;
+                            break;
+                        }
+                        last_highest_gas_limit = highest_gas_limit;
+                    }
+                }
+            }
+            // Reset gas limit in the executor.
+            self.executor.env_mut().tx.gas_limit = init_gas_limit;
+        }
+        Ok(gas_used)
+    }
+}

@@ -1,0 +1,31 @@
+[package]
+name = "foundry-debugger"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+foundry-common.workspace = true
+foundry-compilers.workspace = true
+foundry-evm-traces.workspace = true
+foundry-evm-core.workspace = true
+revm-inspectors.workspace = true
+
+alloy-primitives.workspace = true
+
+crossterm = "0.29"
+eyre.workspace = true
+ratatui = { version = "0.30", default-features = false, features = [
+    "crossterm",
+] }
+revm.workspace = true
+tracing.workspace = true
+serde.workspace = true

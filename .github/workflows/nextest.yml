@@ -1,0 +1,104 @@
+
+# Reusable workflow for running tests via `cargo nextest`
+
+name: nextest
+
+on:
+  workflow_call:
+    inputs:
+      profile:
+        required: true
+        type: string
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+  # Increase thread stack size to prevent stack overflow with large clap enums (e.g., CastSubcommand)
+  RUST_MIN_STACK: 8388608
+
+jobs:
+  matrices:
+    name: build matrices
+    runs-on: ubuntu-latest
+    outputs:
+      test-matrix: ${{ steps.gen.outputs.test-matrix }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: Generate matrices
+        id: gen
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          output=$(python3 .github/scripts/matrices.py)
+          echo "::debug::test-matrix=$output"
+          echo "test-matrix=$output" >> $GITHUB_OUTPUT
+
+  test:
+    name: test ${{ matrix.name }}
+    runs-on: ${{ matrix.runner_label }}
+    timeout-minutes: 60
+    needs: matrices
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.matrices.outputs.test-matrix) }}
+    env:
+      ETH_RPC_URL: https://eth-mainnet.alchemyapi.io/v2/${{ secrets.ALCHEMY_API_KEY }}
+      CARGO_PROFILE_DEV_DEBUG: 0
+      # Note(zk): Using our own Alchemy API key to avoid rate limiting issues
+      ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+      - uses: taiki-e/install-action@nextest
+
+      # External tests dependencies
+      - name: Setup Node.js
+        if: contains(matrix.name, 'external')
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install Bun
+        if: contains(matrix.name, 'external') && !contains(matrix.runner_label, 'windows')
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Install Vyper
+        # Also update vyper version in .devcontainer/Dockerfile.dev
+        run: pip --version && pip install vyper==0.4.3
+
+      - name: Forge RPC cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.foundry/cache
+            ~/.config/.foundry/cache
+          key: rpc-cache-${{ hashFiles('crates/forge/tests/rpc-cache-keyfile') }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Setup Git config
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "<>"
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+      - name: Test
+        env:
+          SVM_TARGET_PLATFORM: ${{ matrix.svm_target_platform }}
+          HTTP_ARCHIVE_URLS: ${{ secrets.HTTP_ARCHIVE_URLS }}
+          WS_ARCHIVE_URLS: ${{ secrets.WS_ARCHIVE_URLS }}
+        run: cargo nextest run ${{ matrix.flags }}

@@ -1,0 +1,6 @@
+# Compiler files
+cache/
+out/
+zkout/
+.lock
+.lock-zk

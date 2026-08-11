@@ -1,0 +1,568 @@
+use crate::{CallTrace, DecodedCallData};
+use alloy_primitives::{Address, B256, U256, hex};
+use alloy_sol_types::{SolCall, abi, sol};
+use foundry_evm_core::precompiles::{
+    BLAKE_2F, BLS12_G1ADD, BLS12_G1MSM, BLS12_G2ADD, BLS12_G2MSM, BLS12_MAP_FP_TO_G1,
+    BLS12_MAP_FP2_TO_G2, BLS12_PAIRING_CHECK, EC_ADD, EC_MUL, EC_PAIRING, EC_RECOVER, IDENTITY,
+    MOD_EXP, P256_VERIFY, POINT_EVALUATION, RIPEMD_160, SHA_256,
+};
+use itertools::Itertools;
+use revm_inspectors::tracing::types::DecodedCallTrace;
+
+sol! {
+/// EVM precompiles interface. For illustration purposes only, as precompiles don't follow the
+/// Solidity ABI codec.
+///
+/// Parameter names and types are taken from [evm.codes](https://www.evm.codes/precompiled).
+interface Precompiles {
+    struct EcPairingInput {
+        uint256 x1;
+        uint256 y1;
+        uint256 x2;
+        uint256 y2;
+        uint256 x3;
+        uint256 y3;
+    }
+
+    /* 0x01 */ function ecrecover(bytes32 hash, uint8 v, uint256 r, uint256 s) returns (address publicAddress);
+    /* 0x02 */ function sha256(bytes data) returns (bytes32 hash);
+    /* 0x03 */ function ripemd(bytes data) returns (bytes20 hash);
+    /* 0x04 */ function identity(bytes data) returns (bytes data);
+    /* 0x05 */ function modexp(uint256 Bsize, uint256 Esize, uint256 Msize, bytes B, bytes E, bytes M) returns (bytes value);
+    /* 0x06 */ function ecadd(uint256 x1, uint256 y1, uint256 x2, uint256 y2) returns (uint256 x, uint256 y);
+    /* 0x07 */ function ecmul(uint256 x1, uint256 y1, uint256 s) returns (uint256 x, uint256 y);
+    /* 0x08 */ function ecpairing(EcPairingInput[] input) returns (bool success);
+    /* 0x09 */ function blake2f(uint32 rounds, uint64[8] h, uint64[16] m, uint64[2] t, bool f) returns (uint64[8] h);
+    /* 0x0a */ function pointEvaluation(bytes32 versionedHash, bytes32 z, bytes32 y, bytes1[48] commitment, bytes1[48] proof) returns (bytes value);
+
+    // Prague BLS12-381 precompiles (EIP-2537)
+    /* 0x0b */ function bls12G1Add(bytes p1, bytes p2) returns (bytes result);
+    /* 0x0c */ function bls12G1Msm(bytes[] scalarsAndPoints) returns (bytes result);
+    /* 0x0d */ function bls12G2Add(bytes p1, bytes p2) returns (bytes result);
+    /* 0x0e */ function bls12G2Msm(bytes[] scalarsAndPoints) returns (bytes result);
+    /* 0x0f */ function bls12PairingCheck(bytes[] pairs) returns (bool success);
+    /* 0x10 */ function bls12MapFpToG1(bytes fp) returns (bytes result);
+    /* 0x11 */ function bls12MapFp2ToG2(bytes fp2) returns (bytes result);
+
+    // Osaka precompiles (EIP-7212)
+    /* 0x100 */ function p256Verify(bytes32 hash, uint256 r, uint256 s, uint256 qx, uint256 qy) returns (bool success);
+}
+}
+use Precompiles::*;
+
+pub(super) fn is_known_precompile(address: Address, _chain_id: u64) -> bool {
+    address[..19].iter().all(|&x| x == 0)
+        && matches!(
+            address,
+            EC_RECOVER
+                | SHA_256
+                | RIPEMD_160
+                | IDENTITY
+                | MOD_EXP
+                | EC_ADD
+                | EC_MUL
+                | EC_PAIRING
+                | BLAKE_2F
+                | POINT_EVALUATION
+                | BLS12_G1ADD
+                | BLS12_G1MSM
+                | BLS12_G2ADD
+                | BLS12_G2MSM
+                | BLS12_PAIRING_CHECK
+                | BLS12_MAP_FP_TO_G1
+                | BLS12_MAP_FP2_TO_G2
+                | P256_VERIFY
+        )
+}
+
+/// Tries to decode a precompile call. Returns `Some` if successful.
+pub(super) fn decode(trace: &CallTrace, _chain_id: u64) -> Option<DecodedCallTrace> {
+    if !is_known_precompile(trace.address, _chain_id) {
+        return None;
+    }
+
+    for &precompile in PRECOMPILES {
+        if trace.address == precompile.address() {
+            let signature = precompile.signature(&trace.data);
+
+            let args = precompile
+                .decode_call(&trace.data)
+                .unwrap_or_else(|_| vec![trace.data.to_string()]);
+
+            let return_data = precompile
+                .decode_return(&trace.output)
+                .unwrap_or_else(|_| vec![trace.output.to_string()]);
+            let return_data = if return_data.len() == 1 {
+                return_data.into_iter().next().unwrap()
+            } else {
+                format!("({})", return_data.join(", "))
+            };
+
+            return Some(DecodedCallTrace {
+                label: Some("PRECOMPILES".to_string()),
+                call_data: Some(DecodedCallData { signature: signature.to_string(), args }),
+                return_data: Some(return_data),
+            });
+        }
+    }
+
+    None
+}
+
+pub(super) trait Precompile {
+    fn address(&self) -> Address;
+    fn signature(&self, data: &[u8]) -> &'static str;
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        Ok(vec![hex::encode_prefixed(data)])
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        Ok(vec![hex::encode_prefixed(data)])
+    }
+}
+
+// Note: we use the ABI decoder, but this is not necessarily ABI-encoded data. It's just a
+// convenient way to decode the data.
+
+const PRECOMPILES: &[&dyn Precompile] = &[
+    &Ecrecover,
+    &Sha256,
+    &Ripemd160,
+    &Identity,
+    &ModExp,
+    &EcAdd,
+    &Ecmul,
+    &Ecpairing,
+    &Blake2f,
+    &PointEvaluation,
+    &Bls12G1Add,
+    &Bls12G1Msm,
+    &Bls12G2Add,
+    &Bls12G2Msm,
+    &Bls12PairingCheck,
+    &Bls12MapFpToG1,
+    &Bls12MapFp2ToG2,
+    &P256Verify,
+];
+
+struct Ecrecover;
+impl Precompile for Ecrecover {
+    fn address(&self) -> Address {
+        EC_RECOVER
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        ecrecoverCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ecrecoverCall { hash, v, r, s } = ecrecoverCall::abi_decode_raw(data)?;
+        Ok(vec![hash.to_string(), v.to_string(), r.to_string(), s.to_string()])
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ret = ecrecoverCall::abi_decode_returns(data)?;
+        Ok(vec![ret.to_string()])
+    }
+}
+
+struct Sha256;
+impl Precompile for Sha256 {
+    fn address(&self) -> Address {
+        SHA_256
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        sha256Call::SIGNATURE
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ret = sha256Call::abi_decode_returns(data)?;
+        Ok(vec![ret.to_string()])
+    }
+}
+
+struct Ripemd160;
+impl Precompile for Ripemd160 {
+    fn address(&self) -> Address {
+        RIPEMD_160
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        ripemdCall::SIGNATURE
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ret = ripemdCall::abi_decode_returns(data)?;
+        Ok(vec![ret.to_string()])
+    }
+}
+
+struct Identity;
+impl Precompile for Identity {
+    fn address(&self) -> Address {
+        IDENTITY
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        identityCall::SIGNATURE
+    }
+}
+
+struct ModExp;
+impl Precompile for ModExp {
+    fn address(&self) -> Address {
+        MOD_EXP
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        modexpCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let mut decoder = abi::Decoder::new(data);
+        let b_size = decoder.take_offset()?;
+        let e_size = decoder.take_offset()?;
+        let m_size = decoder.take_offset()?;
+        let b = decoder.take_slice(b_size)?;
+        let e = decoder.take_slice(e_size)?;
+        let m = decoder.take_slice(m_size)?;
+        Ok(vec![
+            b_size.to_string(),
+            e_size.to_string(),
+            m_size.to_string(),
+            hex::encode_prefixed(b),
+            hex::encode_prefixed(e),
+            hex::encode_prefixed(m),
+        ])
+    }
+}
+
+struct EcAdd;
+impl Precompile for EcAdd {
+    fn address(&self) -> Address {
+        EC_ADD
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        ecaddCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ecaddCall { x1, y1, x2, y2 } = ecaddCall::abi_decode_raw(data)?;
+        Ok(vec![x1.to_string(), y1.to_string(), x2.to_string(), y2.to_string()])
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ecaddReturn { x, y } = ecaddCall::abi_decode_returns(data)?;
+        Ok(vec![x.to_string(), y.to_string()])
+    }
+}
+
+struct Ecmul;
+impl Precompile for Ecmul {
+    fn address(&self) -> Address {
+        EC_MUL
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        ecmulCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ecmulCall { x1, y1, s } = ecmulCall::abi_decode_raw(data)?;
+        Ok(vec![x1.to_string(), y1.to_string(), s.to_string()])
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ecmulReturn { x, y } = ecmulCall::abi_decode_returns(data)?;
+        Ok(vec![x.to_string(), y.to_string()])
+    }
+}
+
+struct Ecpairing;
+impl Precompile for Ecpairing {
+    fn address(&self) -> Address {
+        EC_PAIRING
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        ecpairingCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let mut decoder = abi::Decoder::new(data);
+        let mut values = Vec::new();
+        // input must be either empty or a multiple of 6 32-byte values
+        let mut tmp = <[&B256; 6]>::default();
+        while !decoder.is_empty() {
+            for tmp in &mut tmp {
+                *tmp = decoder.take_word()?;
+            }
+            values.push(iter_to_string(tmp.iter().map(|x| U256::from_be_bytes(x.0))));
+        }
+        Ok(values)
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ret = ecpairingCall::abi_decode_returns(data)?;
+        Ok(vec![ret.to_string()])
+    }
+}
+
+struct Blake2f;
+impl Precompile for Blake2f {
+    fn address(&self) -> Address {
+        BLAKE_2F
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        blake2fCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        decode_blake2f(data)
+    }
+}
+
+fn decode_blake2f<'a>(data: &'a [u8]) -> alloy_sol_types::Result<Vec<String>> {
+    let mut decoder = abi::Decoder::new(data);
+    let rounds = u32::from_be_bytes(decoder.take_slice(4)?.try_into().unwrap());
+    let u64_le_list =
+        |x: &'a [u8]| x.chunks_exact(8).map(|x| u64::from_le_bytes(x.try_into().unwrap()));
+    let h = u64_le_list(decoder.take_slice(64)?);
+    let m = u64_le_list(decoder.take_slice(128)?);
+    let t = u64_le_list(decoder.take_slice(16)?);
+    let f = decoder.take_slice(1)?[0];
+    Ok(vec![
+        rounds.to_string(),
+        iter_to_string(h),
+        iter_to_string(m),
+        iter_to_string(t),
+        f.to_string(),
+    ])
+}
+
+struct PointEvaluation;
+impl Precompile for PointEvaluation {
+    fn address(&self) -> Address {
+        POINT_EVALUATION
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        pointEvaluationCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let mut decoder = abi::Decoder::new(data);
+        let versioned_hash = decoder.take_word()?;
+        let z = decoder.take_word()?;
+        let y = decoder.take_word()?;
+        let commitment = decoder.take_slice(48)?;
+        let proof = decoder.take_slice(48)?;
+        Ok(vec![
+            versioned_hash.to_string(),
+            z.to_string(),
+            y.to_string(),
+            hex::encode_prefixed(commitment),
+            hex::encode_prefixed(proof),
+        ])
+    }
+}
+
+fn iter_to_string<I: Iterator<Item = T>, T: std::fmt::Display>(iter: I) -> String {
+    format!("[{}]", iter.format(", "))
+}
+
+const G1_POINT_SIZE: usize = 128;
+const G2_POINT_SIZE: usize = 256;
+const SCALAR_SIZE: usize = 32;
+const FP_SIZE: usize = 64;
+
+struct Bls12G1Add;
+impl Precompile for Bls12G1Add {
+    fn address(&self) -> Address {
+        BLS12_G1ADD
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        bls12G1AddCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let (p1, rest) = take_at_most(data, G1_POINT_SIZE);
+        let (p2, _) = take_at_most(rest, G1_POINT_SIZE);
+        Ok(vec![hex::encode_prefixed(p1), hex::encode_prefixed(p2)])
+    }
+}
+
+struct Bls12G1Msm;
+impl Precompile for Bls12G1Msm {
+    fn address(&self) -> Address {
+        BLS12_G1MSM
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        bls12G1MsmCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let pair_size = G1_POINT_SIZE + SCALAR_SIZE;
+        Ok(data.chunks(pair_size).map(hex::encode_prefixed).collect())
+    }
+}
+
+struct Bls12G2Add;
+impl Precompile for Bls12G2Add {
+    fn address(&self) -> Address {
+        BLS12_G2ADD
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        bls12G2AddCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let (p1, rest) = take_at_most(data, G2_POINT_SIZE);
+        let (p2, _) = take_at_most(rest, G2_POINT_SIZE);
+        Ok(vec![hex::encode_prefixed(p1), hex::encode_prefixed(p2)])
+    }
+}
+
+struct Bls12G2Msm;
+impl Precompile for Bls12G2Msm {
+    fn address(&self) -> Address {
+        BLS12_G2MSM
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        bls12G2MsmCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let pair_size = G2_POINT_SIZE + SCALAR_SIZE;
+        Ok(data.chunks(pair_size).map(hex::encode_prefixed).collect())
+    }
+}
+
+struct Bls12PairingCheck;
+impl Precompile for Bls12PairingCheck {
+    fn address(&self) -> Address {
+        BLS12_PAIRING_CHECK
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        bls12PairingCheckCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let pair_size = G1_POINT_SIZE + G2_POINT_SIZE;
+        Ok(data.chunks(pair_size).map(hex::encode_prefixed).collect())
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ret = bls12PairingCheckCall::abi_decode_returns(data)?;
+        Ok(vec![ret.to_string()])
+    }
+}
+
+struct Bls12MapFpToG1;
+impl Precompile for Bls12MapFpToG1 {
+    fn address(&self) -> Address {
+        BLS12_MAP_FP_TO_G1
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        bls12MapFpToG1Call::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let (fp, _) = take_at_most(data, FP_SIZE);
+        Ok(vec![hex::encode_prefixed(fp)])
+    }
+}
+
+struct Bls12MapFp2ToG2;
+impl Precompile for Bls12MapFp2ToG2 {
+    fn address(&self) -> Address {
+        BLS12_MAP_FP2_TO_G2
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        bls12MapFp2ToG2Call::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let (fp2, _) = take_at_most(data, G1_POINT_SIZE);
+        Ok(vec![hex::encode_prefixed(fp2)])
+    }
+}
+
+struct P256Verify;
+impl Precompile for P256Verify {
+    fn address(&self) -> Address {
+        P256_VERIFY
+    }
+
+    fn signature(&self, _: &[u8]) -> &'static str {
+        p256VerifyCall::SIGNATURE
+    }
+
+    fn decode_call(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let p256VerifyCall { hash, r, s, qx, qy } = p256VerifyCall::abi_decode_raw(data)?;
+        Ok(vec![hash.to_string(), r.to_string(), s.to_string(), qx.to_string(), qy.to_string()])
+    }
+
+    fn decode_return(&self, data: &[u8]) -> alloy_sol_types::Result<Vec<String>> {
+        let ret = p256VerifyCall::abi_decode_returns(data)?;
+        Ok(vec![ret.to_string()])
+    }
+}
+
+fn take_at_most(data: &[u8], n: usize) -> (&[u8], &[u8]) {
+    let n = n.min(data.len());
+    data.split_at(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloy_primitives::hex;
+
+    #[test]
+    fn ecpairing() {
+        // https://github.com/foundry-rs/foundry/issues/5337#issuecomment-1627384480
+        let data = hex!(
+            "
+            26bbb723f965460ca7282cd75f0e3e7c67b15817f7cee60856b394936ed02917
+            0fbe873ac672168143a91535450bab6c412dce8dc8b66a88f2da6e245f9282df
+            13cd4f0451538ece5014fe6688b197aefcc611a5c6a7c319f834f2188ba04b08
+            126ff07e81490a1b6ae92b2d9e700c8e23e9d5c7f6ab857027213819a6c9ae7d
+            04183624c9858a56c54deb237c26cb4355bc2551312004e65fc5b299440b15a3
+            2e4b11aa549ad6c667057b18be4f4437fda92f018a59430ebb992fa3462c9ca1
+            2d4d9aa7e302d9df41749d5507949d05dbea33fbb16c643b22f599a2be6df2e2
+            14bedd503c37ceb061d8ec60209fe345ce89830a19230301f076caff004d1926
+            0967032fcbf776d1afc985f88877f182d38480a653f2decaa9794cbc3bf3060c
+            0e187847ad4c798374d0d6732bf501847dd68bc0e071241e0213bc7fc13db7ab
+            304cfbd1e08a704a99f5e847d93f8c3caafddec46b7a0d379da69a4d112346a7
+            1739c1b1a457a8c7313123d24d2f9192f896b7c63eea05a9d57f06547ad0cec8
+            001d6fedb032f70e377635238e0563f131670001f6abf439adb3a9d5d52073c6
+            1889afe91e4e367f898a7fcd6464e5ca4e822fe169bccb624f6aeb87e4d060bc
+            198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2
+            1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed
+            090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b
+            12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa
+            2dde6d7baf0bfa09329ec8d44c38282f5bf7f9ead1914edd7dcaebb498c84519
+            0c359f868a85c6e6c1ea819cfab4a867501a3688324d74df1fe76556558b1937
+            29f41c6e0e30802e2749bfb0729810876f3423e6f24829ad3e30adb1934f1c8a
+            030e7a5f70bb5daa6e18d80d6d447e772efb0bb7fb9d0ffcd54fc5a48af1286d
+            0ea726b117e48cda8bce2349405f006a84cdd3dcfba12efc990df25970a27b6d
+            30364cd4f8a293b1a04f0153548d3e01baad091c69097ca4e9f26be63e4095b5
+        "
+        );
+        let decoded = Ecpairing.decode_call(&data).unwrap();
+        // 4 arrays of 6 32-byte values
+        assert_eq!(decoded.len(), 4);
+    }
+}

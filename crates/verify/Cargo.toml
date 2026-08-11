@@ -1,0 +1,53 @@
+[package]
+name = "forge-verify"
+description = "Contract verification tools"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+foundry-config.workspace = true
+foundry-cli.workspace = true
+foundry-common.workspace = true
+foundry-evm.workspace = true
+foundry-evm-networks.workspace = true
+serde_json.workspace = true
+alloy-json-abi.workspace = true
+alloy-primitives.workspace = true
+alloy-rpc-types = { workspace = true, features = ["eth", "trace"] }
+alloy-dyn-abi.workspace = true
+serde.workspace = true
+eyre.workspace = true
+alloy-provider = { workspace = true, features = ["trace-api"] }
+tracing.workspace = true
+foundry-compilers.workspace = true
+foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
+revm.workspace = true
+
+clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+reqwest = { workspace = true, features = ["json"] }
+async-trait.workspace = true
+futures.workspace = true
+semver.workspace = true
+regex = { workspace = true, default-features = false }
+yansi.workspace = true
+itertools.workspace = true
+url.workspace = true
+
+# zk
+foundry-zksync-compilers.workspace = true
+zksync_types = { workspace = true, features = ["contract-verification"] }
+serde_urlencoded.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros"] }
+foundry-test-utils.workspace = true
+tempfile.workspace = true

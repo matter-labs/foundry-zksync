@@ -1,0 +1,394 @@
+use super::{install, watch::WatchArgs};
+use clap::Parser;
+use eyre::{Context, Result};
+use forge_lint::{linter::Linter, sol::SolidityLinter};
+use foundry_cli::{
+    opts::{BuildOpts, configure_pcx_from_solc, get_solar_sources_from_compile_output},
+    utils::{Git, LoadConfig, cache_local_signatures},
+};
+use foundry_common::{compile::ProjectCompiler, shell};
+use foundry_compilers::{
+    CompilationError, FileFilter, Project, ProjectCompileOutput,
+    compilers::{Language, multi::MultiCompilerLanguage},
+    solc::SolcLanguage,
+    utils::source_files_iter,
+};
+use foundry_config::{
+    Config, SkipBuildFilters,
+    figment::{
+        self, Metadata, Profile, Provider,
+        error::Kind::InvalidType,
+        value::{Dict, Map, Value},
+    },
+    filter::expand_globs,
+};
+use serde::Serialize;
+use std::path::PathBuf;
+
+foundry_config::merge_impl_figment_convert!(BuildArgs, build);
+
+/// CLI arguments for `forge build`.
+///
+/// CLI arguments take the highest precedence in the Config/Figment hierarchy.
+/// In order to override them in the foundry `Config` they need to be merged into an existing
+/// `figment::Provider`, like `foundry_config::Config` is.
+///
+/// `BuildArgs` implements `figment::Provider` in which all config related fields are serialized and
+/// then merged into an existing `Config`, effectively overwriting them.
+///
+/// Some arguments are marked as `#[serde(skip)]` and require manual processing in
+/// `figment::Provider` implementation
+#[derive(Clone, Debug, Default, Serialize, Parser)]
+#[command(next_help_heading = "Build options", about = None, long_about = None)] // override doc
+pub struct BuildArgs {
+    /// Build source files from specified paths.
+    #[serde(skip)]
+    pub paths: Option<Vec<PathBuf>>,
+
+    /// Print compiled contract names.
+    #[arg(long)]
+    #[serde(skip)]
+    pub names: bool,
+
+    /// Print compiled contract sizes.
+    /// Constructor argument length is not included in the calculation of initcode size.
+    #[arg(long)]
+    #[serde(skip)]
+    pub sizes: bool,
+
+    /// Ignore initcode contract bytecode size limit introduced by EIP-3860.
+    #[arg(long, alias = "ignore-initcode-size")]
+    #[serde(skip)]
+    pub ignore_eip_3860: bool,
+
+    #[command(flatten)]
+    #[serde(flatten)]
+    pub build: BuildOpts,
+
+    #[command(flatten)]
+    #[serde(skip)]
+    pub watch: WatchArgs,
+}
+
+impl BuildArgs {
+    // TODO(zk): We cannot return `ProjectCompileOutput` as there's currently no way to return
+    // a common type from solc and zksolc branches.
+    pub async fn run(self) -> Result<()> {
+        let mut config = self.load_config()?;
+
+        if install::install_missing_dependencies(&mut config).await && config.auto_detect_remappings
+        {
+            // need to re-configure here to also catch additional remappings
+            config = self.load_config()?;
+        }
+
+        if !config.zksync.should_compile() {
+            self.check_soldeer_lock_consistency(&config).await;
+            self.check_foundry_lock_consistency(&config);
+            let project = config.project()?;
+
+            // Collect sources to compile if build subdirectories specified.
+            let mut files = vec![];
+            if let Some(paths) = &self.paths {
+                for path in paths {
+                    let joined = project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+                }
+
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
+            }
+
+            let format_json = shell::is_json();
+            let compiler = ProjectCompiler::new()
+                .files(files)
+                .dynamic_test_linking(config.dynamic_test_linking)
+                .print_names(self.names)
+                .print_sizes(self.sizes)
+                .ignore_eip_3860(self.ignore_eip_3860)
+                .bail(!format_json);
+
+            let mut output = compiler.compile(&project)?;
+
+            // Cache project selectors.
+            cache_local_signatures(&output)?;
+
+            if format_json && !self.names && !self.sizes {
+                sh_println!("{}", serde_json::to_string_pretty(&output.output())?)?;
+            }
+
+            // Only run the `SolidityLinter` if lint on build and no compilation errors.
+            if config.lint.lint_on_build && !output.output().errors.iter().any(|e| e.is_error()) {
+                self.lint(&project, &config, self.paths.as_deref(), &mut output)
+                    .wrap_err("Lint failed")?;
+            }
+
+            // NOTE(zk): We skip returning output because currently there's no way to return from
+            // this function due to differing solc and zksolc project output types, and
+            // no way to return a default from either branch. Ok(output)
+        } else {
+            let zk_project =
+                foundry_config::zksync::config_create_project(&config, config.cache, false)?;
+
+            // Collect sources to compile if build subdirectories specified.
+            let mut files = vec![];
+            if let Some(paths) = &self.paths {
+                for path in paths {
+                    let joined = zk_project.root().join(path);
+                    let path = if joined.exists() { &joined } else { path };
+                    files.extend(source_files_iter(path, MultiCompilerLanguage::FILE_EXTENSIONS));
+                }
+
+                if files.is_empty() {
+                    eyre::bail!("No source files found in specified build paths.")
+                }
+            }
+
+            let format_json = shell::is_json();
+            let zk_compiler = ProjectCompiler::new()
+                .files(files)
+                .print_names(self.names)
+                .print_sizes(self.sizes)
+                .zksync_sizes()
+                .bail(!format_json);
+
+            let zk_output = zk_compiler.zksync_compile(&zk_project)?;
+
+            if format_json && !self.names && !self.sizes {
+                sh_println!("{}", serde_json::to_string_pretty(&zk_output.output())?)?;
+            }
+
+            // TODO(zk): We cannot return the zk_output as it does not match the concrete type for
+            // solc output. This is safe currently as the output is simply dropped.
+        }
+
+        Ok(())
+    }
+
+    fn lint(
+        &self,
+        project: &Project,
+        config: &Config,
+        files: Option<&[PathBuf]>,
+        output: &mut ProjectCompileOutput,
+    ) -> Result<()> {
+        let format_json = shell::is_json();
+        if project.compiler.solc.is_some() && !shell::is_quiet() {
+            let linter = SolidityLinter::new(config.project_paths())
+                .with_json_emitter(format_json)
+                .with_description(!format_json)
+                .with_severity(if config.lint.severity.is_empty() {
+                    None
+                } else {
+                    Some(config.lint.severity.clone())
+                })
+                .without_lints(if config.lint.exclude_lints.is_empty() {
+                    None
+                } else {
+                    Some(
+                        config
+                            .lint
+                            .exclude_lints
+                            .iter()
+                            .filter_map(|s| forge_lint::sol::SolLint::try_from(s.as_str()).ok())
+                            .collect(),
+                    )
+                })
+                .with_mixed_case_exceptions(&config.lint.mixed_case_exceptions);
+
+            // Expand ignore globs and canonicalize from the get go
+            let ignored = expand_globs(&config.root, config.lint.ignore.iter())?
+                .iter()
+                .flat_map(foundry_common::fs::canonicalize_path)
+                .collect::<Vec<_>>();
+
+            let skip = SkipBuildFilters::new(config.skip.clone(), config.root.clone());
+            let curr_dir = std::env::current_dir()?;
+            let input_files = config
+                .project_paths::<SolcLanguage>()
+                .input_files_iter()
+                .filter(|p| {
+                    // Lint only specified build files, if any.
+                    if let Some(files) = files {
+                        return files.iter().any(|file| &curr_dir.join(file) == p);
+                    }
+                    skip.is_match(p)
+                        && !(ignored.contains(p) || ignored.contains(&curr_dir.join(p)))
+                })
+                .collect::<Vec<_>>();
+
+            let solar_sources =
+                get_solar_sources_from_compile_output(config, output, Some(&input_files), None)?;
+            if solar_sources.input.sources.is_empty() {
+                if !input_files.is_empty() {
+                    sh_warn!(
+                        "unable to lint. Solar only supports Solidity versions prior to 0.8.0"
+                    )?;
+                }
+                return Ok(());
+            }
+
+            // NOTE(rusowsky): Once solar can drop unsupported versions, rather than creating a new
+            // compiler, we should reuse the parser from the project output.
+            let mut compiler = solar::sema::Compiler::new(
+                solar::interface::Session::builder().with_stderr_emitter().build(),
+            );
+
+            // Load the solar-compatible sources to the pcx before linting
+            compiler.enter_mut(|compiler| {
+                let mut pcx = compiler.parse();
+                configure_pcx_from_solc(&mut pcx, &config.project_paths(), &solar_sources, true);
+                pcx.set_resolve_imports(true);
+                pcx.parse();
+            });
+            linter.lint(&input_files, config.deny, &mut compiler)?;
+        }
+
+        Ok(())
+    }
+
+    /// Returns the `Project` for the current workspace
+    ///
+    /// This loads the `foundry_config::Config` for the current workspace (see
+    /// [`foundry_config::utils::find_project_root`] and merges the cli `BuildArgs` into it before
+    /// returning [`foundry_config::Config::project()`]
+    pub fn project(&self) -> Result<Project> {
+        self.build.project()
+    }
+
+    /// Returns whether `BuildArgs` was configured with `--watch`
+    pub fn is_watch(&self) -> bool {
+        self.watch.watch.is_some()
+    }
+
+    /// Returns the [`watchexec::Config`] necessary to bootstrap a new watch loop.
+    pub(crate) fn watchexec_config(&self) -> Result<watchexec::Config> {
+        // Use the path arguments or if none where provided the `src`, `test` and `script`
+        // directories as well as the `foundry.toml` configuration file.
+        self.watch.watchexec_config(|| {
+            let config = self.load_config()?;
+            let foundry_toml: PathBuf = config.root.join(Config::FILE_NAME);
+            Ok([config.src, config.test, config.script, foundry_toml])
+        })
+    }
+
+    /// Check soldeer.lock file consistency using soldeer_core APIs
+    async fn check_soldeer_lock_consistency(&self, config: &Config) {
+        let soldeer_lock_path = config.root.join("soldeer.lock");
+        if !soldeer_lock_path.exists() {
+            return;
+        }
+
+        // Note: read_lockfile returns Ok with empty entries for malformed files
+        let Ok(lockfile) = soldeer_core::lock::read_lockfile(&soldeer_lock_path) else {
+            return;
+        };
+
+        let deps_dir = config.root.join("dependencies");
+        for entry in &lockfile.entries {
+            let dep_name = entry.name();
+
+            // Use soldeer_core's integrity check
+            match soldeer_core::install::check_dependency_integrity(entry, &deps_dir).await {
+                Ok(status) => {
+                    use soldeer_core::install::DependencyStatus;
+                    // Check if status indicates a problem
+                    if matches!(
+                        status,
+                        DependencyStatus::Missing | DependencyStatus::FailedIntegrity
+                    ) {
+                        sh_warn!("Dependency '{}' integrity check failed: {:?}", dep_name, status)
+                            .ok();
+                    }
+                }
+                Err(e) => {
+                    sh_warn!("Dependency '{}' integrity check error: {}", dep_name, e).ok();
+                }
+            }
+        }
+    }
+
+    /// Check foundry.lock file consistency with git submodules
+    fn check_foundry_lock_consistency(&self, config: &Config) {
+        use crate::lockfile::{DepIdentifier, FOUNDRY_LOCK, Lockfile};
+
+        let foundry_lock_path = config.root.join(FOUNDRY_LOCK);
+        if !foundry_lock_path.exists() {
+            return;
+        }
+
+        let git = Git::new(&config.root);
+
+        let mut lockfile = Lockfile::new(&config.root).with_git(&git);
+        if let Err(e) = lockfile.read() {
+            if !e.to_string().contains("Lockfile not found") {
+                sh_warn!("Failed to parse foundry.lock: {}", e).ok();
+            }
+            return;
+        }
+
+        for (dep_path, dep_identifier) in lockfile.iter() {
+            let full_path = config.root.join(dep_path);
+
+            if !full_path.exists() {
+                sh_warn!("Dependency '{}' not found at expected path", dep_path.display()).ok();
+                continue;
+            }
+
+            let actual_rev = match git.get_rev("HEAD", &full_path) {
+                Ok(rev) => rev,
+                Err(_) => {
+                    sh_warn!("Failed to get git revision for dependency '{}'", dep_path.display())
+                        .ok();
+                    continue;
+                }
+            };
+
+            // Compare with the expected revision from lockfile
+            let expected_rev = match dep_identifier {
+                DepIdentifier::Branch { rev, .. }
+                | DepIdentifier::Tag { rev, .. }
+                | DepIdentifier::Rev { rev, .. } => rev.clone(),
+            };
+
+            if actual_rev != expected_rev {
+                sh_warn!(
+                    "Dependency '{}' revision mismatch: expected '{}', found '{}'",
+                    dep_path.display(),
+                    expected_rev,
+                    actual_rev
+                )
+                .ok();
+            }
+        }
+    }
+}
+
+// Make this args a `figment::Provider` so that it can be merged into the `Config`
+impl Provider for BuildArgs {
+    fn metadata(&self) -> Metadata {
+        Metadata::named("Build Args Provider")
+    }
+
+    fn data(&self) -> Result<Map<Profile, Dict>, figment::Error> {
+        let value = Value::serialize(self)?;
+        let error = InvalidType(value.to_actual(), "map".into());
+        let mut dict = value.into_dict().ok_or(error)?;
+
+        if self.names {
+            dict.insert("names".to_string(), true.into());
+        }
+
+        if self.sizes {
+            dict.insert("sizes".to_string(), true.into());
+        }
+
+        if self.ignore_eip_3860 {
+            dict.insert("ignore_eip_3860".to_string(), true.into());
+        }
+
+        Ok(Map::from([(Config::selected_profile(), dict)]))
+    }
+}

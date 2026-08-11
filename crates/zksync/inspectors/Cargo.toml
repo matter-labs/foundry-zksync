@@ -1,0 +1,20 @@
+[package]
+name = "foundry-zksync-inspectors"
+description = "Foundry zksync-vm inspectors implementations"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+[dependencies]
+foundry-evm-core.workspace = true
+foundry-evm-traces.workspace = true
+foundry-zksync-core.workspace = true
+
+alloy-primitives.workspace = true
+revm.workspace = true

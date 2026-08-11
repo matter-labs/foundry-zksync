@@ -1,0 +1,76 @@
+[package]
+name = "foundry-cli"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+foundry-block-explorers.workspace = true
+foundry-cli-markdown.workspace = true
+foundry-common.workspace = true
+foundry-config.workspace = true
+foundry-evm.workspace = true
+foundry-wallets.workspace = true
+
+foundry-strategy-zksync.workspace = true
+
+foundry-compilers.workspace = true
+
+alloy-eips.workspace = true
+alloy-dyn-abi.workspace = true
+alloy-json-abi.workspace = true
+alloy-primitives.workspace = true
+alloy-provider.workspace = true
+alloy-rlp.workspace = true
+alloy-chains.workspace = true
+alloy-ens = { workspace = true, features = ["provider"] }
+alloy-zksync.workspace = true
+
+cfg-if = "1.0"
+clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+clap_complete.workspace = true
+clap_complete_nushell.workspace = true
+color-eyre.workspace = true
+dotenvy = "0.15"
+eyre.workspace = true
+futures.workspace = true
+indicatif.workspace = true
+itertools.workspace = true
+mimalloc = { workspace = true, optional = true }
+path-slash.workspace = true
+rayon.workspace = true
+regex = { workspace = true, default-features = false }
+serde_json.workspace = true
+serde.workspace = true
+strsim = "0.11"
+strum = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["macros"] }
+tracing-subscriber = { workspace = true, features = ["registry", "env-filter"] }
+tracing.workspace = true
+yansi.workspace = true
+rustls = { workspace = true, features = ["ring"] }
+
+tracing-tracy = { version = "0.11", optional = true, features = ["demangle"] }
+
+# zk
+foundry-zksync-compilers.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+tikv-jemallocator = { workspace = true, optional = true }
+
+[features]
+tracy = ["dep:tracing-tracy"]
+tracy-allocator = ["tracy"]
+jemalloc = ["dep:tikv-jemallocator"]
+mimalloc = ["dep:mimalloc"]

@@ -1,0 +1,90 @@
+[package]
+name = "foundry-common"
+
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+foundry-block-explorers = { workspace = true, features = ["foundry-compilers"] }
+foundry-zksync-compilers.workspace = true
+foundry-common-fmt.workspace = true
+foundry-compilers.workspace = true
+foundry-config.workspace = true
+
+alloy-chains.workspace = true
+alloy-dyn-abi = { workspace = true, features = ["arbitrary", "eip712"] }
+alloy-eips.workspace = true
+alloy-json-abi.workspace = true
+alloy-json-rpc.workspace = true
+alloy-primitives = { workspace = true, features = [
+    "serde",
+    "getrandom",
+    "arbitrary",
+    "rlp",
+] }
+alloy-provider.workspace = true
+alloy-pubsub.workspace = true
+alloy-rpc-client.workspace = true
+alloy-rpc-types = { workspace = true, features = ["eth", "engine"] }
+alloy-serde.workspace = true
+alloy-sol-types.workspace = true
+alloy-transport-http = { workspace = true, features = [
+    "reqwest",
+    "reqwest-rustls-tls",
+] }
+alloy-transport-ipc.workspace = true
+alloy-transport-ws.workspace = true
+alloy-transport.workspace = true
+alloy-consensus = { workspace = true, features = ["k256"] }
+alloy-network.workspace = true
+
+alloy-zksync.workspace = true
+
+revm.workspace = true
+
+solar.workspace = true
+
+tower.workspace = true
+
+clap = { version = "4", features = ["derive", "env", "unicode", "wrap_help"] }
+comfy-table.workspace = true
+dunce.workspace = true
+eyre.workspace = true
+itertools.workspace = true
+jiff.workspace = true
+num-format.workspace = true
+path-slash.workspace = true
+regex.workspace = true
+reqwest.workspace = true
+semver.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+walkdir.workspace = true
+yansi.workspace = true
+
+anstream.workspace = true
+anstyle.workspace = true
+ciborium.workspace = true
+
+flate2.workspace = true
+
+[build-dependencies]
+chrono.workspace = true
+vergen = { workspace = true, features = ["build", "emit_and_set"] }
+cargo_metadata = "0.23.1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+axum = { workspace = true }
