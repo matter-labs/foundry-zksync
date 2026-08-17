@@ -1,5 +1,5 @@
 use alloy_primitives::{Address, Bytes, Log, U256};
-use foundry_evm_core::InspectorExt;
+use foundry_evm_core::FoundryInspectorExt;
 use foundry_evm_traces::{
     CallTraceArena, GethTraceBuilder, ParityTraceBuilder, TracingInspector, TracingInspectorConfig,
 };
@@ -160,7 +160,7 @@ where
     }
 }
 
-impl InspectorExt for TraceCollector {
+impl FoundryInspectorExt for TraceCollector {
     fn trace_zksync(
         &mut self,
         context: foundry_evm_core::Ecx,

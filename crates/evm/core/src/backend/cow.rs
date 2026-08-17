@@ -19,7 +19,7 @@ use revm::{
     context_interface::result::ResultAndState,
     database::DatabaseRef,
     primitives::{HashMap as Map, hardfork::SpecId},
-    state::{Account, AccountInfo},
+    state::{Account, AccountInfo, EvmState},
 };
 use std::{any::Any, borrow::Cow, collections::BTreeMap};
 
@@ -45,16 +45,15 @@ pub struct CowBackend<'a> {
     ///
     /// No calls on the `CowBackend` will ever persistently modify the `backend`'s state.
     pub backend: Cow<'a, Backend>,
-    /// Keeps track of whether the backed is already initialized
-    pub is_initialized: bool,
-    /// The [SpecId] of the current backend.
-    pub spec_id: SpecId,
+    /// The [SpecId] to initialize the backend with on first mutable access.
+    /// `None` means the backend has already been initialized for the current call.
+    spec_id: Option<SpecId>,
 }
 
 impl<'a> CowBackend<'a> {
     /// Creates a new `CowBackend` with the given `Backend`.
     pub fn new_borrowed(backend: &'a Backend) -> Self {
-        Self { backend: Cow::Borrowed(backend), is_initialized: false, spec_id: SpecId::default() }
+        Self { backend: Cow::Borrowed(backend), spec_id: Some(SpecId::default()) }
     }
 
     /// Executes the configured transaction of the `env` without committing state changes
@@ -70,8 +69,7 @@ impl<'a> CowBackend<'a> {
     ) -> eyre::Result<ResultAndState> {
         // this is a new call to inspect with a new env, so even if we've cloned the backend
         // already, we reset the initialized state
-        self.is_initialized = false;
-        self.spec_id = env.evm_env.cfg_env.spec;
+        self.spec_id = Some(env.evm_env.cfg_env.spec);
 
         self.backend.strategy.runner.inspect(self.backend.to_mut(), env, inspector, inspect_ctx)
     }
@@ -87,12 +85,11 @@ impl<'a> CowBackend<'a> {
     ///
     /// If this is the first time this is called, the backed is cloned and initialized.
     fn backend_mut(&mut self, env: &EnvMut<'_>) -> &mut Backend {
-        if !self.is_initialized {
+        if let Some(spec_id) = self.spec_id.take() {
             let backend = self.backend.to_mut();
             let mut env = env.to_owned();
-            env.evm_env.cfg_env.spec = self.spec_id;
+            env.evm_env.cfg_env.spec = spec_id;
             backend.initialize(&env);
-            self.is_initialized = true;
             return backend;
         }
         self.backend.to_mut()
@@ -100,7 +97,7 @@ impl<'a> CowBackend<'a> {
 
     /// Returns a mutable instance of the Backend if it is initialized.
     fn initialized_backend_mut(&mut self) -> Option<&mut Backend> {
-        if self.is_initialized {
+        if self.spec_id.is_none() {
             return Some(self.backend.to_mut());
         }
         None
@@ -235,12 +232,8 @@ impl DatabaseExt for CowBackend<'_> {
         self.backend.ensure_fork_id(id)
     }
 
-    fn diagnose_revert(
-        &self,
-        callee: Address,
-        journaled_state: &JournaledState,
-    ) -> Option<RevertDiagnostic> {
-        self.backend.diagnose_revert(callee, journaled_state)
+    fn diagnose_revert(&self, callee: Address, evm_state: &EvmState) -> Option<RevertDiagnostic> {
+        self.backend.diagnose_revert(callee, evm_state)
     }
 
     fn load_allocs(

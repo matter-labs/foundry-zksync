@@ -2,7 +2,7 @@ use super::{ScriptConfig, ScriptResult};
 use crate::build::ScriptPredeployLibraries;
 use alloy_eips::eip7702::SignedAuthorization;
 use alloy_primitives::{Address, Bytes, U256};
-use alloy_serde::OtherFields;
+use alloy_rpc_types::serde_helpers::OtherFields;
 use eyre::Result;
 use foundry_cheatcodes::BroadcastableTransaction;
 use foundry_config::Config;
@@ -16,6 +16,7 @@ use foundry_evm::{
     revm::interpreter::{InstructionResult, return_ok},
     traces::{TraceKind, Traces},
 };
+use foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY;
 use std::collections::VecDeque;
 
 /// Drives script execution
@@ -79,15 +80,22 @@ impl ScriptRunner {
                     )
                     .expect("couldn't deploy library");
 
-                for DeployLibResult { result, tx } in results {
+                for DeployLibResult { result, tx, other_fields } in results {
                     if let Some(deploy_traces) = result.raw.traces {
                         traces.push((TraceKind::Deployment, deploy_traces));
                     }
 
                     if let Some(transaction) = tx {
+                        let zk_metadata = other_fields.as_ref().and_then(|f| {
+                            f.get_deserialized(ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY)
+                                .transpose()
+                                .ok()
+                                .flatten()
+                        });
                         library_transactions.push_back(BroadcastableTransaction {
                             rpc: self.evm_opts.fork_url.clone(),
                             transaction,
+                            zk_metadata,
                         });
                     }
                 }
@@ -111,15 +119,22 @@ impl ScriptRunner {
                         )
                         .expect("couldn't deploy library");
 
-                    for DeployLibResult { result, tx } in results {
+                    for DeployLibResult { result, tx, other_fields } in results {
                         if let Some(deploy_traces) = result.raw.traces {
                             traces.push((TraceKind::Deployment, deploy_traces));
                         }
 
                         if let Some(transaction) = tx {
+                            let zk_metadata = other_fields.as_ref().and_then(|f| {
+                                f.get_deserialized(ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY)
+                                    .transpose()
+                                    .ok()
+                                    .flatten()
+                            });
                             library_transactions.push_back(BroadcastableTransaction {
                                 rpc: self.evm_opts.fork_url.clone(),
                                 transaction,
+                                zk_metadata,
                             });
                         }
                     }

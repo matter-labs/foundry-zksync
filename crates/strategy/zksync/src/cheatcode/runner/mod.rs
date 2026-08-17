@@ -2,13 +2,10 @@ use std::sync::Arc;
 
 use alloy_eips::eip7594::BlobTransactionSidecarVariant;
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, map::HashMap};
-use alloy_rpc_types::{
-    request::{TransactionInput, TransactionRequest},
-    serde_helpers::WithOtherFields,
-};
+use alloy_rpc_types::{TransactionInput, TransactionRequest};
 use foundry_cheatcodes::{
     Broadcast, BroadcastableTransaction, BroadcastableTransactions, Cheatcodes, CheatcodesExecutor,
-    CheatsConfig, CheatsCtxt, CommonCreateInput, DynCheatcode, Result,
+    CheatsConfig, CheatsCtxt, CommonCreateInput, ConcreteEcx, DynCheatcode, Result,
     Vm::{self, AccountAccess, AccountAccessKind, ChainInfo, StorageAccess},
     journaled_account,
     strategy::{
@@ -18,15 +15,15 @@ use foundry_cheatcodes::{
 };
 use foundry_common::TransactionMaybeSigned;
 use foundry_evm::{
-    Env,
+    Env, FoundryInspectorExt,
     backend::{DatabaseError, LocalForkId},
     constants::{DEFAULT_CREATE2_DEPLOYER, DEFAULT_CREATE2_DEPLOYER_CODE},
 };
-use foundry_evm_core::{ContextExt, Ecx, backend::DatabaseExt};
+use foundry_evm_core::{Ecx, backend::DatabaseExt};
 use foundry_zksync_core::{
     ACCOUNT_CODE_STORAGE_ADDRESS, CONTRACT_DEPLOYER_ADDRESS, DEFAULT_CREATE2_DEPLOYER_ZKSYNC,
-    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS, PaymasterParams,
-    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkTransactionMetadata,
+    KNOWN_CODES_STORAGE_ADDRESS, L2_BASE_TOKEN_ADDRESS, NONCE_HOLDER_ADDRESS,
+    ZkTransactionMetadata,
     convert::{ConvertAddress, ConvertH160, ConvertH256, ConvertRU256, ConvertU256},
     get_account_code_key, get_balance_key, get_nonce_key,
     state::parse_full_nonce,
@@ -161,11 +158,11 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         ctx.zk_startup_migration.allow();
     }
 
-    fn apply_full(
+    fn apply_full<'b, 'c>(
         &self,
         cheatcode: &dyn DynCheatcode,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        executor: &mut dyn CheatcodesExecutor,
+        ccx: &mut CheatsCtxt<'_, ConcreteEcx<'b, 'c>>,
+        executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
     ) -> Result {
         self.apply_cheatcode_impl(cheatcode, ccx, executor)
     }
@@ -215,11 +212,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
 
         let mut zk_tx_factory_deps = factory_deps;
 
-        let paymaster_params = ctx.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
-            paymaster: paymaster_data.address.to_h160(),
-            paymaster_input: paymaster_data.input.to_vec(),
-        });
-
         let rpc = ecx_inner.journaled_state.database.active_fork_url();
 
         let injected_factory_deps = ctx
@@ -244,50 +236,57 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
         let mut batched = foundry_zksync_core::vm::batch_factory_dependencies(zk_tx_factory_deps);
         debug!(batches = batched.len(), "splitting factory deps for broadcast");
         // the last batch is the final one that does the deployment
-        zk_tx_factory_deps = batched.pop().expect("must have at least 1 item");
+        let final_factory_deps = batched.pop().expect("must have at least 1 item");
 
         for factory_deps in batched {
-            let mut tx = WithOtherFields::new(TransactionRequest {
+            let tx = TransactionRequest {
                 from: Some(broadcast.new_origin),
                 to: Some(TxKind::Call(Address::ZERO)),
                 value: None,
                 nonce: Some(nonce),
                 ..Default::default()
-            });
-            tx.other.insert(
-                ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-                serde_json::to_value(ZkTransactionMetadata::new(
-                    factory_deps,
-                    paymaster_params.clone(),
-                ))
-                .expect("failed encoding json"),
-            );
+            };
 
             broadcastable_transactions.push_back(BroadcastableTransaction {
                 rpc: rpc.clone(),
                 transaction: TransactionMaybeSigned::Unsigned(tx),
+                zk_metadata: Some(ZkTransactionMetadata {
+                    factory_deps,
+                    paymaster_data: ctx.paymaster_params.clone().map(|paymaster_data| {
+                        foundry_zksync_core::PaymasterParams {
+                            paymaster: paymaster_data.address.to_h160(),
+                            paymaster_input: paymaster_data.input.to_vec(),
+                        }
+                    }),
+                    force_evm_interpreter: Some(ctx.evm_interpreter),
+                }),
             });
 
             //update nonce for each tx
             nonce += 1;
         }
 
-        let mut tx = WithOtherFields::new(TransactionRequest {
+        let tx = TransactionRequest {
             from: Some(broadcast.new_origin),
             to,
             value: Some(input.value()),
             input: TransactionInput::new(call_init_code),
             nonce: Some(nonce),
             ..Default::default()
-        });
-        tx.other.insert(
-            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-            serde_json::to_value(ZkTransactionMetadata::new(zk_tx_factory_deps, paymaster_params))
-                .expect("failed encoding json"),
-        );
+        };
         broadcastable_transactions.push_back(BroadcastableTransaction {
             rpc,
             transaction: TransactionMaybeSigned::Unsigned(tx),
+            zk_metadata: Some(ZkTransactionMetadata {
+                factory_deps: final_factory_deps,
+                paymaster_data: ctx.paymaster_params.clone().map(|paymaster_data| {
+                    foundry_zksync_core::PaymasterParams {
+                        paymaster: paymaster_data.address.to_h160(),
+                        paymaster_input: paymaster_data.input.to_vec(),
+                    }
+                }),
+                force_evm_interpreter: Some(ctx.evm_interpreter),
+            }),
         });
     }
 
@@ -346,10 +345,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             .collect_vec();
         factory_deps.extend(injected_factory_deps.clone());
 
-        let paymaster_params = ctx.paymaster_params.clone().map(|paymaster_data| PaymasterParams {
-            paymaster: paymaster_data.address.to_h160(),
-            paymaster_input: paymaster_data.input.to_vec(),
-        });
         let factory_deps = if call.target_address == DEFAULT_CREATE2_DEPLOYER_ZKSYNC {
             // We shouldn't need factory_deps for CALLs
             factory_deps.clone()
@@ -357,8 +352,6 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
             // For this case we use only the injected factory deps
             injected_factory_deps
         };
-        let zk_tx = ZkTransactionMetadata::new(factory_deps, paymaster_params);
-
         let mut tx_req = TransactionRequest {
             from: Some(broadcast.new_origin),
             to: Some(TxKind::from(Some(call.target_address))),
@@ -388,16 +381,19 @@ impl CheatcodeInspectorStrategyRunner for ZksyncCheatcodeInspectorStrategyRunner
                 tx_req.authorization_list = None;
             }
         }
-        let mut tx = WithOtherFields::new(tx_req);
-
-        tx.other.insert(
-            ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-            serde_json::to_value(zk_tx).expect("failed encoding json"),
-        );
-
         broadcastable_transactions.push_back(BroadcastableTransaction {
             rpc: ecx_inner.journaled_state.database.active_fork_url(),
-            transaction: TransactionMaybeSigned::Unsigned(tx),
+            transaction: TransactionMaybeSigned::Unsigned(tx_req),
+            zk_metadata: Some(ZkTransactionMetadata {
+                factory_deps,
+                paymaster_data: ctx.paymaster_params.clone().map(|paymaster_data| {
+                    foundry_zksync_core::PaymasterParams {
+                        paymaster: paymaster_data.address.to_h160(),
+                        paymaster_input: paymaster_data.input.to_vec(),
+                    }
+                }),
+                force_evm_interpreter: Some(ctx.evm_interpreter),
+            }),
         });
         debug!(target: "cheatcodes", tx=?broadcastable_transactions.back().unwrap(), "broadcastable call");
     }
@@ -526,12 +522,12 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     /// Try handling the `CREATE` within zkEVM.
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
-    fn zksync_try_create(
+    fn zksync_try_create<'b, 'c>(
         &self,
         state: &mut Cheatcodes,
-        ecx: Ecx<'_, '_, '_>,
+        ecx: Ecx<'_, 'b, 'c>,
         input: &dyn CommonCreateInput,
-        executor: &mut dyn CheatcodesExecutor,
+        executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
     ) -> Option<CreateOutcome> {
         let ctx = get_context(state.strategy.context.as_mut());
 
@@ -546,11 +542,9 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             return None;
         }
 
-        let (db, journal, _) = ecx.as_db_env_and_journal();
         if let Some(CreateScheme::Create) = input.scheme() {
             let caller = input.caller();
-            let nonce =
-                journal.load_account(db, caller).expect("to load caller account").info.nonce;
+            let nonce = journaled_account(ecx, caller).expect("to load caller account").info.nonce;
             let address = caller.create(nonce);
             if ecx
                 .journaled_state
@@ -657,24 +651,16 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(foundry_evm::decode::decode_console_log).for_each(
                     |decoded_log| {
-                        executor.console_log(
-                            &mut CheatsCtxt {
-                                state,
-                                ecx,
-                                gas_limit: input.gas_limit(),
-                                caller: input.caller(),
-                            },
-                            &decoded_log,
-                        );
+                        executor.console_log(state, &decoded_log);
                     },
                 );
 
                 // append traces
-                executor.get_inspector(state).trace_zksync(
-                    ecx,
-                    Box::new(result.call_traces),
-                    false,
-                );
+                if let Some(tracer) =
+                    executor.tracing_inspector().and_then(|tracer| tracer.as_deref_mut())
+                {
+                    tracer.trace_zksync(ecx, Box::new(result.call_traces), false);
+                }
 
                 // for each log in cloned logs call handle_expect_emit
                 if !state.expected_emits.is_empty() {
@@ -782,12 +768,12 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
     /// Try handling the `CALL` within zkEVM.
     /// If `Some` is returned then the result must be returned immediately, else the call must be
     /// handled in EVM.
-    fn zksync_try_call(
+    fn zksync_try_call<'b, 'c>(
         &self,
         state: &mut Cheatcodes,
-        ecx: Ecx<'_, '_, '_>,
+        ecx: Ecx<'_, 'b, 'c>,
         call: &CallInputs,
-        executor: &mut dyn CheatcodesExecutor,
+        executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
     ) -> Option<CallOutcome> {
         let ctx = get_context(state.strategy.context.as_mut());
 
@@ -806,13 +792,8 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
             return None;
         }
 
-        if ecx
-            .journaled_state
-            .database
-            .get_test_contract_address()
-            .map(|addr| call.bytecode_address == addr)
-            .unwrap_or_default()
-        {
+        let test_contract_addr = ecx.journaled_state.database.get_test_contract_address();
+        if test_contract_addr.map(|addr| call.bytecode_address == addr).unwrap_or_default() {
             info!(
                 "running call in EVM, instead of zkEVM (Test Contract) {:#?}",
                 call.bytecode_address
@@ -843,15 +824,7 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                 // append console logs from zkEVM to the current executor's LogTracer
                 result.logs.iter().filter_map(foundry_evm::decode::decode_console_log).for_each(
                     |decoded_log| {
-                        executor.console_log(
-                            &mut CheatsCtxt {
-                                state,
-                                ecx,
-                                gas_limit: call.gas_limit,
-                                caller: call.caller,
-                            },
-                            &decoded_log,
-                        );
+                        executor.console_log(state, &decoded_log);
                     },
                 );
 
@@ -866,11 +839,11 @@ impl CheatcodeInspectorStrategyExt for ZksyncCheatcodeInspectorStrategyRunner {
                     }
 
                     // append traces
-                    executor.get_inspector(state).trace_zksync(
-                        ecx,
-                        Box::new(result.call_traces),
-                        false,
-                    );
+                    if let Some(tracer) =
+                        executor.tracing_inspector().and_then(|tracer| tracer.as_deref_mut())
+                    {
+                        tracer.trace_zksync(ecx, Box::new(result.call_traces), false);
+                    }
 
                     // for each log in cloned logs call handle_expect_emit
                     if !state.expected_emits.is_empty() {

@@ -17,7 +17,7 @@ use eyre::{Context, Result};
 use forge_script_sequence::{ScriptSequence, TransactionWithMetadata};
 use foundry_cheatcodes::Wallets;
 use foundry_cli::utils::{has_different_gas_calc, now};
-use foundry_common::{ContractData, TransactionMaybeSigned, shell};
+use foundry_common::{ContractData, shell};
 use foundry_evm::traces::{decode_trace_arena, render_trace_arena};
 use futures::future::{join_all, try_join_all};
 use parking_lot::RwLock;
@@ -63,7 +63,8 @@ impl PreSimulationState {
                 let nonce = tx.transaction.nonce().expect("all transactions should have a nonce");
                 let to = tx.transaction.to();
 
-                let mut builder = ScriptTransactionBuilder::new(tx.transaction, rpc);
+                let mut builder =
+                    ScriptTransactionBuilder::new(tx.transaction, rpc, tx.zk_metadata);
 
                 if let Some(TxKind::Call(_)) = to {
                     builder.set_call(
@@ -120,12 +121,17 @@ impl PreSimulationState {
             .into_iter()
             .map(|mut transaction| async {
                 let mut runner = runners.get(&transaction.rpc).expect("invalid rpc url").write();
+                let zk_metadata = transaction.zk_metadata.clone();
                 let tx = transaction.tx_mut();
 
-                let other_fields = match &tx {
-                    TransactionMaybeSigned::Unsigned(tx) => Some(tx.other.clone()),
-                    _ => None,
-                };
+                let other_fields = zk_metadata.as_ref().map(|meta| {
+                    let mut fields = alloy_rpc_types::serde_helpers::OtherFields::default();
+                    fields.insert(
+                        foundry_zksync_core::ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
+                        serde_json::to_value(meta).unwrap(),
+                    );
+                    fields
+                });
                 let to = if let Some(TxKind::Call(to)) = tx.to() { Some(to) } else { None };
                 let result = runner
                     .simulate(

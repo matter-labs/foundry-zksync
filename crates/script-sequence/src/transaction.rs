@@ -30,6 +30,8 @@ pub struct TransactionWithMetadata {
     #[serde(skip)]
     pub rpc: String,
     pub transaction: TransactionMaybeSigned,
+    #[serde(default)]
+    pub zk_metadata: Option<foundry_zksync_core::ZkTransactionMetadata>,
     pub additional_contracts: Vec<AdditionalContract>,
     pub is_fixed_gas_limit: bool,
 }
@@ -50,6 +52,7 @@ impl TransactionWithMetadata {
     pub fn from_tx_request(transaction: TransactionMaybeSigned) -> Self {
         Self {
             transaction,
+            zk_metadata: Default::default(),
             hash: Default::default(),
             opcode: Default::default(),
             contract_name: Default::default(),

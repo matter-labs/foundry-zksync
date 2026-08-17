@@ -7,8 +7,8 @@ use alloy_sol_types::SolValue;
 use alloy_zksync::network::tx_envelope::TxEnvelope as ZkTxEnvelope;
 use eyre::Context;
 use foundry_cheatcodes::{
-    BroadcastableTransaction, CheatcodesExecutor, CheatsCtxt, DealRecord, DynCheatcode, Error,
-    Result,
+    BroadcastableTransaction, CheatcodesExecutor, CheatsCtxt, ConcreteEcx, DealRecord,
+    DynCheatcode, Error, Result,
     Vm::{
         broadcastRawTransactionCall, createFork_0Call, createFork_1Call, createFork_2Call,
         createSelectFork_0Call, createSelectFork_1Call, createSelectFork_2Call, dealCall, etchCall,
@@ -22,12 +22,8 @@ use foundry_cheatcodes::{
 use foundry_common::TransactionMaybeSigned;
 use foundry_compilers::info::ContractInfo;
 use foundry_evm::backend::LocalForkId;
-use foundry_evm_core::ContextExt;
 use foundry_zksync_compilers::dual_compiled_contracts::DualCompiledContract;
-use foundry_zksync_core::{
-    H256, PaymasterParams, ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY, ZkPaymasterData,
-    ZkTransactionMetadata,
-};
+use foundry_zksync_core::{H256, ZkPaymasterData, ZkTransactionMetadata, convert::ConvertAddress};
 use revm::interpreter::InstructionResult;
 use tracing::{info, warn};
 
@@ -35,16 +31,16 @@ use crate::{
     backend::ZksyncInspectContext,
     cheatcode::{
         ZksyncCheatcodeInspectorStrategyRunner,
-        runner::{WithOtherFields, get_context, utils::get_artifact_code},
+        runner::{get_context, utils::get_artifact_code},
     },
 };
 
 impl ZksyncCheatcodeInspectorStrategyRunner {
-    pub(super) fn apply_cheatcode_impl(
+    pub(super) fn apply_cheatcode_impl<'b, 'c>(
         &self,
         cheatcode: &dyn DynCheatcode,
-        ccx: &mut CheatsCtxt<'_, '_, '_, '_>,
-        executor: &mut dyn CheatcodesExecutor,
+        ccx: &mut CheatsCtxt<'_, ConcreteEcx<'b, 'c>>,
+        executor: &mut dyn CheatcodesExecutor<ConcreteEcx<'b, 'c>>,
     ) -> Result {
         fn is<T: std::any::Any>(t: TypeId) -> bool {
             TypeId::of::<T>() == t
@@ -376,48 +372,39 @@ impl ZksyncCheatcodeInspectorStrategyRunner {
                     gas_price: Default::default(),
                 };
 
-                let (factory_deps, paymaster_data) = match parts.eip712_meta {
+                let (factory_deps, paymaster_data) = match parts.eip712_meta.as_ref() {
                     None => Default::default(),
                     Some(meta) => (
-                        meta.factory_deps.into_iter().map(|b| b.to_vec()).collect::<Vec<_>>(),
-                        meta.paymaster_params.map(|params| PaymasterParams {
-                            paymaster: zksync_types::H160::from(params.paymaster.0.0),
-                            paymaster_input: params.paymaster_input.to_vec(),
+                        meta.factory_deps.iter().map(|b| b.to_vec()).collect::<Vec<_>>(),
+                        meta.paymaster_params.clone().map(|params| {
+                            foundry_zksync_core::PaymasterParams {
+                                paymaster: params.paymaster.to_h160(),
+                                paymaster_input: params.paymaster_input.to_vec(),
+                            }
                         }),
                     ),
                 };
 
                 let inspect_ctx = {
                     let ctx = get_context(ccx.state.strategy.context.as_mut());
-
-                    ZksyncInspectContext {
+                    Box::new(ZksyncInspectContext {
                         factory_deps: factory_deps.clone(),
                         paymaster_data: paymaster_data.clone(),
                         zk_env: ctx.zk_env.clone(),
                         evm_interpreter: ctx.evm_interpreter,
-                    }
+                    })
                 };
 
-                let (db, journal, env) = ccx.ecx.as_db_env_and_journal();
-                db.transact_from_tx(
-                    &tx,
-                    env.to_owned(),
-                    journal,
-                    &mut *executor.get_inspector(ccx.state),
-                    Box::new(inspect_ctx),
-                )?;
-
-                let mut tx_with_fields = WithOtherFields::new(tx);
-                tx_with_fields.other.insert(
-                    ZKSYNC_TRANSACTION_OTHER_FIELDS_KEY.to_string(),
-                    serde_json::to_value(ZkTransactionMetadata::new(factory_deps, paymaster_data))
-                        .expect("failed encoding json"),
-                );
+                executor.transact_from_tx_on_db(ccx.state, ccx.ecx, &tx, inspect_ctx)?;
 
                 if ccx.state.broadcast.is_some() {
+                    let zk_metadata =
+                        Some(ZkTransactionMetadata::new(factory_deps, paymaster_data));
+
                     ccx.state.broadcastable_transactions.push_back(BroadcastableTransaction {
                         rpc: ccx.journaled_state.database.active_fork_url(),
-                        transaction: { TransactionMaybeSigned::new(tx_with_fields) },
+                        transaction: { TransactionMaybeSigned::new(tx) },
+                        zk_metadata,
                     });
                 }
                 Ok(Default::default())

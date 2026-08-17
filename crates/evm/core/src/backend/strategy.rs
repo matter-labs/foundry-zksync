@@ -220,7 +220,7 @@ impl BackendStrategyRunner for EvmBackendStrategyRunner {
         backend.commit(journaled_state.state.clone());
 
         let res = {
-            configure_tx_req_env(&mut env.as_env_mut(), tx, None)?;
+            configure_tx_req_env(&mut env.as_env_mut(), tx)?;
 
             let mut db = backend.clone();
             let mut evm = new_evm_with_inspector(&mut db, env.to_owned(), inspector);

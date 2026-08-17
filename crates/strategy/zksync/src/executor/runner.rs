@@ -94,13 +94,13 @@ impl ExecutorStrategyRunner for ZksyncExecutorStrategyRunner {
     ) -> BackendResult<()> {
         EvmExecutorStrategyRunner.set_nonce(executor, address, nonce)?;
 
-        let (address, slot) = foundry_zksync_core::state::get_nonce_storage(address);
+        let (nonce_addr, slot) = foundry_zksync_core::state::get_nonce_storage(address);
         // fetch the full nonce to preserve account's deployment nonce
-        let full_nonce = executor.backend_mut().storage(address, slot)?;
+        let full_nonce = executor.backend_mut().storage(nonce_addr, slot)?;
         let full_nonce = foundry_zksync_core::state::parse_full_nonce(full_nonce);
         let new_full_nonce =
             foundry_zksync_core::state::new_full_nonce(nonce as u128, full_nonce.deploy_nonce);
-        executor.backend_mut().insert_account_storage(address, slot, new_full_nonce)?;
+        executor.backend_mut().insert_account_storage(nonce_addr, slot, new_full_nonce)?;
 
         Ok(())
     }
