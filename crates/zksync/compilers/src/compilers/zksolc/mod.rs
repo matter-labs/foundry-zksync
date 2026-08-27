@@ -418,7 +418,7 @@ impl ZkSolc {
     /// Get supported zksolc versions
     pub fn zksolc_supported_versions() -> Vec<Version> {
         let mut ret = vec![];
-        let version_ranges = vec![(1, 5, 6..=15)];
+        let version_ranges = vec![(1, 5, 6..=17)];
 
         for (major, minor, patch_range) in version_ranges {
             for patch in patch_range {
@@ -526,7 +526,7 @@ impl ZkSolc {
         let compiler_prefix = os.get_zksolc_prefix();
         let download_url = if version.pre.is_empty() {
             format!(
-                "https://github.com/matter-labs/zksolc-bin/releases/download/v{version}/{compiler_prefix}v{version}",
+                "https://github.com/matter-labs/era-compiler-solidity/releases/download/{version}/{compiler_prefix}v{version}",
             )
         } else {
             let pre = version.pre.as_str();
